@@ -16,6 +16,7 @@ import { Plus, Search, Truck, MapPin, Clock, CheckCircle, XCircle, User, Phone }
 import { Delivery, DeliveryDriver } from '@/types';
 import { api } from '@/lib/api-client';
 import { toast } from 'sonner';
+import { ENABLE_AUTH } from '@/constants/auth';
 
 export default function EntregasPage() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -39,8 +40,58 @@ export default function EntregasPage() {
   const fetchDeliveries = async () => {
     try {
       setLoading(true);
-      const data = await api.get<Delivery[]>('/deliveries');
-      setDeliveries(data);
+      
+      if (ENABLE_AUTH) {
+        const data = await api.get<Delivery[]>('/deliveries');
+        setDeliveries(data);
+      } else {
+        // Usar dados mockados quando autenticação estiver desabilitada
+        const mockDeliveries: Delivery[] = [
+          {
+            id: 1,
+            order_id: 1,
+            customer_name: 'João Silva',
+            customer_phone: '(11) 99999-9999',
+            customer_address: 'Rua das Flores, 123 - São Paulo/SP',
+            status: 'aguardando',
+            driver_id: null,
+            driver_name: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            delivered_at: null,
+            notes: 'Entrega urgente'
+          },
+          {
+            id: 2,
+            order_id: 2,
+            customer_name: 'Maria Oliveira',
+            customer_phone: '(11) 88888-8888',
+            customer_address: 'Av. Paulista, 456 - São Paulo/SP',
+            status: 'em_rota',
+            driver_id: 1,
+            driver_name: 'Carlos Santos',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            delivered_at: null,
+            notes: 'Cliente solicita entrega após 18h'
+          },
+          {
+            id: 3,
+            order_id: 3,
+            customer_name: 'Pedro Santos',
+            customer_phone: '(11) 77777-7777',
+            customer_address: 'Rua Augusta, 789 - São Paulo/SP',
+            status: 'entregue',
+            driver_id: 1,
+            driver_name: 'Carlos Santos',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            delivered_at: new Date().toISOString(),
+            notes: 'Entrega realizada com sucesso'
+          }
+        ];
+        setDeliveries(mockDeliveries);
+      }
     } catch (error) {
       console.error('Erro ao carregar entregas:', error);
       toast.error('Erro ao carregar entregas');
@@ -51,8 +102,35 @@ export default function EntregasPage() {
 
   const fetchDrivers = async () => {
     try {
-      const data = await api.get<DeliveryDriver[]>('/delivery-drivers');
-      setDrivers(data);
+      if (ENABLE_AUTH) {
+        const data = await api.get<DeliveryDriver[]>('/delivery-drivers');
+        setDrivers(data);
+      } else {
+        // Usar dados mockados quando autenticação estiver desabilitada
+        const mockDrivers: DeliveryDriver[] = [
+          {
+            id: 1,
+            name: 'Carlos Santos',
+            phone: '(11) 99999-1111',
+            vehicle_type: 'Moto',
+            vehicle_plate: 'ABC-1234',
+            status: 'ativo',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          {
+            id: 2,
+            name: 'Ana Costa',
+            phone: '(11) 99999-2222',
+            vehicle_type: 'Carro',
+            vehicle_plate: 'DEF-5678',
+            status: 'ativo',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ];
+        setDrivers(mockDrivers);
+      }
     } catch (error) {
       console.error('Erro ao carregar entregadores:', error);
     }
@@ -60,14 +138,38 @@ export default function EntregasPage() {
 
   const handleUpdateDeliveryStatus = async (deliveryId: number, status: string, driverId?: number) => {
     try {
-      const updateData: any = { status };
-      if (driverId !== undefined) {
-        updateData.driver_id = driverId;
-      }
+      if (ENABLE_AUTH) {
+        const updateData: any = { status };
+        if (driverId !== undefined) {
+          updateData.driver_id = driverId;
+        }
 
-      await api.put(`/deliveries?id=${deliveryId}`, updateData);
+        await api.put(`/deliveries?id=${deliveryId}`, updateData);
+      } else {
+        // Simular atualização com dados mockados
+        setDeliveries(prev => prev.map(delivery => {
+          if (delivery.id === deliveryId) {
+            const updatedDelivery = { 
+              ...delivery, 
+              status: status as any, 
+              updated_at: new Date().toISOString() 
+            };
+            if (driverId !== undefined) {
+              updatedDelivery.driver_id = driverId;
+              updatedDelivery.driver_name = drivers.find(d => d.id === driverId)?.name || null;
+            }
+            if (status === 'entregue') {
+              updatedDelivery.delivered_at = new Date().toISOString();
+            }
+            return updatedDelivery;
+          }
+          return delivery;
+        }));
+      }
       toast.success('Status da entrega atualizado');
-      fetchDeliveries();
+      if (ENABLE_AUTH) {
+        fetchDeliveries();
+      }
     } catch (error) {
       console.error('Erro ao atualizar entrega:', error);
       toast.error('Erro ao atualizar entrega');

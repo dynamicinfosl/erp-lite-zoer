@@ -9,6 +9,7 @@ import { MapPin, Phone, Clock, CheckCircle, Truck, Navigation } from 'lucide-rea
 import { Delivery } from '@/types';
 import { api } from '@/lib/api-client';
 import { toast } from 'sonner';
+import { ENABLE_AUTH } from '@/constants/auth';
 
 export default function EntregadorPage() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -24,16 +25,52 @@ export default function EntregadorPage() {
   const fetchMyDeliveries = async () => {
     try {
       setLoading(true);
-      // Buscar entregas do entregador logado
-      const data = await api.get<Delivery[]>('/deliveries');
-      // Filtrar apenas entregas atribuídas ao entregador atual
-      // Em um cenário real, isso seria filtrado no backend
-      const today = new Date().toISOString().split('T')[0];
-      const myDeliveries = data.filter(delivery => 
-        delivery.created_at.startsWith(today) && 
-        (delivery.status === 'em_rota' || delivery.status === 'aguardando')
-      );
-      setDeliveries(myDeliveries);
+      
+      if (ENABLE_AUTH) {
+        // Buscar entregas do entregador logado
+        const data = await api.get<Delivery[]>('/deliveries');
+        // Filtrar apenas entregas atribuídas ao entregador atual
+        // Em um cenário real, isso seria filtrado no backend
+        const today = new Date().toISOString().split('T')[0];
+        const myDeliveries = data.filter(delivery => 
+          delivery.created_at.startsWith(today) && 
+          (delivery.status === 'em_rota' || delivery.status === 'aguardando')
+        );
+        setDeliveries(myDeliveries);
+      } else {
+        // Usar dados mockados quando autenticação estiver desabilitada
+        const mockDeliveries: Delivery[] = [
+          {
+            id: 1,
+            order_id: 1,
+            customer_name: 'João Silva',
+            customer_phone: '(11) 99999-9999',
+            customer_address: 'Rua das Flores, 123 - São Paulo/SP',
+            status: 'aguardando',
+            driver_id: 1,
+            driver_name: 'Carlos Santos',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            delivered_at: null,
+            notes: 'Entrega urgente'
+          },
+          {
+            id: 2,
+            order_id: 2,
+            customer_name: 'Maria Oliveira',
+            customer_phone: '(11) 88888-8888',
+            customer_address: 'Av. Paulista, 456 - São Paulo/SP',
+            status: 'em_rota',
+            driver_id: 1,
+            driver_name: 'Carlos Santos',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            delivered_at: null,
+            notes: 'Cliente solicita entrega após 18h'
+          }
+        ];
+        setDeliveries(mockDeliveries);
+      }
     } catch (error) {
       console.error('Erro ao carregar entregas:', error);
       toast.error('Erro ao carregar entregas');
@@ -44,9 +81,20 @@ export default function EntregadorPage() {
 
   const handleStartDelivery = async (deliveryId: number) => {
     try {
-      await api.put(`/deliveries?id=${deliveryId}`, { status: 'em_rota' });
+      if (ENABLE_AUTH) {
+        await api.put(`/deliveries?id=${deliveryId}`, { status: 'em_rota' });
+      } else {
+        // Simular atualização com dados mockados
+        setDeliveries(prev => prev.map(delivery => 
+          delivery.id === deliveryId 
+            ? { ...delivery, status: 'em_rota' as const, updated_at: new Date().toISOString() }
+            : delivery
+        ));
+      }
       toast.success('Entrega iniciada!');
-      fetchMyDeliveries();
+      if (ENABLE_AUTH) {
+        fetchMyDeliveries();
+      }
     } catch (error) {
       console.error('Erro ao iniciar entrega:', error);
       toast.error('Erro ao iniciar entrega');
@@ -57,9 +105,25 @@ export default function EntregadorPage() {
     if (!confirm('Confirmar que a entrega foi realizada?')) return;
 
     try {
-      await api.put(`/deliveries?id=${deliveryId}`, { status: 'entregue' });
+      if (ENABLE_AUTH) {
+        await api.put(`/deliveries?id=${deliveryId}`, { status: 'entregue' });
+      } else {
+        // Simular atualização com dados mockados
+        setDeliveries(prev => prev.map(delivery => 
+          delivery.id === deliveryId 
+            ? { 
+                ...delivery, 
+                status: 'entregue' as const, 
+                updated_at: new Date().toISOString(),
+                delivered_at: new Date().toISOString()
+              }
+            : delivery
+        ));
+      }
       toast.success('Entrega finalizada com sucesso!');
-      fetchMyDeliveries();
+      if (ENABLE_AUTH) {
+        fetchMyDeliveries();
+      }
     } catch (error) {
       console.error('Erro ao finalizar entrega:', error);
       toast.error('Erro ao finalizar entrega');

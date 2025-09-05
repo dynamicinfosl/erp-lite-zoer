@@ -89,16 +89,16 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Resumo das operações do dia e métricas importantes
           </p>
         </div>
-        <div className="text-sm text-muted-foreground">
+        <div className="text-xs sm:text-sm text-muted-foreground">
           Atualizado em: {new Date().toLocaleString('pt-BR')}
         </div>
       </div>
@@ -131,24 +131,24 @@ export default function DashboardPage() {
       <DashboardStats stats={data} />
 
       {/* Gráficos */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
         <SalesChart data={data.monthlyData} />
         <CashFlowChart data={data.monthlyData} />
       </div>
 
       {/* Resumo Rápido */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Vendas Hoje</CardTitle>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base sm:text-lg">Vendas Hoje</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div className="space-y-2">
-              <div className="flex justify-between">
+              <div className="flex justify-between text-sm">
                 <span>Total de Vendas:</span>
                 <span className="font-semibold">{data.todaySales.salesCount}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between text-sm">
                 <span>Faturamento:</span>
                 <span className="font-semibold">
                   {new Intl.NumberFormat('pt-BR', {
@@ -157,7 +157,7 @@ export default function DashboardPage() {
                   }).format(data.todaySales.totalAmount)}
                 </span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between text-sm">
                 <span>Ticket Médio:</span>
                 <span className="font-semibold">
                   {new Intl.NumberFormat('pt-BR', {
