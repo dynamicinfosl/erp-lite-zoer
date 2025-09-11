@@ -32,7 +32,9 @@ export default function LoginPage() {
       await signIn(email, password);
       router.push('/dashboard');
     } catch (error: any) {
-      setError(error.message || 'Erro ao fazer login');
+      console.error('Erro no login:', error);
+      const errorMessage = error?.message || error?.toString() || 'Erro ao fazer login';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -49,9 +51,16 @@ export default function LoginPage() {
         phone,
         role: 'vendedor' // Role padrão para novos usuários
       });
+      // Limpar formulário após sucesso
+      setEmail('');
+      setPassword('');
+      setName('');
+      setPhone('');
       // Não redirecionar automaticamente, aguardar confirmação por email
     } catch (error: any) {
-      setError(error.message || 'Erro ao criar conta');
+      console.error('Erro no registro:', error);
+      const errorMessage = error?.message || error?.toString() || 'Erro ao criar conta';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

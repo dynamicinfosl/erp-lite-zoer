@@ -45,13 +45,18 @@ export async function authCrudOperations(): Promise<{
 
 // Create an admin token
 export async function generateAdminUserToken() {
-  const adminUserToken = await generateToken({
-    sub: "",
-    email: "",
-    role: process.env.SCHEMA_ADMIN_USER || "",
-  }, DURATION_EXPIRE_TIME);
+  try {
+    const adminUserToken = await generateToken({
+      sub: "",
+      email: "",
+      role: process.env.SCHEMA_ADMIN_USER || "admin",
+    }, DURATION_EXPIRE_TIME);
 
-  return adminUserToken;
+    return adminUserToken;
+  } catch (error) {
+    console.error('Erro ao gerar token de admin:', error);
+    throw new Error('Falha ao gerar token de administrador');
+  }
 }
 
 // Generate access token
