@@ -17,9 +17,6 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   // Se autenticação estiver desabilitada, usar sidebar sem autenticação
   if (!ENABLE_AUTH) {
-    if (pathname === '/login') {
-      return <>{children}</>;
-    }
     
     return (
       <SidebarProvider>

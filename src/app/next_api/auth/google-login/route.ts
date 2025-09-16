@@ -18,11 +18,10 @@ export const GET = requestMiddleware(async (request: NextRequest) => {
 
     const googleAccessToken = searchParams.get('access_token');
     const callbackUrl = searchParams.get('callback_url') || request.url;
-    const loginUrl = new URL('/login', callbackUrl).href;
     const homeUrl = new URL('/', callbackUrl).href;
 
     if(!googleAccessToken) {
-      return responseRedirect(loginUrl, callbackUrl);
+      return responseRedirect(homeUrl, callbackUrl);
     }
 
     const { usersCrud, sessionsCrud, refreshTokensCrud } =
@@ -31,7 +30,7 @@ export const GET = requestMiddleware(async (request: NextRequest) => {
     const { valid, payload } = await verifyToken(googleAccessToken);
 
     if(!valid || !payload?.sub) {
-      return responseRedirect(loginUrl, callbackUrl);
+      return responseRedirect(homeUrl, callbackUrl);
     }
 
     const users = await usersCrud.findMany({ email: payload.sub });

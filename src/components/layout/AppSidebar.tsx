@@ -32,6 +32,8 @@ import {
   Receipt,
   Shield,
   Wrench,
+  ChevronDown,
+  Tag,
 } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useSupabaseAuth } from '@/components/auth/SupabaseAuthProvider';
@@ -39,6 +41,7 @@ import { ENABLE_AUTH } from '@/constants/auth';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { mockUserProfile } from '@/lib/mock-data';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const menuItems = [
   {
@@ -46,6 +49,15 @@ const menuItems = [
     url: '/dashboard',
     icon: LayoutDashboard,
     roles: ['admin', 'vendedor', 'financeiro'],
+  },
+  {
+    title: 'Cadastros',
+    icon: Users,
+    roles: ['admin', 'vendedor', 'financeiro'],
+    children: [
+      { title: 'Clientes', url: '/clientes', icon: Users, roles: ['admin', 'vendedor'] },
+      { title: 'Fornecedores', url: '/fornecedores', icon: Truck, roles: ['admin', 'financeiro'] },
+    ],
   },
   {
     title: 'PDV',
@@ -61,20 +73,18 @@ const menuItems = [
   },
   {
     title: 'Produtos',
-    url: '/produtos',
     icon: Package,
     roles: ['admin', 'vendedor'],
+    children: [
+      { title: 'Gerenciar Produtos', url: '/produtos', icon: Package, roles: ['admin', 'vendedor'] },
+      { title: 'Valores de Venda', url: '/produtos/valores', icon: DollarSign, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Etiquetas', url: '/produtos/etiquetas', icon: Tag, roles: ['admin', 'vendedor'] },
+    ],
   },
   {
     title: 'Estoque',
     url: '/estoque',
     icon: Warehouse,
-    roles: ['admin', 'vendedor'],
-  },
-  {
-    title: 'Clientes',
-    url: '/clientes',
-    icon: Users,
     roles: ['admin', 'vendedor'],
   },
   {
@@ -159,9 +169,15 @@ export function AppSidebar() {
   // Simular perfil do usuário baseado no role ou usar um perfil padrão se auth estiver desabilitado
   const userRole = ENABLE_AUTH ? (user?.isAdmin ? 'admin' : user?.role || 'vendedor') : mockUserProfile.role;
 
-  const filteredMenuItems = menuItems.filter(item =>
-    item.roles.includes(userRole)
-  );
+  const filteredMenuItems = menuItems
+    .filter(item => item.roles.includes(userRole))
+    .map(item => {
+      if (item.children) {
+        const children = item.children.filter((c: any) => c.roles.includes(userRole));
+        return { ...item, children };
+      }
+      return item;
+    });
 
   return (
     <Sidebar className="w-48">
@@ -182,19 +198,55 @@ export function AppSidebar() {
           <SidebarGroupLabel className="text-xs px-2">Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-0.5">
-              {filteredMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname === item.url}
-                    className="h-7 text-xs px-2"
-                  >
-                    <Link href={item.url}>
-                      <item.icon className="h-3 w-3" />
-                      <span className="truncate">{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+              {filteredMenuItems.map((item: any) => (
+                <React.Fragment key={item.title}>
+                  {!item.children ? (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === item.url}
+                        className="h-7 text-xs px-2"
+                      >
+                        <Link href={item.url}>
+                          <item.icon className="h-3 w-3" />
+                          <span className="truncate">{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ) : (
+                    <Collapsible defaultOpen={item.children.some((c: any) => pathname.startsWith(c.url))}>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton className="h-7 text-xs px-2 justify-between">
+                            <span className="flex items-center gap-2">
+                              <item.icon className="h-3 w-3" />
+                              <span className="truncate">{item.title}</span>
+                            </span>
+                            <ChevronDown className="h-3 w-3 transition-transform duration-200 data-[state=open]:rotate-180" />
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="pl-4 py-1">
+                          {item.children.map((child: any) => (
+                            <SidebarMenuItem key={child.title}>
+                              <SidebarMenuButton
+                                asChild
+                                isActive={pathname === child.url}
+                                className="h-7 text-xs px-2"
+                              >
+                                <Link href={child.url}>
+                                  <child.icon className="h-3 w-3" />
+                                  <span className="truncate">{child.title}</span>
+                                </Link>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          ))}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
+                </React.Fragment>
               ))}
             </SidebarMenu>
           </SidebarGroupContent>

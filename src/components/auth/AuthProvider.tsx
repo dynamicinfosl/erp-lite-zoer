@@ -61,11 +61,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       await api.post('/auth/logout');
       setUser(null);
-      router.push('/login');
+      router.push('/');
     } catch (error) {
       console.error('Logout failed:', error);
       setUser(null);
-      router.push('/login');
+      router.push('/');
     }
   };
 

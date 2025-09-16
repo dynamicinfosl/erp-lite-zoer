@@ -16,10 +16,10 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !user && pathname !== '/login') {
-      router.push('/login');
+    if (!loading && !user) {
+      router.push('/');
     }
-  }, [user, loading, router, pathname]);
+  }, [user, loading, router]);
 
   if (loading) {
     return (
@@ -29,12 +29,8 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
     );
   }
 
-  if (!user && pathname !== '/login') {
+  if (!user) {
     return null; // Será redirecionado pelo useEffect
-  }
-
-  if (pathname === '/login') {
-    return <>{children}</>;
   }
 
   return (

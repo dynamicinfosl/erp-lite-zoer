@@ -69,6 +69,12 @@ export interface Customer {
   state?: string;
   zipcode?: string;
   notes?: string;
+  responsible_seller?: string;
+  responsible_financial?: string;
+  photo?: string;
+  attachments?: string[];
+  observations?: string;
+  credit_limit?: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -140,6 +146,24 @@ export interface UserProfile {
   name: string;
   phone?: string;
   role_type: 'admin' | 'vendedor' | 'financeiro' | 'entregador';
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Supplier {
+  id: number;
+  user_id: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  document?: string;
+  address?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  zipcode?: string;
+  notes?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;

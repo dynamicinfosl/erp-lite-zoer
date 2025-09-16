@@ -53,6 +53,19 @@ export const POST = requestMiddleware(async (request, context) => {
     }
 
     const customersCrud = new CrudOperations("customers", context.token);
+    // Evitar duplicado por documento (quando informado)
+    if (body.document) {
+      const existing = await customersCrud.findMany({
+        user_id: context.payload?.sub,
+        document: body.document,
+      }, { limit: 1, offset: 0 });
+      if (existing && existing.length > 0) {
+        return createErrorResponse({
+          errorMessage: "Documento já cadastrado",
+          status: 409,
+        });
+      }
+    }
     
     const customerData = {
       user_id: context.payload?.sub,

@@ -17,7 +17,8 @@
     "confirm-email": "node scripts/confirm-email.js",
     "db-manager": "node scripts/db-manager.js",
     "quick-fix": "node scripts/quick-fix.js",
-    "supabase-admin": "node scripts/supabase-admin.js"
+    "supabase-admin": "node scripts/supabase-admin.js",
+    "apply-unique": "node scripts/apply-unique-constraints.js"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",

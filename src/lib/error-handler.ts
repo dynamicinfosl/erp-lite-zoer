@@ -1,30 +1,36 @@
 // Global error handler para promises rejeitadas não tratadas
 export function setupGlobalErrorHandlers() {
+  // Import dinâmico do toast para evitar problemas de SSR
+  let toast: any;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    toast = require('sonner').toast;
+  } catch {}
   // Handler para promises rejeitadas não tratadas
   window.addEventListener('unhandledrejection', (event) => {
     console.error('Unhandled promise rejection:', event.reason);
     
     // Prevenir que o erro apareça como [object Object]
-    if (event.reason && typeof event.reason === 'object') {
-      const errorMessage = event.reason?.message || 
-                          event.reason?.toString() || 
-                          'Erro não tratado';
-      console.error('Error details:', errorMessage);
+    const errorMessage = getErrorMessage(event.reason);
+    console.error('Error details:', errorMessage);
+    if (toast) {
+      toast.error(errorMessage);
     }
     
-    // Prevenir o comportamento padrão (que mostra [object Object])
-    event.preventDefault();
+    // Prevenir o comportamento padrão (que mostra [object Object]) apenas em produção
+    if (process.env.NODE_ENV === 'production') {
+      event.preventDefault();
+    }
   });
 
   // Handler para erros JavaScript não tratados
   window.addEventListener('error', (event) => {
     console.error('Unhandled error:', event.error);
     
-    if (event.error && typeof event.error === 'object') {
-      const errorMessage = event.error?.message || 
-                          event.error?.toString() || 
-                          'Erro JavaScript não tratado';
-      console.error('Error details:', errorMessage);
+    const errorMessage = getErrorMessage(event.error);
+    console.error('Error details:', errorMessage);
+    if (toast) {
+      toast.error(errorMessage);
     }
   });
 }

@@ -6,6 +6,7 @@ import { ConditionalAuthProvider } from "@/components/auth/ConditionalAuthProvid
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Toaster } from "@/components/ui/toaster";
 import ZoerCopilot from "@/components/ZoerCopilot";
+import { ErrorHandler } from "@/components/ErrorHandler";
 
 import "./globals.css";
 
@@ -44,6 +45,7 @@ export default function RootLayout({
             <AppLayout>
               {children}
             </AppLayout>
+            <ErrorHandler />
             <Toaster />
             <ZoerCopilot />
           </ConditionalAuthProvider>
