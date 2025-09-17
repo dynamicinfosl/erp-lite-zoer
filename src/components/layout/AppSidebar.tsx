@@ -56,7 +56,7 @@ const menuItems = [
     roles: ['admin', 'vendedor', 'financeiro'],
     children: [
       { title: 'Clientes', url: '/clientes', icon: Users, roles: ['admin', 'vendedor'] },
-      { title: 'Fornecedores', url: '/fornecedores', icon: Truck, roles: ['admin', 'financeiro'] },
+      { title: 'Fornecedores', url: '/fornecedores', icon: Truck, roles: ['admin', 'financeiro', 'vendedor'] },
     ],
   },
   {

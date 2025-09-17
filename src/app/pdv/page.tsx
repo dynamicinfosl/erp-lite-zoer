@@ -3,6 +3,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { ProductSearch } from '@/components/pdv/ProductSearch';
 import { CartItems } from '@/components/pdv/CartItems';
 import { PaymentForm } from '@/components/pdv/PaymentForm';
@@ -17,10 +18,12 @@ import { ENABLE_AUTH } from '@/constants/auth';
 import { mockProducts } from '@/lib/mock-data';
 
 export default function PDVPage() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [showPayment, setShowPayment] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [cashSession, setCashSession] = useState<any | null>(null);
 
   const handleCancelSale = useCallback(() => {
     if (cartItems.length > 0) {
@@ -34,6 +37,7 @@ export default function PDVPage() {
 
   useEffect(() => {
     fetchProducts();
+    fetchCashSession();
     
     // Atalhos de teclado
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -59,6 +63,19 @@ export default function PDVPage() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [cartItems, handleCancelSale]);
+  const fetchCashSession = async () => {
+    try {
+      if (ENABLE_AUTH) {
+        const session = await api.get<any>('/cash-sessions');
+        setCashSession(session);
+      } else {
+        setCashSession({ id: 0, status: 'open' });
+      }
+    } catch (error) {
+      console.error('Erro ao obter sessão de caixa:', error);
+    }
+  };
+
 
   const fetchProducts = async () => {
     try {
@@ -179,6 +196,20 @@ export default function PDVPage() {
     );
   }
 
+  // Guard: exigir caixa aberto
+  if (ENABLE_AUTH && !cashSession) {
+    return (
+      <div className="container mx-auto p-6">
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Nenhuma sessão de caixa aberta. Abra um caixa para iniciar vendas.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   if (showPayment) {
     return (
       <div className="container mx-auto p-6">
@@ -192,7 +223,7 @@ export default function PDVPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -202,6 +233,9 @@ export default function PDVPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => router.push('/dashboard')}>
+            Voltar ao Menu
+          </Button>
           <ShoppingCart className="h-5 w-5" />
           <span className="font-semibold">
             {cartItems.length} itens - {new Intl.NumberFormat('pt-BR', {
@@ -220,7 +254,7 @@ export default function PDVPage() {
         </AlertDescription>
       </Alert>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
         {/* Busca de Produtos */}
         <div className="lg:col-span-2 space-y-6">
           <Card>
@@ -280,7 +314,7 @@ export default function PDVPage() {
             <Button
               onClick={() => setShowPayment(true)}
               disabled={cartItems.length === 0}
-              className="w-full h-12 text-lg"
+              className="w-full h-12 text-base sm:text-lg"
               size="lg"
             >
               Finalizar Venda (F4)

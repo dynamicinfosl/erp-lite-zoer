@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { mockCustomers } from '@/lib/mock-data';
 import { getErrorMessage } from '@/lib/error-handler';
+import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
 
 export default function ClientesPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -30,6 +31,11 @@ export default function ClientesPage() {
   const [importLoading, setImportLoading] = useState(false);
   const [showExportPreview, setShowExportPreview] = useState(false);
   const [showImportConfirmation, setShowImportConfirmation] = useState(false);
+  const [showImportPreview, setShowImportPreview] = useState(false);
+  const [importFileName, setImportFileName] = useState('');
+  const [importHeaders, setImportHeaders] = useState<string[]>([]);
+  const [importRows, setImportRows] = useState<any[][]>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
   const [selectedCustomers, setSelectedCustomers] = useState<number[]>([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [formData, setFormData] = useState({
@@ -384,56 +390,115 @@ export default function ClientesPage() {
     }
   };
 
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const parseCSVFlexible = (text: string): any[] => {
+    const lines = text.split(/\r?\n/).filter(line => line.trim());
+    if (lines.length < 2) return [];
+    const first = lines[0];
+    const delimiter = (first.split(';').length - 1) > (first.split(',').length - 1) ? ';' : ',';
+    const headers = first.split(delimiter).map(h => h.replace(/"/g, '').trim());
+    return lines.slice(1).map(line => {
+      const values = [] as string[];
+      let cur = '';
+      let quoted = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (quoted && line[i + 1] === '"') { cur += '"'; i++; }
+          else { quoted = !quoted; }
+        } else if (ch === delimiter && !quoted) {
+          values.push(cur); cur = '';
+        } else { cur += ch; }
+      }
+      values.push(cur);
+      const row: any = {};
+      headers.forEach((h, idx) => { row[h] = (values[idx] || '').replace(/"/g, '').trim(); });
+      return row;
+    });
+  };
+
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      toast.error('Por favor, selecione um arquivo CSV válido');
-      return;
-    }
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      let rows: any[][] = [];
+      let headers: string[] = [];
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const csvText = e.target?.result as string;
-        const lines = csvText.split('\n').filter(line => line.trim());
-        
-        if (lines.length < 2) {
-          toast.error('Arquivo CSV deve ter pelo menos um cabeçalho e uma linha de dados');
+      if (ext === 'xlsx' || ext === 'xls') {
+        // @ts-ignore dependência opcional
+        const XLSX = await import('xlsx');
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(data);
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        if (rows.length < 2) {
+          toast.error('Planilha deve conter cabeçalho e pelo menos uma linha');
           return;
         }
-
-        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
-        const data = lines.slice(1).map(line => {
-          const values = line.split(',').map(v => v.replace(/"/g, '').trim());
-          const row: any = {};
-          headers.forEach((header, index) => {
-            row[header] = values[index] || '';
-          });
-          return row;
-        });
-
-        setImportData(data);
-        setShowImportConfirmation(true);
-        toast.success(`${data.length} registros carregados com sucesso!`);
-      } catch (error) {
-        console.error('Erro ao processar arquivo CSV:', getErrorMessage(error));
-        toast.error('Erro ao processar arquivo CSV');
+        headers = rows[0].map((h: any) => String(h || '').trim());
+      } else if (ext === 'csv') {
+        const text = await file.text();
+        rows = parseCSVFlexible(text).map(row => Object.values(row));
+        if (rows.length === 0) {
+          toast.error('Arquivo CSV inválido ou vazio');
+          return;
+        }
+        headers = Object.keys(parseCSVFlexible(text)[0] || {});
+      } else {
+        toast.error('Selecione um arquivo .csv, .xls ou .xlsx');
+        return;
       }
-    };
 
-    reader.readAsText(file, 'utf-8');
+      // Preparar dados para o modal de preview
+      const dataRows = rows.slice(1).map(r => {
+        const obj: any = {};
+        headers.forEach((h: string, idx: number) => { 
+          obj[h] = (r[idx] ?? '').toString().trim(); 
+        });
+        return obj;
+      });
+
+      // Validar dados e contar erros
+      const errors: string[] = [];
+      let validCount = 0;
+      let invalidCount = 0;
+
+      dataRows.forEach((row, index) => {
+        if (!row['Nome'] && !row['nome']) {
+          errors.push(`Linha ${index + 2}: Nome é obrigatório`);
+          invalidCount++;
+        } else {
+          validCount++;
+        }
+      });
+
+      // Configurar estado para o modal de preview
+      setImportFileName(file.name);
+      setImportHeaders(headers);
+      setImportRows(rows.slice(1));
+      setImportData(dataRows);
+      setImportErrors(errors);
+      setShowImportPreview(true);
+
+      toast.success(`${rows.length - 1} registros carregados com sucesso!`);
+    } catch (error) {
+      console.error('Erro ao importar arquivo:', getErrorMessage(error));
+      toast.error('Erro ao importar arquivo');
+    }
   };
 
-  const confirmImport = () => {
-    setShowImportConfirmation(false);
+  const handleImportConfirm = () => {
+    setShowImportPreview(false);
     setShowImportDialog(true);
   };
 
-  const cancelImport = () => {
-    setShowImportConfirmation(false);
+  const handleImportCancel = () => {
+    setShowImportPreview(false);
     setImportData([]);
+    setImportHeaders([]);
+    setImportRows([]);
+    setImportErrors([]);
   };
 
   const processImportData = async () => {
@@ -558,7 +623,7 @@ export default function ClientesPage() {
                 className="cursor-pointer"
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Importar CSV
+                Importar CSV/XLSX
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={handleBulkDelete} 
@@ -573,7 +638,7 @@ export default function ClientesPage() {
           <input
             id="import-file"
             type="file"
-            accept=".csv"
+            accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
             onChange={handleFileImport}
             style={{ display: 'none' }}
           />
@@ -933,60 +998,19 @@ export default function ClientesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de Confirmação de Importação */}
-      <Dialog open={showImportConfirmation} onOpenChange={setShowImportConfirmation}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Confirmar Importação de Clientes</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <h4 className="font-medium text-blue-900">Arquivo CSV Carregado</h4>
-              </div>
-              <p className="text-sm text-blue-700 mt-1">
-                {importData.length} registros foram encontrados no arquivo CSV.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="font-medium">Próximos passos:</h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Os dados serão validados automaticamente</li>
-                <li>• Clientes com nomes duplicados serão ignorados</li>
-                <li>• Você poderá revisar os dados antes da importação final</li>
-                <li>• Um relatório será gerado com o resultado da importação</li>
-              </ul>
-            </div>
-
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                <h4 className="font-medium text-yellow-900">Atenção</h4>
-              </div>
-              <p className="text-sm text-yellow-700 mt-1">
-                Esta operação irá adicionar novos clientes ao sistema. Certifique-se de que os dados estão corretos.
-              </p>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button 
-                variant="outline" 
-                onClick={cancelImport}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                onClick={confirmImport}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                Continuar para Revisão
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Modal de Preview da Importação */}
+      <ImportPreviewModal
+        isOpen={showImportPreview}
+        onClose={handleImportCancel}
+        onConfirm={handleImportConfirm}
+        fileName={importFileName}
+        headers={importHeaders}
+        data={importRows}
+        totalRows={importRows.length}
+        validRows={importRows.length - importErrors.length}
+        invalidRows={importErrors.length}
+        errors={importErrors}
+      />
 
       {/* Dialog de Visualização da Planilha */}
       <Dialog open={showExportPreview} onOpenChange={setShowExportPreview}>

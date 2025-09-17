@@ -292,3 +292,69 @@ INSERT INTO categories (name, description, color) VALUES
 ('Destilados', 'Cachaças, vodkas e whisky', '#34495e'),
 ('Vinhos', 'Vinhos nacionais e importados', '#8e44ad'),
 ('Isotônicos', 'Bebidas isotônicas', '#16a085');
+
+-- Caixa (PDV)
+CREATE TABLE cash_registers (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    location VARCHAR(100),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE cash_sessions (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID NOT NULL,
+    register_id BIGINT NOT NULL REFERENCES cash_registers(id),
+    status VARCHAR(20) NOT NULL CHECK (status IN ('open','closed')) DEFAULT 'open',
+    opened_by UUID NOT NULL,
+    opened_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    opening_amount DECIMAL(10,2) DEFAULT 0,
+    notes TEXT,
+    closed_by UUID,
+    closed_at TIMESTAMP WITH TIME ZONE,
+    closing_amount_cash DECIMAL(10,2),
+    closing_amount_card DECIMAL(10,2),
+    closing_amount_pix DECIMAL(10,2),
+    difference_amount DECIMAL(10,2),
+    difference_reason TEXT
+);
+
+CREATE TABLE cash_transactions (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID NOT NULL,
+    session_id BIGINT NOT NULL REFERENCES cash_sessions(id),
+    type VARCHAR(20) NOT NULL CHECK (type IN ('opening','sale','supply','withdrawal','expense','refund','adjustment','closing')),
+    method VARCHAR(20) CHECK (method IN ('cash','card','pix','other')),
+    amount DECIMAL(10,2) NOT NULL,
+    reference_type VARCHAR(30),
+    reference_id BIGINT,
+    description TEXT,
+    created_by UUID NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- RLS para tabelas de caixa
+ALTER TABLE cash_registers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cash_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cash_transactions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY cash_registers_select ON cash_registers FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY cash_registers_insert ON cash_registers FOR INSERT WITH CHECK (user_id = auth.uid());
+CREATE POLICY cash_registers_update ON cash_registers FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY cash_sessions_select ON cash_sessions FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY cash_sessions_insert ON cash_sessions FOR INSERT WITH CHECK (user_id = auth.uid());
+CREATE POLICY cash_sessions_update ON cash_sessions FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY cash_transactions_select ON cash_transactions FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY cash_transactions_insert ON cash_transactions FOR INSERT WITH CHECK (user_id = auth.uid());
+
+-- Índices
+CREATE INDEX idx_cash_registers_user ON cash_registers(user_id);
+CREATE INDEX idx_cash_sessions_register ON cash_sessions(register_id);
+CREATE INDEX idx_cash_sessions_status ON cash_sessions(status);
+CREATE INDEX idx_cash_transactions_session ON cash_transactions(session_id);
+CREATE INDEX idx_cash_transactions_type ON cash_transactions(type);

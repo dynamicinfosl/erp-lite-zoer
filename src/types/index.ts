@@ -8,6 +8,17 @@ export interface Product {
   sku?: string;
   barcode?: string;
   description?: string;
+  // novos campos opcionais
+  internal_code?: string;
+  product_group?: string;
+  has_variations?: boolean;
+  fiscal_note?: string; // NCM/CFOP ou referência fiscal
+  unit_conversion?: string; // ex.: 1 CX = 12 UN
+  moves_stock?: boolean;
+  width_cm?: number;
+  height_cm?: number;
+  length_cm?: number;
+  weight_kg?: number;
   cost_price: number;
   sale_price: number;
   stock_quantity: number;
@@ -167,6 +178,49 @@ export interface Supplier {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// Caixa (PDV)
+export interface CashRegister {
+  id: number;
+  user_id: number | string;
+  name: string;
+  location?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CashSession {
+  id: number;
+  user_id: number | string;
+  register_id: number;
+  status: 'open' | 'closed';
+  opened_by: string;
+  opened_at: string;
+  opening_amount: number;
+  notes?: string;
+  closed_by?: string;
+  closed_at?: string;
+  closing_amount_cash?: number;
+  closing_amount_card?: number;
+  closing_amount_pix?: number;
+  difference_amount?: number;
+  difference_reason?: string;
+}
+
+export interface CashTransaction {
+  id: number;
+  user_id: number | string;
+  session_id: number;
+  type: 'opening' | 'sale' | 'supply' | 'withdrawal' | 'expense' | 'refund' | 'adjustment' | 'closing';
+  method?: 'cash' | 'card' | 'pix' | 'other';
+  amount: number;
+  reference_type?: string;
+  reference_id?: number;
+  description?: string;
+  created_by: string;
+  created_at: string;
 }
 
 // Tipos para PDV

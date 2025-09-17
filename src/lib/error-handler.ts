@@ -45,6 +45,24 @@ export function getErrorMessage(error: any): string {
     return error.message;
   }
   
+  // Se for um objeto simples, tentar serializar para JSON para evitar [object Object]
+  if (typeof error === 'object' && error !== null) {
+    try {
+      const json = JSON.stringify(error);
+      if (json && json !== '{}') {
+        return json;
+      }
+    } catch {}
+    // como fallback, mostrar chaves conhecidas ou o tipo
+    const knownFields = ['code', 'status', 'statusText', 'error', 'reason'];
+    const summary = knownFields
+      .map((k) => (error as Record<string, unknown>)[k])
+      .filter((v) => v !== undefined)
+      .join(' - ');
+    if (summary) return String(summary);
+    return Object.prototype.toString.call(error);
+  }
+
   if (error?.toString && typeof error.toString === 'function') {
     return error.toString();
   }

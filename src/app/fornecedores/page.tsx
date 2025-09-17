@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { Edit, Trash2, CheckSquare, Square, Trash, FileSpreadsheet, Upload, ChevronDown, Eye } from 'lucide-react';
 import { useRef } from 'react';
 import { getErrorMessage } from '@/lib/error-handler';
+import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
 
 export default function FornecedoresPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -28,6 +29,12 @@ export default function FornecedoresPage() {
   });
   const [editing, setEditing] = useState(false);
   const [selectedSuppliers, setSelectedSuppliers] = useState<number[]>([]);
+  const [showImportPreview, setShowImportPreview] = useState(false);
+  const [importFileName, setImportFileName] = useState('');
+  const [importHeaders, setImportHeaders] = useState<string[]>([]);
+  const [importRowsData, setImportRowsData] = useState<any[][]>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [importData, setImportData] = useState<any[]>([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
 
   useEffect(() => {
@@ -208,26 +215,83 @@ export default function FornecedoresPage() {
     fileInputRef.current?.click();
   };
 
+  const handleImportConfirm = async () => {
+    setShowImportPreview(false);
+    await importRows(importRowsData);
+  };
+
+  const handleImportCancel = () => {
+    setShowImportPreview(false);
+    setImportData([]);
+    setImportHeaders([]);
+    setImportRowsData([]);
+    setImportErrors([]);
+  };
+
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
       const ext = file.name.split('.').pop()?.toLowerCase();
+      let rows: any[][] = [];
+      let headers: string[] = [];
+
       if (ext === 'xlsx' || ext === 'xls') {
         // @ts-ignore: dependência opcional carregada dinamicamente
         const XLSX = await import('xlsx');
         const data = await file.arrayBuffer();
         const wb = XLSX.read(data);
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
-        await importRows(rows);
+        rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        if (rows.length < 2) {
+          toast.error('Planilha deve conter cabeçalho e pelo menos uma linha');
+          return;
+        }
+        headers = rows[0].map((h: any) => String(h || '').trim());
       } else if (ext === 'csv') {
-        const text = await file.text();
-        const rows = parseCSV(text);
-        await importRows(rows);
+        rows = parseCSV(await file.text());
+        if (rows.length < 2) {
+          toast.error('Arquivo CSV deve conter cabeçalho e pelo menos uma linha');
+          return;
+        }
+        headers = rows[0];
       } else {
         toast.error('Formato não suportado. Use CSV ou XLSX.');
+        return;
       }
+
+      // Preparar dados para o modal de preview
+      const dataRows = rows.slice(1).map(r => {
+        const obj: any = {};
+        headers.forEach((h: string, idx: number) => { 
+          obj[h] = (r[idx] ?? '').toString().trim(); 
+        });
+        return obj;
+      });
+
+      // Validar dados e contar erros
+      const errors: string[] = [];
+      let validCount = 0;
+      let invalidCount = 0;
+
+      dataRows.forEach((row, index) => {
+        if (!row['Nome'] && !row['nome']) {
+          errors.push(`Linha ${index + 2}: Nome é obrigatório`);
+          invalidCount++;
+        } else {
+          validCount++;
+        }
+      });
+
+      // Configurar estado para o modal de preview
+      setImportFileName(file.name);
+      setImportHeaders(headers);
+      setImportRowsData(rows.slice(1));
+      setImportData(dataRows);
+      setImportErrors(errors);
+      setShowImportPreview(true);
+
+      toast.success(`${rows.length - 1} registros carregados com sucesso!`);
     } catch (err) {
       console.error('Erro ao importar arquivo:', err);
       toast.error('Erro ao importar arquivo');
@@ -238,8 +302,10 @@ export default function FornecedoresPage() {
 
   const parseCSV = (text: string): string[][] => {
     const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length === 0) return [];
+    const first = lines[0];
+    const delimiter = (first.split(';').length - 1) > (first.split(',').length - 1) ? ';' : ',';
     return lines.map(line => {
-      // parse simples para CSV com aspas
       const result: string[] = [];
       let cur = '';
       let quoted = false;
@@ -248,17 +314,18 @@ export default function FornecedoresPage() {
         if (ch === '"') {
           if (quoted && line[i + 1] === '"') { cur += '"'; i++; }
           else { quoted = !quoted; }
-        } else if (ch === ',' && !quoted) {
+        } else if (ch === delimiter && !quoted) {
           result.push(cur); cur = '';
         } else {
           cur += ch;
         }
       }
       result.push(cur);
-    
       return result.map(v => v.trim());
     });
   };
+
+  const normalizeDoc = (s: string): string => s.replace(/\D/g, '');
 
   const importRows = async (rows: any[][]) => {
     if (!rows.length) return;
@@ -283,7 +350,7 @@ export default function FornecedoresPage() {
       if (!r || r.length === 0) continue;
       const name = (r[idxNome] || '').toString().trim();
       if (!name) continue;
-      const document = idxDoc !== -1 ? (r[idxDoc] || '').toString().trim() : '';
+      const document = idxDoc !== -1 ? normalizeDoc((r[idxDoc] || '').toString().trim()) : '';
       const phone = idxTel !== -1 ? (r[idxTel] || '').toString().trim() : '';
       const situacaoRaw = idxSit !== -1 ? (r[idxSit] || '').toString().toLowerCase().trim() : '';
       const is_active = situacaoRaw ? ['ativo','ativa','1','true','sim','yes','ok'].includes(situacaoRaw) : true;
@@ -481,6 +548,20 @@ export default function FornecedoresPage() {
           </table>
         </div>
       )}
+
+      {/* Modal de Preview da Importação */}
+      <ImportPreviewModal
+        isOpen={showImportPreview}
+        onClose={handleImportCancel}
+        onConfirm={handleImportConfirm}
+        fileName={importFileName}
+        headers={importHeaders}
+        data={importRowsData}
+        totalRows={importRowsData.length}
+        validRows={importRowsData.length - importErrors.length}
+        invalidRows={importErrors.length}
+        errors={importErrors}
+      />
     </div>
   );
 }

@@ -17,7 +17,17 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   // Se autenticação estiver desabilitada, usar sidebar sem autenticação
   if (!ENABLE_AUTH) {
-    
+    // PDV fullscreen sem sidebar
+    if (pathname?.startsWith('/pdv')) {
+      return (
+        <main className="min-h-screen w-full">
+          <div className="w-full h-full">
+            {children}
+          </div>
+        </main>
+      );
+    }
+
     return (
       <SidebarProvider>
         <AppSidebar />
