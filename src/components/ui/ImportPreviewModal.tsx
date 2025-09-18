@@ -3,12 +3,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Download, Upload, X } from 'lucide-react';
+import { FileText, Download, Upload, X, Save } from 'lucide-react';
 
 interface ImportPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  onSave?: () => void;
   fileName: string;
   headers: string[];
   data: any[][];
@@ -22,6 +23,7 @@ export function ImportPreviewModal({
   isOpen,
   onClose,
   onConfirm,
+  onSave,
   fileName,
   headers,
   data,
@@ -31,10 +33,11 @@ export function ImportPreviewModal({
   errors = []
 }: ImportPreviewModalProps) {
   const maxPreviewRows = 10;
+  const handleSave = onSave || onConfirm;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+      <DialogContent className="w-[95vw] sm:max-w-3xl lg:max-w-6xl max-h-[100dvh] sm:max-h-[90vh] overflow-hidden sm:rounded-lg rounded-none p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -44,7 +47,7 @@ export function ImportPreviewModal({
 
         <div className="space-y-4">
           {/* Estatísticas */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div className="bg-blue-50 p-3 rounded-lg">
               <div className="text-sm text-blue-600">Total de Linhas</div>
               <div className="text-2xl font-bold text-blue-900">{totalRows}</div>
@@ -79,12 +82,12 @@ export function ImportPreviewModal({
 
           {/* Tabela de Preview */}
           <div className="border rounded-lg overflow-hidden">
-            <div className="bg-gray-50 px-4 py-2 border-b">
+            <div className="bg-gray-50 px-3 sm:px-4 py-2 border-b">
               <h4 className="font-medium text-gray-800">
                 Preview dos Dados ({Math.min(maxPreviewRows, data.length)} de {data.length} linhas)
               </h4>
             </div>
-            <div className="overflow-auto max-h-96">
+            <div className="overflow-auto max-h-[50vh] sm:max-h-96">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -97,30 +100,33 @@ export function ImportPreviewModal({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.slice(0, maxPreviewRows).map((row, rowIndex) => (
-                    <TableRow key={rowIndex}>
-                      <TableCell className="font-medium text-gray-500">
-                        {rowIndex + 1}
-                      </TableCell>
-                      {row.map((cell, cellIndex) => (
-                        <TableCell key={cellIndex} className="max-w-[200px] truncate">
-                          {cell || '-'}
+                  {data.slice(0, maxPreviewRows).map((row: any, rowIndex) => {
+                    const isArrayRow = Array.isArray(row);
+                    return (
+                      <TableRow key={rowIndex}>
+                        <TableCell className="font-medium text-gray-500">
+                          {rowIndex + 1}
                         </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
+                        {headers.map((header, cellIndex) => (
+                          <TableCell key={cellIndex} className="max-w-[200px] truncate">
+                            {isArrayRow ? (row[cellIndex] ?? '-') : (row[header] ?? '-')}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
             {data.length > maxPreviewRows && (
-              <div className="bg-gray-50 px-4 py-2 text-sm text-gray-600 text-center">
+              <div className="bg-gray-50 px-3 sm:px-4 py-2 text-sm text-gray-600 text-center">
                 ... e mais {data.length - maxPreviewRows} linhas
               </div>
             )}
           </div>
 
           {/* Ações */}
-          <div className="flex justify-between items-center pt-4 border-t">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pt-4 border-t">
             <div className="text-sm text-gray-600">
               {validRows > 0 ? (
                 <span className="text-green-600">
@@ -132,15 +138,23 @@ export function ImportPreviewModal({
                 </span>
               )}
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={onClose}>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">
                 <X className="h-4 w-4 mr-2" />
                 Cancelar
               </Button>
               <Button 
+                variant="secondary"
+                onClick={handleSave}
+                className="w-full sm:w-auto"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Salvar
+              </Button>
+              <Button 
                 onClick={onConfirm} 
                 disabled={validRows === 0}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
               >
                 <Upload className="h-4 w-4 mr-2" />
                 Importar {validRows} Registros

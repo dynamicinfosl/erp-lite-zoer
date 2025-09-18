@@ -8,19 +8,35 @@ export function setupGlobalErrorHandlers() {
   } catch {}
   // Handler para promises rejeitadas não tratadas
   window.addEventListener('unhandledrejection', (event) => {
-    console.error('Unhandled promise rejection:', event.reason);
-    
-    // Prevenir que o erro apareça como [object Object]
-    const errorMessage = getErrorMessage(event.reason);
-    console.error('Error details:', errorMessage);
+    // Alguns erros comuns (rede/refresh de sessão)
+    const reason: any = event.reason;
+    let message = getErrorMessage(reason);
+
+    const isNetworkError =
+      typeof reason === 'object' && (
+        /Failed to fetch/i.test(String(reason?.message || '')) ||
+        /TypeError: Failed to fetch/i.test(String(reason)) ||
+        /NetworkError/i.test(String(reason))
+      );
+
+    const isSupabaseRefresh =
+      typeof reason === 'object' && (
+        /refresh/i.test(String(reason?.message || '')) ||
+        /AuthRetryableFetchError/i.test(String(reason?.name || ''))
+      );
+
+    if (isNetworkError || isSupabaseRefresh) {
+      message = 'Falha de rede/autenticação. Verifique sua conexão e sessão. Tente recarregar ou fazer login novamente.';
+    }
+
+    console.error('Unhandled promise rejection:', reason);
+    console.error('Error details:', message);
     if (toast) {
-      toast.error(errorMessage);
+      toast.error(message);
     }
-    
-    // Prevenir o comportamento padrão (que mostra [object Object]) apenas em produção
-    if (process.env.NODE_ENV === 'production') {
-      event.preventDefault();
-    }
+
+    // Suprimir o overlay do Next em dev e prod
+    event.preventDefault();
   });
 
   // Handler para erros JavaScript não tratados

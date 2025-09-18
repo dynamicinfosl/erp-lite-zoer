@@ -47,7 +47,8 @@ export default function RootLayout({
             </AppLayout>
             <ErrorHandler />
             <Toaster />
-            <ZoerCopilot />
+            {/* Renderizar ZoerCopilot apenas quando habilitado por envs */}
+            {process.env.NEXT_PUBLIC_ENABLE_ZOER === 'true' && <ZoerCopilot />}
           </ConditionalAuthProvider>
         </ThemeProvider>
       </body>

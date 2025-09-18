@@ -416,6 +416,40 @@ export default function ClientesPage() {
     });
   };
 
+  // Normalização de cabeçalhos e linhas importadas
+  const normalizeHeader = (raw: string): string => {
+    const h = String(raw || '')
+      .replace(/\u00A0/g, ' ')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\s\/]/g, '') // Manter barras para "nome/nome fantasia"
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (["nome","name","cliente","razão social","razao social","nome do cliente","nome/nome fantasia"].includes(h)) return "nome";
+    if (["e-mail","email","mail"].includes(h)) return "e-mail";
+    if (["telefone","celular","phone","telemovel"].includes(h)) return "telefone";
+    if (["cpf/cnpj","cpf","cnpj","documento","document"].includes(h)) return "cpf/cnpj";
+    if (["endereço","endereco","address"].includes(h)) return "endereço";
+    if (["bairro","district","neighborhood"].includes(h)) return "bairro";
+    if (["cidade","city","municipio","município"].includes(h)) return "cidade";
+    if (["estado","uf","state"].includes(h)) return "estado";
+    if (["cep","zip","zipcode","código postal","codigo postal"].includes(h)) return "cep";
+    if (["observações","observacoes","obs","notes","observações adicionais","observacoes adicionais"].includes(h)) return "observações";
+    if (["vendedor responsável","vendedor responsavel","responsible_seller"].includes(h)) return "vendedor responsável";
+    if (["financeiro responsável","financeiro responsavel","responsible_financial"].includes(h)) return "financeiro responsável";
+    if (["limite financeiro","limite","credit_limit","limite de crédito","limite de credito"].includes(h)) return "limite financeiro";
+    return h;
+  };
+
+  const normalizeImportedRow = (row: Record<string, any>): Record<string, any> => {
+    const out: Record<string, any> = {};
+    Object.entries(row).forEach(([k, v]) => {
+      const key = normalizeHeader(k);
+      out[key] = typeof v === 'string' ? v.replace(/\u00A0/g, ' ').trim() : v;
+    });
+    return out;
+  };
+
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -436,15 +470,18 @@ export default function ClientesPage() {
           toast.error('Planilha deve conter cabeçalho e pelo menos uma linha');
           return;
         }
-        headers = rows[0].map((h: any) => String(h || '').trim());
+        const rawHeaders = rows[0].map((h: any) => String(h || ''));
+        headers = rawHeaders.map(h => h.replace(/\u00A0/g, ' ').trim());
       } else if (ext === 'csv') {
         const text = await file.text();
-        rows = parseCSVFlexible(text).map(row => Object.values(row));
+        const parsed = parseCSVFlexible(text);
+        const first = parsed[0] || {};
+        headers = Object.keys(first).map(h => h.replace(/\u00A0/g, ' ').trim());
+        rows = [headers, ...parsed.map(r => headers.map(h => r[h]))];
         if (rows.length === 0) {
           toast.error('Arquivo CSV inválido ou vazio');
           return;
         }
-        headers = Object.keys(parseCSVFlexible(text)[0] || {});
       } else {
         toast.error('Selecione um arquivo .csv, .xls ou .xlsx');
         return;
@@ -453,9 +490,31 @@ export default function ClientesPage() {
       // Preparar dados para o modal de preview
       const dataRows = rows.slice(1).map(r => {
         const obj: any = {};
-        headers.forEach((h: string, idx: number) => { 
-          obj[h] = (r[idx] ?? '').toString().trim(); 
+        headers.forEach((h: string, idx: number) => {
+          const key = normalizeHeader(h);
+          obj[key] = (r[idx] ?? '').toString().replace(/\u00A0/g, ' ').trim();
         });
+        // Ajustes específicos para o layout Clientes.xlsx (Worksheet)
+        const tipo = (obj['tipo'] || '').toUpperCase();
+        const cpf = (obj['cpf'] || '').replace(/\D/g, '');
+        const cnpj = (obj['cnpj'] || '').replace(/\D/g, '');
+        if (!obj['cpf/cnpj']) {
+          obj['cpf/cnpj'] = (tipo === 'PJ' ? cnpj : cpf) || cpf || cnpj || '';
+        }
+        // Endereço completo
+        const logradouro = obj['endereço'] || obj['logradouro'] || '';
+        const numero = obj['número'] || obj['numero'] || '';
+        const complemento = obj['complemento'] || '';
+        if (!obj['endereço']) {
+          const parts = [logradouro, numero && `, ${numero}`, complemento && `, ${complemento}`].filter(Boolean);
+          obj['endereço'] = parts.join('');
+        }
+        // Telefone preferindo celular
+        if (!obj['telefone'] && obj['celular']) obj['telefone'] = obj['celular'];
+        // CEP somente dígitos
+        if (obj['cep']) obj['cep'] = String(obj['cep']).replace(/\D/g, '');
+        // Ativo: "Sim" -> true
+        if (obj['ativo']) obj['ativo'] = /^sim$/i.test(String(obj['ativo']).trim());
         return obj;
       });
 
@@ -465,7 +524,8 @@ export default function ClientesPage() {
       let invalidCount = 0;
 
       dataRows.forEach((row, index) => {
-        if (!row['Nome'] && !row['nome']) {
+        const nome = row['nome'] || row['Nome'];
+        if (!nome || String(nome).trim().length === 0) {
           errors.push(`Linha ${index + 2}: Nome é obrigatório`);
           invalidCount++;
         } else {
@@ -475,7 +535,7 @@ export default function ClientesPage() {
 
       // Configurar estado para o modal de preview
       setImportFileName(file.name);
-      setImportHeaders(headers);
+      setImportHeaders(headers.map(normalizeHeader));
       setImportRows(rows.slice(1));
       setImportData(dataRows);
       setImportErrors(errors);
