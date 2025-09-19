@@ -16,14 +16,9 @@ export default function LoginPage() {
   const { user, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('login');
 
-  // Redirecionar se já estiver logado
+  // Redirecionar se já estiver logado (apenas quando autenticação estiver habilitada)
   useEffect(() => {
-    if (!ENABLE_AUTH) {
-      router.push('/dashboard');
-      return;
-    }
-
-    if (!isLoading && user) {
+    if (ENABLE_AUTH && !isLoading && user) {
       // Verificar se há um parâmetro de redirecionamento
       const urlParams = new URLSearchParams(window.location.search);
       const redirectTo = urlParams.get('redirect') || '/dashboard';
@@ -43,21 +38,28 @@ export default function LoginPage() {
     );
   }
 
-  // Se não estiver habilitada a autenticação, redirecionar
-  if (!ENABLE_AUTH) {
-    return null;
-  }
+  // Quando autenticação não estiver habilitada, mostrar página de login normalmente
 
   const handleLoginSuccess = () => {
-    // Verificar se há um parâmetro de redirecionamento
-    const urlParams = new URLSearchParams(window.location.search);
-    const redirectTo = urlParams.get('redirect') || '/dashboard';
-    router.push(redirectTo);
+    if (ENABLE_AUTH) {
+      // Verificar se há um parâmetro de redirecionamento
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectTo = urlParams.get('redirect') || '/dashboard';
+      router.push(redirectTo);
+    } else {
+      // Quando autenticação está desabilitada, apenas redirecionar para dashboard
+      router.push('/dashboard');
+    }
   };
 
   const handleRegisterSuccess = () => {
-    setActiveTab('login');
-    // Mostrar mensagem de sucesso ou redirecionar
+    if (ENABLE_AUTH) {
+      setActiveTab('login');
+      // Mostrar mensagem de sucesso ou redirecionar
+    } else {
+      // Quando autenticação está desabilitada, redirecionar para dashboard
+      router.push('/dashboard');
+    }
   };
 
   return (
