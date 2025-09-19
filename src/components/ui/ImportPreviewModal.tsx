@@ -153,7 +153,10 @@ export function ImportPreviewModal({
               </Button>
               <Button 
                 variant="secondary"
-                onClick={handleSave}
+                onClick={() => {
+                  console.log('💾 Botão Salvar clicado');
+                  handleSave();
+                }}
                 className="w-full text-xs h-6 px-2"
               >
                 <Save className="h-2.5 w-2.5 mr-0.5" />
@@ -162,7 +165,10 @@ export function ImportPreviewModal({
               {onExtract && (
                 <Button 
                   variant="default"
-                  onClick={onExtract}
+                  onClick={() => {
+                    console.log('🔵 Botão Extrair clicado');
+                    onExtract();
+                  }}
                   disabled={isExtracting || validRows === 0}
                   className="w-full text-xs h-6 px-2 bg-blue-600 hover:bg-blue-700"
                 >
@@ -173,7 +179,10 @@ export function ImportPreviewModal({
               {onConsume && (
                 <Button 
                   variant="default"
-                  onClick={onConsume}
+                  onClick={() => {
+                    console.log('🟣 Botão Consumir clicado');
+                    onConsume();
+                  }}
                   disabled={isConsuming || validRows === 0}
                   className="w-full text-xs h-6 px-2 bg-purple-600 hover:bg-purple-700"
                 >
@@ -182,7 +191,10 @@ export function ImportPreviewModal({
                 </Button>
               )}
               <Button 
-                onClick={onConfirm} 
+                onClick={() => {
+                  console.log('🟢 Botão Importar clicado');
+                  onConfirm();
+                }}
                 disabled={validRows === 0}
                 className="w-full text-xs h-6 px-2 bg-green-600 hover:bg-green-700"
               >

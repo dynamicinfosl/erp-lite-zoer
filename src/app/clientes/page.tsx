@@ -564,12 +564,15 @@ export default function ClientesPage() {
   };
 
   const handleExtractData = async () => {
+    console.log('🔵 handleExtractData chamado');
     try {
       setIsExtracting(true);
+      console.log('🔵 isExtracting definido como true');
       
       if (ENABLE_AUTH) {
         // Verificar se há dados para extrair
         if (!importData || importData.length === 0) {
+          console.log('🔴 Nenhum dado para extrair');
           toast.error('Nenhum dado para extrair');
           return;
         }
@@ -634,8 +637,10 @@ export default function ClientesPage() {
   };
 
   const handleConsumeData = async () => {
+    console.log('🟣 handleConsumeData chamado');
     try {
       setIsConsuming(true);
+      console.log('🟣 isConsuming definido como true');
       
       // Consumir dados de uma sessão anterior (simular dados em memória)
       // Em um sistema real, isso poderia vir de um cache ou sessão
