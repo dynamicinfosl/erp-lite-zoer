@@ -40,7 +40,7 @@ export function ImportPreviewModal({
   isExtracting = false,
   isConsuming = false
 }: ImportPreviewModalProps) {
-  const maxPreviewRows = 20;
+  const maxPreviewRows = 50;
   const handleSave = onSave || onConfirm;
 
   return (
@@ -92,10 +92,10 @@ export function ImportPreviewModal({
           <div className="border rounded overflow-hidden flex-1 flex flex-col min-h-0 mx-1">
             <div className="bg-gray-50 px-1 py-0.5 border-b flex-shrink-0">
               <h4 className="font-medium text-gray-800 text-xs">
-                Preview ({Math.min(maxPreviewRows, data.length)}/{data.length})
+                Dados Completos ({data.length} linhas)
               </h4>
             </div>
-            <div className="overflow-auto flex-1">
+            <div className="overflow-auto flex-1 max-h-[70vh]">
               <Table>
                 <TableHeader className="sticky top-0 bg-white z-10">
                   <TableRow>
@@ -108,7 +108,7 @@ export function ImportPreviewModal({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.slice(0, maxPreviewRows).map((row: any, rowIndex) => {
+                  {data.map((row: any, rowIndex) => {
                     const isArrayRow = Array.isArray(row);
                     return (
                       <TableRow key={rowIndex}>
@@ -126,11 +126,6 @@ export function ImportPreviewModal({
                 </TableBody>
               </Table>
             </div>
-            {data.length > maxPreviewRows && (
-              <div className="bg-gray-50 px-1 py-0.5 text-xs text-gray-600 text-center flex-shrink-0">
-                ... e mais {data.length - maxPreviewRows} linhas
-              </div>
-            )}
           </div>
 
           {/* Ações */}
