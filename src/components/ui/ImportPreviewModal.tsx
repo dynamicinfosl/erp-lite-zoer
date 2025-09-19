@@ -45,32 +45,32 @@ export function ImportPreviewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[98vw] sm:w-[95vw] md:max-w-4xl lg:max-w-6xl max-h-[100dvh] sm:max-h-[95vh] overflow-hidden sm:rounded-lg rounded-none p-1 sm:p-2">
-        <DialogHeader className="pb-1">
-          <DialogTitle className="flex items-center gap-1 text-xs">
-            <FileText className="h-3 w-3" />
+      <DialogContent className="w-[100vw] h-[100vh] max-w-none max-h-none m-0 rounded-none p-2 sm:p-3 md:p-4 overflow-hidden">
+        <DialogHeader className="pb-2 flex-shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-sm sm:text-base">
+            <FileText className="h-4 w-4" />
             <span className="truncate">Preview - {fileName}</span>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-1.5 sm:space-y-2">
+        <div className="flex flex-col h-full space-y-2 sm:space-y-3">
           {/* Estatísticas */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-1">
-            <div className="bg-blue-50 p-1 rounded text-center">
-              <div className="text-xs text-blue-600">Total</div>
-              <div className="text-xs font-bold text-blue-900">{totalRows}</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 flex-shrink-0">
+            <div className="bg-blue-50 p-2 rounded text-center">
+              <div className="text-xs sm:text-sm text-blue-600">Total</div>
+              <div className="text-sm sm:text-base font-bold text-blue-900">{totalRows}</div>
             </div>
-            <div className="bg-green-50 p-1 rounded text-center">
-              <div className="text-xs text-green-600">Válidas</div>
-              <div className="text-xs font-bold text-green-900">{validRows}</div>
+            <div className="bg-green-50 p-2 rounded text-center">
+              <div className="text-xs sm:text-sm text-green-600">Válidas</div>
+              <div className="text-sm sm:text-base font-bold text-green-900">{validRows}</div>
             </div>
-            <div className="bg-red-50 p-1 rounded text-center">
-              <div className="text-xs text-red-600">Inválidas</div>
-              <div className="text-xs font-bold text-red-900">{invalidRows}</div>
+            <div className="bg-red-50 p-2 rounded text-center">
+              <div className="text-xs sm:text-sm text-red-600">Inválidas</div>
+              <div className="text-sm sm:text-base font-bold text-red-900">{invalidRows}</div>
             </div>
-            <div className="bg-gray-50 p-1 rounded text-center">
-              <div className="text-xs text-gray-600">Preview</div>
-              <div className="text-xs font-bold text-gray-900">
+            <div className="bg-gray-50 p-2 rounded text-center">
+              <div className="text-xs sm:text-sm text-gray-600">Preview</div>
+              <div className="text-sm sm:text-base font-bold text-gray-900">
                 {Math.min(maxPreviewRows, data.length)}/{data.length}
               </div>
             </div>
@@ -78,9 +78,9 @@ export function ImportPreviewModal({
 
           {/* Erros se houver */}
           {errors.length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded p-1.5">
-              <h4 className="font-medium text-red-800 mb-0.5 text-xs">Erros encontrados:</h4>
-              <ul className="text-xs text-red-700 space-y-0.5 max-h-20 overflow-y-auto">
+            <div className="bg-red-50 border border-red-200 rounded p-2 flex-shrink-0">
+              <h4 className="font-medium text-red-800 mb-1 text-sm">Erros encontrados:</h4>
+              <ul className="text-xs sm:text-sm text-red-700 space-y-1 max-h-24 overflow-y-auto">
                 {errors.map((error, index) => (
                   <li key={index}>• {error}</li>
                 ))}
@@ -89,19 +89,19 @@ export function ImportPreviewModal({
           )}
 
           {/* Tabela de Preview */}
-          <div className="border rounded overflow-hidden">
-            <div className="bg-gray-50 px-1.5 py-0.5 border-b">
-              <h4 className="font-medium text-gray-800 text-xs">
+          <div className="border rounded overflow-hidden flex-1 flex flex-col min-h-0">
+            <div className="bg-gray-50 px-2 py-1 border-b flex-shrink-0">
+              <h4 className="font-medium text-gray-800 text-sm">
                 Preview ({Math.min(maxPreviewRows, data.length)}/{data.length})
               </h4>
             </div>
-            <div className="overflow-auto max-h-[30vh] sm:max-h-[40vh] md:max-h-72">
+            <div className="overflow-auto flex-1">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 bg-white z-10">
                   <TableRow>
-                    <TableHead className="w-5 text-xs py-1">#</TableHead>
+                    <TableHead className="w-12 text-xs sm:text-sm py-2 sticky left-0 bg-white border-r">#</TableHead>
                     {headers.map((header, index) => (
-                      <TableHead key={index} className="min-w-[50px] sm:min-w-[70px] text-xs py-1">
+                      <TableHead key={index} className="min-w-[80px] sm:min-w-[100px] text-xs sm:text-sm py-2 whitespace-nowrap">
                         {header}
                       </TableHead>
                     ))}
@@ -112,11 +112,11 @@ export function ImportPreviewModal({
                     const isArrayRow = Array.isArray(row);
                     return (
                       <TableRow key={rowIndex}>
-                        <TableCell className="font-medium text-gray-500 text-xs py-1">
+                        <TableCell className="font-medium text-gray-500 text-xs sm:text-sm py-2 sticky left-0 bg-white border-r">
                           {rowIndex + 1}
                         </TableCell>
                         {headers.map((header, cellIndex) => (
-                          <TableCell key={cellIndex} className="max-w-[70px] sm:max-w-[100px] truncate text-xs py-1">
+                          <TableCell key={cellIndex} className="max-w-[120px] sm:max-w-[150px] truncate text-xs sm:text-sm py-2">
                             {isArrayRow ? (row[cellIndex] ?? '-') : (row[header] ?? '-')}
                           </TableCell>
                         ))}
@@ -127,15 +127,15 @@ export function ImportPreviewModal({
               </Table>
             </div>
             {data.length > maxPreviewRows && (
-              <div className="bg-gray-50 px-1.5 py-0.5 text-xs text-gray-600 text-center">
+              <div className="bg-gray-50 px-2 py-1 text-xs sm:text-sm text-gray-600 text-center flex-shrink-0">
                 ... e mais {data.length - maxPreviewRows} linhas
               </div>
             )}
           </div>
 
           {/* Ações */}
-          <div className="flex flex-col gap-1.5 pt-1.5 border-t">
-            <div className="text-xs text-gray-600 text-center">
+          <div className="flex flex-col gap-2 pt-2 border-t flex-shrink-0">
+            <div className="text-xs sm:text-sm text-gray-600 text-center">
               {validRows > 0 ? (
                 <span className="text-green-600">
                   ✓ {validRows} válidos
@@ -146,10 +146,10 @@ export function ImportPreviewModal({
                 </span>
               )}
             </div>
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-1">
-              <Button variant="outline" onClick={onClose} className="w-full text-xs h-6 px-2">
-                <X className="h-2.5 w-2.5 mr-0.5" />
-                <span className="hidden sm:inline">Cancelar</span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              <Button variant="outline" onClick={onClose} className="w-full text-xs sm:text-sm h-8 sm:h-9 px-2">
+                <X className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                <span className="hidden xs:inline">Cancelar</span>
               </Button>
               <Button 
                 variant="secondary"
@@ -157,10 +157,10 @@ export function ImportPreviewModal({
                   console.log('💾 Botão Salvar clicado');
                   handleSave();
                 }}
-                className="w-full text-xs h-6 px-2"
+                className="w-full text-xs sm:text-sm h-8 sm:h-9 px-2"
               >
-                <Save className="h-2.5 w-2.5 mr-0.5" />
-                <span className="hidden sm:inline">Salvar</span>
+                <Save className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                <span className="hidden xs:inline">Salvar</span>
               </Button>
               {onExtract && (
                 <Button 
@@ -170,10 +170,10 @@ export function ImportPreviewModal({
                     onExtract();
                   }}
                   disabled={isExtracting || validRows === 0}
-                  className="w-full text-xs h-6 px-2 bg-blue-600 hover:bg-blue-700"
+                  className="w-full text-xs sm:text-sm h-8 sm:h-9 px-2 bg-blue-600 hover:bg-blue-700"
                 >
-                  <Database className="h-2.5 w-2.5 mr-0.5" />
-                  <span className="hidden sm:inline">{isExtracting ? 'Extraindo...' : 'Extrair'}</span>
+                  <Database className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                  <span className="hidden xs:inline">{isExtracting ? 'Extraindo...' : 'Extrair'}</span>
                 </Button>
               )}
               {onConsume && (
@@ -184,10 +184,10 @@ export function ImportPreviewModal({
                     onConsume();
                   }}
                   disabled={isConsuming || validRows === 0}
-                  className="w-full text-xs h-6 px-2 bg-purple-600 hover:bg-purple-700"
+                  className="w-full text-xs sm:text-sm h-8 sm:h-9 px-2 bg-purple-600 hover:bg-purple-700"
                 >
-                  <Plus className="h-2.5 w-2.5 mr-0.5" />
-                  <span className="hidden sm:inline">{isConsuming ? 'Consumindo...' : 'Consumir'}</span>
+                  <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                  <span className="hidden xs:inline">{isConsuming ? 'Consumindo...' : 'Consumir'}</span>
                 </Button>
               )}
               <Button 
@@ -196,10 +196,10 @@ export function ImportPreviewModal({
                   onConfirm();
                 }}
                 disabled={validRows === 0}
-                className="w-full text-xs h-6 px-2 bg-green-600 hover:bg-green-700"
+                className="w-full text-xs sm:text-sm h-8 sm:h-9 px-2 bg-green-600 hover:bg-green-700 col-span-2 sm:col-span-1"
               >
-                <Upload className="h-2.5 w-2.5 mr-0.5" />
-                <span className="hidden sm:inline">Importar</span>
+                <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                <span className="hidden xs:inline">Importar</span>
               </Button>
             </div>
           </div>

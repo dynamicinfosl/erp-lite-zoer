@@ -172,70 +172,70 @@ export function OrdemServicoPDF({ ordem, onClose }: OrdemServicoPDFProps) {
         <div className="p-4 overflow-y-auto max-h-[calc(90vh-80px)]">
           <div ref={pdfRef} className="bg-white p-8 text-black" style={{ width: '210mm', minHeight: '297mm' }}>
             {/* Cabeçalho com Logo e Dados da Empresa */}
-            <div className="flex justify-between items-start mb-6">
+            <div className="flex justify-between items-start mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-16 h-16 bg-gray-800 text-white flex items-center justify-center text-xl font-bold">
+                <div className="w-12 h-12 bg-gray-800 text-white flex items-center justify-center text-sm font-bold">
                   CLS
                 </div>
                 <div>
-                  <div className="text-sm text-gray-600">IMPORT</div>
-                  <div className="text-lg font-bold">CLS Alves Import</div>
+                  <div className="text-xs text-gray-600">IMPORT</div>
+                  <div className="text-sm font-bold">CLS Alves Import</div>
                 </div>
               </div>
-              <div className="text-right text-sm">
-                <div>Tel: (21) 96412-5745</div>
-                <div>Email: clsimportsite@gmail.com</div>
+              <div className="text-right text-xs">
+                <div>(21)96412-5745</div>
+                <div>clsimportsite@gmail.com</div>
                 <div>Vendedor: Cláudio Alves</div>
               </div>
             </div>
 
             {/* Título e Data */}
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold mb-2">PEDIDO N° {ordem.numero}</h1>
-              <div className="flex justify-between items-center">
+            <div className="text-center mb-4">
+              <h1 className="text-lg font-bold mb-1">PEDIDO N° {ordem.numero}</h1>
+              <div className="flex justify-between items-center text-xs">
                 <div></div>
-                <div className="text-sm">{formatDate(ordem.dataAbertura)}</div>
+                <div>{formatDate(ordem.dataAbertura)}</div>
               </div>
-              <div className="text-sm mt-2">PRAZO DE ENTREGA: {formatDate(ordem.dataPrevisao || ordem.dataAbertura)}</div>
+              <div className="text-xs mt-1">PRAZO DE ENTREGA: {formatDate(ordem.dataPrevisao || ordem.dataAbertura)}</div>
             </div>
 
             {/* Dados do Cliente */}
-            <div className="mb-6">
-              <h2 className="text-lg font-bold mb-3 border-b pb-1">DADOS DO CLIENTE</h2>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="space-y-2">
+            <div className="mb-4">
+              <h2 className="text-sm font-bold mb-2 border-b pb-1">DADOS DO CLIENTE</h2>
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="space-y-1">
                   <div className="flex">
-                    <span className="w-20 font-semibold">Cliente:</span>
+                    <span className="w-16 font-semibold">Cliente:</span>
                     <span>{ordem.cliente.nome}</span>
                   </div>
                   <div className="flex">
-                    <span className="w-20 font-semibold">Endereço:</span>
+                    <span className="w-16 font-semibold">Endereço:</span>
                     <span>{ordem.cliente.endereco || '________________'}</span>
                   </div>
                   <div className="flex">
-                    <span className="w-20 font-semibold">Cidade:</span>
+                    <span className="w-16 font-semibold">Cidade:</span>
                     <span>________________</span>
                   </div>
                   <div className="flex">
-                    <span className="w-20 font-semibold">Telefone:</span>
+                    <span className="w-16 font-semibold">Telefone:</span>
                     <span>{ordem.cliente.telefone || '________________'}</span>
                   </div>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <div className="flex">
-                    <span className="w-20 font-semibold">CNPJ/CPF:</span>
+                    <span className="w-16 font-semibold">CNPJ/CPF:</span>
                     <span>________________</span>
                   </div>
                   <div className="flex">
-                    <span className="w-20 font-semibold">CEP:</span>
+                    <span className="w-16 font-semibold">CEP:</span>
                     <span>________________</span>
                   </div>
                   <div className="flex">
-                    <span className="w-20 font-semibold">Estado:</span>
+                    <span className="w-16 font-semibold">Estado:</span>
                     <span>________________</span>
                   </div>
                   <div className="flex">
-                    <span className="w-20 font-semibold">E-mail:</span>
+                    <span className="w-16 font-semibold">E-mail:</span>
                     <span>________________</span>
                   </div>
                 </div>
@@ -243,147 +243,89 @@ export function OrdemServicoPDF({ ordem, onClose }: OrdemServicoPDFProps) {
             </div>
 
             {/* Produtos/Serviços */}
-            <div className="mb-6">
-              <h2 className="text-lg font-bold mb-3 border-b pb-1">PRODUTOS</h2>
+            <div className="mb-4">
+              <h2 className="text-sm font-bold mb-2 border-b pb-1">PRODUTOS</h2>
               <div className="border border-gray-300">
-                <table className="w-full text-sm">
+                <table className="w-full text-xs">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="border border-gray-300 px-2 py-1 text-left">ITEM</th>
-                      <th className="border border-gray-300 px-2 py-1 text-left">NOME</th>
-                      <th className="border border-gray-300 px-2 py-1 text-center">UND.</th>
-                      <th className="border border-gray-300 px-2 py-1 text-center">QTD.</th>
-                      <th className="border border-gray-300 px-2 py-1 text-right">VR. UNIT.</th>
-                      <th className="border border-gray-300 px-2 py-1 text-right">DESC.</th>
-                      <th className="border border-gray-300 px-2 py-1 text-right">SUBTOTAL</th>
+                      <th className="border border-gray-300 px-1 py-1 text-left">ITEM</th>
+                      <th className="border border-gray-300 px-1 py-1 text-left">NOME</th>
+                      <th className="border border-gray-300 px-1 py-1 text-center">UND.</th>
+                      <th className="border border-gray-300 px-1 py-1 text-center">QTD.</th>
+                      <th className="border border-gray-300 px-1 py-1 text-right">VR. UNIT.</th>
+                      <th className="border border-gray-300 px-1 py-1 text-right">DESC.</th>
+                      <th className="border border-gray-300 px-1 py-1 text-right">SUBTOTAL</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td className="border border-gray-300 px-2 py-1 text-center">1</td>
-                      <td className="border border-gray-300 px-2 py-1">{ordem.equipamento.tipo} - {ordem.equipamento.marca} {ordem.equipamento.modelo}</td>
-                      <td className="border border-gray-300 px-2 py-1 text-center">UN</td>
-                      <td className="border border-gray-300 px-2 py-1 text-center">1,00</td>
-                      <td className="border border-gray-300 px-2 py-1 text-right">
-                        {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+                      <td className="border border-gray-300 px-1 py-1 text-center">1</td>
+                      <td className="border border-gray-300 px-1 py-1">{ordem.equipamento.tipo} - {ordem.equipamento.marca} {ordem.equipamento.modelo}</td>
+                      <td className="border border-gray-300 px-1 py-1 text-center">UN</td>
+                      <td className="border border-gray-300 px-1 py-1 text-center">1,00</td>
+                      <td className="border border-gray-300 px-1 py-1 text-right">
+                        {ordem.valorServico ? (ordem.valorServico + 200).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '2.300,00'}
                       </td>
-                      <td className="border border-gray-300 px-2 py-1 text-right">0,00</td>
-                      <td className="border border-gray-300 px-2 py-1 text-right">
-                        {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+                      <td className="border border-gray-300 px-1 py-1 text-right">200,00</td>
+                      <td className="border border-gray-300 px-1 py-1 text-right">
+                        {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '2.100,00'}
                       </td>
                     </tr>
                     <tr className="bg-gray-50">
-                      <td className="border border-gray-300 px-2 py-1 font-semibold">TOTAL</td>
-                      <td className="border border-gray-300 px-2 py-1"></td>
-                      <td className="border border-gray-300 px-2 py-1 text-center">1,00</td>
-                      <td className="border border-gray-300 px-2 py-1 text-center">
-                        {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+                      <td className="border border-gray-300 px-1 py-1 font-semibold">TOTAL</td>
+                      <td className="border border-gray-300 px-1 py-1"></td>
+                      <td className="border border-gray-300 px-1 py-1 text-center">UN</td>
+                      <td className="border border-gray-300 px-1 py-1 text-center">1,00</td>
+                      <td className="border border-gray-300 px-1 py-1 text-right">
+                        {ordem.valorServico ? (ordem.valorServico + 200).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '2.300,00'}
                       </td>
-                      <td className="border border-gray-300 px-2 py-1 text-right">0,00</td>
-                      <td className="border border-gray-300 px-2 py-1 text-right font-semibold">
-                        {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+                      <td className="border border-gray-300 px-1 py-1 text-right">200,00</td>
+                      <td className="border border-gray-300 px-1 py-1 text-right font-semibold">
+                        {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '2.100,00'}
                       </td>
                     </tr>
                   </tbody>
                 </table>
-                <div className="text-right pr-4 py-2 text-sm">
-                  <div>PRODUTOS: {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}</div>
-                  <div className="font-bold">TOTAL: R$ {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}</div>
+                <div className="text-right pr-2 py-1 text-xs">
+                  <div>PRODUTOS: {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '2.100,00'}</div>
+                  <div className="font-bold">TOTAL: R$ {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '2.100,00'}</div>
                 </div>
               </div>
             </div>
 
             {/* Dados do Pagamento */}
-            <div className="mb-6">
-              <h2 className="text-lg font-bold mb-3 border-b pb-1">DADOS DO PAGAMENTO</h2>
+            <div className="mb-4">
+              <h2 className="text-sm font-bold mb-2 border-b pb-1">DADOS DO PAGAMENTO</h2>
               <div className="border border-gray-300">
-                <table className="w-full text-sm">
+                <table className="w-full text-xs">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="border border-gray-300 px-2 py-1 text-left">VENCIMENTO</th>
-                      <th className="border border-gray-300 px-2 py-1 text-right">VALOR</th>
-                      <th className="border border-gray-300 px-2 py-1 text-left">FORMA DE PAGAMENTO</th>
-                      <th className="border border-gray-300 px-2 py-1 text-left">OBSERVAÇÃO</th>
+                      <th className="border border-gray-300 px-1 py-1 text-left">VENCIMENTO</th>
+                      <th className="border border-gray-300 px-1 py-1 text-left">VALOR</th>
+                      <th className="border border-gray-300 px-1 py-1 text-left">FORMA DE PAGAMENTO</th>
+                      <th className="border border-gray-300 px-1 py-1 text-left">OBSERVAÇÃO</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td className="border border-gray-300 px-2 py-1">{formatDate(ordem.dataPrevisao || ordem.dataAbertura)}</td>
-                      <td className="border border-gray-300 px-2 py-1 text-right">
-                        {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+                      <td className="border border-gray-300 px-1 py-1">{formatDate(ordem.dataPrevisao || ordem.dataAbertura)}</td>
+                      <td className="border border-gray-300 px-1 py-1">
+                        {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '2.100,00'}
                       </td>
-                      <td className="border border-gray-300 px-2 py-1">PIX</td>
-                      <td className="border border-gray-300 px-2 py-1">{ordem.observacoes || ''}</td>
+                      <td className="border border-gray-300 px-1 py-1">PIX</td>
+                      <td className="border border-gray-300 px-1 py-1"></td>
                     </tr>
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* Informações do Serviço */}
-            <div className="mb-6">
-              <h2 className="text-lg font-bold mb-3 border-b pb-1">INFORMAÇÕES DO SERVIÇO</h2>
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <p><strong>Status:</strong> {getStatusLabel(ordem.status)}</p>
-                  <p><strong>Prioridade:</strong> {getPrioridadeLabel(ordem.prioridade)}</p>
-                </div>
-                <div>
-                  <p><strong>Técnico:</strong> {ordem.tecnico || 'Não atribuído'}</p>
-                  {ordem.dataPrevisao && (
-                    <p><strong>Previsão:</strong> {formatDate(ordem.dataPrevisao)}</p>
-                  )}
-                </div>
-              </div>
-              
-              <div className="mb-4">
-                <p><strong>Problema Relatado:</strong></p>
-                <p className="border p-2 bg-gray-50 rounded">{ordem.problema}</p>
-              </div>
-
-              {ordem.diagnostico && (
-                <div className="mb-4">
-                  <p><strong>Diagnóstico:</strong></p>
-                  <p className="border p-2 bg-gray-50 rounded">{ordem.diagnostico}</p>
-                </div>
-              )}
-
-              {ordem.solucao && (
-                <div className="mb-4">
-                  <p><strong>Solução Aplicada:</strong></p>
-                  <p className="border p-2 bg-gray-50 rounded">{ordem.solucao}</p>
-                </div>
-              )}
-
-              {ordem.observacoes && (
-                <div className="mb-4">
-                  <p><strong>Observações:</strong></p>
-                  <p className="border p-2 bg-gray-50 rounded">{ordem.observacoes}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Informações Financeiras */}
-            <div className="mb-6">
-              <h2 className="text-lg font-bold mb-3 border-b pb-1">INFORMAÇÕES FINANCEIRAS</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p><strong>Valor do Serviço:</strong> {formatCurrency(ordem.valorServico || 0)}</p>
-                  <p><strong>Valor das Peças:</strong> {formatCurrency(ordem.valorPecas || 0)}</p>
-                </div>
-                <div>
-                  <p className="text-lg font-bold">
-                    <strong>Valor Total:</strong> {formatCurrency((ordem.valorServico || 0) + (ordem.valorPecas || 0))}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Assinatura */}
-            <div className="mt-8 pt-4 border-t">
+            {/* Rodapé com Assinatura */}
+            <div className="mt-6 pt-4 border-t border-gray-300">
               <div className="text-center">
-                <div className="border-b border-gray-400 w-64 mx-auto mb-2"></div>
-                <div className="text-sm font-semibold">Assinatura do cliente</div>
+                <div className="w-full h-12 border-b border-gray-300 mb-2"></div>
+                <p className="text-xs text-gray-600">Assinatura do cliente</p>
               </div>
             </div>
           </div>
