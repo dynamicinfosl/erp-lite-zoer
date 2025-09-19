@@ -55,24 +55,22 @@ export function ImportPreviewModal({
 
         <div className="flex flex-col h-full space-y-0.5">
           {/* Estatísticas */}
-          <div className="grid grid-cols-4 gap-0.5 flex-shrink-0 px-1">
-            <div className="bg-blue-50 p-0.5 rounded text-center">
-              <div className="text-xs text-blue-600">Total</div>
-              <div className="text-xs font-bold text-blue-900">{totalRows}</div>
+          <div className="grid grid-cols-4 gap-0.5 flex-shrink-0 px-1 h-8">
+            <div className="bg-blue-50 p-0.5 rounded text-center flex flex-col justify-center">
+              <div className="text-xs text-blue-600 leading-none">Total</div>
+              <div className="text-xs font-bold text-blue-900 leading-none">{totalRows}</div>
             </div>
-            <div className="bg-green-50 p-0.5 rounded text-center">
-              <div className="text-xs text-green-600">Válidas</div>
-              <div className="text-xs font-bold text-green-900">{validRows}</div>
+            <div className="bg-green-50 p-0.5 rounded text-center flex flex-col justify-center">
+              <div className="text-xs text-green-600 leading-none">Válidas</div>
+              <div className="text-xs font-bold text-green-900 leading-none">{validRows}</div>
             </div>
-            <div className="bg-red-50 p-0.5 rounded text-center">
-              <div className="text-xs text-red-600">Inválidas</div>
-              <div className="text-xs font-bold text-red-900">{invalidRows}</div>
+            <div className="bg-red-50 p-0.5 rounded text-center flex flex-col justify-center">
+              <div className="text-xs text-red-600 leading-none">Inválidas</div>
+              <div className="text-xs font-bold text-red-900 leading-none">{invalidRows}</div>
             </div>
-            <div className="bg-gray-50 p-0.5 rounded text-center">
-              <div className="text-xs text-gray-600">Preview</div>
-              <div className="text-xs font-bold text-gray-900">
-                {Math.min(maxPreviewRows, data.length)}/{data.length}
-              </div>
+            <div className="bg-gray-50 p-0.5 rounded text-center flex flex-col justify-center">
+              <div className="text-xs text-gray-600 leading-none">Dados</div>
+              <div className="text-xs font-bold text-gray-900 leading-none">{data.length}</div>
             </div>
           </div>
 
