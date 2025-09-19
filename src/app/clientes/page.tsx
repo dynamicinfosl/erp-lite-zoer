@@ -551,8 +551,10 @@ export default function ClientesPage() {
   };
 
   const handleImportConfirm = async () => {
+    console.log('🟢 handleImportConfirm chamado');
     setShowImportPreview(false);
     // Executar importação diretamente
+    console.log('Executando processImportData...');
     await processImportData();
   };
 
@@ -700,15 +702,18 @@ export default function ClientesPage() {
 
   const processImportData = async () => {
     try {
+      console.log('🔄 processImportData iniciado');
       setImportLoading(true);
       let successCount = 0;
       let errorCount = 0;
 
       console.log('Iniciando importação de', importData.length, 'clientes');
       console.log('ENABLE_AUTH:', ENABLE_AUTH);
+      console.log('Dados para importar:', importData);
 
       for (const row of importData) {
         try {
+          console.log('Processando linha:', row);
           const customerData = {
             name: row['Nome'] || row['nome'] || '',
             email: row['E-mail'] || row['email'] || '',
@@ -723,10 +728,10 @@ export default function ClientesPage() {
             is_active: (row['Status'] || row['status'] || 'Ativo').toLowerCase() === 'ativo'
           };
 
-          console.log('Processando cliente:', customerData.name);
+          console.log('Dados do cliente processados:', customerData);
 
           if (!customerData.name) {
-            console.log('Cliente sem nome, pulando...');
+            console.log('Cliente sem nome, pulando...', customerData);
             errorCount++;
             continue;
           }
@@ -760,12 +765,18 @@ export default function ClientesPage() {
       console.log('Atualizando lista de clientes...');
       await fetchCustomers();
       
+      console.log(`Importação concluída: ${successCount} sucessos, ${errorCount} erros`);
+      
       if (successCount > 0) {
         toast.success(`${successCount} clientes importados com sucesso!`);
       }
       
       if (errorCount > 0) {
         toast.error(`${errorCount} clientes não puderam ser importados`);
+      }
+      
+      if (successCount === 0 && errorCount === 0) {
+        toast.warning('Nenhum cliente foi processado');
       }
     } catch (error) {
       console.error('Erro ao processar importação:', getErrorMessage(error));
