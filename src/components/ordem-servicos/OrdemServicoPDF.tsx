@@ -171,42 +171,152 @@ export function OrdemServicoPDF({ ordem, onClose }: OrdemServicoPDFProps) {
         
         <div className="p-4 overflow-y-auto max-h-[calc(90vh-80px)]">
           <div ref={pdfRef} className="bg-white p-8 text-black" style={{ width: '210mm', minHeight: '297mm' }}>
-            {/* Cabeçalho */}
-            <div className="text-center mb-8 border-b pb-4">
-              <h1 className="text-2xl font-bold mb-2">ORDEM DE SERVIÇO</h1>
-              <p className="text-lg">Número: {ordem.numero}</p>
-              <p className="text-sm text-gray-600">
-                Data de Abertura: {formatDate(ordem.dataAbertura)}
-              </p>
-            </div>
-
-            {/* Informações do Cliente */}
-            <div className="mb-6">
-              <h2 className="text-lg font-bold mb-3 border-b pb-1">DADOS DO CLIENTE</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p><strong>Nome:</strong> {ordem.cliente.nome}</p>
-                  <p><strong>Telefone:</strong> {ordem.cliente.telefone}</p>
+            {/* Cabeçalho com Logo e Dados da Empresa */}
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-16 h-16 bg-gray-800 text-white flex items-center justify-center text-xl font-bold">
+                  CLS
                 </div>
                 <div>
-                  <p><strong>Endereço:</strong></p>
-                  <p className="text-sm">{ordem.cliente.endereco}</p>
+                  <div className="text-sm text-gray-600">IMPORT</div>
+                  <div className="text-lg font-bold">CLS Alves Import</div>
+                </div>
+              </div>
+              <div className="text-right text-sm">
+                <div>Tel: (21) 96412-5745</div>
+                <div>Email: clsimportsite@gmail.com</div>
+                <div>Vendedor: Cláudio Alves</div>
+              </div>
+            </div>
+
+            {/* Título e Data */}
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-bold mb-2">PEDIDO N° {ordem.numero}</h1>
+              <div className="flex justify-between items-center">
+                <div></div>
+                <div className="text-sm">{formatDate(ordem.dataAbertura)}</div>
+              </div>
+              <div className="text-sm mt-2">PRAZO DE ENTREGA: {formatDate(ordem.dataPrevisao || ordem.dataAbertura)}</div>
+            </div>
+
+            {/* Dados do Cliente */}
+            <div className="mb-6">
+              <h2 className="text-lg font-bold mb-3 border-b pb-1">DADOS DO CLIENTE</h2>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="space-y-2">
+                  <div className="flex">
+                    <span className="w-20 font-semibold">Cliente:</span>
+                    <span>{ordem.cliente.nome}</span>
+                  </div>
+                  <div className="flex">
+                    <span className="w-20 font-semibold">Endereço:</span>
+                    <span>{ordem.cliente.endereco || '________________'}</span>
+                  </div>
+                  <div className="flex">
+                    <span className="w-20 font-semibold">Cidade:</span>
+                    <span>________________</span>
+                  </div>
+                  <div className="flex">
+                    <span className="w-20 font-semibold">Telefone:</span>
+                    <span>{ordem.cliente.telefone || '________________'}</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex">
+                    <span className="w-20 font-semibold">CNPJ/CPF:</span>
+                    <span>________________</span>
+                  </div>
+                  <div className="flex">
+                    <span className="w-20 font-semibold">CEP:</span>
+                    <span>________________</span>
+                  </div>
+                  <div className="flex">
+                    <span className="w-20 font-semibold">Estado:</span>
+                    <span>________________</span>
+                  </div>
+                  <div className="flex">
+                    <span className="w-20 font-semibold">E-mail:</span>
+                    <span>________________</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Informações do Equipamento */}
+            {/* Produtos/Serviços */}
             <div className="mb-6">
-              <h2 className="text-lg font-bold mb-3 border-b pb-1">DADOS DO EQUIPAMENTO</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p><strong>Tipo:</strong> {ordem.equipamento.tipo}</p>
-                  <p><strong>Marca:</strong> {ordem.equipamento.marca}</p>
+              <h2 className="text-lg font-bold mb-3 border-b pb-1">PRODUTOS</h2>
+              <div className="border border-gray-300">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="border border-gray-300 px-2 py-1 text-left">ITEM</th>
+                      <th className="border border-gray-300 px-2 py-1 text-left">NOME</th>
+                      <th className="border border-gray-300 px-2 py-1 text-center">UND.</th>
+                      <th className="border border-gray-300 px-2 py-1 text-center">QTD.</th>
+                      <th className="border border-gray-300 px-2 py-1 text-right">VR. UNIT.</th>
+                      <th className="border border-gray-300 px-2 py-1 text-right">DESC.</th>
+                      <th className="border border-gray-300 px-2 py-1 text-right">SUBTOTAL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="border border-gray-300 px-2 py-1 text-center">1</td>
+                      <td className="border border-gray-300 px-2 py-1">{ordem.equipamento.tipo} - {ordem.equipamento.marca} {ordem.equipamento.modelo}</td>
+                      <td className="border border-gray-300 px-2 py-1 text-center">UN</td>
+                      <td className="border border-gray-300 px-2 py-1 text-center">1,00</td>
+                      <td className="border border-gray-300 px-2 py-1 text-right">
+                        {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+                      </td>
+                      <td className="border border-gray-300 px-2 py-1 text-right">0,00</td>
+                      <td className="border border-gray-300 px-2 py-1 text-right">
+                        {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+                      </td>
+                    </tr>
+                    <tr className="bg-gray-50">
+                      <td className="border border-gray-300 px-2 py-1 font-semibold">TOTAL</td>
+                      <td className="border border-gray-300 px-2 py-1"></td>
+                      <td className="border border-gray-300 px-2 py-1 text-center">1,00</td>
+                      <td className="border border-gray-300 px-2 py-1 text-center">
+                        {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+                      </td>
+                      <td className="border border-gray-300 px-2 py-1 text-right">0,00</td>
+                      <td className="border border-gray-300 px-2 py-1 text-right font-semibold">
+                        {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div className="text-right pr-4 py-2 text-sm">
+                  <div>PRODUTOS: {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}</div>
+                  <div className="font-bold">TOTAL: R$ {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}</div>
                 </div>
-                <div>
-                  <p><strong>Modelo:</strong> {ordem.equipamento.modelo}</p>
-                  <p><strong>Nº Série:</strong> {ordem.equipamento.numeroSerie}</p>
-                </div>
+              </div>
+            </div>
+
+            {/* Dados do Pagamento */}
+            <div className="mb-6">
+              <h2 className="text-lg font-bold mb-3 border-b pb-1">DADOS DO PAGAMENTO</h2>
+              <div className="border border-gray-300">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="border border-gray-300 px-2 py-1 text-left">VENCIMENTO</th>
+                      <th className="border border-gray-300 px-2 py-1 text-right">VALOR</th>
+                      <th className="border border-gray-300 px-2 py-1 text-left">FORMA DE PAGAMENTO</th>
+                      <th className="border border-gray-300 px-2 py-1 text-left">OBSERVAÇÃO</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="border border-gray-300 px-2 py-1">{formatDate(ordem.dataPrevisao || ordem.dataAbertura)}</td>
+                      <td className="border border-gray-300 px-2 py-1 text-right">
+                        {ordem.valorServico ? ordem.valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+                      </td>
+                      <td className="border border-gray-300 px-2 py-1">PIX</td>
+                      <td className="border border-gray-300 px-2 py-1">{ordem.observacoes || ''}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
 
@@ -269,17 +379,11 @@ export function OrdemServicoPDF({ ordem, onClose }: OrdemServicoPDFProps) {
               </div>
             </div>
 
-            {/* Rodapé */}
+            {/* Assinatura */}
             <div className="mt-8 pt-4 border-t">
-              <div className="grid grid-cols-2 gap-8">
-                <div className="text-center">
-                  <p className="border-b mb-2 pb-1">Assinatura do Cliente</p>
-                  <p className="text-sm text-gray-600">Data: ___/___/______</p>
-                </div>
-                <div className="text-center">
-                  <p className="border-b mb-2 pb-1">Assinatura do Técnico</p>
-                  <p className="text-sm text-gray-600">Data: ___/___/______</p>
-                </div>
+              <div className="text-center">
+                <div className="border-b border-gray-400 w-64 mx-auto mb-2"></div>
+                <div className="text-sm font-semibold">Assinatura do cliente</div>
               </div>
             </div>
           </div>
