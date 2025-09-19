@@ -598,7 +598,19 @@ export default function ClientesPage() {
           console.log('Dados do cliente a ser criado:', customerData);
 
           if (customerData.name.trim()) {
-            await api.post('/customers', customerData);
+            if (ENABLE_AUTH) {
+              await api.post('/customers', customerData);
+            } else {
+              // Modo sem autenticação - adicionar diretamente à lista local
+              const newCustomer = {
+                id: Date.now() + Math.random(),
+                user_id: 1,
+                ...customerData,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+              setCustomers(prev => [...prev, newCustomer]);
+            }
             successCount++;
           }
         } catch (error) {
