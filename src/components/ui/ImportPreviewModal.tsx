@@ -54,25 +54,31 @@ export function ImportPreviewModal({
   // Reset selection when modal opens/closes
   useEffect(() => {
     if (isOpen) {
+      console.log('🔄 Modal aberto - resetando seleção');
+      console.log('📊 Dados disponíveis:', data.length);
       setSelectedRows(new Set());
       setSelectAll(false);
     }
-  }, [isOpen]);
+  }, [isOpen, data.length]);
 
   // Handle select all
   const handleSelectAll = (checked: boolean) => {
+    console.log('🔘 Selecionar todos:', checked);
     if (checked) {
       const allIndices = data.map((_, index) => index);
       setSelectedRows(new Set(allIndices));
       setSelectAll(true);
+      console.log('📊 Todas as linhas selecionadas:', allIndices.length);
     } else {
       setSelectedRows(new Set());
       setSelectAll(false);
+      console.log('📊 Nenhuma linha selecionada');
     }
   };
 
   // Handle individual row selection
   const handleRowSelect = (index: number, checked: boolean) => {
+    console.log('🔘 Selecionando linha:', index, 'checked:', checked);
     const newSelected = new Set(selectedRows);
     if (checked) {
       newSelected.add(index);
@@ -81,13 +87,28 @@ export function ImportPreviewModal({
     }
     setSelectedRows(newSelected);
     setSelectAll(newSelected.size === data.length);
+    console.log('📊 Linhas selecionadas:', newSelected.size, 'de', data.length);
   };
 
   // Handle register selected rows
   const handleRegister = () => {
-    if (onRegister && selectedRows.size > 0) {
-      const selectedData = Array.from(selectedRows).map(index => data[index]);
-      onRegister(selectedData);
+    console.log('👤 handleRegister chamado');
+    console.log('📊 selectedRows.size:', selectedRows.size);
+    console.log('📊 onRegister existe:', !!onRegister);
+    console.log('📊 data.length:', data.length);
+    
+    if (onRegister) {
+      if (selectedRows.size > 0) {
+        const selectedData = Array.from(selectedRows).map(index => data[index]);
+        console.log('📊 Dados selecionados para cadastro:', selectedData.length);
+        onRegister(selectedData);
+      } else {
+        // Se nenhuma linha está selecionada, cadastra todos os dados
+        console.log('📊 Nenhuma linha selecionada, cadastrando todos os dados:', data.length);
+        onRegister(data);
+      }
+    } else {
+      console.log('❌ Não é possível cadastrar - onRegister não existe');
     }
   };
 
@@ -207,7 +228,7 @@ export function ImportPreviewModal({
             <div className="text-xs text-gray-600 text-center">
               {validRows > 0 ? (
                 <span className="text-green-600">
-                  ✓ {validRows} válidos | {selectedRows.size} selecionados
+                  ✓ {validRows} válidos | {selectedRows.size} selecionados | onRegister: {onRegister ? '✅' : '❌'}
                 </span>
               ) : (
                 <span className="text-red-600">
@@ -226,14 +247,15 @@ export function ImportPreviewModal({
                   variant="default"
                   onClick={() => {
                     console.log('👤 Botão Cadastrar clicado');
+                    console.log('📊 Estado do botão - isRegistering:', isRegistering, 'selectedRows.size:', selectedRows.size);
                     handleRegister();
                   }}
-                  disabled={isRegistering || selectedRows.size === 0}
+                  disabled={isRegistering}
                   className="w-full text-xs h-4 px-0.5 bg-green-600 hover:bg-green-700"
                 >
                   <UserPlus className="h-2 w-2" />
                   <span className="hidden sm:inline ml-0.5 text-xs">
-                    {isRegistering ? 'Cadastrando...' : `Cadastrar (${selectedRows.size})`}
+                    {isRegistering ? 'Cadastrando...' : selectedRows.size > 0 ? `Cadastrar (${selectedRows.size})` : `Cadastrar Todos (${data.length})`}
                   </span>
                 </Button>
               )}

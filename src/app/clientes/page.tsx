@@ -653,7 +653,8 @@ export default function ClientesPage() {
   };
 
   const handleRegisterSelected = async (selectedRows: any[]) => {
-    console.log('👤 Cadastrando clientes selecionados:', selectedRows.length);
+    console.log('👤 handleRegisterSelected chamado com', selectedRows.length, 'clientes');
+    console.log('📊 Dados recebidos:', selectedRows);
     try {
       setIsRegistering(true);
       let successCount = 0;
