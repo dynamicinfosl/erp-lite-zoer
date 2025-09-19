@@ -750,9 +750,12 @@ export default function ClientesPage() {
       setShowImportDialog(false);
       setImportData([]);
       
+      // Sempre atualizar a lista após importação
+      console.log('Atualizando lista de clientes...');
+      await fetchCustomers();
+      
       if (successCount > 0) {
         toast.success(`${successCount} clientes importados com sucesso!`);
-        fetchCustomers();
       }
       
       if (errorCount > 0) {
