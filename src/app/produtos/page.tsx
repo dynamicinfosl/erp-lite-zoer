@@ -312,6 +312,29 @@ export default function ProdutosPage() {
     setImportErrors([]);
   };
 
+  const handleSaveImportData = () => {
+    console.log('💾 Salvando dados de importação de produtos no localStorage...');
+    try {
+      const importDataToSave = {
+        fileName: importFileName,
+        headers: importHeaders,
+        data: importRowsData,
+        totalRows: importRowsData.length,
+        validRows: importRowsData.length - importErrors.length,
+        invalidRows: importErrors.length,
+        errors: importErrors,
+        timestamp: new Date().toISOString()
+      };
+      
+      localStorage.setItem('produtos_import_data', JSON.stringify(importDataToSave));
+      toast.success('Dados de importação de produtos salvos no localStorage!');
+      console.log('✅ Dados salvos:', importDataToSave);
+    } catch (error) {
+      console.error('❌ Erro ao salvar no localStorage:', error);
+      toast.error('Erro ao salvar dados no localStorage');
+    }
+  };
+
   const handleExtractData = async () => {
     try {
       setIsExtracting(true);
@@ -1108,6 +1131,7 @@ export default function ProdutosPage() {
         isOpen={showImportPreview}
         onClose={handleImportCancel}
         onConfirm={handleImportConfirm}
+        onSave={handleSaveImportData}
         onExtract={handleExtractData}
         onConsume={handleConsumeData}
         fileName={importFileName}

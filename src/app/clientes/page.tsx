@@ -566,6 +566,29 @@ export default function ClientesPage() {
     setImportErrors([]);
   };
 
+  const handleSaveImportData = () => {
+    console.log('💾 Salvando dados de importação no localStorage...');
+    try {
+      const importDataToSave = {
+        fileName: importFileName,
+        headers: importHeaders,
+        data: importRows,
+        totalRows: importRows.length,
+        validRows: importRows.length - importErrors.length,
+        invalidRows: importErrors.length,
+        errors: importErrors,
+        timestamp: new Date().toISOString()
+      };
+      
+      localStorage.setItem('clientes_import_data', JSON.stringify(importDataToSave));
+      toast.success('Dados de importação salvos no localStorage!');
+      console.log('✅ Dados salvos:', importDataToSave);
+    } catch (error) {
+      console.error('❌ Erro ao salvar no localStorage:', error);
+      toast.error('Erro ao salvar dados no localStorage');
+    }
+  };
+
   const handleExtractData = async () => {
     console.log('🔵 handleExtractData chamado');
     try {
@@ -1228,6 +1251,7 @@ export default function ClientesPage() {
         isOpen={showImportPreview}
         onClose={handleImportCancel}
         onConfirm={handleImportConfirm}
+        onSave={handleSaveImportData}
         onExtract={handleExtractData}
         onConsume={handleConsumeData}
         fileName={importFileName}
