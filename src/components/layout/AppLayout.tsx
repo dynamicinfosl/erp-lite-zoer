@@ -15,6 +15,21 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
 
+  // Páginas que não devem ter sidebar (login, registro, etc.)
+  const noSidebarPages = ['/login', '/register', '/forgot-password', '/reset-password'];
+  const shouldHideSidebar = noSidebarPages.some(page => pathname?.startsWith(page));
+
+  // Se for uma página sem sidebar, renderizar apenas o conteúdo
+  if (shouldHideSidebar) {
+    return (
+      <main className="min-h-screen w-full">
+        <div className="w-full h-full">
+          {children}
+        </div>
+      </main>
+    );
+  }
+
   // Se autenticação estiver desabilitada, usar sidebar sem autenticação
   if (!ENABLE_AUTH) {
     // PDV fullscreen sem sidebar
