@@ -698,6 +698,9 @@ export default function ClientesPage() {
       let successCount = 0;
       let errorCount = 0;
 
+      console.log('Iniciando importação de', importData.length, 'clientes');
+      console.log('ENABLE_AUTH:', ENABLE_AUTH);
+
       for (const row of importData) {
         try {
           const customerData = {
@@ -714,17 +717,32 @@ export default function ClientesPage() {
             is_active: (row['Status'] || row['status'] || 'Ativo').toLowerCase() === 'ativo'
           };
 
+          console.log('Processando cliente:', customerData.name);
+
           if (!customerData.name) {
+            console.log('Cliente sem nome, pulando...');
             errorCount++;
             continue;
           }
 
           if (ENABLE_AUTH) {
+            console.log('Salvando via API...');
             await api.post('/customers', customerData);
+          } else {
+            console.log('Modo sem auth - adicionando à lista local');
+            const newCustomer = {
+              id: Date.now() + Math.random(),
+              user_id: 1,
+              ...customerData,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            setCustomers(prev => [...prev, newCustomer]);
           }
           successCount++;
         } catch (error) {
           console.error('Erro ao importar cliente:', getErrorMessage(error));
+          console.error('Dados do cliente que causou erro:', row);
           errorCount++;
         }
       }
