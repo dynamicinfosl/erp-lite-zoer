@@ -14,6 +14,7 @@ import { Edit, Trash2, CheckSquare, Square, Trash, FileSpreadsheet, Upload, Chev
 import { useRef } from 'react';
 import { getErrorMessage } from '@/lib/error-handler';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
+import { ENABLE_AUTH } from '@/constants/auth';
 
 export default function FornecedoresPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -37,6 +38,7 @@ export default function FornecedoresPage() {
   const [importData, setImportData] = useState<any[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isConsuming, setIsConsuming] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
   const [isAllSelected, setIsAllSelected] = useState(false);
 
   useEffect(() => {
@@ -230,26 +232,88 @@ export default function FornecedoresPage() {
     setImportErrors([]);
   };
 
-  const handleSaveImportData = () => {
-    console.log('💾 Salvando dados de importação de fornecedores no localStorage...');
+  const handleSaveImportData = async () => {
+    console.log('💾 Integrando dados de importação de fornecedores diretamente no sistema...');
     try {
-      const importDataToSave = {
-        fileName: importFileName,
-        headers: importHeaders,
-        data: importRowsData,
-        totalRows: importRowsData.length,
-        validRows: importRowsData.length - importErrors.length,
-        invalidRows: importErrors.length,
-        errors: importErrors,
-        timestamp: new Date().toISOString()
-      };
+      setImportLoading(true);
+      let successCount = 0;
+      let errorCount = 0;
+
+      console.log('Iniciando integração de', importData.length, 'fornecedores');
+      console.log('ENABLE_AUTH:', ENABLE_AUTH);
+
+      for (const row of importData) {
+        try {
+          console.log('Processando linha:', row);
+          const supplierData = {
+            name: row['Nome'] || row['nome'] || '',
+            email: row['E-mail'] || row['email'] || '',
+            phone: row['Telefone'] || row['telefone'] || '',
+            document: row['CNPJ'] || row['cnpj'] || '',
+            address: row['Endereço'] || row['endereco'] || '',
+            neighborhood: row['Bairro'] || row['bairro'] || '',
+            city: row['Cidade'] || row['cidade'] || '',
+            state: row['Estado'] || row['estado'] || '',
+            zipcode: row['CEP'] || row['cep'] || '',
+            notes: row['Observações'] || row['observacoes'] || '',
+            is_active: (row['Status'] || row['status'] || 'Ativo').toLowerCase() === 'ativo'
+          };
+
+          console.log('Dados do fornecedor processados:', supplierData);
+
+          if (!supplierData.name) {
+            console.log('Fornecedor sem nome, pulando...', supplierData);
+            errorCount++;
+            continue;
+          }
+
+          if (ENABLE_AUTH) {
+            console.log('Salvando via API...');
+            await api.post('/suppliers', supplierData);
+          } else {
+            console.log('Modo sem auth - adicionando à lista local');
+            const newSupplier = {
+              id: Date.now() + Math.random(),
+              user_id: 1,
+              ...supplierData,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            setSuppliers(prev => [...prev, newSupplier]);
+          }
+          successCount++;
+        } catch (error) {
+          console.error('Erro ao integrar fornecedor:', getErrorMessage(error));
+          console.error('Dados do fornecedor que causou erro:', row);
+          errorCount++;
+        }
+      }
+
+      setShowImportPreview(false);
+      setImportData([]);
       
-      localStorage.setItem('fornecedores_import_data', JSON.stringify(importDataToSave));
-      toast.success('Dados de importação de fornecedores salvos no localStorage!');
-      console.log('✅ Dados salvos:', importDataToSave);
+      // Sempre atualizar a lista após integração
+      console.log('Atualizando lista de fornecedores...');
+      await fetchSuppliers();
+      
+      console.log(`Integração concluída: ${successCount} sucessos, ${errorCount} erros`);
+      
+      if (successCount > 0) {
+        toast.success(`${successCount} fornecedores integrados com sucesso!`);
+      }
+      
+      if (errorCount > 0) {
+        toast.error(`${errorCount} fornecedores não puderam ser integrados`);
+      }
+      
+      if (successCount === 0 && errorCount === 0) {
+        toast.warning('Nenhum fornecedor foi processado');
+      }
     } catch (error) {
-      console.error('❌ Erro ao salvar no localStorage:', error);
-      toast.error('Erro ao salvar dados no localStorage');
+      console.error('Erro ao integrar dados:', getErrorMessage(error));
+      toast.error('Erro ao integrar dados no sistema');
+    } finally {
+      setImportLoading(false);
     }
   };
 

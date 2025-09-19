@@ -566,26 +566,88 @@ export default function ClientesPage() {
     setImportErrors([]);
   };
 
-  const handleSaveImportData = () => {
-    console.log('💾 Salvando dados de importação no localStorage...');
+  const handleSaveImportData = async () => {
+    console.log('💾 Integrando dados de importação diretamente no sistema...');
     try {
-      const importDataToSave = {
-        fileName: importFileName,
-        headers: importHeaders,
-        data: importRows,
-        totalRows: importRows.length,
-        validRows: importRows.length - importErrors.length,
-        invalidRows: importErrors.length,
-        errors: importErrors,
-        timestamp: new Date().toISOString()
-      };
+      setImportLoading(true);
+      let successCount = 0;
+      let errorCount = 0;
+
+      console.log('Iniciando integração de', importData.length, 'clientes');
+      console.log('ENABLE_AUTH:', ENABLE_AUTH);
+
+      for (const row of importData) {
+        try {
+          console.log('Processando linha:', row);
+          const customerData = {
+            name: row['Nome'] || row['nome'] || '',
+            email: row['E-mail'] || row['email'] || '',
+            phone: row['Telefone'] || row['telefone'] || '',
+            document: row['CPF/CNPJ'] || row['documento'] || '',
+            address: row['Endereço'] || row['endereco'] || '',
+            neighborhood: row['Bairro'] || row['bairro'] || '',
+            city: row['Cidade'] || row['cidade'] || '',
+            state: row['Estado'] || row['estado'] || '',
+            zipcode: row['CEP'] || row['cep'] || '',
+            notes: row['Observações'] || row['observacoes'] || '',
+            is_active: (row['Status'] || row['status'] || 'Ativo').toLowerCase() === 'ativo'
+          };
+
+          console.log('Dados do cliente processados:', customerData);
+
+          if (!customerData.name) {
+            console.log('Cliente sem nome, pulando...', customerData);
+            errorCount++;
+            continue;
+          }
+
+          if (ENABLE_AUTH) {
+            console.log('Salvando via API...');
+            await api.post('/customers', customerData);
+          } else {
+            console.log('Modo sem auth - adicionando à lista local');
+            const newCustomer = {
+              id: Date.now() + Math.random(),
+              user_id: 1,
+              ...customerData,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            setCustomers(prev => [...prev, newCustomer]);
+          }
+          successCount++;
+        } catch (error) {
+          console.error('Erro ao integrar cliente:', getErrorMessage(error));
+          console.error('Dados do cliente que causou erro:', row);
+          errorCount++;
+        }
+      }
+
+      setShowImportPreview(false);
+      setImportData([]);
       
-      localStorage.setItem('clientes_import_data', JSON.stringify(importDataToSave));
-      toast.success('Dados de importação salvos no localStorage!');
-      console.log('✅ Dados salvos:', importDataToSave);
+      // Sempre atualizar a lista após integração
+      console.log('Atualizando lista de clientes...');
+      await fetchCustomers();
+      
+      console.log(`Integração concluída: ${successCount} sucessos, ${errorCount} erros`);
+      
+      if (successCount > 0) {
+        toast.success(`${successCount} clientes integrados com sucesso!`);
+      }
+      
+      if (errorCount > 0) {
+        toast.error(`${errorCount} clientes não puderam ser integrados`);
+      }
+      
+      if (successCount === 0 && errorCount === 0) {
+        toast.warning('Nenhum cliente foi processado');
+      }
     } catch (error) {
-      console.error('❌ Erro ao salvar no localStorage:', error);
-      toast.error('Erro ao salvar dados no localStorage');
+      console.error('Erro ao integrar dados:', getErrorMessage(error));
+      toast.error('Erro ao integrar dados no sistema');
+    } finally {
+      setImportLoading(false);
     }
   };
 

@@ -41,6 +41,7 @@ export default function ProdutosPage() {
   const [importData, setImportData] = useState<any[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isConsuming, setIsConsuming] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     sku: '',
@@ -312,26 +313,97 @@ export default function ProdutosPage() {
     setImportErrors([]);
   };
 
-  const handleSaveImportData = () => {
-    console.log('💾 Salvando dados de importação de produtos no localStorage...');
+  const handleSaveImportData = async () => {
+    console.log('💾 Integrando dados de importação de produtos diretamente no sistema...');
     try {
-      const importDataToSave = {
-        fileName: importFileName,
-        headers: importHeaders,
-        data: importRowsData,
-        totalRows: importRowsData.length,
-        validRows: importRowsData.length - importErrors.length,
-        invalidRows: importErrors.length,
-        errors: importErrors,
-        timestamp: new Date().toISOString()
-      };
+      setImportLoading(true);
+      let successCount = 0;
+      let errorCount = 0;
+
+      console.log('Iniciando integração de', importData.length, 'produtos');
+
+      for (const row of importData) {
+        try {
+          console.log('Processando linha:', row);
+          const productData = {
+            name: row['Nome'] || row['nome'] || '',
+            sku: row['SKU'] || row['sku'] || '',
+            barcode: row['Código de Barras'] || row['codigo_barras'] || '',
+            description: row['Descrição'] || row['descricao'] || '',
+            category_id: row['Categoria'] || row['categoria'] || '',
+            cost_price: parseFloat((row['Preço de Custo'] || row['preco_custo'] || '0').toString().replace(',', '.')) || 0,
+            sale_price: parseFloat((row['Preço de Venda'] || row['preco_venda'] || '0').toString().replace(',', '.')) || 0,
+            stock_quantity: parseInt((row['Estoque'] || row['estoque'] || '0').toString()) || 0,
+            min_stock: parseInt((row['Estoque Mínimo'] || row['estoque_minimo'] || '0').toString()) || 0,
+            unit: row['Unidade'] || row['unidade'] || 'UN',
+            internal_code: row['Código Interno'] || row['codigo_interno'] || '',
+            product_group: row['Grupo'] || row['grupo'] || '',
+            has_variations: (row['Tem Variações'] || row['tem_variacoes'] || 'Não').toLowerCase() === 'sim',
+            fiscal_note: row['Nota Fiscal'] || row['nota_fiscal'] || '',
+            unit_conversion: (row['Conversão de Unidade'] || row['conversao_unidade'] || '1').toString(),
+            moves_stock: (row['Move Estoque'] || row['move_estoque'] || 'Sim').toLowerCase() === 'sim',
+            width_cm: parseFloat((row['Largura (cm)'] || row['largura_cm'] || '0').toString().replace(',', '.')) || 0,
+            height_cm: parseFloat((row['Altura (cm)'] || row['altura_cm'] || '0').toString().replace(',', '.')) || 0,
+            length_cm: parseFloat((row['Comprimento (cm)'] || row['comprimento_cm'] || '0').toString().replace(',', '.')) || 0,
+            weight_kg: parseFloat((row['Peso (kg)'] || row['peso_kg'] || '0').toString().replace(',', '.')) || 0
+          };
+
+          console.log('Dados do produto processados:', productData);
+
+          if (!productData.name) {
+            console.log('Produto sem nome, pulando...', productData);
+            errorCount++;
+            continue;
+          }
+
+          if (ENABLE_AUTH) {
+            console.log('Salvando via API...');
+            await api.post('/products', productData);
+          } else {
+            console.log('Modo sem auth - adicionando à lista local');
+            const newProduct = {
+              id: Date.now() + Math.random(),
+              user_id: 1,
+              ...productData,
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            setProducts(prev => [...prev, newProduct]);
+          }
+          successCount++;
+        } catch (error) {
+          console.error('Erro ao integrar produto:', getErrorMessage(error));
+          console.error('Dados do produto que causou erro:', row);
+          errorCount++;
+        }
+      }
+
+      setShowImportPreview(false);
+      setImportData([]);
       
-      localStorage.setItem('produtos_import_data', JSON.stringify(importDataToSave));
-      toast.success('Dados de importação de produtos salvos no localStorage!');
-      console.log('✅ Dados salvos:', importDataToSave);
+      // Sempre atualizar a lista após integração
+      console.log('Atualizando lista de produtos...');
+      await fetchProducts();
+      
+      console.log(`Integração concluída: ${successCount} sucessos, ${errorCount} erros`);
+      
+      if (successCount > 0) {
+        toast.success(`${successCount} produtos integrados com sucesso!`);
+      }
+      
+      if (errorCount > 0) {
+        toast.error(`${errorCount} produtos não puderam ser integrados`);
+      }
+      
+      if (successCount === 0 && errorCount === 0) {
+        toast.warning('Nenhum produto foi processado');
+      }
     } catch (error) {
-      console.error('❌ Erro ao salvar no localStorage:', error);
-      toast.error('Erro ao salvar dados no localStorage');
+      console.error('Erro ao integrar dados:', getErrorMessage(error));
+      toast.error('Erro ao integrar dados no sistema');
+    } finally {
+      setImportLoading(false);
     }
   };
 
