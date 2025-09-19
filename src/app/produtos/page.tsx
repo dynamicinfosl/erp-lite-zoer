@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { mockProducts } from '@/lib/mock-data';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
+import { getErrorMessage } from '@/lib/error-handler';
 
 export default function ProdutosPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -38,6 +39,8 @@ export default function ProdutosPage() {
   const [importRowsData, setImportRowsData] = useState<any[][]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [importData, setImportData] = useState<any[]>([]);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [isConsuming, setIsConsuming] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     sku: '',
@@ -307,6 +310,57 @@ export default function ProdutosPage() {
     setImportHeaders([]);
     setImportRowsData([]);
     setImportErrors([]);
+  };
+
+  const handleExtractData = async () => {
+    try {
+      setIsExtracting(true);
+      
+      const extractedData = {
+        fileName: importFileName,
+        headers: importHeaders,
+        data: importData,
+        totalRows: importRowsData.length,
+        validRows: importRowsData.length - importErrors.length,
+        extractedAt: new Date().toISOString()
+      };
+      
+      localStorage.setItem('extractedProductData', JSON.stringify(extractedData));
+      toast.success('Dados de produtos extraídos com sucesso!');
+      
+    } catch (error) {
+      console.error('Erro ao extrair dados:', getErrorMessage(error));
+      toast.error('Erro ao extrair dados');
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  const handleConsumeData = async () => {
+    try {
+      setIsConsuming(true);
+      
+      const extractedData = localStorage.getItem('extractedProductData');
+      if (extractedData) {
+        const parsedData = JSON.parse(extractedData);
+        
+        const combinedData = [...importData, ...parsedData.data];
+        const combinedHeaders = [...new Set([...importHeaders, ...parsedData.headers])];
+        
+        setImportData(combinedData);
+        setImportHeaders(combinedHeaders);
+        
+        toast.success(`${parsedData.data.length} registros de produtos consumidos com sucesso!`);
+      } else {
+        toast.error('Nenhum dado de produto extraído encontrado para consumir');
+      }
+      
+    } catch (error) {
+      console.error('Erro ao consumir dados:', getErrorMessage(error));
+      toast.error('Erro ao consumir dados');
+    } finally {
+      setIsConsuming(false);
+    }
   };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -784,8 +838,8 @@ export default function ProdutosPage() {
                     <div className="space-y-2">
                       <Label htmlFor="internal_code">Código Interno</Label>
                       <Input id="internal_code" value={formData.internal_code} onChange={(e) => setFormData(prev => ({ ...prev, internal_code: e.target.value }))} />
-                    </div>
-                  </div>
+                </div>
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">Descrição</Label>
@@ -990,6 +1044,8 @@ export default function ProdutosPage() {
         isOpen={showImportPreview}
         onClose={handleImportCancel}
         onConfirm={handleImportConfirm}
+        onExtract={handleExtractData}
+        onConsume={handleConsumeData}
         fileName={importFileName}
         headers={importHeaders}
         data={importRowsData}
@@ -997,6 +1053,8 @@ export default function ProdutosPage() {
         validRows={importRowsData.length - importErrors.length}
         invalidRows={importErrors.length}
         errors={importErrors}
+        isExtracting={isExtracting}
+        isConsuming={isConsuming}
       />
     </div>
   );

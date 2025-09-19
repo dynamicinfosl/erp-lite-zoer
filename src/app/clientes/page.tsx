@@ -37,6 +37,8 @@ export default function ClientesPage() {
   const [importRows, setImportRows] = useState<any[][]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [selectedCustomers, setSelectedCustomers] = useState<number[]>([]);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [isConsuming, setIsConsuming] = useState(false);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -484,8 +486,8 @@ export default function ClientesPage() {
         }
       } else {
         toast.error('Selecione um arquivo .csv, .xls ou .xlsx');
-        return;
-      }
+          return;
+        }
 
       // Preparar dados para o modal de preview
       const dataRows = rows.slice(1).map(r => {
@@ -542,7 +544,7 @@ export default function ClientesPage() {
       setShowImportPreview(true);
 
       toast.success(`${rows.length - 1} registros carregados com sucesso!`);
-    } catch (error) {
+      } catch (error) {
       console.error('Erro ao importar arquivo:', getErrorMessage(error));
       toast.error('Erro ao importar arquivo');
     }
@@ -559,6 +561,63 @@ export default function ClientesPage() {
     setImportHeaders([]);
     setImportRows([]);
     setImportErrors([]);
+  };
+
+  const handleExtractData = async () => {
+    try {
+      setIsExtracting(true);
+      
+      const extractedData = {
+        fileName: importFileName,
+        headers: importHeaders,
+        data: importData,
+        totalRows: importRows.length,
+        validRows: importRows.length - importErrors.length,
+        extractedAt: new Date().toISOString()
+      };
+      
+      localStorage.setItem('extractedImportData', JSON.stringify(extractedData));
+      toast.success('Dados extraídos com sucesso!');
+      
+    } catch (error) {
+      console.error('Erro ao extrair dados:', getErrorMessage(error));
+      toast.error('Erro ao extrair dados');
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  const handleConsumeData = async () => {
+    try {
+      setIsConsuming(true);
+      
+      // Consumir dados do localStorage (se existir)
+      const extractedData = localStorage.getItem('extractedImportData');
+      if (extractedData) {
+        const parsedData = JSON.parse(extractedData);
+        
+        // Adicionar os dados extraídos aos dados atuais de importação
+        const combinedData = [...importData, ...parsedData.data];
+        const combinedHeaders = [...new Set([...importHeaders, ...parsedData.headers])];
+        
+        setImportData(combinedData);
+        setImportHeaders(combinedHeaders);
+        
+        // Atualizar estatísticas
+        const newValidRows = combinedData.length;
+        const newTotalRows = importRows.length + parsedData.totalRows;
+        
+        toast.success(`${parsedData.data.length} registros consumidos com sucesso!`);
+      } else {
+        toast.error('Nenhum dado extraído encontrado para consumir');
+      }
+      
+    } catch (error) {
+      console.error('Erro ao consumir dados:', getErrorMessage(error));
+      toast.error('Erro ao consumir dados');
+    } finally {
+      setIsConsuming(false);
+    }
   };
 
   const processImportData = async () => {
@@ -1063,6 +1122,8 @@ export default function ClientesPage() {
         isOpen={showImportPreview}
         onClose={handleImportCancel}
         onConfirm={handleImportConfirm}
+        onExtract={handleExtractData}
+        onConsume={handleConsumeData}
         fileName={importFileName}
         headers={importHeaders}
         data={importRows}
@@ -1070,6 +1131,8 @@ export default function ClientesPage() {
         validRows={importRows.length - importErrors.length}
         invalidRows={importErrors.length}
         errors={importErrors}
+        isExtracting={isExtracting}
+        isConsuming={isConsuming}
       />
 
       {/* Dialog de Visualização da Planilha */}
