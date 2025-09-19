@@ -272,10 +272,14 @@ export function AppSidebar() {
           <Button
             variant="outline"
             size="sm"
-            onClick={ENABLE_AUTH ? logout : () => {
-              // Quando autenticação está desabilitada, apenas mostrar confirmação
+            onClick={() => {
               if (confirm('Deseja sair do sistema?')) {
-                window.location.href = '/';
+                if (ENABLE_AUTH) {
+                  // Se autenticação estiver habilitada, fazer logout
+                  logout();
+                }
+                // Sempre redirecionar para login
+                window.location.href = '/login';
               }
             }}
             className="w-full justify-start gap-1 h-7 text-xs px-2"

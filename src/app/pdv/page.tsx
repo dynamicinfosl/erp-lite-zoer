@@ -241,13 +241,8 @@ export default function PDVPage() {
             size="sm" 
             onClick={() => {
               if (confirm('Deseja sair do sistema?')) {
-                if (ENABLE_AUTH) {
-                  // Se autenticação estiver habilitada, fazer logout
-                  router.push('/login');
-                } else {
-                  // Se autenticação estiver desabilitada, ir para home
-                  router.push('/');
-                }
+                // Sempre redirecionar para login
+                router.push('/login');
               }
             }}
             className="text-red-600 hover:text-red-700 hover:bg-red-50"

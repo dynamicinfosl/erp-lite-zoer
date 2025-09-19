@@ -45,11 +45,9 @@ export function AppHeader({
       if (ENABLE_AUTH) {
         // Se autenticação estiver habilitada, fazer logout
         logout();
-        router.push('/login');
-      } else {
-        // Se autenticação estiver desabilitada, ir para home
-        router.push('/');
       }
+      // Sempre redirecionar para login
+      router.push('/login');
     }
   };
 
