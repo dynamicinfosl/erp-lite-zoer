@@ -1,7 +1,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { AuthenticatedLayout } from './AuthenticatedLayout';
@@ -14,10 +14,16 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
+  const [isClient, setIsClient] = useState(false);
+
+  // Garantir que a lógica de layout só seja aplicada no cliente
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Páginas que não devem ter sidebar (login, registro, etc.)
   const noSidebarPages = ['/login', '/register', '/forgot-password', '/reset-password'];
-  const shouldHideSidebar = noSidebarPages.some(page => pathname?.startsWith(page));
+  const shouldHideSidebar = isClient && noSidebarPages.some(page => pathname?.startsWith(page));
 
   // Se for uma página sem sidebar, renderizar apenas o conteúdo
   if (shouldHideSidebar) {
@@ -33,7 +39,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   // Se autenticação estiver desabilitada, usar sidebar sem autenticação
   if (!ENABLE_AUTH) {
     // PDV fullscreen sem sidebar
-    if (pathname?.startsWith('/pdv')) {
+    if (isClient && pathname?.startsWith('/pdv')) {
       return (
         <main className="min-h-screen w-full">
           <div className="w-full h-full">
