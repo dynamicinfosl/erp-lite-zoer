@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Download, Upload, X, Save, Database, Plus } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { FileText, Download, Upload, X, Save, Database, Plus, UserPlus, CheckSquare, Square } from 'lucide-react';
 
 interface ImportPreviewModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface ImportPreviewModalProps {
   onSave?: () => void;
   onExtract?: () => void;
   onConsume?: () => void;
+  onRegister?: (selectedRows: any[]) => void;
   fileName: string;
   headers: string[];
   data: any[][];
@@ -21,6 +23,7 @@ interface ImportPreviewModalProps {
   errors?: string[];
   isExtracting?: boolean;
   isConsuming?: boolean;
+  isRegistering?: boolean;
 }
 
 export function ImportPreviewModal({
@@ -30,6 +33,7 @@ export function ImportPreviewModal({
   onSave,
   onExtract,
   onConsume,
+  onRegister,
   fileName,
   headers,
   data,
@@ -38,10 +42,54 @@ export function ImportPreviewModal({
   invalidRows,
   errors = [],
   isExtracting = false,
-  isConsuming = false
+  isConsuming = false,
+  isRegistering = false
 }: ImportPreviewModalProps) {
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
+  
   const maxPreviewRows = 50;
   const handleSave = onSave || onConfirm;
+
+  // Reset selection when modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedRows(new Set());
+      setSelectAll(false);
+    }
+  }, [isOpen]);
+
+  // Handle select all
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIndices = data.map((_, index) => index);
+      setSelectedRows(new Set(allIndices));
+      setSelectAll(true);
+    } else {
+      setSelectedRows(new Set());
+      setSelectAll(false);
+    }
+  };
+
+  // Handle individual row selection
+  const handleRowSelect = (index: number, checked: boolean) => {
+    const newSelected = new Set(selectedRows);
+    if (checked) {
+      newSelected.add(index);
+    } else {
+      newSelected.delete(index);
+    }
+    setSelectedRows(newSelected);
+    setSelectAll(newSelected.size === data.length);
+  };
+
+  // Handle register selected rows
+  const handleRegister = () => {
+    if (onRegister && selectedRows.size > 0) {
+      const selectedData = Array.from(selectedRows).map(index => data[index]);
+      onRegister(selectedData);
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -89,9 +137,22 @@ export function ImportPreviewModal({
           {/* Tabela de Preview */}
           <div className="border rounded overflow-hidden flex-1 flex flex-col min-h-0 mx-1">
             <div className="bg-gray-50 px-1 py-0.5 border-b flex-shrink-0 flex items-center justify-between">
-              <h4 className="font-medium text-gray-800 text-xs">
-                Dados Completos ({data.length} linhas)
-              </h4>
+              <div className="flex items-center gap-2">
+                <h4 className="font-medium text-gray-800 text-xs">
+                  Dados Completos ({data.length} linhas)
+                </h4>
+                <div className="flex items-center gap-1">
+                  <Checkbox
+                    id="select-all"
+                    checked={selectAll}
+                    onCheckedChange={handleSelectAll}
+                    className="h-3 w-3"
+                  />
+                  <label htmlFor="select-all" className="text-xs text-gray-600 cursor-pointer">
+                    Selecionar Todos
+                  </label>
+                </div>
+              </div>
               <div className="text-xs text-gray-500">
                 ↕️ Scroll vertical | ↔️ Scroll horizontal
               </div>
@@ -102,6 +163,7 @@ export function ImportPreviewModal({
                   <TableHeader className="sticky top-0 bg-white z-10">
                     <TableRow>
                       <TableHead className="w-6 text-xs py-0.5 sticky left-0 bg-white border-r z-20">#</TableHead>
+                      <TableHead className="w-8 text-xs py-0.5 sticky left-6 bg-white border-r z-20">✓</TableHead>
                       {headers.map((header, index) => (
                         <TableHead key={index} className="min-w-[60px] text-xs py-0.5 whitespace-nowrap">
                           {header}
@@ -113,9 +175,16 @@ export function ImportPreviewModal({
                     {data.map((row: any, rowIndex) => {
                       const isArrayRow = Array.isArray(row);
                       return (
-                        <TableRow key={rowIndex}>
+                        <TableRow key={rowIndex} className="hover:bg-gray-50">
                           <TableCell className="font-medium text-gray-500 text-xs py-0.5 sticky left-0 bg-white border-r z-10">
                             {rowIndex + 1}
+                          </TableCell>
+                          <TableCell className="w-8 text-xs py-0.5 sticky left-6 bg-white border-r z-10">
+                            <Checkbox
+                              checked={selectedRows.has(rowIndex)}
+                              onCheckedChange={(checked) => handleRowSelect(rowIndex, checked as boolean)}
+                              className="h-3 w-3"
+                            />
                           </TableCell>
                           {headers.map((header, cellIndex) => (
                             <TableCell key={cellIndex} className="min-w-[60px] max-w-[100px] text-xs py-0.5">
@@ -138,7 +207,7 @@ export function ImportPreviewModal({
             <div className="text-xs text-gray-600 text-center">
               {validRows > 0 ? (
                 <span className="text-green-600">
-                  ✓ {validRows} válidos
+                  ✓ {validRows} válidos | {selectedRows.size} selecionados
                 </span>
               ) : (
                 <span className="text-red-600">
@@ -146,11 +215,29 @@ export function ImportPreviewModal({
                 </span>
               )}
             </div>
-            <div className="grid grid-cols-5 gap-0.5">
+            <div className="grid grid-cols-4 gap-0.5">
               <Button variant="outline" onClick={onClose} className="w-full text-xs h-4 px-0.5">
                 <X className="h-2 w-2" />
                 <span className="hidden sm:inline ml-0.5 text-xs">Cancelar</span>
               </Button>
+              
+              {onRegister && (
+                <Button 
+                  variant="default"
+                  onClick={() => {
+                    console.log('👤 Botão Cadastrar clicado');
+                    handleRegister();
+                  }}
+                  disabled={isRegistering || selectedRows.size === 0}
+                  className="w-full text-xs h-4 px-0.5 bg-green-600 hover:bg-green-700"
+                >
+                  <UserPlus className="h-2 w-2" />
+                  <span className="hidden sm:inline ml-0.5 text-xs">
+                    {isRegistering ? 'Cadastrando...' : `Cadastrar (${selectedRows.size})`}
+                  </span>
+                </Button>
+              )}
+              
               <Button 
                 variant="secondary"
                 onClick={() => {
@@ -162,41 +249,15 @@ export function ImportPreviewModal({
                 <Save className="h-2 w-2" />
                 <span className="hidden sm:inline ml-0.5 text-xs">Salvar</span>
               </Button>
-              {onExtract && (
-                <Button 
-                  variant="default"
-                  onClick={() => {
-                    console.log('🔵 Botão Extrair clicado');
-                    onExtract();
-                  }}
-                  disabled={isExtracting || validRows === 0}
-                  className="w-full text-xs h-4 px-0.5 bg-blue-600 hover:bg-blue-700"
-                >
-                  <Database className="h-2 w-2" />
-                  <span className="hidden sm:inline ml-0.5 text-xs">{isExtracting ? 'Extraindo...' : 'Extrair'}</span>
-                </Button>
-              )}
-              {onConsume && (
-                <Button 
-                  variant="default"
-                  onClick={() => {
-                    console.log('🟣 Botão Consumir clicado');
-                    onConsume();
-                  }}
-                  disabled={isConsuming || validRows === 0}
-                  className="w-full text-xs h-4 px-0.5 bg-purple-600 hover:bg-purple-700"
-                >
-                  <Plus className="h-2 w-2" />
-                  <span className="hidden sm:inline ml-0.5 text-xs">{isConsuming ? 'Consumindo...' : 'Consumir'}</span>
-                </Button>
-              )}
+              
               <Button 
+                variant="default"
                 onClick={() => {
-                  console.log('🟢 Botão Importar clicado');
+                  console.log('📥 Botão Importar clicado');
                   onConfirm();
                 }}
                 disabled={validRows === 0}
-                className="w-full text-xs h-4 px-0.5 bg-green-600 hover:bg-green-700"
+                className="w-full text-xs h-4 px-0.5 bg-blue-600 hover:bg-blue-700"
               >
                 <Upload className="h-2 w-2" />
                 <span className="hidden sm:inline ml-0.5 text-xs">Importar</span>

@@ -39,6 +39,7 @@ export default function ClientesPage() {
   const [selectedCustomers, setSelectedCustomers] = useState<number[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isConsuming, setIsConsuming] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -648,6 +649,91 @@ export default function ClientesPage() {
       toast.error('Erro ao integrar dados no sistema');
     } finally {
       setImportLoading(false);
+    }
+  };
+
+  const handleRegisterSelected = async (selectedRows: any[]) => {
+    console.log('👤 Cadastrando clientes selecionados:', selectedRows.length);
+    try {
+      setIsRegistering(true);
+      let successCount = 0;
+      let errorCount = 0;
+
+      console.log('Iniciando cadastro de', selectedRows.length, 'clientes selecionados');
+      console.log('ENABLE_AUTH:', ENABLE_AUTH);
+
+      for (const row of selectedRows) {
+        try {
+          console.log('Processando linha selecionada:', row);
+          const customerData = {
+            name: row['Nome'] || row['nome'] || '',
+            email: row['E-mail'] || row['email'] || '',
+            phone: row['Telefone'] || row['telefone'] || '',
+            document: row['CPF/CNPJ'] || row['documento'] || '',
+            address: row['Endereço'] || row['endereco'] || '',
+            neighborhood: row['Bairro'] || row['bairro'] || '',
+            city: row['Cidade'] || row['cidade'] || '',
+            state: row['Estado'] || row['estado'] || '',
+            zipcode: row['CEP'] || row['cep'] || '',
+            notes: row['Observações'] || row['observacoes'] || '',
+            is_active: (row['Status'] || row['status'] || 'Ativo').toLowerCase() === 'ativo'
+          };
+
+          console.log('Dados do cliente processados:', customerData);
+
+          if (!customerData.name) {
+            console.log('Cliente sem nome, pulando...', customerData);
+            errorCount++;
+            continue;
+          }
+
+          if (ENABLE_AUTH) {
+            console.log('Salvando via API...');
+            await api.post('/customers', customerData);
+          } else {
+            console.log('Modo sem auth - adicionando à lista local');
+            const newCustomer = {
+              id: Date.now() + Math.random(),
+              user_id: 1,
+              ...customerData,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            setCustomers(prev => [...prev, newCustomer]);
+          }
+          successCount++;
+        } catch (error) {
+          console.error('Erro ao cadastrar cliente:', getErrorMessage(error));
+          console.error('Dados do cliente que causou erro:', row);
+          errorCount++;
+        }
+      }
+
+      setShowImportPreview(false);
+      setImportData([]);
+      
+      // Sempre atualizar a lista após cadastro
+      console.log('Atualizando lista de clientes...');
+      await fetchCustomers();
+      
+      console.log(`Cadastro concluído: ${successCount} sucessos, ${errorCount} erros`);
+      
+      if (successCount > 0) {
+        toast.success(`${successCount} clientes cadastrados com sucesso!`);
+      }
+      
+      if (errorCount > 0) {
+        toast.error(`${errorCount} clientes não puderam ser cadastrados`);
+      }
+      
+      if (successCount === 0 && errorCount === 0) {
+        toast.warning('Nenhum cliente foi processado');
+      }
+    } catch (error) {
+      console.error('Erro ao cadastrar clientes:', getErrorMessage(error));
+      toast.error('Erro ao cadastrar clientes no sistema');
+    } finally {
+      setIsRegistering(false);
     }
   };
 
@@ -1309,23 +1395,25 @@ export default function ClientesPage() {
       </Dialog>
 
       {/* Modal de Preview da Importação */}
-      <ImportPreviewModal
-        isOpen={showImportPreview}
-        onClose={handleImportCancel}
-        onConfirm={handleImportConfirm}
-        onSave={handleSaveImportData}
-        onExtract={handleExtractData}
-        onConsume={handleConsumeData}
-        fileName={importFileName}
-        headers={importHeaders}
-        data={importRows}
-        totalRows={importRows.length}
-        validRows={importRows.length - importErrors.length}
-        invalidRows={importErrors.length}
-        errors={importErrors}
-        isExtracting={isExtracting}
-        isConsuming={isConsuming}
-      />
+        <ImportPreviewModal
+          isOpen={showImportPreview}
+          onClose={handleImportCancel}
+          onConfirm={handleImportConfirm}
+          onSave={handleSaveImportData}
+          onExtract={handleExtractData}
+          onConsume={handleConsumeData}
+          onRegister={handleRegisterSelected}
+          fileName={importFileName}
+          headers={importHeaders}
+          data={importRows}
+          totalRows={importRows.length}
+          validRows={importRows.length - importErrors.length}
+          invalidRows={importErrors.length}
+          errors={importErrors}
+          isExtracting={isExtracting}
+          isConsuming={isConsuming}
+          isRegistering={isRegistering}
+        />
 
       {/* Dialog de Visualização da Planilha */}
       <Dialog open={showExportPreview} onOpenChange={setShowExportPreview}>
