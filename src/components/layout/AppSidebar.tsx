@@ -2,7 +2,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -133,12 +133,18 @@ const menuItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const [isClient, setIsClient] = useState(false);
+  
+  // Garantir que a lógica de autenticação só seja aplicada no cliente
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
   
   // Usar autenticação do Supabase quando habilitada
   let user = mockUserProfile;
   let logout = () => {};
   
-  if (ENABLE_AUTH) {
+  if (ENABLE_AUTH && isClient) {
     try {
       const supabaseAuth = useSupabaseAuth();
       // Corrige os tipos conforme o tipo User do Supabase
@@ -269,24 +275,26 @@ export function AppSidebar() {
           </div>
           
           {/* Botão Sair */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (confirm('Deseja sair do sistema?')) {
-                if (ENABLE_AUTH) {
-                  // Se autenticação estiver habilitada, fazer logout
-                  logout();
+          {isClient && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (confirm('Deseja sair do sistema?')) {
+                  if (ENABLE_AUTH) {
+                    // Se autenticação estiver habilitada, fazer logout
+                    logout();
+                  }
+                  // Sempre redirecionar para login
+                  window.location.href = '/login';
                 }
-                // Sempre redirecionar para login
-                window.location.href = '/login';
-              }
-            }}
-            className="w-full justify-start gap-1 h-7 text-xs px-2"
-          >
-            <LogOut className="h-3 w-3" />
-            Sair
-          </Button>
+              }}
+              className="w-full justify-start gap-1 h-7 text-xs px-2"
+            >
+              <LogOut className="h-3 w-3" />
+              Sair
+            </Button>
+          )}
         </div>
       </SidebarFooter>
     </Sidebar>
