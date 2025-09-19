@@ -584,10 +584,6 @@ export default function ClientesPage() {
             state: row['estado'] || row['state'] || '',
             zipcode: row['cep'] || row['zipcode'] || '',
             notes: row['observações'] || row['notes'] || '',
-            responsible_seller: row['vendedor responsável'] || '',
-            responsible_financial: row['financeiro responsável'] || '',
-            observations: row['observações adicionais'] || '',
-            credit_limit: parseFloat(String(row['limite financeiro'] || '0').replace(',', '.')) || 0,
             is_active: (String(row['ativo'] || 'Sim')).toLowerCase() === 'sim'
           };
 
@@ -692,10 +688,6 @@ export default function ClientesPage() {
             state: row['Estado'] || row['estado'] || '',
             zipcode: row['CEP'] || row['cep'] || '',
             notes: row['Observações'] || row['observacoes'] || '',
-            responsible_seller: row['Vendedor Responsável'] || row['vendedor_responsavel'] || '',
-            responsible_financial: row['Financeiro Responsável'] || row['financeiro_responsavel'] || '',
-            observations: row['Observações Adicionais'] || row['observacoes_adicionais'] || '',
-            credit_limit: parseFloat(row['Limite Financeiro'] || row['limite_financeiro'] || '0') || 0,
             is_active: (row['Status'] || row['status'] || 'Ativo').toLowerCase() === 'ativo'
           };
 
