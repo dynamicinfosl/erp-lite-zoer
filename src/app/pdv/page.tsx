@@ -10,7 +10,7 @@ import { PaymentForm } from '@/components/pdv/PaymentForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ShoppingCart, AlertTriangle } from 'lucide-react';
+import { ShoppingCart, AlertTriangle, LogOut } from 'lucide-react';
 import { Product, CartItem } from '@/types';
 import { api } from '@/lib/api-client';
 import { toast } from 'sonner';
@@ -235,6 +235,25 @@ export default function PDVPage() {
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => router.push('/dashboard')}>
             Voltar ao Menu
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              if (confirm('Deseja sair do sistema?')) {
+                if (ENABLE_AUTH) {
+                  // Se autenticação estiver habilitada, fazer logout
+                  router.push('/login');
+                } else {
+                  // Se autenticação estiver desabilitada, ir para home
+                  router.push('/');
+                }
+              }
+            }}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <LogOut className="h-4 w-4 mr-1" />
+            Sair
           </Button>
           <ShoppingCart className="h-5 w-5" />
           <span className="font-semibold">

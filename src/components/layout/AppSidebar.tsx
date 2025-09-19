@@ -269,17 +269,20 @@ export function AppSidebar() {
           </div>
           
           {/* Botão Sair */}
-          {ENABLE_AUTH && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={logout}
-              className="w-full justify-start gap-1 h-7 text-xs px-2"
-            >
-              <LogOut className="h-3 w-3" />
-              Sair
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={ENABLE_AUTH ? logout : () => {
+              // Quando autenticação está desabilitada, apenas mostrar confirmação
+              if (confirm('Deseja sair do sistema?')) {
+                window.location.href = '/';
+              }
+            }}
+            className="w-full justify-start gap-1 h-7 text-xs px-2"
+          >
+            <LogOut className="h-3 w-3" />
+            Sair
+          </Button>
         </div>
       </SidebarFooter>
     </Sidebar>
