@@ -90,7 +90,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [refreshUser]);
 
   if (!ENABLE_AUTH) {
-    return children;
+    // Quando autenticação está desabilitada, fornecer um contexto vazio
+    const mockValue = {
+      user: null,
+      isLoading: false,
+      login: async () => {},
+      register: async () => {},
+      logout: async () => {},
+      refreshUser: async () => {},
+    };
+    
+    return (
+      <AuthContext.Provider value={mockValue}>
+        {children}
+      </AuthContext.Provider>
+    );
   }
 
   if (isLoading) {

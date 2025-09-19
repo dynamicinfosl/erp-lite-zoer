@@ -15,5 +15,7 @@ export function ConditionalAuthProvider({ children }: ConditionalAuthProviderPro
     return <SupabaseAuthProvider>{children}</SupabaseAuthProvider>;
   }
   
-  return <>{children}</>;
+  // Quando autenticação está desabilitada, ainda fornecer um provider vazio
+  // para evitar erros de "useAuth must be used within an AuthProvider"
+  return <AuthProvider>{children}</AuthProvider>;
 }
