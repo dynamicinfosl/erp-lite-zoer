@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import {
   Sidebar,
@@ -131,20 +132,15 @@ const menuItems = [
   },
 ];
 
-export function AppSidebar() {
+// Componente interno do sidebar que será renderizado apenas no cliente
+function SidebarContentInternal() {
   const pathname = usePathname();
-  const [isClient, setIsClient] = useState(false);
-  
-  // Garantir que a lógica de autenticação só seja aplicada no cliente
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
   
   // Usar autenticação do Supabase quando habilitada
   let user = mockUserProfile;
   let logout = () => {};
   
-  if (ENABLE_AUTH && isClient) {
+  if (ENABLE_AUTH) {
     try {
       const supabaseAuth = useSupabaseAuth();
       // Corrige os tipos conforme o tipo User do Supabase
@@ -275,29 +271,55 @@ export function AppSidebar() {
           </div>
           
           {/* Botão Sair */}
-          {isClient && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (confirm('Deseja sair do sistema?')) {
-                  if (ENABLE_AUTH) {
-                    // Se autenticação estiver habilitada, fazer logout
-                    logout();
-                  }
-                  // Sempre redirecionar para login
-                  window.location.href = '/login';
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (confirm('Deseja sair do sistema?')) {
+                if (ENABLE_AUTH) {
+                  // Se autenticação estiver habilitada, fazer logout
+                  logout();
                 }
-              }}
-              className="w-full justify-start gap-1 h-7 text-xs px-2"
-            >
-              <LogOut className="h-3 w-3" />
-              Sair
-            </Button>
-          )}
+                // Sempre redirecionar para login
+                window.location.href = '/login';
+              }
+            }}
+            className="w-full justify-start gap-1 h-7 text-xs px-2"
+          >
+            <LogOut className="h-3 w-3" />
+            Sair
+          </Button>
         </div>
       </SidebarFooter>
     </Sidebar>
   );
+}
+
+// Componente principal que usa dynamic para renderizar apenas no cliente
+const DynamicSidebarContent = dynamic(() => Promise.resolve(SidebarContentInternal), {
+  ssr: false,
+  loading: () => (
+    <Sidebar className="w-48">
+      <SidebarHeader className="border-b p-2">
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <Store className="h-3 w-3" />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-semibold truncate">ERP Lite</span>
+          </div>
+        </div>
+      </SidebarHeader>
+      <div className="px-1">
+        <div className="flex items-center justify-center p-4">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    </Sidebar>
+  )
+});
+
+export function AppSidebar() {
+  return <DynamicSidebarContent />;
 }
 
