@@ -550,9 +550,10 @@ export default function ClientesPage() {
     }
   };
 
-  const handleImportConfirm = () => {
+  const handleImportConfirm = async () => {
     setShowImportPreview(false);
-    setShowImportDialog(true);
+    // Executar importação diretamente
+    await processImportData();
   };
 
   const handleImportCancel = () => {
