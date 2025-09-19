@@ -52,6 +52,13 @@ export const POST = requestMiddleware(async (request, context) => {
       });
     }
 
+    if (!context.payload?.sub) {
+      return createErrorResponse({
+        errorMessage: "Usuário não autenticado",
+        status: 401,
+      });
+    }
+
     const customersCrud = new CrudOperations("customers", context.token);
     // Evitar duplicado por documento (quando informado)
     if (body.document) {
@@ -82,12 +89,16 @@ export const POST = requestMiddleware(async (request, context) => {
       is_active: body.is_active !== false,
     };
 
+    console.log('Dados do cliente a ser criado na API:', customerData);
+
     const customer = await customersCrud.create(customerData);
     return createSuccessResponse(customer, 201);
   } catch (error) {
     console.error('Erro ao criar cliente:', error);
+    console.error('Dados recebidos:', body);
+    console.error('User ID:', context.payload?.sub);
     return createErrorResponse({
-      errorMessage: "Erro ao criar cliente",
+      errorMessage: `Erro ao criar cliente: ${error.message || error}`,
       status: 500,
     });
   }

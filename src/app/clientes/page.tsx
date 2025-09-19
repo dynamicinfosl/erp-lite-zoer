@@ -567,6 +567,14 @@ export default function ClientesPage() {
     try {
       setIsExtracting(true);
       
+      if (ENABLE_AUTH) {
+        // Verificar se há dados para extrair
+        if (!importData || importData.length === 0) {
+          toast.error('Nenhum dado para extrair');
+          return;
+        }
+      }
+      
       // Processar e salvar os dados extraídos diretamente no sistema
       let successCount = 0;
       let errorCount = 0;
@@ -587,12 +595,15 @@ export default function ClientesPage() {
             is_active: (String(row['ativo'] || 'Sim')).toLowerCase() === 'sim'
           };
 
+          console.log('Dados do cliente a ser criado:', customerData);
+
           if (customerData.name.trim()) {
             await api.post('/customers', customerData);
             successCount++;
           }
         } catch (error) {
           console.error('Erro ao extrair cliente:', error);
+          console.error('Dados que causaram erro:', row);
           errorCount++;
         }
       }
