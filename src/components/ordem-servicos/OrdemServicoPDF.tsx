@@ -333,4 +333,4 @@ export function OrdemServicoPDF({ ordem, onClose }: OrdemServicoPDFProps) {
       </div>
     </div>
   );
-}[]
+}

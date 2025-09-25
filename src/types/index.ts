@@ -231,6 +231,15 @@ export interface CartItem {
   total_price: number;
 }
 
+export interface PDVItem {
+  id: number
+  name: string
+  price: number
+  code: string
+  quantity: number
+  discount: number
+}
+
 // Tipos para Dashboard
 export interface DashboardStats {
   today_sales: {

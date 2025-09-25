@@ -10,7 +10,7 @@ export const GET = requestMiddleware(async (request, context) => {
     const salesCrud = new CrudOperations("sales", context.token);
     
     const filters = {
-      user_id: context.payload?.sub,
+      user_id: context.payload?.sub || '00000000-0000-0000-0000-000000000000',
     };
 
     const sales = await salesCrud.findMany(filters, { 
@@ -27,7 +27,7 @@ export const GET = requestMiddleware(async (request, context) => {
       status: 500,
     });
   }
-}, true);
+}, false);
 
 // POST - criar venda
 export const POST = requestMiddleware(async (request, context) => {
@@ -88,7 +88,7 @@ export const POST = requestMiddleware(async (request, context) => {
 
     // Criar venda
     const saleData = {
-      user_id: context.payload?.sub,
+      user_id: context.payload?.sub || '00000000-0000-0000-0000-000000000000',
       sale_number: saleNumber,
       total_amount: totalAmount,
       discount_amount: discountAmount,
@@ -105,7 +105,7 @@ export const POST = requestMiddleware(async (request, context) => {
     // Criar itens da venda
     for (const item of validatedItems) {
       await saleItemsCrud.create({
-        user_id: context.payload?.sub,
+        user_id: context.payload?.sub || '00000000-0000-0000-0000-000000000000',
         sale_id: sale.id,
         product_id: item.product_id,
         quantity: item.quantity,
@@ -122,7 +122,7 @@ export const POST = requestMiddleware(async (request, context) => {
 
       // Registrar movimentação de estoque
       await stockMovementsCrud.create({
-        user_id: context.payload?.sub,
+        user_id: context.payload?.sub || '00000000-0000-0000-0000-000000000000',
         product_id: item.product_id,
         movement_type: 'saida',
         quantity: item.quantity,
@@ -135,7 +135,7 @@ export const POST = requestMiddleware(async (request, context) => {
     // Criar entrega se necessário
     if (body.sale_type === 'entrega' && body.customer_info) {
       await deliveriesCrud.create({
-        user_id: context.payload?.sub,
+        user_id: context.payload?.sub || '00000000-0000-0000-0000-000000000000',
         sale_id: sale.id,
         customer_name: body.customer_info.name,
         delivery_address: body.customer_info.address,
@@ -147,7 +147,7 @@ export const POST = requestMiddleware(async (request, context) => {
 
     // Registrar transação financeira
     await financialCrud.create({
-      user_id: context.payload?.sub,
+      user_id: context.payload?.sub || '00000000-0000-0000-0000-000000000000',
       transaction_type: 'receita',
       category: 'Vendas',
       description: `Venda ${saleNumber}`,
@@ -168,4 +168,4 @@ export const POST = requestMiddleware(async (request, context) => {
       status: 500,
     });
   }
-}, true);
+}, false);

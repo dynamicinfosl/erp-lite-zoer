@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useAuth } from "./AuthProvider";
+import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { GoogleLoginButton } from "./GoogleLoginButton";
+import { GoogleLoginButton } from "@/components/auth/GoogleLoginButton";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -50,7 +50,14 @@ export function LoginForm({
       await login(data.email, data.password);
       onSuccess?.();
     } catch (err: any) {
-      setError(err.errorMessage || "Login failed. Please try again later");
+      const msg = err?.message || err?.errorMessage;
+      if (typeof msg === 'string' && /invalid login credentials|Invalid login credentials/i.test(msg)) {
+        setError('Credenciais inválidas. Verifique email e senha.');
+      } else if (typeof msg === 'string' && /email already registered|User already registered/i.test(msg)) {
+        setError('Usuário já cadastrado. Tente Entrar.');
+      } else {
+        setError('Falha no login. Tente novamente.');
+      }
     } finally {
       setIsLoading(false);
     }

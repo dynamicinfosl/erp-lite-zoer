@@ -10,7 +10,7 @@ export const GET = requestMiddleware(async (request, context) => {
     const movementsCrud = new CrudOperations("stock_movements", context.token);
     
     const filters = {
-      user_id: context.payload?.sub,
+      user_id: context.payload?.sub || '00000000-0000-0000-0000-000000000000',
     };
 
     const movements = await movementsCrud.findMany(filters, { 
@@ -27,7 +27,7 @@ export const GET = requestMiddleware(async (request, context) => {
       status: 500,
     });
   }
-}, true);
+}, false);
 
 // POST - criar movimentação de estoque
 export const POST = requestMiddleware(async (request, context) => {
@@ -78,7 +78,7 @@ export const POST = requestMiddleware(async (request, context) => {
 
     // Criar movimentação
     const movementData = {
-      user_id: context.payload?.sub,
+      user_id: context.payload?.sub || '00000000-0000-0000-0000-000000000000',
       product_id: body.product_id,
       movement_type: body.movement_type,
       quantity: body.movement_type === 'ajuste' ? 
@@ -106,4 +106,4 @@ export const POST = requestMiddleware(async (request, context) => {
       status: 500,
     });
   }
-}, true);
+}, false);

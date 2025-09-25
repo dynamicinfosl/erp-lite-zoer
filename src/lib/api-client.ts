@@ -96,9 +96,8 @@ async function apiRequest<T = any>(
       }
     }
 
-    if ([AUTH_CODE.TOKEN_MISSING].includes(result.errorCode || '')) {
-      redirectToLogin();
-    }
+    // Não redirecionar automaticamente em TOKEN_MISSING para evitar loops;
+    // deixar o caller decidir o que fazer.
 
     if (response.status === 401 && 
         (result?.errorCode === AUTH_CODE.TOKEN_EXPIRED) && 
@@ -109,9 +108,8 @@ async function apiRequest<T = any>(
         if (refreshSuccess) {
           return apiRequest<T>(endpoint, options, true);
         } else {
-          console.error('Token refresh failed, redirecting to login');
-          redirectToLogin();
-          throw new ApiError(401, 'Token refresh failed, redirecting to login', AUTH_CODE.TOKEN_EXPIRED);
+          console.error('Token refresh failed');
+          throw new ApiError(401, 'Token refresh failed', AUTH_CODE.TOKEN_EXPIRED);
         }
       }
 
@@ -125,9 +123,8 @@ async function apiRequest<T = any>(
           if (refreshSuccess) {
             return apiRequest<T>(endpoint, options, true);
           } else {
-            console.error('Token refresh failed, redirecting to login');
-            redirectToLogin();
-            throw new ApiError(401, 'Token refresh failed, redirecting to login', AUTH_CODE.TOKEN_EXPIRED);
+            console.error('Token refresh failed');
+            throw new ApiError(401, 'Token refresh failed', AUTH_CODE.TOKEN_EXPIRED);
           }
         } finally {
           isRefreshing = false;

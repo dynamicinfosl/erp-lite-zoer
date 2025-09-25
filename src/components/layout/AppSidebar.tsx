@@ -35,259 +35,133 @@ import {
   Wrench,
   ChevronDown,
   Tag,
+  CreditCard,
 } from 'lucide-react';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { useSupabaseAuth } from '@/components/auth/SupabaseAuthProvider';
+import { useAuth } from '@/contexts/AuthContext';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { mockUserProfile } from '@/lib/mock-data';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
-const menuItems = [
+const menuGroups = [
   {
-    title: 'Dashboard',
-    url: '/dashboard',
-    icon: LayoutDashboard,
-    roles: ['admin', 'vendedor', 'financeiro'],
-  },
-  {
-    title: 'Cadastros',
-    icon: Users,
-    roles: ['admin', 'vendedor', 'financeiro'],
-    children: [
-      { title: 'Clientes', url: '/clientes', icon: Users, roles: ['admin', 'vendedor'] },
-      { title: 'Fornecedores', url: '/fornecedores', icon: Truck, roles: ['admin', 'financeiro', 'vendedor'] },
+    title: 'Principal',
+    items: [
+      { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'vendedor', 'financeiro'] },
     ],
-  },
-  {
-    title: 'PDV',
-    url: '/pdv',
-    icon: ShoppingCart,
-    roles: ['admin', 'vendedor'],
   },
   {
     title: 'Vendas',
-    url: '/vendas',
-    icon: Receipt,
-    roles: ['admin', 'vendedor', 'financeiro'],
-  },
-  {
-    title: 'Produtos',
-    icon: Package,
-    roles: ['admin', 'vendedor'],
-    children: [
-      { title: 'Gerenciar Produtos', url: '/produtos', icon: Package, roles: ['admin', 'vendedor'] },
-      { title: 'Valores de Venda', url: '/produtos/valores', icon: DollarSign, roles: ['admin', 'vendedor', 'financeiro'] },
-      { title: 'Etiquetas', url: '/produtos/etiquetas', icon: Tag, roles: ['admin', 'vendedor'] },
+    items: [
+      { title: 'Clientes', url: '/clientes', icon: Users, roles: ['admin', 'vendedor'] },
+      { title: 'Produtos', url: '/produtos', icon: Package, roles: ['admin', 'vendedor'] },
+      { title: 'Vendas / PDV', url: '/pdv', icon: ShoppingCart, roles: ['admin', 'vendedor'] },
     ],
   },
   {
-    title: 'Estoque',
-    url: '/estoque',
-    icon: Warehouse,
-    roles: ['admin', 'vendedor'],
+    title: 'Operações',
+    items: [
+      { title: 'Estoque', url: '/estoque', icon: Warehouse, roles: ['admin', 'vendedor'] },
+      { title: 'Entregas', url: '/entregas', icon: Truck, roles: ['admin', 'vendedor'] },
+      { title: 'Ordem de Serviços', url: '/ordem-servicos', icon: Wrench, roles: ['admin', 'vendedor'] },
+    ],
   },
   {
-    title: 'Entregas',
-    url: '/entregas',
-    icon: Truck,
-    roles: ['admin', 'vendedor'],
-  },
-  {
-    title: 'Ordem de Serviços',
-    url: '/ordem-servicos',
-    icon: Wrench,
-    roles: ['admin', 'vendedor'],
-  },
-  {
-    title: 'Portal Entregador',
-    url: '/entregador',
-    icon: Truck,
-    roles: ['entregador'],
-  },
-  {
-    title: 'Financeiro',
-    url: '/financeiro',
-    icon: DollarSign,
-    roles: ['admin', 'financeiro'],
-  },
-  {
-    title: 'Relatórios',
-    url: '/relatorios',
-    icon: BarChart3,
-    roles: ['admin', 'financeiro'],
-  },
-  {
-    title: 'Configurações',
-    url: '/configuracoes',
-    icon: Settings,
-    roles: ['admin'],
-  },
-  {
-    title: 'Admin',
-    url: '/admin',
-    icon: Shield,
-    roles: ['admin'],
+    title: 'Gestão',
+    items: [
+      { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin', 'financeiro'] },
+      { title: 'Relatórios', url: '/relatorios', icon: BarChart3, roles: ['admin', 'financeiro'] },
+      { title: 'Assinatura', url: '/assinatura', icon: CreditCard, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Administração', url: '/admin', icon: Shield, roles: ['admin'] },
+    ],
   },
 ];
 
 // Componente interno do sidebar que será renderizado apenas no cliente
 function SidebarContentInternal() {
   const pathname = usePathname();
+  const { user, currentTenant, signOut } = useAuth();
   
-  // Usar autenticação do Supabase quando habilitada
-  let user = mockUserProfile;
-  let logout = () => {};
-  
-  if (ENABLE_AUTH) {
-    try {
-      const supabaseAuth = useSupabaseAuth();
-      // Corrige os tipos conforme o tipo User do Supabase
-      user = {
-        ...mockUserProfile,
-        ...supabaseAuth?.user,
-        // Apenas sobrescreve propriedades que existem em mockUserProfile
-        role: (supabaseAuth?.user as any)?.role ?? mockUserProfile.role,
-        email: supabaseAuth?.user?.email ?? mockUserProfile.email,
-        id: typeof supabaseAuth?.user?.id === 'number'
-          ? supabaseAuth?.user?.id
-          : mockUserProfile.id,
-        // Propriedades customizadas (isAdmin, name, avatar, created_at, updated_at) só se existirem
-        ...(typeof (supabaseAuth?.user as any)?.isAdmin !== 'undefined' && { isAdmin: (supabaseAuth?.user as any).isAdmin }),
-        ...(typeof (supabaseAuth?.user as any)?.name !== 'undefined' && { name: (supabaseAuth?.user as any).name }),
-        ...(typeof (supabaseAuth?.user as any)?.avatar !== 'undefined' && { avatar: (supabaseAuth?.user as any).avatar }),
-        ...(typeof (supabaseAuth?.user as any)?.created_at !== 'undefined' && { created_at: (supabaseAuth?.user as any).created_at }),
-        ...(typeof (supabaseAuth?.user as any)?.updated_at !== 'undefined' && { updated_at: (supabaseAuth?.user as any).updated_at }),
-      };
-      logout = supabaseAuth?.signOut || (() => {});
-    } catch (error) {
-      console.error('Erro na autenticação do sidebar:', error);
-      user = mockUserProfile;
-      logout = () => {};
-    }
-  }
-
   // Simular perfil do usuário baseado no role ou usar um perfil padrão se auth estiver desabilitado
-  const userRole = ENABLE_AUTH ? (user?.isAdmin ? 'admin' : user?.role || 'vendedor') : mockUserProfile.role;
+  const userRole = ENABLE_AUTH && user ? 'admin' : mockUserProfile.role;
 
-  const filteredMenuItems = menuItems
-    .filter(item => item.roles.includes(userRole))
-    .map(item => {
-      if (item.children) {
-        const children = item.children.filter((c: any) => c.roles.includes(userRole));
-        return { ...item, children };
-      }
-      return item;
-    });
+  const filteredGroups = menuGroups.map(group => ({
+    title: group.title,
+    items: group.items.filter(item => item.roles.includes(userRole)),
+  })).filter(group => group.items.length > 0);
 
   return (
-    <Sidebar className="w-48">
-      <SidebarHeader className="border-b p-2">
-        <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Store className="h-3 w-3" />
+    <Sidebar className="hidden lg:flex w-60 flex-col juga-sidebar-gradient text-white">
+      <SidebarHeader className="px-4 py-5 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
+            <Store className="h-5 w-5" />
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-xs font-semibold truncate">ERP Lite</span>
-            <span className="text-xs text-muted-foreground hidden">Gestão de Bebidas</span>
+            <span className="text-sm font-semibold tracking-wide">JUGA</span>
+            <span className="text-xs text-white/60">ERP v1.0.0</span>
           </div>
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-1">
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-xs px-2">Menu</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-0.5">
-              {filteredMenuItems.map((item: any) => (
-                <React.Fragment key={item.title}>
-                  {!item.children ? (
-                    <SidebarMenuItem>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={pathname === item.url}
-                        className="h-7 text-xs px-2"
-                      >
-                        <Link href={item.url}>
-                          <item.icon className="h-3 w-3" />
-                          <span className="truncate">{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ) : (
-                    <Collapsible defaultOpen={item.children.some((c: any) => pathname.startsWith(c.url))}>
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton className="h-7 text-xs px-2 justify-between">
-                            <span className="flex items-center gap-2">
-                              <item.icon className="h-3 w-3" />
-                              <span className="truncate">{item.title}</span>
-                            </span>
-                            <ChevronDown className="h-3 w-3 transition-transform duration-200 data-[state=open]:rotate-180" />
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="pl-4 py-1">
-                          {item.children.map((child: any) => (
-                            <SidebarMenuItem key={child.title}>
-                              <SidebarMenuButton
-                                asChild
-                                isActive={pathname === child.url}
-                                className="h-7 text-xs px-2"
-                              >
-                                <Link href={child.url}>
-                                  <child.icon className="h-3 w-3" />
-                                  <span className="truncate">{child.title}</span>
-                                </Link>
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
-                          ))}
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  )}
-                </React.Fragment>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      <SidebarContent className="flex-1 px-3 py-5">
+        {filteredGroups.map(group => (
+          <SidebarGroup key={group.title} className="space-y-3">
+            <SidebarGroupLabel className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/60 px-3">
+              {group.title}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="space-y-1">
+                {group.items.map((item: any) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname === item.url}
+                      className="group h-9 rounded-xl px-3 text-sm text-white/80 transition data-[active=true]:bg-white/20 data-[active=true]:text-white hover:bg-white/15"
+                    >
+                      <Link href={item.url}>
+                        <item.icon className="h-4 w-4 text-white/60 transition group-data-[active=true]:text-white group-hover:text-white" />
+                        <span className="truncate font-medium">{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
-      <SidebarFooter className="border-t p-2">
-        <div className="flex flex-col gap-1">
-          {/* Seção do Perfil do Usuário */}
+      <SidebarFooter className="px-4 py-5 border-t border-white/10">
+        <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <div className="flex flex-col min-w-0 flex-1">
-              <span className="text-xs font-semibold text-foreground truncate">
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-semibold text-white truncate">
                 {user?.email || mockUserProfile.email}
               </span>
-              <span className="text-xs text-muted-foreground capitalize">
-                {userRole === 'admin' ? 'Admin' : userRole === 'vendedor' ? 'Vendedor' : userRole === 'financeiro' ? 'Financeiro' : userRole === 'entregador' ? 'Entregador' : 'Usuário'}
+              <span className="text-xs text-white/60 capitalize">
+                {currentTenant?.name || 'Empresa JUGA'}
               </span>
             </div>
             <ThemeToggle />
           </div>
-          
-          {/* Botão Sair */}
           <Button
             variant="outline"
             size="sm"
             onClick={() => {
               if (confirm('Deseja sair do sistema?')) {
                 if (ENABLE_AUTH) {
-                  // Se autenticação estiver habilitada, fazer logout
-                  logout();
+                  signOut();
+                } else {
+                  window.location.href = '/login';
                 }
-                // Sempre redirecionar para login
-                window.location.href = '/login';
               }
             }}
-            className="w-full justify-start gap-1 h-7 text-xs px-2"
+            className="w-full justify-center gap-2 rounded-xl border border-white/30 bg-white/10 text-xs text-white hover:bg-white/20"
           >
             <LogOut className="h-3 w-3" />
-            Sair
+            Finalizar sessão
           </Button>
         </div>
       </SidebarFooter>
@@ -299,21 +173,17 @@ function SidebarContentInternal() {
 const DynamicSidebarContent = dynamic(() => Promise.resolve(SidebarContentInternal), {
   ssr: false,
   loading: () => (
-    <Sidebar className="w-48">
-      <SidebarHeader className="border-b p-2">
-        <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Store className="h-3 w-3" />
+    <Sidebar className="hidden lg:flex w-60 flex-col juga-sidebar-gradient text-white">
+      <SidebarHeader className="px-4 py-5 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
+            <Store className="h-5 w-5" />
           </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs font-semibold truncate">ERP Lite</span>
-          </div>
+          <span className="text-sm font-semibold">JUGA</span>
         </div>
       </SidebarHeader>
-      <div className="px-1">
-        <div className="flex items-center justify-center p-4">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-        </div>
+      <div className="flex h-full items-center justify-center">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
       </div>
     </Sidebar>
   )

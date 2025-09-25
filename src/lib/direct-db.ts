@@ -1,6 +1,5 @@
 import { Client } from 'pg';
 
-// Configuração da conexão direta com PostgreSQL
 const connectionConfig = {
   host: 'db.lfxietcasaooenffdodr.supabase.co',
   port: 5432,
@@ -8,14 +7,12 @@ const connectionConfig = {
   user: 'postgres',
   password: '[97872715Ga!]',
   ssl: {
-    rejectUnauthorized: false
-  }
+    rejectUnauthorized: false,
+  },
 };
 
-// String de conexão alternativa
 export const connectionString = 'postgresql://postgres:[97872715Ga!]@db.lfxietcasaooenffdodr.supabase.co:5432/postgres';
 
-// Cliente PostgreSQL
 export class DirectDBClient {
   private client: Client;
 
@@ -43,9 +40,9 @@ export class DirectDBClient {
     }
   }
 
-  async query(text: string, params?: any[]) {
+  async query<T = unknown>(text: string, params?: any[]) {
     try {
-      const result = await this.client.query(text, params);
+      const result = await this.client.query<T>(text, params);
       return result;
     } catch (error) {
       console.error('❌ Erro na query:', error);

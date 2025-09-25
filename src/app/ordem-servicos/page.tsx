@@ -1,592 +1,674 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+} from '@/components/ui/dropdown-menu';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { 
   Plus, 
+  MoreHorizontal, 
   Search, 
-  Filter, 
-  Edit, 
-  Trash2, 
-  Eye, 
-  Calendar,
+  Settings2, 
+  Upload, 
+  Download, 
+  Filter,
+  FileText,
+  Trash2,
+  Edit,
+  Eye,
   Clock,
-  User,
-  Phone,
-  MapPin,
-  Wrench,
   CheckCircle,
-  XCircle,
   AlertCircle,
-  FileText
+  User,
+  Calendar
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { OrdemServicoForm } from '@/components/ordem-servicos/OrdemServicoForm';
-import { OrdemServicoPDFSimple } from '@/components/ordem-servicos/OrdemServicoPDFSimple';
-import { TestPDF } from '@/components/ordem-servicos/TestPDF';
 
 interface OrdemServico {
   id: string;
   numero: string;
-  cliente: {
-    id: string;
-    nome: string;
-    telefone: string;
-    endereco: string;
-  };
-  equipamento: {
-    tipo: string;
-    marca: string;
-    modelo: string;
-    numeroSerie: string;
-  };
-  problema: string;
-  diagnostico?: string;
-  solucao?: string;
-  status: 'aberta' | 'em_andamento' | 'aguardando_pecas' | 'concluida' | 'cancelada';
-  prioridade: 'baixa' | 'media' | 'alta' | 'urgente';
-  dataAbertura: string;
-  dataPrevisao?: string;
-  dataConclusao?: string;
+  cliente: string;
+  tipo: string;
+  descricao: string;
+  status: 'aberta' | 'em_andamento' | 'concluida' | 'cancelada';
+  prioridade: 'baixa' | 'media' | 'alta';
   tecnico?: string;
-  valorServico?: number;
-  valorPecas?: number;
-  observacoes?: string;
+  valor_estimado: number;
+  valor_final?: number;
+  data_abertura: string;
+  data_prazo?: string;
+  data_conclusao?: string;
 }
 
-const statusConfig = {
-  aberta: { label: 'Aberta', color: 'bg-blue-100 text-blue-800', icon: AlertCircle },
-  em_andamento: { label: 'Em Andamento', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-  aguardando_pecas: { label: 'Aguardando Peças', color: 'bg-orange-100 text-orange-800', icon: Wrench },
-  concluida: { label: 'Concluída', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-  cancelada: { label: 'Cancelada', color: 'bg-red-100 text-red-800', icon: XCircle }
-};
-
-const prioridadeConfig = {
-  baixa: { label: 'Baixa', color: 'bg-gray-100 text-gray-800' },
-  media: { label: 'Média', color: 'bg-blue-100 text-blue-800' },
-  alta: { label: 'Alta', color: 'bg-orange-100 text-orange-800' },
-  urgente: { label: 'Urgente', color: 'bg-red-100 text-red-800' }
-};
+interface ColumnVisibility {
+  numero: boolean;
+  cliente: boolean;
+  tipo: boolean;
+  status: boolean;
+  prioridade: boolean;
+  tecnico: boolean;
+  valor_estimado: boolean;
+  data_abertura: boolean;
+  data_prazo: boolean;
+}
 
 export default function OrdemServicosPage() {
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('todos');
-  const [prioridadeFilter, setPrioridadeFilter] = useState<string>('todos');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingOrdem, setEditingOrdem] = useState<OrdemServico | null>(null);
-  const [showPDF, setShowPDF] = useState(false);
-  const [selectedOrdemForPDF, setSelectedOrdemForPDF] = useState<OrdemServico | null>(null);
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
+    numero: true,
+    cliente: true,
+    tipo: true,
+    status: true,
+    prioridade: true,
+    tecnico: true,
+    valor_estimado: true,
+    data_abertura: true,
+    data_prazo: true,
+  });
 
-  // Dados do formulário
-  const [formData, setFormData] = useState({
-    cliente: { nome: '', telefone: '', endereco: '' },
-    equipamento: { tipo: '', marca: '', modelo: '', numeroSerie: '' },
-    problema: '',
-    prioridade: 'media' as const,
-    dataPrevisao: '',
+  // Filtros avançados
+  const [advancedFilters, setAdvancedFilters] = useState({
+    status: '',
+    prioridade: '',
     tecnico: '',
-    observacoes: ''
+    data_inicio: '',
+    data_fim: ''
   });
 
-  // Dados mockados para demonstração
-  useEffect(() => {
-    const ordensMock: OrdemServico[] = [
-      {
-        id: '1',
-        numero: 'OS-2024-001',
-        cliente: {
-          id: '1',
-          nome: 'João Silva',
-          telefone: '(11) 99999-9999',
-          endereco: 'Rua das Flores, 123 - São Paulo/SP'
-        },
-        equipamento: {
-          tipo: 'Geladeira',
-          marca: 'Brastemp',
-          modelo: 'BRM44HK',
-          numeroSerie: 'BR2024001'
-        },
-        problema: 'Não está gelando',
-        status: 'em_andamento',
-        prioridade: 'alta',
-        dataAbertura: '2024-01-15',
-        dataPrevisao: '2024-01-20',
-        tecnico: 'Carlos Santos',
-        valorServico: 150.00
-      },
-      {
-        id: '2',
-        numero: 'OS-2024-002',
-        cliente: {
-          id: '2',
-          nome: 'Maria Oliveira',
-          telefone: '(11) 88888-8888',
-          endereco: 'Av. Paulista, 456 - São Paulo/SP'
-        },
-        equipamento: {
-          tipo: 'Máquina de Lavar',
-          marca: 'Consul',
-          modelo: 'CWH12B',
-          numeroSerie: 'CO2024002'
-        },
-        problema: 'Não centrifuga',
-        diagnostico: 'Problema no motor de centrifugação',
-        status: 'aguardando_pecas',
-        prioridade: 'media',
-        dataAbertura: '2024-01-16',
-        dataPrevisao: '2024-01-25',
-        tecnico: 'Ana Costa',
-        valorServico: 200.00,
-        valorPecas: 80.00
-      },
-      {
-        id: '3',
-        numero: 'OS-2024-003',
-        cliente: {
-          id: '3',
-          nome: 'Pedro Santos',
-          telefone: '(11) 77777-7777',
-          endereco: 'Rua Augusta, 789 - São Paulo/SP'
-        },
-        equipamento: {
-          tipo: 'Ar Condicionado',
-          marca: 'Samsung',
-          modelo: 'AR12BVH',
-          numeroSerie: 'SA2024003'
-        },
-        problema: 'Não liga',
-        diagnostico: 'Problema na placa de controle',
-        solucao: 'Substituição da placa de controle',
-        status: 'concluida',
-        prioridade: 'baixa',
-        dataAbertura: '2024-01-10',
-        dataPrevisao: '2024-01-15',
-        dataConclusao: '2024-01-14',
-        tecnico: 'Roberto Lima',
-        valorServico: 300.00,
-        valorPecas: 150.00
-      }
-    ];
-    setOrdens(ordensMock);
-  }, []);
-
-  const filteredOrdens = ordens.filter(ordem => {
-    const matchesSearch = ordem.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ordem.cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ordem.equipamento.tipo.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'todos' || ordem.status === statusFilter;
-    const matchesPrioridade = prioridadeFilter === 'todos' || ordem.prioridade === prioridadeFilter;
-    
-    return matchesSearch && matchesStatus && matchesPrioridade;
+  // Estados para formulário
+  const [newOrdem, setNewOrdem] = useState({
+    cliente: '',
+    tipo: '',
+    descricao: '',
+    prioridade: 'media' as 'baixa' | 'media' | 'alta',
+    valor_estimado: '',
+    data_prazo: '',
+    tecnico: ''
   });
 
-  const handleSubmit = async (data: any) => {
+  const mockOrdens = useMemo<OrdemServico[]>(() => [
+    {
+      id: '1',
+      numero: 'OS-2024-001',
+      cliente: 'João Silva',
+      tipo: 'Reparo Equipamento',
+      descricao: 'Reparo no sistema de refrigeração',
+      status: 'aberta',
+      prioridade: 'alta',
+      tecnico: 'Carlos Santos',
+      valor_estimado: 350.00,
+      data_abertura: '2024-01-15T10:00:00Z',
+      data_prazo: '2024-01-20T18:00:00Z'
+    },
+    {
+      id: '2',
+      numero: 'OS-2024-002',
+      cliente: 'Maria Oliveira',
+      tipo: 'Manutenção Preventiva',
+      descricao: 'Limpeza e verificação geral',
+      status: 'em_andamento',
+      prioridade: 'media',
+      tecnico: 'Pedro Costa',
+      valor_estimado: 150.00,
+      data_abertura: '2024-01-14T09:30:00Z',
+      data_prazo: '2024-01-18T17:00:00Z'
+    }
+  ], []);
+
+  const loadOrdens = useCallback(async () => {
     try {
       setLoading(true);
-      
+      setTimeout(() => {
+        setOrdens(mockOrdens);
+        setLoading(false);
+      }, 500);
+    } catch (error) {
+      console.error('Erro ao carregar ordens de serviço:', error);
+      toast.error('Erro ao carregar ordens de serviço');
+      setLoading(false);
+    }
+  }, [mockOrdens]);
+
+  useEffect(() => {
+    loadOrdens();
+  }, [loadOrdens]);
+
+  // Filtrar ordens
+  const filteredOrdens = ordens.filter(ordem => {
+    const matchesSearch = ordem.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         ordem.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         ordem.descricao.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesAdvanced = (!advancedFilters.status || ordem.status === advancedFilters.status) &&
+                           (!advancedFilters.prioridade || ordem.prioridade === advancedFilters.prioridade) &&
+                           (!advancedFilters.tecnico || ordem.tecnico?.toLowerCase().includes(advancedFilters.tecnico.toLowerCase()));
+
+    return matchesSearch && matchesAdvanced;
+  });
+
+  // Adicionar ordem de serviço
+  const handleAddOrdem = async () => {
+    try {
       const novaOrdem: OrdemServico = {
         id: Date.now().toString(),
-        numero: `OS-2024-${String(ordens.length + 1).padStart(3, '0')}`,
-        cliente: data.cliente,
-        equipamento: data.equipamento,
-        problema: data.problema,
-        diagnostico: data.diagnostico,
-        solucao: data.solucao,
+        numero: `OS-${new Date().getFullYear()}-${(ordens.length + 1).toString().padStart(3, '0')}`,
+        ...newOrdem,
+        valor_estimado: parseFloat(newOrdem.valor_estimado) || 0,
         status: 'aberta',
-        prioridade: data.prioridade,
-        dataAbertura: new Date().toISOString().split('T')[0],
-        dataPrevisao: data.dataPrevisao,
-        tecnico: data.tecnico,
-        valorServico: data.valorServico,
-        valorPecas: data.valorPecas,
-        observacoes: data.observacoes
+        data_abertura: new Date().toISOString()
       };
 
-      setOrdens([...ordens, novaOrdem]);
-      setIsDialogOpen(false);
-      setEditingOrdem(null);
+      setOrdens(prev => [...prev, novaOrdem]);
+      setShowAddDialog(false);
+      setNewOrdem({
+        cliente: '',
+        tipo: '',
+        descricao: '',
+        prioridade: 'media',
+        valor_estimado: '',
+        data_prazo: '',
+        tecnico: ''
+      });
       toast.success('Ordem de serviço criada com sucesso!');
     } catch (error) {
+      console.error('Erro ao criar ordem de serviço:', error);
       toast.error('Erro ao criar ordem de serviço');
-    } finally {
-      setLoading(false);
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      cliente: { nome: '', telefone: '', endereco: '' },
-      equipamento: { tipo: '', marca: '', modelo: '', numeroSerie: '' },
-      problema: '',
-      prioridade: 'media',
-      dataPrevisao: '',
-      tecnico: '',
-      observacoes: ''
-    });
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value);
   };
 
-  const handleEdit = (ordem: OrdemServico) => {
-    setEditingOrdem(ordem);
-    setIsDialogOpen(true);
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
-  const handleGeneratePDF = (ordem: OrdemServico) => {
-    setSelectedOrdemForPDF(ordem);
-    setShowPDF(true);
+  const getStatusBadge = (status: OrdemServico['status']) => {
+    const statusMap = {
+      'aberta': { label: 'Aberta', variant: 'outline' as const, icon: Clock },
+      'em_andamento': { label: 'Em Andamento', variant: 'default' as const, icon: AlertCircle },
+      'concluida': { label: 'Concluída', variant: 'secondary' as const, icon: CheckCircle },
+      'cancelada': { label: 'Cancelada', variant: 'destructive' as const, icon: Clock }
+    };
+    
+    const statusInfo = statusMap[status];
+    const Icon = statusInfo.icon;
+    
+    return (
+      <Badge variant={statusInfo.variant} className="gap-1">
+        <Icon className="h-3 w-3" />
+        {statusInfo.label}
+      </Badge>
+    );
   };
 
-  const handleDelete = (id: string) => {
-    setOrdens(ordens.filter(ordem => ordem.id !== id));
-    toast.success('Ordem de serviço removida com sucesso!');
-  };
-
-  const updateStatus = (id: string, novoStatus: OrdemServico['status']) => {
-    setOrdens(ordens.map(ordem => 
-      ordem.id === id 
-        ? { ...ordem, status: novoStatus, dataConclusao: novoStatus === 'concluida' ? new Date().toISOString().split('T')[0] : undefined }
-        : ordem
-    ));
-    toast.success('Status atualizado com sucesso!');
+  const getPrioridadeBadge = (prioridade: OrdemServico['prioridade']) => {
+    const prioridadeMap = {
+      'baixa': { label: 'Baixa', variant: 'outline' as const },
+      'media': { label: 'Média', variant: 'default' as const },
+      'alta': { label: 'Alta', variant: 'destructive' as const }
+    };
+    
+    return (
+      <Badge variant={prioridadeMap[prioridade].variant}>
+        {prioridadeMap[prioridade].label}
+      </Badge>
+    );
   };
 
   return (
-    <div className="container mx-auto p-2 sm:p-4 space-y-3 sm:space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold">Ordem de Serviços</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground">Gerencie as ordens de serviço da sua empresa</p>
+          <h1 className="text-3xl font-bold tracking-tight">Ordens de Serviço</h1>
+          <p className="text-muted-foreground">
+            Gerencie ordens de serviço e manutenções
+          </p>
         </div>
-        
-        <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 w-full sm:w-auto">
-          <Button onClick={() => setIsDialogOpen(true)} className="w-full sm:w-auto h-8 text-sm">
-            <Plus className="h-3 w-3 mr-1" />
-            Nova Ordem
-          </Button>
-          <TestPDF />
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="px-3 py-1">
+            <FileText className="h-3 w-3 mr-1" />
+            {ordens.length} ordens
+          </Badge>
+          <Badge variant="outline" className="px-3 py-1">
+            <Clock className="h-3 w-3 mr-1" />
+            {ordens.filter(o => o.status === 'aberta').length} abertas
+          </Badge>
         </div>
       </div>
 
-      {/* Filtros */}
+      {/* Quick Stats */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">OS Abertas</CardTitle>
+            <Clock className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{ordens.filter(o => o.status === 'aberta').length}</div>
+            <p className="text-xs text-muted-foreground">Aguardando atendimento</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Em Andamento</CardTitle>
+            <AlertCircle className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{ordens.filter(o => o.status === 'em_andamento').length}</div>
+            <p className="text-xs text-muted-foreground">Sendo executadas</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Concluídas</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{ordens.filter(o => o.status === 'concluida').length}</div>
+            <p className="text-xs text-muted-foreground">Este mês</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Valor Estimado</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatCurrency(ordens.reduce((acc, o) => acc + o.valor_estimado, 0))}
+            </div>
+            <p className="text-xs text-muted-foreground">Total em aberto</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Toolbar */}
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-1 text-sm">
-            <Filter className="h-3 w-3" />
-            Filtros
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            <div className="space-y-1">
-              <Label htmlFor="search" className="text-xs">Buscar</Label>
+        <CardContent className="pt-6">
+          <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+            {/* Lado esquerdo - Botões de ação */}
+            <div className="flex items-center gap-2">
+              <Button 
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => setShowAddDialog(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nova OS
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <MoreHorizontal className="h-4 w-4 mr-2" />
+                    Mais Ações
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importar OSs
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar Lista
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-red-600">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir Selecionadas
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <Settings2 className="h-4 w-4 mr-2" />
+                    Colunas
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>Mostrar Colunas</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {Object.entries(columnVisibility).map(([key, value]) => (
+                    <DropdownMenuCheckboxItem
+                      key={key}
+                      checked={value}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, [key]: checked || false }))
+                      }
+                    >
+                      {key === 'numero' ? 'Número' :
+                       key === 'cliente' ? 'Cliente' :
+                       key === 'tipo' ? 'Tipo' :
+                       key === 'status' ? 'Status' :
+                       key === 'prioridade' ? 'Prioridade' :
+                       key === 'tecnico' ? 'Técnico' :
+                       key === 'valor_estimado' ? 'Valor Estimado' :
+                       key === 'data_abertura' ? 'Data Abertura' :
+                       key === 'data_prazo' ? 'Data Prazo' : key}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Lado direito - Busca */}
+            <div className="flex items-center gap-2">
               <div className="relative">
-                <Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  id="search"
-                  placeholder="Número, cliente..."
+                  placeholder="Buscar ordens de serviço..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-7 h-8 text-xs"
+                  className="pl-10 w-80"
                 />
               </div>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Busca Avançada
+              </Button>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="status-filter" className="text-xs">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="aberta">Aberta</SelectItem>
-                  <SelectItem value="em_andamento">Em Andamento</SelectItem>
-                  <SelectItem value="aguardando_pecas">Aguardando Peças</SelectItem>
-                  <SelectItem value="concluida">Concluída</SelectItem>
-                  <SelectItem value="cancelada">Cancelada</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1 sm:col-span-2 lg:col-span-1">
-              <Label htmlFor="prioridade-filter" className="text-xs">Prioridade</Label>
-              <Select value={prioridadeFilter} onValueChange={setPrioridadeFilter}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todas</SelectItem>
-                  <SelectItem value="baixa">Baixa</SelectItem>
-                  <SelectItem value="media">Média</SelectItem>
-                  <SelectItem value="alta">Alta</SelectItem>
-                  <SelectItem value="urgente">Urgente</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Lista de Ordens */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Ordens de Serviço ({filteredOrdens.length})</CardTitle>
-          <CardDescription className="text-xs">
-            Lista de todas as ordens de serviço cadastradas
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {/* Desktop Table */}
-          <div className="hidden lg:block overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="h-8">
-                  <TableHead className="text-xs py-2">Número</TableHead>
-                  <TableHead className="text-xs py-2">Cliente</TableHead>
-                  <TableHead className="text-xs py-2">Equipamento</TableHead>
-                  <TableHead className="text-xs py-2">Problema</TableHead>
-                  <TableHead className="text-xs py-2">Status</TableHead>
-                  <TableHead className="text-xs py-2">Prioridade</TableHead>
-                  <TableHead className="text-xs py-2">Técnico</TableHead>
-                  <TableHead className="text-xs py-2">Data</TableHead>
-                  <TableHead className="text-xs py-2">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrdens.map((ordem) => {
-                  const StatusIcon = statusConfig[ordem.status].icon;
-                  return (
-                    <TableRow key={ordem.id} className="h-10">
-                      <TableCell className="font-medium text-xs py-2">{ordem.numero}</TableCell>
-                      <TableCell className="py-2">
-                        <div>
-                          <div className="font-medium text-xs">{ordem.cliente.nome}</div>
-                          <div className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Phone className="h-2 w-2" />
-                            {ordem.cliente.telefone}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-2">
-                        <div>
-                          <div className="font-medium text-xs">{ordem.equipamento.tipo}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {ordem.equipamento.marca} {ordem.equipamento.modelo}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate text-xs py-2">{ordem.problema}</TableCell>
-                      <TableCell className="py-2">
-                        <Badge className={`${statusConfig[ordem.status].color} text-xs px-1 py-0`}>
-                          <StatusIcon className="h-2 w-2 mr-1" />
-                          {statusConfig[ordem.status].label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="py-2">
-                        <Badge className={`${prioridadeConfig[ordem.prioridade].color} text-xs px-1 py-0`}>
-                          {prioridadeConfig[ordem.prioridade].label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs py-2">{ordem.tecnico || '-'}</TableCell>
-                      <TableCell className="py-2">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-2 w-2" />
-                          <span className="text-xs">{new Date(ordem.dataAbertura).toLocaleDateString('pt-BR')}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-2">
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleGeneratePDF(ordem)}
-                            title="Gerar PDF"
-                            className="h-6 w-6 p-0"
-                          >
-                            <FileText className="h-2 w-2" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEdit(ordem)}
-                            title="Editar"
-                            className="h-6 w-6 p-0"
-                          >
-                            <Edit className="h-2 w-2" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDelete(ordem.id)}
-                            title="Excluir"
-                            className="h-6 w-6 p-0"
-                          >
-                            <Trash2 className="h-2 w-2" />
-                          </Button>
-                          <Select
-                            value={ordem.status}
-                            onValueChange={(value: any) => updateStatus(ordem.id, value)}
-                          >
-                            <SelectTrigger className="w-20 h-6 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="aberta">Aberta</SelectItem>
-                              <SelectItem value="em_andamento">Em Andamento</SelectItem>
-                              <SelectItem value="aguardando_pecas">Aguardando Peças</SelectItem>
-                              <SelectItem value="concluida">Concluída</SelectItem>
-                              <SelectItem value="cancelada">Cancelada</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
           </div>
 
-          {/* Mobile Cards */}
-          <div className="lg:hidden space-y-2">
-            {filteredOrdens.map((ordem) => {
-              const StatusIcon = statusConfig[ordem.status].icon;
-              return (
-                <Card key={ordem.id} className="p-3">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-semibold text-xs">{ordem.numero}</h3>
-                        <p className="text-xs text-muted-foreground">{ordem.cliente.nome}</p>
-                      </div>
-                      <Badge className={`${statusConfig[ordem.status].color} text-xs px-1 py-0`}>
-                        <StatusIcon className="h-2 w-2 mr-1" />
-                        {statusConfig[ordem.status].label}
-                      </Badge>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="text-muted-foreground">Equipamento:</span>
-                        <p className="font-medium text-xs">{ordem.equipamento.tipo}</p>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Prioridade:</span>
-                        <Badge className={`${prioridadeConfig[ordem.prioridade].color} text-xs px-1 py-0`}>
-                          {prioridadeConfig[ordem.prioridade].label}
-                        </Badge>
-                      </div>
-                    </div>
-                    
-                    <div className="text-xs">
-                      <span className="text-muted-foreground">Problema:</span>
-                      <p className="line-clamp-2 text-xs">{ordem.problema}</p>
-                    </div>
-                    
-                    <div className="flex justify-between items-center">
-                      <div className="text-xs text-muted-foreground">
-                        <Calendar className="h-2 w-2 inline mr-1" />
-                        {new Date(ordem.dataAbertura).toLocaleDateString('pt-BR')}
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleGeneratePDF(ordem)}
-                          className="h-6 w-6 p-0"
-                        >
-                          <FileText className="h-2 w-2" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEdit(ordem)}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Edit className="h-2 w-2" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDelete(ordem.id)}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Trash2 className="h-2 w-2" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-          
-          {filteredOrdens.length === 0 && (
-            <div className="text-center py-8">
-              <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium">Nenhuma ordem encontrada</h3>
-              <p className="text-muted-foreground">
-                {searchTerm || statusFilter !== 'todos' || prioridadeFilter !== 'todos'
-                  ? 'Tente ajustar os filtros de busca'
-                  : 'Crie sua primeira ordem de serviço'
-                }
-              </p>
+          {/* Busca Avançada */}
+          {showAdvancedSearch && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <select 
+                  className="px-3 py-2 border rounded-md"
+                  value={advancedFilters.status}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))}
+                >
+                  <option value="">Todos os status</option>
+                  <option value="aberta">Aberta</option>
+                  <option value="em_andamento">Em Andamento</option>
+                  <option value="concluida">Concluída</option>
+                  <option value="cancelada">Cancelada</option>
+                </select>
+                <select 
+                  className="px-3 py-2 border rounded-md"
+                  value={advancedFilters.prioridade}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, prioridade: e.target.value }))}
+                >
+                  <option value="">Todas as prioridades</option>
+                  <option value="baixa">Baixa</option>
+                  <option value="media">Média</option>
+                  <option value="alta">Alta</option>
+                </select>
+                <Input
+                  placeholder="Técnico..."
+                  value={advancedFilters.tecnico}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, tecnico: e.target.value }))}
+                />
+                <Input
+                  type="date"
+                  placeholder="Data início..."
+                  value={advancedFilters.data_inicio}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, data_inicio: e.target.value }))}
+                />
+                <Input
+                  type="date"
+                  placeholder="Data fim..."
+                  value={advancedFilters.data_fim}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, data_fim: e.target.value }))}
+                />
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Modal do Formulário */}
-      {isDialogOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-1 sm:p-2">
-          <div className="bg-white rounded-lg max-w-7xl w-full max-h-[98vh] overflow-hidden">
-            <OrdemServicoForm
-              initialData={editingOrdem ? {
-                cliente: editingOrdem.cliente,
-                equipamento: editingOrdem.equipamento,
-                problema: editingOrdem.problema,
-                diagnostico: editingOrdem.diagnostico,
-                solucao: editingOrdem.solucao,
-                prioridade: editingOrdem.prioridade,
-                dataPrevisao: editingOrdem.dataPrevisao || '',
-                tecnico: editingOrdem.tecnico || '',
-                valorServico: editingOrdem.valorServico || 0,
-                valorPecas: editingOrdem.valorPecas || 0,
-                observacoes: editingOrdem.observacoes || ''
-              } : undefined}
-              onSubmit={handleSubmit}
-              onCancel={() => {
-                setIsDialogOpen(false);
-                setEditingOrdem(null);
-              }}
-              isLoading={loading}
-              title={editingOrdem ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}
-            />
-          </div>
-        </div>
-      )}
+      {/* Tabela */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Lista de Ordens de Serviço ({filteredOrdens.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-center py-8">Carregando ordens de serviço...</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {columnVisibility.numero && <TableHead>Número</TableHead>}
+                  {columnVisibility.cliente && <TableHead>Cliente</TableHead>}
+                  {columnVisibility.tipo && <TableHead>Tipo</TableHead>}
+                  <TableHead>Descrição</TableHead>
+                  {columnVisibility.status && <TableHead>Status</TableHead>}
+                  {columnVisibility.prioridade && <TableHead>Prioridade</TableHead>}
+                  {columnVisibility.tecnico && <TableHead>Técnico</TableHead>}
+                  {columnVisibility.valor_estimado && <TableHead>Valor Estimado</TableHead>}
+                  {columnVisibility.data_abertura && <TableHead>Data Abertura</TableHead>}
+                  {columnVisibility.data_prazo && <TableHead>Prazo</TableHead>}
+                  <TableHead>Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredOrdens.map((ordem) => (
+                  <TableRow key={ordem.id}>
+                    {columnVisibility.numero && (
+                      <TableCell className="font-mono text-sm font-medium">
+                        {ordem.numero}
+                      </TableCell>
+                    )}
+                    {columnVisibility.cliente && (
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <User className="h-3 w-3 text-gray-400" />
+                          {ordem.cliente}
+                        </div>
+                      </TableCell>
+                    )}
+                    {columnVisibility.tipo && <TableCell>{ordem.tipo}</TableCell>}
+                    <TableCell className="max-w-xs">
+                      <div className="truncate" title={ordem.descricao}>
+                        {ordem.descricao}
+                      </div>
+                    </TableCell>
+                    {columnVisibility.status && <TableCell>{getStatusBadge(ordem.status)}</TableCell>}
+                    {columnVisibility.prioridade && <TableCell>{getPrioridadeBadge(ordem.prioridade)}</TableCell>}
+                    {columnVisibility.tecnico && <TableCell>{ordem.tecnico || '-'}</TableCell>}
+                    {columnVisibility.valor_estimado && <TableCell>{formatCurrency(ordem.valor_estimado)}</TableCell>}
+                    {columnVisibility.data_abertura && (
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-gray-400" />
+                          {formatDate(ordem.data_abertura)}
+                        </div>
+                      </TableCell>
+                    )}
+                    {columnVisibility.data_prazo && (
+                      <TableCell>
+                        {ordem.data_prazo ? (
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3 text-gray-400" />
+                            {formatDate(ordem.data_prazo)}
+                          </div>
+                        ) : '-'}
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Ver Detalhes
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Cancelar OS
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
 
-      {/* Modal do PDF */}
-      {showPDF && selectedOrdemForPDF && (
-        <OrdemServicoPDFSimple
-          ordem={selectedOrdemForPDF}
-          onClose={() => {
-            setShowPDF(false);
-            setSelectedOrdemForPDF(null);
-          }}
-        />
-      )}
+          {filteredOrdens.length === 0 && !loading && (
+            <div className="text-center py-8 text-muted-foreground">
+              Nenhuma ordem de serviço encontrada
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Dialog Adicionar OS */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Nova Ordem de Serviço</DialogTitle>
+            <DialogDescription>
+              Preencha as informações da ordem de serviço
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="cliente">Cliente *</label>
+              <Input
+                id="cliente"
+                value={newOrdem.cliente}
+                onChange={(e) => setNewOrdem(prev => ({ ...prev, cliente: e.target.value }))}
+                placeholder="Nome do cliente"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label htmlFor="tipo">Tipo de Serviço *</label>
+                <Input
+                  id="tipo"
+                  value={newOrdem.tipo}
+                  onChange={(e) => setNewOrdem(prev => ({ ...prev, tipo: e.target.value }))}
+                  placeholder="Ex: Reparo, Manutenção..."
+                />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="prioridade">Prioridade</label>
+                <select 
+                  id="prioridade"
+                  className="px-3 py-2 border rounded-md"
+                  value={newOrdem.prioridade}
+                  onChange={(e) => setNewOrdem(prev => ({ ...prev, prioridade: e.target.value as 'baixa' | 'media' | 'alta' }))}
+                >
+                  <option value="baixa">Baixa</option>
+                  <option value="media">Média</option>
+                  <option value="alta">Alta</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="descricao">Descrição do Serviço *</label>
+              <textarea
+                id="descricao"
+                className="px-3 py-2 border rounded-md min-h-[100px]"
+                value={newOrdem.descricao}
+                onChange={(e) => setNewOrdem(prev => ({ ...prev, descricao: e.target.value }))}
+                placeholder="Descreva o serviço a ser realizado..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label htmlFor="valor_estimado">Valor Estimado</label>
+                <Input
+                  id="valor_estimado"
+                  type="number"
+                  step="0.01"
+                  value={newOrdem.valor_estimado}
+                  onChange={(e) => setNewOrdem(prev => ({ ...prev, valor_estimado: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="data_prazo">Data Prazo</label>
+                <Input
+                  id="data_prazo"
+                  type="date"
+                  value={newOrdem.data_prazo}
+                  onChange={(e) => setNewOrdem(prev => ({ ...prev, data_prazo: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="tecnico">Técnico Responsável</label>
+              <Input
+                id="tecnico"
+                value={newOrdem.tecnico}
+                onChange={(e) => setNewOrdem(prev => ({ ...prev, tecnico: e.target.value }))}
+                placeholder="Nome do técnico"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAddOrdem} className="bg-emerald-600 hover:bg-emerald-700">
+              Criar Ordem de Serviço
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

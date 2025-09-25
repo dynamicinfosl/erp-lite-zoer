@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { LogOut, Home } from 'lucide-react';
 import { ENABLE_AUTH } from '@/constants/auth';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { useSupabaseAuth } from '@/components/auth/SupabaseAuthProvider';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AppHeaderProps {
   title?: string;
@@ -26,28 +25,15 @@ export function AppHeader({
   className = ''
 }: AppHeaderProps) {
   const router = useRouter();
-  
-  // Usar autenticação do Supabase quando habilitada
-  let logout = () => {};
-  
-  if (ENABLE_AUTH) {
-    try {
-      const supabaseAuth = useSupabaseAuth();
-      logout = supabaseAuth?.signOut || (() => {});
-    } catch (error) {
-      console.error('Erro na autenticação do header:', error);
-      logout = () => {};
-    }
-  }
+  const { logout } = useAuth();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (confirm('Deseja sair do sistema?')) {
       if (ENABLE_AUTH) {
-        // Se autenticação estiver habilitada, fazer logout
-        logout();
+        await logout();
+      } else {
+        router.push('/login');
       }
-      // Sempre redirecionar para login
-      router.push('/login');
     }
   };
 

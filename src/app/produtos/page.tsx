@@ -1,1220 +1,894 @@
-
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle, FileSpreadsheet, ChevronDown, Settings } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Product, Category } from '@/types';
-import { api } from '@/lib/api-client';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+} from '@/components/ui/dropdown-menu';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { 
+  Plus, 
+  MoreHorizontal, 
+  Search, 
+  Settings2, 
+  Upload, 
+  Download, 
+  Filter,
+  Package,
+  Trash2,
+  Edit,
+  Eye,
+  DollarSign,
+  BarChart3
+} from 'lucide-react';
 import { toast } from 'sonner';
-import { ENABLE_AUTH } from '@/constants/auth';
-import { mockProducts } from '@/lib/mock-data';
+import * as XLSX from 'xlsx';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
-import { getErrorMessage } from '@/lib/error-handler';
+
+interface Product {
+  id: string;
+  sku: string;
+  name: string;
+  description?: string;
+  category?: string;
+  brand?: string;
+  cost_price: number;
+  sale_price: number;
+  stock_quantity: number;
+  barcode?: string;
+  ncm?: string;
+  unit: string;
+  status: 'active' | 'inactive';
+  created_at: string;
+  imported_at?: string;
+}
+
+interface ColumnVisibility {
+  sku: boolean;
+  category: boolean;
+  brand: boolean;
+  cost_price: boolean;
+  sale_price: boolean;
+  stock_quantity: boolean;
+  barcode: boolean;
+  ncm: boolean;
+  unit: boolean;
+  status: boolean;
+}
 
 export default function ProdutosPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showDialog, setShowDialog] = useState(false);
-  const [showManageModal, setShowManageModal] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
+    sku: true,
+    category: true,
+    brand: true,
+    cost_price: true,
+    sale_price: true,
+    stock_quantity: true,
+    barcode: false,
+    ncm: false,
+    unit: true,
+    status: true,
+  });
+
+  // Filtros avançados
+  const [advancedFilters, setAdvancedFilters] = useState({
+    category: '',
+    brand: '',
+    minPrice: '',
+    maxPrice: '',
+    status: ''
+  });
+
+  // Estados para formulário
+  const [newProduct, setNewProduct] = useState({
+    sku: '',
+    name: '',
+    description: '',
+    category: '',
+    brand: '',
+    cost_price: '',
+    sale_price: '',
+    stock_quantity: '0',
+    barcode: '',
+    ncm: '',
+    unit: 'UN',
+  });
+
+  // Estados para preview de importação
   const [showImportPreview, setShowImportPreview] = useState(false);
   const [importFileName, setImportFileName] = useState('');
   const [importHeaders, setImportHeaders] = useState<string[]>([]);
-  const [importRowsData, setImportRowsData] = useState<any[][]>([]);
+  const [importRows, setImportRows] = useState<any[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
-  const [importData, setImportData] = useState<any[]>([]);
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [isConsuming, setIsConsuming] = useState(false);
-  const [importLoading, setImportLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    sku: '',
-    barcode: '',
-    description: '',
-    category_id: '',
-    cost_price: '',
-    sale_price: '',
-    stock_quantity: '',
-    min_stock: '',
-    unit: 'UN',
-    internal_code: '',
-    product_group: '',
-    has_variations: false,
-    fiscal_note: '',
-    unit_conversion: '',
-    moves_stock: true,
-    width_cm: '',
-    height_cm: '',
-    length_cm: '',
-    weight_kg: '',
-  });
+  const [isRegistering, setIsRegistering] = useState(false);
 
-  type ProductSettings = {
-    unitDefault: string;
-    minStockDefault: number;
-    lowStockAlert: boolean;
-    blockSaleWithoutStock: boolean;
-    defaultMarkupPercent: number;
-  };
-
-  const defaultSettings: ProductSettings = {
-    unitDefault: 'UN',
-    minStockDefault: 0,
-    lowStockAlert: true,
-    blockSaleWithoutStock: false,
-    defaultMarkupPercent: 0,
-  };
-
-  const [settings, setSettings] = useState<ProductSettings>(defaultSettings);
-
+  // Carregar produtos
   useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-    // carregar configurações do localStorage
-    try {
-      const raw = localStorage.getItem('products_settings');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        setSettings({ ...defaultSettings, ...parsed });
-      }
-    } catch {}
+    loadProducts();
   }, []);
 
-  const fetchProducts = async () => {
+  const loadProducts = async () => {
     try {
       setLoading(true);
+      const response = await fetch('/next_api/products');
+      if (!response.ok) throw new Error('Erro ao carregar produtos');
       
-      if (ENABLE_AUTH) {
-        const data = await api.get<Product[]>('/products');
-        setProducts(data);
-      } else {
-        setProducts(mockProducts);
-      }
+      const data = await response.json();
+      setProducts(data.rows || []);
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
-      if (ENABLE_AUTH) {
-        toast.error('Erro ao carregar produtos');
-      }
+      toast.error('Erro ao carregar produtos');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchCategories = async () => {
-    try {
-      if (ENABLE_AUTH) {
-        const data = await api.get<Category[]>('/categories');
-        setCategories(data);
-      } else {
-        // Categorias mockadas
-        const mockCategories: Category[] = [
-          { id: 1, name: 'Refrigerantes', description: 'Bebidas gaseificadas', color: '#e74c3c', is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-          { id: 2, name: 'Cervejas', description: 'Cervejas nacionais e importadas', color: '#f39c12', is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-          { id: 3, name: 'Águas', description: 'Águas minerais', color: '#3498db', is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-          { id: 4, name: 'Energéticos', description: 'Bebidas energéticas', color: '#9b59b6', is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
-        ];
-        setCategories(mockCategories);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar categorias:', error);
-      if (ENABLE_AUTH) {
-        toast.error('Erro ao carregar categorias');
-      }
-    }
-  };
+  // Filtrar produtos
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.name || !formData.sale_price) {
-      toast.error('Nome e preço de venda são obrigatórios');
-      return;
-    }
+    const matchesAdvanced = (!advancedFilters.category || product.category?.toLowerCase().includes(advancedFilters.category.toLowerCase())) &&
+                           (!advancedFilters.brand || product.brand?.toLowerCase().includes(advancedFilters.brand.toLowerCase())) &&
+                           (!advancedFilters.minPrice || product.sale_price >= parseFloat(advancedFilters.minPrice)) &&
+                           (!advancedFilters.maxPrice || product.sale_price <= parseFloat(advancedFilters.maxPrice)) &&
+                           (!advancedFilters.status || product.status === advancedFilters.status);
 
+    return matchesSearch && matchesAdvanced;
+  });
+
+  // Adicionar produto
+  const handleAddProduct = async () => {
     try {
       const productData = {
-        ...formData,
-        category_id: formData.category_id ? parseInt(formData.category_id) : null,
-        cost_price: parseFloat(formData.cost_price) || 0,
-        sale_price: parseFloat(formData.sale_price),
-        stock_quantity: parseInt(formData.stock_quantity) || 0,
-        min_stock: parseInt(formData.min_stock) || 0,
-        width_cm: formData.width_cm ? parseFloat(formData.width_cm) : null,
-        height_cm: formData.height_cm ? parseFloat(formData.height_cm) : null,
-        length_cm: formData.length_cm ? parseFloat(formData.length_cm) : null,
-        weight_kg: formData.weight_kg ? parseFloat(formData.weight_kg) : null,
+        ...newProduct,
+        cost_price: parseFloat(newProduct.cost_price) || 0,
+        sale_price: parseFloat(newProduct.sale_price) || 0,
+        stock_quantity: parseInt(newProduct.stock_quantity) || 0,
       };
 
-      if (editingProduct) {
-        await api.put(`/products?id=${editingProduct.id}`, productData);
-        toast.success('Produto atualizado com sucesso');
+      const response = await fetch('/next_api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(productData)
+      });
+
+      if (!response.ok) throw new Error('Erro ao adicionar produto');
+
+      await loadProducts();
+      setShowAddDialog(false);
+      setNewProduct({
+        sku: '',
+        name: '',
+        description: '',
+        category: '',
+        brand: '',
+        cost_price: '',
+        sale_price: '',
+        stock_quantity: '0',
+        barcode: '',
+        ncm: '',
+        unit: 'UN',
+      });
+      toast.success('Produto adicionado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao adicionar produto:', error);
+      toast.error('Erro ao adicionar produto');
+    }
+  };
+
+  // Handle import
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImporting(true);
+
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      let headers: string[] = [];
+      let rows: any[] = [];
+
+      if (ext === 'xlsx' || ext === 'xls') {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer);
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[];
+        if (json.length < 2) {
+          toast.error('Planilha precisa de cabeçalho e ao menos uma linha');
+          setImporting(false);
+          return;
+        }
+        headers = (json[0] as any[]).map(h => String(h || '').trim());
+        rows = json.slice(1);
+      } else if (ext === 'csv') {
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        if (lines.length < 2) {
+          toast.error('CSV inválido');
+          setImporting(false);
+          return;
+        }
+        const delimiter = (lines[0].split(';').length - 1) > (lines[0].split(',').length - 1) ? ';' : ',';
+        headers = lines[0].split(delimiter).map(h => h.replace(/"/g, '').trim());
+        rows = lines.slice(1).map(line => {
+          const values: string[] = [];
+          let cur = '';
+          let quoted = false;
+          for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (ch === '"') {
+              if (quoted && line[i + 1] === '"') {
+                cur += '"';
+                i++;
+              } else {
+                quoted = !quoted;
+              }
+            } else if (ch === delimiter && !quoted) {
+              values.push(cur);
+              cur = '';
+            } else {
+              cur += ch;
+            }
+          }
+          values.push(cur);
+          return values;
+        });
       } else {
-        await api.post('/products', productData);
-        toast.success('Produto criado com sucesso');
+        toast.error('Envie um arquivo .xlsx, .xls ou .csv');
+        setImporting(false);
+        return;
       }
 
-      setShowDialog(false);
-      setEditingProduct(null);
-      resetForm();
-      fetchProducts();
+      setImportFileName(file.name);
+      setImportHeaders(headers);
+      setImportRows(rows);
+      setImportErrors([]);
+      setShowImportPreview(true);
+      setShowImportDialog(false);
     } catch (error) {
-      console.error('Erro ao salvar produto:', error);
-      toast.error('Erro ao salvar produto');
+      console.error('Erro ao importar arquivo:', error);
+      toast.error('Erro ao importar arquivo');
+    } finally {
+      setImporting(false);
     }
   };
 
-  const handleEdit = (product: Product) => {
-    setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      sku: product.sku || '',
-      barcode: product.barcode || '',
-      description: product.description || '',
-      category_id: product.category_id?.toString() || '',
-      cost_price: product.cost_price.toString(),
-      sale_price: product.sale_price.toString(),
-      stock_quantity: product.stock_quantity.toString(),
-      min_stock: product.min_stock.toString(),
-      unit: product.unit,
-      internal_code: product.internal_code || '',
-      product_group: product.product_group || '',
-      has_variations: product.has_variations || false,
-      fiscal_note: product.fiscal_note || '',
-      unit_conversion: product.unit_conversion || '',
-      moves_stock: product.moves_stock !== false,
-      width_cm: product.width_cm?.toString() || '',
-      height_cm: product.height_cm?.toString() || '',
-      length_cm: product.length_cm?.toString() || '',
-      weight_kg: product.weight_kg?.toString() || '',
-    });
-    setShowDialog(true);
+  const normalizeHeader = (raw: string): string => {
+    return String(raw || '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s\/]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Tem certeza que deseja excluir este produto?')) return;
-
+  const handleRegisterSelected = async (selected: any[]) => {
     try {
-      await api.delete(`/products?id=${id}`);
-      toast.success('Produto excluído com sucesso');
-      fetchProducts();
+      setIsRegistering(true);
+      let success = 0;
+      let fail = 0;
+      const errors: string[] = [];
+
+      for (const row of selected) {
+        const obj: Record<string, any> = Array.isArray(row)
+          ? (() => {
+              const keys = importHeaders.map(normalizeHeader);
+              const out: Record<string, any> = {};
+              keys.forEach((key, index) => {
+                out[key] = row[index];
+              });
+              return out;
+            })()
+          : (() => {
+              const out: Record<string, any> = {};
+              Object.entries(row as Record<string, any>).forEach(([key, value]) => {
+                out[normalizeHeader(key)] = value;
+              });
+              return out;
+            })();
+
+        const productData = {
+          sku: (obj['codigo'] || obj['sku'] || '').toString().trim(),
+          name: (obj['nome'] || obj['produto'] || '').toString().trim(),
+          description: (obj['descricao'] || obj['descrição'] || '').toString().trim() || null,
+          category: (obj['categoria'] || '').toString().trim() || null,
+          brand: (obj['marca'] || '').toString().trim() || null,
+          cost_price: parseFloat((obj['valor de custo'] || obj['custo'] || obj['preco de custo'] || '0').toString().replace(/[^\d.,]/g, '').replace(',', '.')) || 0,
+          sale_price: parseFloat((obj['valor de venda'] || obj['preco'] || obj['preco de venda'] || '0').toString().replace(/[^\d.,]/g, '').replace(',', '.')) || 0,
+          stock_quantity: parseInt((obj['quantidade'] || obj['estoque'] || '0').toString(), 10) || 0,
+          barcode: (obj['codigo de barras'] || obj['barcode'] || '').toString().trim() || null,
+          ncm: (obj['ncm'] || '').toString().trim() || null,
+          unit: (obj['unidade'] || obj['und'] || 'UN').toString().trim().toUpperCase() || 'UN',
+          imported_at: new Date().toISOString(),
+        };
+
+        if (!productData.sku || !productData.name) {
+          fail++;
+          errors.push('Produto com código ou nome vazio, pulado.');
+          continue;
+        }
+
+        const response = await fetch('/next_api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(productData),
+        });
+
+        if (response.ok) {
+          success++;
+        } else {
+          fail++;
+          const text = await response.text();
+          console.error('Erro ao cadastrar produto:', text);
+          errors.push(text);
+        }
+      }
+
+      if (success > 0) toast.success(`${success} produtos cadastrados`);
+      if (fail > 0) toast.error(`${fail} produtos não cadastrados`);
+      await loadProducts();
+      setShowImportPreview(false);
+      setImportErrors(errors);
     } catch (error) {
-      console.error('Erro ao excluir produto:', error);
-      toast.error('Erro ao excluir produto');
+      console.error('Erro ao cadastrar produtos:', error);
+      toast.error('Erro ao cadastrar produtos');
+    } finally {
+      setIsRegistering(false);
     }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      sku: '',
-      barcode: '',
-      description: '',
-      category_id: '',
-      cost_price: '',
-      sale_price: '',
-      stock_quantity: '',
-      min_stock: settings.minStockDefault ? String(settings.minStockDefault) : '',
-      unit: settings.unitDefault || 'UN',
-      internal_code: '',
-      product_group: '',
-      has_variations: false,
-      fiscal_note: '',
-      unit_conversion: '',
-      moves_stock: true,
-      width_cm: '',
-      height_cm: '',
-      length_cm: '',
-      weight_kg: '',
-    });
-  };
-
-  const exportCSV = () => {
-    try {
-      const rows = [
-        ['ID', 'Nome', 'Valor', 'Estoque'],
-        ...filteredProducts.map((p) => [
-          p.id,
-          p.name || '',
-          p.sale_price ?? 0,
-          `${p.stock_quantity} ${p.unit}`,
-        ]),
-      ];
-      const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `produtos_${new Date().toISOString().slice(0,10)}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      toast.success('CSV exportado com sucesso');
-    } catch (e) {
-      console.error('Erro ao exportar CSV:', e);
-      toast.error('Erro ao exportar CSV');
-    }
-  };
-
-  const exportXLSX = async () => {
-    try {
-      // @ts-ignore dependência opcional
-      const XLSX = await import('xlsx');
-      const rows = [
-        ['ID', 'Nome', 'Valor', 'Estoque'],
-        ...filteredProducts.map((p) => [
-          p.id,
-          p.name || '',
-          p.sale_price ?? 0,
-          `${p.stock_quantity} ${p.unit}`,
-        ]),
-      ];
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      XLSX.utils.book_append_sheet(wb, ws, 'Produtos');
-      XLSX.writeFile(wb, `produtos_${new Date().toISOString().slice(0,10)}.xlsx`);
-      toast.success('XLSX exportado com sucesso');
-    } catch (e) {
-      console.error('Erro ao exportar XLSX:', e);
-      toast.error('Erro ao exportar XLSX');
-    }
-  };
-
-  const onClickImport = () => {
-    fileInputRef.current?.click();
   };
 
   const handleImportConfirm = async () => {
-    setShowImportPreview(false);
-    await importRows(importRowsData);
+    await handleRegisterSelected(importRows);
   };
 
   const handleImportCancel = () => {
     setShowImportPreview(false);
-    setImportData([]);
+    setImportRows([]);
     setImportHeaders([]);
-    setImportRowsData([]);
     setImportErrors([]);
   };
-
-  const handleSaveImportData = async () => {
-    console.log('💾 Integrando dados de importação de produtos diretamente no sistema...');
-    try {
-      setImportLoading(true);
-      let successCount = 0;
-      let errorCount = 0;
-
-      console.log('Iniciando integração de', importData.length, 'produtos');
-
-      for (const row of importData) {
-        try {
-          console.log('Processando linha:', row);
-          const productData = {
-            name: row['Nome'] || row['nome'] || '',
-            sku: row['SKU'] || row['sku'] || '',
-            barcode: row['Código de Barras'] || row['codigo_barras'] || '',
-            description: row['Descrição'] || row['descricao'] || '',
-            category_id: row['Categoria'] || row['categoria'] || '',
-            cost_price: parseFloat((row['Preço de Custo'] || row['preco_custo'] || '0').toString().replace(',', '.')) || 0,
-            sale_price: parseFloat((row['Preço de Venda'] || row['preco_venda'] || '0').toString().replace(',', '.')) || 0,
-            stock_quantity: parseInt((row['Estoque'] || row['estoque'] || '0').toString()) || 0,
-            min_stock: parseInt((row['Estoque Mínimo'] || row['estoque_minimo'] || '0').toString()) || 0,
-            unit: row['Unidade'] || row['unidade'] || 'UN',
-            internal_code: row['Código Interno'] || row['codigo_interno'] || '',
-            product_group: row['Grupo'] || row['grupo'] || '',
-            has_variations: (row['Tem Variações'] || row['tem_variacoes'] || 'Não').toLowerCase() === 'sim',
-            fiscal_note: row['Nota Fiscal'] || row['nota_fiscal'] || '',
-            unit_conversion: (row['Conversão de Unidade'] || row['conversao_unidade'] || '1').toString(),
-            moves_stock: (row['Move Estoque'] || row['move_estoque'] || 'Sim').toLowerCase() === 'sim',
-            width_cm: parseFloat((row['Largura (cm)'] || row['largura_cm'] || '0').toString().replace(',', '.')) || 0,
-            height_cm: parseFloat((row['Altura (cm)'] || row['altura_cm'] || '0').toString().replace(',', '.')) || 0,
-            length_cm: parseFloat((row['Comprimento (cm)'] || row['comprimento_cm'] || '0').toString().replace(',', '.')) || 0,
-            weight_kg: parseFloat((row['Peso (kg)'] || row['peso_kg'] || '0').toString().replace(',', '.')) || 0
-          };
-
-          console.log('Dados do produto processados:', productData);
-
-          if (!productData.name) {
-            console.log('Produto sem nome, pulando...', productData);
-            errorCount++;
-            continue;
-          }
-
-          if (ENABLE_AUTH) {
-            console.log('Salvando via API...');
-            await api.post('/products', productData);
-          } else {
-            console.log('Modo sem auth - adicionando à lista local');
-            const newProduct = {
-              id: Date.now() + Math.random(),
-              user_id: 1,
-              ...productData,
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            };
-            setProducts(prev => [...prev, newProduct]);
-          }
-          successCount++;
-        } catch (error) {
-          console.error('Erro ao integrar produto:', getErrorMessage(error));
-          console.error('Dados do produto que causou erro:', row);
-          errorCount++;
-        }
-      }
-
-      setShowImportPreview(false);
-      setImportData([]);
-      
-      // Sempre atualizar a lista após integração
-      console.log('Atualizando lista de produtos...');
-      await fetchProducts();
-      
-      console.log(`Integração concluída: ${successCount} sucessos, ${errorCount} erros`);
-      
-      if (successCount > 0) {
-        toast.success(`${successCount} produtos integrados com sucesso!`);
-      }
-      
-      if (errorCount > 0) {
-        toast.error(`${errorCount} produtos não puderam ser integrados`);
-      }
-      
-      if (successCount === 0 && errorCount === 0) {
-        toast.warning('Nenhum produto foi processado');
-      }
-    } catch (error) {
-      console.error('Erro ao integrar dados:', getErrorMessage(error));
-      toast.error('Erro ao integrar dados no sistema');
-    } finally {
-      setImportLoading(false);
-    }
-  };
-
-  const handleExtractData = async () => {
-    try {
-      setIsExtracting(true);
-      
-      // Processar e salvar os dados extraídos diretamente no sistema
-      let successCount = 0;
-      let errorCount = 0;
-      
-      for (const row of importData) {
-        try {
-          const productData = {
-            name: row['nome'] || row['name'] || '',
-            sku: row['sku'] || row['código'] || '',
-            barcode: row['barcode'] || row['código de barras'] || '',
-            description: row['descrição'] || row['description'] || '',
-            category_id: row['categoria'] || row['category'] || null,
-            cost_price: parseFloat(String(row['preço de custo'] || row['cost_price'] || '0').replace(',', '.')) || 0,
-            sale_price: parseFloat(String(row['preço de venda'] || row['sale_price'] || '0').replace(',', '.')) || 0,
-            stock_quantity: parseInt(String(row['estoque'] || row['stock'] || '0')) || 0,
-            min_stock: parseInt(String(row['estoque mínimo'] || row['min_stock'] || '0')) || 0,
-            unit: row['unidade'] || row['unit'] || 'UN',
-            is_active: (String(row['ativo'] || row['active'] || 'Sim')).toLowerCase() === 'sim',
-            internal_code: row['código interno'] || row['internal_code'] || '',
-            product_group: row['grupo'] || row['group'] || '',
-            has_variations: (String(row['variações'] || row['variations'] || 'Não')).toLowerCase() === 'sim',
-            fiscal_note: row['ncm'] || row['fiscal_note'] || '',
-            unit_conversion: row['conversão'] || row['conversion'] || '',
-            moves_stock: (String(row['movimenta estoque'] || row['moves_stock'] || 'Sim')).toLowerCase() === 'sim',
-            width_cm: parseFloat(String(row['largura'] || row['width'] || '0')) || null,
-            height_cm: parseFloat(String(row['altura'] || row['height'] || '0')) || null,
-            length_cm: parseFloat(String(row['comprimento'] || row['length'] || '0')) || null,
-            weight_kg: parseFloat(String(row['peso'] || row['weight'] || '0')) || null
-          };
-
-          if (productData.name.trim()) {
-            await api.post('/products', productData);
-            successCount++;
-          }
-        } catch (error) {
-          console.error('Erro ao extrair produto:', error);
-          errorCount++;
-        }
-      }
-      
-      // Atualizar a lista de produtos
-      await fetchProducts();
-      
-      toast.success(`${successCount} produtos extraídos com sucesso!${errorCount > 0 ? ` (${errorCount} erros)` : ''}`);
-      
-    } catch (error) {
-      console.error('Erro ao extrair dados:', getErrorMessage(error));
-      toast.error('Erro ao extrair dados');
-    } finally {
-      setIsExtracting(false);
-    }
-  };
-
-  const handleConsumeData = async () => {
-    try {
-      setIsConsuming(true);
-      
-      // Consumir dados de uma sessão anterior (simular dados em memória)
-      const mockConsumeData = [
-        {
-          name: 'Produto Consumido 1',
-          sku: 'PC001',
-          barcode: '7891234567890',
-          description: 'Produto de exemplo consumido 1',
-          cost_price: 10.50,
-          sale_price: 15.00,
-          stock_quantity: 100,
-          min_stock: 10,
-          unit: 'UN',
-          is_active: true
-        },
-        {
-          name: 'Produto Consumido 2',
-          sku: 'PC002',
-          barcode: '7891234567891',
-          description: 'Produto de exemplo consumido 2',
-          cost_price: 25.00,
-          sale_price: 35.00,
-          stock_quantity: 50,
-          min_stock: 5,
-          unit: 'UN',
-          is_active: true
-        }
-      ];
-      
-      let successCount = 0;
-      let errorCount = 0;
-      
-      for (const productData of mockConsumeData) {
-        try {
-          await api.post('/products', productData);
-          successCount++;
-        } catch (error) {
-          console.error('Erro ao consumir produto:', error);
-          errorCount++;
-        }
-      }
-      
-      // Atualizar a lista de produtos
-      await fetchProducts();
-      
-      toast.success(`${successCount} produtos consumidos com sucesso!${errorCount > 0 ? ` (${errorCount} erros)` : ''}`);
-      
-    } catch (error) {
-      console.error('Erro ao consumir dados:', getErrorMessage(error));
-      toast.error('Erro ao consumir dados');
-    } finally {
-      setIsConsuming(false);
-    }
-  };
-
-  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const ext = file.name.split('.').pop()?.toLowerCase();
-      let rows: any[][] = [];
-      let headers: string[] = [];
-
-      if (ext === 'xlsx' || ext === 'xls') {
-        // @ts-ignore dependência opcional
-        const XLSX = await import('xlsx');
-        const data = await file.arrayBuffer();
-        const wb = XLSX.read(data);
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-        if (rows.length < 2) {
-          toast.error('Planilha deve conter cabeçalho e pelo menos uma linha');
-          return;
-        }
-        headers = rows[0].map((h: any) => String(h || '').trim());
-      } else if (ext === 'csv') {
-        rows = parseCSV(await file.text());
-        if (rows.length < 2) {
-          toast.error('Arquivo CSV deve conter cabeçalho e pelo menos uma linha');
-          return;
-        }
-        headers = rows[0];
-      } else {
-        toast.error('Formato não suportado. Use CSV ou XLSX.');
-        return;
-      }
-
-      // Preparar dados para o modal de preview
-      const dataRows = rows.slice(1).map(r => {
-        const obj: any = {};
-        headers.forEach((h: string, idx: number) => { 
-          obj[h] = (r[idx] ?? '').toString().trim(); 
-        });
-        return obj;
-      });
-
-      // Validar dados e contar erros
-      const errors: string[] = [];
-      let validCount = 0;
-      let invalidCount = 0;
-
-      dataRows.forEach((row, index) => {
-        if (!row['Nome'] && !row['nome']) {
-          errors.push(`Linha ${index + 2}: Nome é obrigatório`);
-          invalidCount++;
-        } else {
-          validCount++;
-        }
-      });
-
-      // Configurar estado para o modal de preview
-      setImportFileName(file.name);
-      setImportHeaders(headers);
-      setImportRowsData(rows.slice(1));
-      setImportData(dataRows);
-      setImportErrors(errors);
-      setShowImportPreview(true);
-
-      toast.success(`${rows.length - 1} registros carregados com sucesso!`);
-    } catch (err) {
-      console.error('Erro ao importar arquivo:', err);
-      toast.error('Erro ao importar arquivo');
-    } finally {
-      if (e.target) e.target.value = '';
-    }
-  };
-
-  const parseCSV = (text: string): string[][] => {
-    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
-    if (lines.length === 0) return [];
-    const first = lines[0];
-    const delimiter = (first.split(';').length - 1) > (first.split(',').length - 1) ? ';' : ',';
-    return lines.map(line => {
-      const result: string[] = [];
-      let cur = '';
-      let quoted = false;
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === '"') {
-          if (quoted && line[i + 1] === '"') { cur += '"'; i++; }
-          else { quoted = !quoted; }
-        } else if (ch === delimiter && !quoted) {
-          result.push(cur); cur = '';
-        } else {
-          cur += ch;
-        }
-      }
-      result.push(cur);
-      return result.map(v => v.trim());
-    });
-  };
-
-  const normalizeNumber = (raw: any): number => {
-    if (raw === null || raw === undefined) return 0;
-    let s = String(raw).trim();
-    if (s === '') return 0;
-    if (s.includes(',')) {
-      s = s.replace(/\./g, '').replace(/,/g, '.');
-    }
-    s = s.replace(/[^0-9.+-]/g, '');
-    const n = Number(s);
-    return isNaN(n) ? 0 : n;
-  };
-
-  const importRows = async (rows: any[][]) => {
-    if (!rows.length) return;
-    const header = rows[0].map((h: any) => String(h || '').toLowerCase());
-    const idxNome = header.findIndex((h: string) => ['nome','name','produto','product'].includes(h));
-    const idxValor = header.findIndex((h: string) => ['valor','preco','preço','sale_price','preco_venda','preço_venda','valor_unit','valor unit','vr. unit.'].includes(h));
-    const idxEstoque = header.findIndex((h: string) => ['estoque','quantidade','qtd','stock','stock_quantity','qtd.','qtd'].includes(h));
-    const idxSku = header.findIndex((h: string) => ['sku','codigo','código'].includes(h));
-
-    if (idxNome === -1) {
-      toast.error('Cabeçalho "nome" não encontrado');
-      return;
-    }
-
-    let imported = 0;
-    for (let i = 1; i < rows.length; i++) {
-      const r = rows[i];
-      if (!r || r.length === 0) continue;
-      const name = (r[idxNome] || '').toString().trim();
-      if (!name) continue;
-      const sale_price = idxValor !== -1 ? normalizeNumber(r[idxValor]) : 0;
-      const stock_quantity = idxEstoque !== -1 ? Math.round(normalizeNumber(r[idxEstoque])) : 0;
-      const sku = idxSku !== -1 ? (r[idxSku] || '').toString().trim() : '';
-
-      try {
-        await api.post('/products', {
-          name,
-          sku,
-          sale_price,
-          stock_quantity,
-          unit: settings.unitDefault || 'UN',
-          min_stock: settings.minStockDefault || 0,
-          cost_price: 0,
-        });
-        imported++;
-      } catch (err) {
-        console.error('Falha ao importar linha', i + 1, err);
-      }
-    }
-
-    toast.success(`Importação concluída: ${imported} produto(s).`);
-    fetchProducts();
-  };
-
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.barcode?.includes(searchTerm)
-  );
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL',
+      currency: 'BRL'
     }).format(value);
   };
 
-  const getCategoryName = (categoryId?: number) => {
-    const category = categories.find(c => c.id === categoryId);
-    return category?.name || 'Sem categoria';
+  const getStockStatus = (quantity: number) => {
+    if (quantity === 0) return { label: 'Sem estoque', variant: 'destructive' as const };
+    if (quantity <= 10) return { label: 'Estoque baixo', variant: 'outline' as const };
+    return { label: 'Em estoque', variant: 'default' as const };
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Modal Gerenciar Produtos */}
-      <Dialog open={showManageModal} onOpenChange={setShowManageModal}>
-        <DialogContent className="max-w-5xl">
-          <DialogHeader>
-            <DialogTitle>Gerenciar Produtos</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nome, SKU ou código de barras..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <input ref={fileInputRef} onChange={handleImportFile} type="file" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" className="hidden" />
-              <Button size="sm" variant="outline" onClick={onClickImport}>Importar</Button>
-              <Button size="sm" variant="outline" onClick={exportCSV}>Exportar CSV</Button>
-              <Button size="sm" onClick={exportXLSX}>Exportar XLSX</Button>
-              <Button onClick={() => { resetForm(); setEditingProduct(null); setShowDialog(true); }}>
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Produto
-              </Button>
-            </div>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-16">ID</TableHead>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Estoque</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={5}>
-                        <div className="flex items-center justify-center py-6">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredProducts.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell>{product.id}</TableCell>
-                        <TableCell className="max-w-[280px] truncate">{product.name}</TableCell>
-                        <TableCell>{formatCurrency(product.sale_price)}</TableCell>
-                        <TableCell>
-                          <span className={`font-medium ${
-                            product.stock_quantity <= product.min_stock ? 'text-red-600' : ''
-                          }`}>
-                            {product.stock_quantity} {product.unit}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button variant="outline" size="sm" onClick={() => handleEdit(product)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="destructive" size="sm" onClick={() => handleDelete(product.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-              {!loading && filteredProducts.length === 0 && (
-                <div className="text-center py-6 text-muted-foreground text-sm">Nenhum produto encontrado.</div>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal Configurações de Produtos */}
-      <Dialog open={showSettings} onOpenChange={setShowSettings}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Configurações de Produtos</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Unidade padrão</Label>
-                <Select
-                  value={settings.unitDefault}
-                  onValueChange={(value) => setSettings((prev) => ({ ...prev, unitDefault: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UN">Unidade</SelectItem>
-                    <SelectItem value="KG">Quilograma</SelectItem>
-                    <SelectItem value="L">Litro</SelectItem>
-                    <SelectItem value="ML">Mililitro</SelectItem>
-                    <SelectItem value="CX">Caixa</SelectItem>
-                    <SelectItem value="PC">Peça</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Estoque mínimo padrão</Label>
-                <Input
-                  type="number"
-                  value={settings.minStockDefault}
-                  onChange={(e) => setSettings((prev) => ({ ...prev, minStockDefault: Number(e.target.value) || 0 }))}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center justify-between gap-4 p-3 border rounded-md">
-                <div className="space-y-0.5">
-                  <div className="text-sm font-medium">Alerta de baixo estoque</div>
-                  <div className="text-xs text-muted-foreground">Destacar quando estoque ≤ mínimo</div>
-                </div>
-                <Switch
-                  checked={settings.lowStockAlert}
-                  onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, lowStockAlert: checked }))}
-                />
-              </div>
-              <div className="flex items-center justify-between gap-4 p-3 border rounded-md">
-                <div className="space-y-0.5">
-                  <div className="text-sm font-medium">Bloquear venda sem estoque</div>
-                  <div className="text-xs text-muted-foreground">Impede finalizar com estoque negativo</div>
-                </div>
-                <Switch
-                  checked={settings.blockSaleWithoutStock}
-                  onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, blockSaleWithoutStock: checked }))}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Markup padrão (%)</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={settings.defaultMarkupPercent}
-                onChange={(e) => setSettings((prev) => ({ ...prev, defaultMarkupPercent: Number(e.target.value) || 0 }))}
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowSettings(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={() => {
-                  try {
-                    localStorage.setItem('products_settings', JSON.stringify(settings));
-                    toast.success('Configurações salvas');
-                    setShowSettings(false);
-                  } catch {
-                    toast.error('Falha ao salvar configurações');
-                  }
-                }}
-              >
-                Salvar
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Produtos</h1>
-          <p className="text-muted-foreground">
-            Gerencie o catálogo de produtos da sua loja
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Gerenciar Produtos
-                <ChevronDown className="h-4 w-4 ml-2" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setShowManageModal(true)}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Abrir Planilha
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setShowSettings(true)}>
-                <Settings className="h-4 w-4 mr-2" />
-                Configurações
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        <Dialog open={showDialog} onOpenChange={setShowDialog}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { resetForm(); setEditingProduct(null); }}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Produto
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
-                {editingProduct ? 'Editar Produto' : 'Novo Produto'}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Tabs defaultValue="dados">
-                <TabsList>
-                  <TabsTrigger value="dados">Dados</TabsTrigger>
-                  <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
-                  <TabsTrigger value="valores">Valores</TabsTrigger>
-                  <TabsTrigger value="estoque">Estoque/Variações</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="dados" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome *</Label>
-                      <Input id="name" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} required />
-                </div>
-                <div className="space-y-2">
-                      <Label htmlFor="category">Grupo/Categoria</Label>
-                      <Select value={formData.category_id} onValueChange={(value) => setFormData(prev => ({ ...prev, category_id: value }))}>
-                    <SelectTrigger>
-                          <SelectValue placeholder="Selecione um grupo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map(category => (
-                        <SelectItem key={category.id} value={category.id.toString()}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                      <Label htmlFor="sku">Código Interno (SKU)</Label>
-                      <Input id="sku" value={formData.sku} onChange={(e) => setFormData(prev => ({ ...prev, sku: e.target.value }))} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="barcode">Código de Barras</Label>
-                      <Input id="barcode" value={formData.barcode} onChange={(e) => setFormData(prev => ({ ...prev, barcode: e.target.value }))} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="unit">Unidade</Label>
-                      <Select value={formData.unit} onValueChange={(value) => setFormData(prev => ({ ...prev, unit: value }))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="UN">Unidade</SelectItem>
-                      <SelectItem value="KG">Quilograma</SelectItem>
-                      <SelectItem value="L">Litro</SelectItem>
-                      <SelectItem value="ML">Mililitro</SelectItem>
-                      <SelectItem value="CX">Caixa</SelectItem>
-                      <SelectItem value="PC">Peça</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="product_group">Grupo do Produto</Label>
-                      <Input id="product_group" value={formData.product_group} onChange={(e) => setFormData(prev => ({ ...prev, product_group: e.target.value }))} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="fiscal_note">Nota Fiscal (NCM/CFOP)</Label>
-                      <Input id="fiscal_note" value={formData.fiscal_note} onChange={(e) => setFormData(prev => ({ ...prev, fiscal_note: e.target.value }))} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="unit_conversion">Conversão de Unidade</Label>
-                      <Input id="unit_conversion" placeholder="Ex.: 1 CX = 12 UN" value={formData.unit_conversion} onChange={(e) => setFormData(prev => ({ ...prev, unit_conversion: e.target.value }))} />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="flex items-center gap-2">
-                      <Switch checked={formData.has_variations} onCheckedChange={(checked) => setFormData(prev => ({ ...prev, has_variations: checked }))} />
-                      <Label>Possui variações</Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch checked={formData.moves_stock} onCheckedChange={(checked) => setFormData(prev => ({ ...prev, moves_stock: checked }))} />
-                      <Label>Movimenta estoque</Label>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="internal_code">Código Interno</Label>
-                      <Input id="internal_code" value={formData.internal_code} onChange={(e) => setFormData(prev => ({ ...prev, internal_code: e.target.value }))} />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Descrição</Label>
-                    <Textarea id="description" value={formData.description} onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))} rows={3} />
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="detalhes" className="space-y-4">
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="width_cm">Largura (cm)</Label>
-                      <Input id="width_cm" type="number" step="0.01" value={formData.width_cm} onChange={(e) => setFormData(prev => ({ ...prev, width_cm: e.target.value }))} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="height_cm">Altura (cm)</Label>
-                      <Input id="height_cm" type="number" step="0.01" value={formData.height_cm} onChange={(e) => setFormData(prev => ({ ...prev, height_cm: e.target.value }))} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="length_cm">Comprimento (cm)</Label>
-                      <Input id="length_cm" type="number" step="0.01" value={formData.length_cm} onChange={(e) => setFormData(prev => ({ ...prev, length_cm: e.target.value }))} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="weight_kg">Peso (kg)</Label>
-                      <Input id="weight_kg" type="number" step="0.001" value={formData.weight_kg} onChange={(e) => setFormData(prev => ({ ...prev, weight_kg: e.target.value }))} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Descrição detalhada</Label>
-                    <Textarea id="description" value={formData.description} onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))} rows={6} />
-              </div>
-                </TabsContent>
-
-                <TabsContent value="valores" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cost_price">Preço de Custo</Label>
-                      <Input id="cost_price" type="number" step="0.01" value={formData.cost_price} onChange={(e) => setFormData(prev => ({ ...prev, cost_price: e.target.value }))} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sale_price">Preço de Venda *</Label>
-                      <Input id="sale_price" type="number" step="0.01" value={formData.sale_price} onChange={(e) => setFormData(prev => ({ ...prev, sale_price: e.target.value }))} required />
-                </div>
-              </div>
-                </TabsContent>
-
-                <TabsContent value="estoque" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="stock_quantity">Quantidade em Estoque</Label>
-                      <Input id="stock_quantity" type="number" value={formData.stock_quantity} onChange={(e) => setFormData(prev => ({ ...prev, stock_quantity: e.target.value }))} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="min_stock">Estoque Mínimo</Label>
-                      <Input id="min_stock" type="number" value={formData.min_stock} onChange={(e) => setFormData(prev => ({ ...prev, min_stock: e.target.value }))} />
-                </div>
-              </div>
-                  {formData.has_variations && (
-                    <div className="text-sm text-muted-foreground">Configuração de variações pode ser adicionada aqui (atributos, combinações, preços e estoque por variação).</div>
-                  )}
-                </TabsContent>
-              </Tabs>
-
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancelar</Button>
-                <Button type="submit">{editingProduct ? 'Atualizar' : 'Criar'} Produto</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome, SKU ou código de barras..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+      <Card className="border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-white">
+        <CardContent className="pt-6 pb-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-blue-900">Produtos</h1>
+              <p className="text-sm text-blue-900/70">
+                Gerencie seu catálogo de produtos e controle de estoque
+              </p>
             </div>
-            <Button variant="outline" onClick={fetchProducts}>
-              Atualizar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Badge className="px-3 py-1 bg-blue-600 text-white">
+                <Package className="h-3 w-3 mr-1" />
+                {products.length} produtos
+              </Badge>
+              <Badge variant="outline" className="px-3 py-1 border-blue-200">
+                <BarChart3 className="h-3 w-3 mr-1" />
+                {products.filter(p => p.stock_quantity <= 10).length} estoque baixo
+              </Badge>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Lista de Produtos */}
+      {/* Toolbar */}
+      <Card className="border-blue-100">
+        <CardContent className="pt-6">
+          <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+            {/* Lado esquerdo - Botões de ação */}
+            <div className="flex items-center gap-2">
+              <Button 
+                className="juga-gradient text-white"
+                onClick={() => setShowAddDialog(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Produto
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="border-blue-200 hover:bg-blue-50">
+                    <MoreHorizontal className="h-4 w-4 mr-2" />
+                    Mais Ações
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setShowImportDialog(true)} className="cursor-pointer">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importar Produtos
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar Lista
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-red-600">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir Selecionados
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="border-blue-200 hover:bg-blue-50">
+                    <Settings2 className="h-4 w-4 mr-2" />
+                    Colunas
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>Mostrar Colunas</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {Object.entries(columnVisibility).map(([key, value]) => (
+                    <DropdownMenuCheckboxItem
+                      key={key}
+                      checked={value}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, [key]: checked || false }))
+                      }
+                    >
+                      {key === 'sku' ? 'SKU' : 
+                       key === 'cost_price' ? 'Preço Custo' :
+                       key === 'sale_price' ? 'Preço Venda' :
+                       key === 'stock_quantity' ? 'Estoque' :
+                       key === 'barcode' ? 'Código de Barras' :
+                       key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Lado direito - Busca */}
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Buscar produtos..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-80"
+                />
+              </div>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Busca Avançada
+              </Button>
+            </div>
+          </div>
+
+          {/* Busca Avançada */}
+          {showAdvancedSearch && (
+            <div className="mt-4 p-4 bg-blue-50/40 rounded-lg border border-blue-100">
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <Input
+                  placeholder="Categoria..."
+                  value={advancedFilters.category}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, category: e.target.value }))}
+                />
+                <Input
+                  placeholder="Marca..."
+                  value={advancedFilters.brand}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, brand: e.target.value }))}
+                />
+                <Input
+                  type="number"
+                  placeholder="Preço mín..."
+                  value={advancedFilters.minPrice}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, minPrice: e.target.value }))}
+                />
+                <Input
+                  type="number"
+                  placeholder="Preço máx..."
+                  value={advancedFilters.maxPrice}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
+                />
+                <select 
+                  className="px-3 py-2 border rounded-md"
+                  value={advancedFilters.status}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))}
+                >
+                  <option value="">Todos os status</option>
+                  <option value="active">Ativo</option>
+                  <option value="inactive">Inativo</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tabela */}
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Produtos ({filteredProducts.length})</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Lista de Produtos ({filteredProducts.length})
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
+            <div className="text-center py-8">Carregando produtos...</div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Produto</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Preços</TableHead>
-                  <TableHead>Estoque</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead>Nome</TableHead>
+                  {columnVisibility.sku && <TableHead>SKU</TableHead>}
+                  {columnVisibility.category && <TableHead>Categoria</TableHead>}
+                  {columnVisibility.brand && <TableHead>Marca</TableHead>}
+                  {columnVisibility.cost_price && <TableHead>Preço Custo</TableHead>}
+                  {columnVisibility.sale_price && <TableHead>Preço Venda</TableHead>}
+                  {columnVisibility.stock_quantity && <TableHead>Estoque</TableHead>}
+                  {columnVisibility.unit && <TableHead>Unidade</TableHead>}
+                  {columnVisibility.barcode && <TableHead>Código Barras</TableHead>}
+                  {columnVisibility.ncm && <TableHead>NCM</TableHead>}
+                  {columnVisibility.status && <TableHead>Status</TableHead>}
+                  <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-lg">
-                          <Package className="h-4 w-4 text-primary" />
-                        </div>
+                {filteredProducts.map((product) => {
+                  const stockStatus = getStockStatus(product.stock_quantity);
+                  return (
+                    <TableRow key={product.id}>
+                      <TableCell className="font-medium">
                         <div>
-                          <div className="font-medium">{product.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {product.sku && `SKU: ${product.sku}`}
-                            {product.sku && product.barcode && ' • '}
-                            {product.barcode && `Código: ${product.barcode}`}
+                          <div>{product.name}</div>
+                          {product.description && (
+                            <div className="text-sm text-muted-foreground">{product.description}</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      {columnVisibility.sku && <TableCell className="font-mono text-sm">{product.sku}</TableCell>}
+                      {columnVisibility.category && <TableCell>{product.category || '-'}</TableCell>}
+                      {columnVisibility.brand && <TableCell>{product.brand || '-'}</TableCell>}
+                      {columnVisibility.cost_price && (
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-3 w-3 text-gray-400" />
+                            {formatCurrency(product.cost_price)}
                           </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {getCategoryName(product.category_id)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="text-sm">
-                          <span className="text-muted-foreground">Custo:</span> {formatCurrency(product.cost_price)}
-                        </div>
-                        <div className="font-medium">
-                          <span className="text-muted-foreground">Venda:</span> {formatCurrency(product.sale_price)}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className={`font-medium ${
-                          product.stock_quantity <= product.min_stock ? 'text-red-600' : ''
-                        }`}>
-                          {product.stock_quantity} {product.unit}
-                        </span>
-                        {product.stock_quantity <= product.min_stock && (
-                          <AlertTriangle className="h-4 w-4 text-red-500" />
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Mín: {product.min_stock} {product.unit}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={product.is_active ? 'default' : 'secondary'}>
-                        {product.is_active ? 'Ativo' : 'Inativo'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(product)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDelete(product.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        </TableCell>
+                      )}
+                      {columnVisibility.sale_price && (
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-3 w-3 text-green-600" />
+                            {formatCurrency(product.sale_price)}
+                          </div>
+                        </TableCell>
+                      )}
+                      {columnVisibility.stock_quantity && (
+                        <TableCell>
+                          <Badge variant={stockStatus.variant}>
+                            {product.stock_quantity} {product.unit}
+                          </Badge>
+                        </TableCell>
+                      )}
+                      {columnVisibility.unit && <TableCell>{product.unit}</TableCell>}
+                      {columnVisibility.barcode && <TableCell className="font-mono text-sm">{product.barcode || '-'}</TableCell>}
+                      {columnVisibility.ncm && <TableCell className="font-mono text-sm">{product.ncm || '-'}</TableCell>}
+                      {columnVisibility.status && (
+                        <TableCell>
+                          <Badge variant={product.status === 'active' ? 'default' : 'secondary'}>
+                            {product.status === 'active' ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Eye className="h-4 w-4 mr-2" />
+                              Ver Detalhes
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-red-600">
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
 
-          {!loading && filteredProducts.length === 0 && (
+          {filteredProducts.length === 0 && !loading && (
             <div className="text-center py-8 text-muted-foreground">
-              {searchTerm ? 'Nenhum produto encontrado com os filtros aplicados.' : 'Nenhum produto cadastrado.'}
+              Nenhum produto encontrado
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Modal de Preview da Importação */}
+      {/* Dialog Adicionar Produto */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Adicionar Novo Produto</DialogTitle>
+            <DialogDescription>
+              Preencha as informações do produto abaixo
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label htmlFor="sku">SKU *</label>
+                <Input
+                  id="sku"
+                  value={newProduct.sku}
+                  onChange={(e) => setNewProduct(prev => ({ ...prev, sku: e.target.value }))}
+                  placeholder="Código do produto"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="name">Nome *</label>
+                <Input
+                  id="name"
+                  value={newProduct.name}
+                  onChange={(e) => setNewProduct(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Nome do produto"
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="description">Descrição</label>
+              <Input
+                id="description"
+                value={newProduct.description}
+                onChange={(e) => setNewProduct(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Descrição do produto"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label htmlFor="category">Categoria</label>
+                <Input
+                  id="category"
+                  value={newProduct.category}
+                  onChange={(e) => setNewProduct(prev => ({ ...prev, category: e.target.value }))}
+                  placeholder="Categoria"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="brand">Marca</label>
+                <Input
+                  id="brand"
+                  value={newProduct.brand}
+                  onChange={(e) => setNewProduct(prev => ({ ...prev, brand: e.target.value }))}
+                  placeholder="Marca"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="grid gap-2">
+                <label htmlFor="cost_price">Preço de Custo</label>
+                <Input
+                  id="cost_price"
+                  type="number"
+                  step="0.01"
+                  value={newProduct.cost_price}
+                  onChange={(e) => setNewProduct(prev => ({ ...prev, cost_price: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="sale_price">Preço de Venda</label>
+                <Input
+                  id="sale_price"
+                  type="number"
+                  step="0.01"
+                  value={newProduct.sale_price}
+                  onChange={(e) => setNewProduct(prev => ({ ...prev, sale_price: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="stock_quantity">Estoque</label>
+                <Input
+                  id="stock_quantity"
+                  type="number"
+                  value={newProduct.stock_quantity}
+                  onChange={(e) => setNewProduct(prev => ({ ...prev, stock_quantity: e.target.value }))}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="grid gap-2">
+                <label htmlFor="unit">Unidade</label>
+                <select 
+                  id="unit"
+                  className="px-3 py-2 border rounded-md"
+                  value={newProduct.unit}
+                  onChange={(e) => setNewProduct(prev => ({ ...prev, unit: e.target.value }))}
+                >
+                  <option value="UN">UN - Unidade</option>
+                  <option value="CX">CX - Caixa</option>
+                  <option value="KG">KG - Quilograma</option>
+                  <option value="L">L - Litro</option>
+                  <option value="M">M - Metro</option>
+                </select>
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="barcode">Código de Barras</label>
+                <Input
+                  id="barcode"
+                  value={newProduct.barcode}
+                  onChange={(e) => setNewProduct(prev => ({ ...prev, barcode: e.target.value }))}
+                  placeholder="7891234567890"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="ncm">NCM</label>
+                <Input
+                  id="ncm"
+                  value={newProduct.ncm}
+                  onChange={(e) => setNewProduct(prev => ({ ...prev, ncm: e.target.value }))}
+                  placeholder="12345678"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAddProduct} className="bg-emerald-600 hover:bg-emerald-700">
+              Adicionar Produto
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Importar */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Importar Produtos</DialogTitle>
+            <DialogDescription>
+              Selecione um arquivo CSV ou Excel com os dados dos produtos
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="file">Arquivo</label>
+              <Input
+                id="file"
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={handleFileUpload}
+                disabled={importing}
+              />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <p>O arquivo deve conter as colunas:</p>
+              <ul className="list-disc pl-4 mt-2 space-y-1">
+                <li><strong>Código</strong> ou <strong>SKU</strong> (obrigatório)</li>
+                <li><strong>Nome</strong> ou <strong>Produto</strong> (obrigatório)</li>
+                <li><strong>Descrição</strong> ou <strong>Descricao</strong></li>
+                <li><strong>Categoria</strong></li>
+                <li><strong>Marca</strong></li>
+                <li><strong>Valor de custo</strong> ou <strong>Custo</strong></li>
+                <li><strong>Valor de venda</strong> ou <strong>Preço</strong></li>
+                <li><strong>Quantidade</strong> ou <strong>Estoque</strong></li>
+                <li><strong>Código de barras</strong> ou <strong>Barcode</strong></li>
+                <li><strong>NCM</strong></li>
+                <li><strong>Unidade</strong></li>
+              </ul>
+            </div>
+            {importing && (
+              <div className="text-center py-4">
+                <div className="text-sm text-muted-foreground">Importando produtos...</div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImportDialog(false)} disabled={importing}>
+              Cancelar
+            </Button>
+            <Button 
+              className="bg-emerald-600 hover:bg-emerald-700" 
+              disabled={importing}
+              onClick={() => {
+                const input = document.getElementById('file') as HTMLInputElement;
+                if (input?.files?.[0]) {
+                  handleFileUpload({ target: input } as any);
+                } else {
+                  toast.error('Selecione um arquivo para importar');
+                }
+              }}
+            >
+              {importing ? 'Importando...' : 'Importar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <ImportPreviewModal
         isOpen={showImportPreview}
         onClose={handleImportCancel}
         onConfirm={handleImportConfirm}
-        onSave={handleSaveImportData}
-        onExtract={handleExtractData}
-        onConsume={handleConsumeData}
+        onRegister={handleRegisterSelected}
         fileName={importFileName}
         headers={importHeaders}
-        data={importRowsData}
-        totalRows={importRowsData.length}
-        validRows={importRowsData.length - importErrors.length}
+        data={importRows}
+        totalRows={importRows.length}
+        validRows={importRows.length}
         invalidRows={importErrors.length}
         errors={importErrors}
-        isExtracting={isExtracting}
-        isConsuming={isConsuming}
+        isRegistering={isRegistering}
       />
     </div>
   );

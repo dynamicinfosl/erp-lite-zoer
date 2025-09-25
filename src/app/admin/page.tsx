@@ -2,18 +2,18 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Shield, 
-  Users, 
-  Database, 
-  Settings, 
-  Activity, 
+import {
+  Shield,
+  Users,
+  Database,
+  Settings,
+  Activity,
   AlertTriangle,
   CheckCircle,
   Clock,
@@ -21,11 +21,10 @@ import {
   Server,
   HardDrive,
   Cpu,
-  Wifi
+  Wifi,
 } from 'lucide-react';
-import { useAuth } from '@/components/auth/AuthProvider';
+import { useAuth } from '@/contexts/AuthContext';
 import { ENABLE_AUTH } from '@/constants/auth';
-import { api } from '@/lib/api-client';
 import { toast } from 'sonner';
 
 interface SystemStats {
@@ -37,13 +36,23 @@ interface SystemStats {
   lastBackup: string;
 }
 
+function checkIsAdmin(user: unknown): boolean {
+  if (!user) return false;
+  if (typeof user === 'object' && user !== null) {
+    return Boolean((user as { isAdmin?: boolean }).isAdmin);
+  }
+  return false;
+}
+
 export default function AdminPage() {
+  const { user } = useAuth();
+  const isAdmin = useMemo(() => {
+    if (!ENABLE_AUTH) return true;
+    return checkIsAdmin(user);
+  }, [user]);
+
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  // Só usar useAuth se a autenticação estiver habilitada
-  const authData = ENABLE_AUTH ? useAuth() : { user: { isAdmin: true } };
-  const { user } = authData;
 
   useEffect(() => {
     fetchSystemStats();
@@ -52,7 +61,6 @@ export default function AdminPage() {
   const fetchSystemStats = async () => {
     try {
       setLoading(true);
-      // Simular dados do sistema
       const mockStats: SystemStats = {
         totalUsers: 5,
         activeUsers: 3,
@@ -92,7 +100,7 @@ export default function AdminPage() {
     }
   };
 
-  if (!user?.isAdmin) {
+  if (!isAdmin) {
     return (
       <div className="container mx-auto p-6">
         <Alert variant="destructive">
@@ -122,9 +130,7 @@ export default function AdminPage() {
             <Shield className="h-8 w-8" />
             Painel Administrativo
           </h1>
-          <p className="text-muted-foreground">
-            Controle total do sistema ERP Lite
-          </p>
+          <p className="text-muted-foreground">Controle total do sistema ERP Lite</p>
         </div>
         <Badge variant="default" className="bg-green-600">
           <CheckCircle className="h-3 w-3 mr-1" />
@@ -141,9 +147,7 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.totalUsers}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats?.activeUsers} ativos
-            </p>
+            <p className="text-xs text-muted-foreground">{stats?.activeUsers} ativos</p>
           </CardContent>
         </Card>
         <Card>
@@ -153,9 +157,7 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.totalSales}</div>
-            <p className="text-xs text-muted-foreground">
-              Todas as vendas
-            </p>
+            <p className="text-xs text-muted-foreground">Todas as vendas</p>
           </CardContent>
         </Card>
         <Card>
@@ -165,9 +167,7 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.totalProducts}</div>
-            <p className="text-xs text-muted-foreground">
-              Cadastrados
-            </p>
+            <p className="text-xs text-muted-foreground">Cadastrados</p>
           </CardContent>
         </Card>
         <Card>
@@ -177,9 +177,7 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">Saudável</div>
-            <p className="text-xs text-muted-foreground">
-              Todos os serviços OK
-            </p>
+            <p className="text-xs text-muted-foreground">Todos os serviços OK</p>
           </CardContent>
         </Card>
       </div>
@@ -204,21 +202,27 @@ export default function AdminPage() {
                     <Server className="h-4 w-4" />
                     <span>Servidor Web</span>
                   </div>
-                  <Badge variant="default" className="bg-green-600">Online</Badge>
+                  <Badge variant="default" className="bg-green-600">
+                    Online
+                  </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Database className="h-4 w-4" />
                     <span>Banco de Dados</span>
                   </div>
-                  <Badge variant="default" className="bg-green-600">Online</Badge>
+                  <Badge variant="default" className="bg-green-600">
+                    Online
+                  </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Wifi className="h-4 w-4" />
                     <span>API</span>
                   </div>
-                  <Badge variant="default" className="bg-green-600">Online</Badge>
+                  <Badge variant="default" className="bg-green-600">
+                    Online
+                  </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -337,7 +341,9 @@ export default function AdminPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm">Status:</span>
-                  <Badge variant="default" className="bg-green-600">Ativo</Badge>
+                  <Badge variant="default" className="bg-green-600">
+                    Ativo
+                  </Badge>
                 </div>
               </CardContent>
             </Card>
@@ -354,16 +360,10 @@ export default function AdminPage() {
                 <div className="space-y-3">
                   <h3 className="font-semibold">Backup e Restauração</h3>
                   <div className="space-y-2">
-                    <Button 
-                      onClick={() => handleSystemAction('backup')}
-                      className="w-full justify-start"
-                    >
+                    <Button onClick={() => handleSystemAction('backup')} className="w-full justify-start">
                       Fazer Backup Manual
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start"
-                    >
+                    <Button variant="outline" className="w-full justify-start">
                       Restaurar Backup
                     </Button>
                   </div>
@@ -372,14 +372,14 @@ export default function AdminPage() {
                 <div className="space-y-3">
                   <h3 className="font-semibold">Sistema</h3>
                   <div className="space-y-2">
-                    <Button 
+                    <Button
                       variant="outline"
                       onClick={() => handleSystemAction('clear-cache')}
                       className="w-full justify-start"
                     >
                       Limpar Cache
                     </Button>
-                    <Button 
+                    <Button
                       variant="destructive"
                       onClick={() => handleSystemAction('restart')}
                       className="w-full justify-start"
@@ -393,8 +393,8 @@ export default function AdminPage() {
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Atenção:</strong> Algumas ações podem afetar o funcionamento do sistema. 
-                  Execute apenas se necessário e durante horários de baixo movimento.
+                  <strong>Atenção:</strong> Algumas ações podem afetar o funcionamento do sistema. Execute apenas se necessário e
+                  durante horários de baixo movimento.
                 </AlertDescription>
               </Alert>
             </CardContent>

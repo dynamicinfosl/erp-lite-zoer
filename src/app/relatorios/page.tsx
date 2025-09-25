@@ -1,321 +1,287 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis } from 'recharts';
-import { FileText, Download, Calendar, TrendingUp, Package, DollarSign, Users, Truck } from 'lucide-react';
-import { Sale, Product, FinancialTransaction, Delivery } from '@/types';
-import { api } from '@/lib/api-client';
-import { toast } from 'sonner';
+import { JugaKPICard } from '@/components/dashboard/JugaComponents';
+import {
+  TrendingUp,
+  DollarSign,
+  Package,
+  Truck,
+  Filter,
+  Download,
+  Calendar,
+  PieChart as PieIcon,
+  LineChart as LineIcon,
+  ArrowRight,
+} from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import { mockSales, mockProducts, mockFinancialTransactions, mockDeliveries } from '@/lib/mock-data';
+import { Label } from '@/components/ui/label';
+
+const COLORS = ['#2563eb', '#22c55e', '#f97316', '#a855f7', '#0ea5e9'];
 
 export default function RelatoriosPage() {
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
-  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0],
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dateRange, setDateRange] = useState(() => {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    return {
+      start: firstDay.toISOString().split('T')[0],
+      end: now.toISOString().split('T')[0],
+    };
   });
 
-  useEffect(() => {
-    fetchAllData();
-  }, []);
+  const formatCurrency = useCallback(
+    (value: number) =>
+      new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      }).format(value),
+    [],
+  );
 
-  const fetchAllData = async () => {
-    try {
-      setLoading(true);
-      const [salesData, productsData, transactionsData, deliveriesData] = await Promise.all([
-        api.get<Sale[]>('/sales'),
-        api.get<Product[]>('/products'),
-        api.get<FinancialTransaction[]>('/financial-transactions'),
-        api.get<Delivery[]>('/deliveries'),
-      ]);
-      
-      setSales(salesData);
-      setProducts(productsData);
-      setTransactions(transactionsData);
-      setDeliveries(deliveriesData);
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      toast.error('Erro ao carregar dados dos relatórios');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const filteredSales = useMemo(
+    () =>
+      mockSales.filter((sale) => {
+        const saleDate = sale.sold_at.split('T')[0];
+        return saleDate >= dateRange.start && saleDate <= dateRange.end;
+      }),
+    [dateRange],
+  );
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
+  const filteredTransactions = useMemo(
+    () =>
+      mockFinancialTransactions.filter((transaction) => {
+        const transactionDate = transaction.created_at.split('T')[0];
+        return transactionDate >= dateRange.start && transactionDate <= dateRange.end;
+      }),
+    [dateRange],
+  );
 
-  // Filtrar dados por período
-  const filteredSales = sales.filter(sale => {
-    const saleDate = sale.sold_at.split('T')[0];
-    return saleDate >= dateRange.start && saleDate <= dateRange.end;
-  });
+  const filteredDeliveries = useMemo(
+    () =>
+      mockDeliveries.filter((delivery) => {
+        const deliveryDate = delivery.created_at.split('T')[0];
+        return deliveryDate >= dateRange.start && deliveryDate <= dateRange.end;
+      }),
+    [dateRange],
+  );
 
-  const filteredTransactions = transactions.filter(transaction => {
-    const transactionDate = transaction.created_at.split('T')[0];
-    return transactionDate >= dateRange.start && transactionDate <= dateRange.end;
-  });
+  const salesStats = useMemo(() => {
+    const totalAmount = filteredSales.reduce((sum, sale) => sum + sale.final_amount, 0);
+    const totalSales = filteredSales.length;
+    const averageTicket = totalSales > 0 ? totalAmount / totalSales : 0;
 
-  const filteredDeliveries = deliveries.filter(delivery => {
-    const deliveryDate = delivery.created_at.split('T')[0];
-    return deliveryDate >= dateRange.start && deliveryDate <= dateRange.end;
-  });
+    return {
+      totalAmount,
+      totalSales,
+      averageTicket,
+    };
+  }, [filteredSales]);
 
-  // Cálculos de vendas
-  const salesStats = {
-    totalSales: filteredSales.length,
-    totalAmount: filteredSales.reduce((sum, sale) => sum + sale.final_amount, 0),
-    averageTicket: filteredSales.length > 0 ? 
-      filteredSales.reduce((sum, sale) => sum + sale.final_amount, 0) / filteredSales.length : 0,
-  };
+  const paymentMethodData = useMemo(() => {
+    const stats = filteredSales.reduce((acc, sale) => {
+      acc[sale.payment_method] = (acc[sale.payment_method] || 0) + sale.final_amount;
+      return acc;
+    }, {} as Record<string, number>);
 
-  // Vendas por forma de pagamento
-  const paymentMethodStats = filteredSales.reduce((acc, sale) => {
-    acc[sale.payment_method] = (acc[sale.payment_method] || 0) + sale.final_amount;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const paymentMethodData = Object.entries(paymentMethodStats).map(([method, amount]) => ({
-    name: method.replace('_', ' ').toUpperCase(),
-    value: amount,
-  }));
-
-  // Vendas por dia
-  const dailySalesData = filteredSales.reduce((acc, sale) => {
-    const date = sale.sold_at.split('T')[0];
-    acc[date] = (acc[date] || 0) + sale.final_amount;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const dailySalesChart = Object.entries(dailySalesData)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, amount]) => ({
-      date: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-      amount,
+    return Object.entries(stats).map(([method, amount]) => ({
+      name: method.replace('_', ' ').toUpperCase(),
+      value: amount,
     }));
+  }, [filteredSales]);
 
-  // Produtos mais vendidos
-  const productSales = filteredSales.reduce((acc, sale) => {
-    // Em um cenário real, você teria os itens da venda
-    // Por agora, vamos simular com dados dos produtos
-    return acc;
-  }, {} as Record<number, { name: string; quantity: number; amount: number }>);
+  const dailySalesChart = useMemo(() => {
+    const dailyData = filteredSales.reduce((acc, sale) => {
+      const date = sale.sold_at.split('T')[0];
+      acc[date] = (acc[date] || 0) + sale.final_amount;
+      return acc;
+    }, {} as Record<string, number>);
 
-  // Fluxo de caixa
-  const cashFlowData = filteredTransactions.reduce((acc, transaction) => {
-    const date = transaction.created_at.split('T')[0];
-    if (!acc[date]) {
-      acc[date] = { income: 0, expense: 0 };
-    }
-    
-    if (transaction.transaction_type === 'receita' && transaction.status === 'pago') {
-      acc[date].income += transaction.amount;
-    } else if (transaction.transaction_type === 'despesa' && transaction.status === 'pago') {
-      acc[date].expense += transaction.amount;
-    }
-    
-    return acc;
-  }, {} as Record<string, { income: number; expense: number }>);
+    return Object.entries(dailyData)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, amount]) => ({
+        date: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        amount,
+      }));
+  }, [filteredSales]);
 
-  const cashFlowChart = Object.entries(cashFlowData)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, data]) => ({
-      date: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-      receitas: data.income,
-      despesas: data.expense,
-      saldo: data.income - data.expense,
-    }));
+  const cashFlowChart = useMemo(() => {
+    const flowData = filteredTransactions.reduce((acc, transaction) => {
+      const date = transaction.created_at.split('T')[0];
+      if (!acc[date]) acc[date] = { income: 0, expense: 0 };
 
-  // Stats de entregas
-  const deliveryStats = {
-    total: filteredDeliveries.length,
-    completed: filteredDeliveries.filter(d => d.status === 'entregue').length,
-    pending: filteredDeliveries.filter(d => d.status === 'aguardando').length,
-    inRoute: filteredDeliveries.filter(d => d.status === 'em_rota').length,
-  };
+      if (transaction.transaction_type === 'receita' && transaction.status === 'pago') {
+        acc[date].income += transaction.amount;
+      } else if (transaction.transaction_type === 'despesa' && transaction.status === 'pago') {
+        acc[date].expense += transaction.amount;
+      }
 
-  const exportToCSV = (data: any[], filename: string) => {
-    if (data.length === 0) {
-      toast.error('Nenhum dado para exportar');
-      return;
-    }
+      return acc;
+    }, {} as Record<string, { income: number; expense: number }>);
 
-    const headers = Object.keys(data[0]);
-    const csvContent = [
-      headers.join(','),
-      ...data.map(row => headers.map(header => row[header]).join(','))
-    ].join('\n');
+    return Object.entries(flowData)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, data]) => ({
+        date: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        receitas: data.income,
+        despesas: data.expense,
+        saldo: data.income - data.expense,
+      }));
+  }, [filteredTransactions]);
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${filename}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const chartConfig = {
-    amount: { label: "Valor", color: "hsl(var(--chart-1))" },
-    receitas: { label: "Receitas", color: "hsl(var(--chart-1))" },
-    despesas: { label: "Despesas", color: "hsl(var(--chart-2))" },
-    saldo: { label: "Saldo", color: "hsl(var(--chart-3))" },
-  };
-
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  const summaryCards = useMemo(
+    () => [
+      {
+        title: 'Faturamento no período',
+        value: formatCurrency(salesStats.totalAmount),
+        description: `${salesStats.totalSales} vendas concluídas`,
+        trend: 'up' as const,
+        trendValue: '+8,2%',
+        icon: <DollarSign className="h-5 w-5" />,
+        color: 'primary' as const,
+      },
+      {
+        title: 'Ticket médio',
+        value: formatCurrency(salesStats.averageTicket),
+        description: 'Média por transação',
+        trend: 'neutral' as const,
+        trendValue: 'Estável',
+        icon: <TrendingUp className="h-5 w-5" />,
+        color: 'accent' as const,
+      },
+      {
+        title: 'Produtos ativos',
+        value: `${mockProducts.filter((p) => p.is_active).length}`,
+        description: `${mockProducts.length} no catálogo`,
+        trend: 'up' as const,
+        trendValue: '+12 itens',
+        icon: <Package className="h-5 w-5" />,
+        color: 'success' as const,
+      },
+      {
+        title: 'Entregas concluídas',
+        value: `${filteredDeliveries.filter((d) => d.status === 'entregue').length}`,
+        description: `${filteredDeliveries.length} no período`,
+        trend: 'up' as const,
+        trendValue: '+5%',
+        icon: <Truck className="h-5 w-5" />,
+        color: 'warning' as const,
+      },
+    ],
+    [filteredDeliveries, formatCurrency, salesStats],
+  );
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Relatórios</h1>
-          <p className="text-muted-foreground">
-            Análise detalhada do desempenho do negócio
+    <div className="space-y-6 p-4 sm:p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between rounded-3xl border border-border bg-white/90 shadow-sm p-6">
+        <div className="space-y-1">
+          <Badge className="w-fit bg-sky-600">Relatórios</Badge>
+          <h1 className="text-3xl font-bold text-heading">Análise Avançada de Resultados</h1>
+          <p className="text-muted-foreground max-w-3xl">
+            Explore métricas de vendas, finanças, produtos e entregas para orientar decisões estratégicas do seu negócio.
           </p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="start-date">De:</Label>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-white/70 px-3 py-2 shadow-sm">
+            <Label className="text-xs uppercase text-muted-foreground">De</Label>
             <Input
-              id="start-date"
               type="date"
               value={dateRange.start}
-              onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+              onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
+              className="border-none bg-transparent focus-visible:ring-0"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="end-date">Até:</Label>
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-white/70 px-3 py-2 shadow-sm">
+            <Label className="text-xs uppercase text-muted-foreground">Até</Label>
             <Input
-              id="end-date"
               type="date"
               value={dateRange.end}
-              onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+              onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
+              className="border-none bg-transparent focus-visible:ring-0"
             />
           </div>
-          <Button onClick={fetchAllData}>
-            Atualizar
+          <Button variant="outline" className="gap-2 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100">
+            <Filter className="h-4 w-4" />
+            Aplicar Filtro
           </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Vendas</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(salesStats.totalAmount)}</div>
-            <p className="text-xs text-muted-foreground">
-              {salesStats.totalSales} vendas realizadas
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ticket Médio</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(salesStats.averageTicket)}</div>
-            <p className="text-xs text-muted-foreground">
-              Por venda
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Produtos Ativos</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{products.filter(p => p.is_active).length}</div>
-            <p className="text-xs text-muted-foreground">
-              Total: {products.length}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Entregas</CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{deliveryStats.completed}</div>
-            <p className="text-xs text-muted-foreground">
-              De {deliveryStats.total} total
-            </p>
-          </CardContent>
-        </Card>
+      <div className="rounded-3xl border border-border bg-gradient-to-br from-slate-50 via-white to-slate-100 p-4 shadow-inner">
+        <div className="grid gap-4 lg:grid-cols-4">
+        {summaryCards.map((card) => (
+          <JugaKPICard
+            key={card.title}
+            title={card.title}
+            value={card.value}
+            description={card.description}
+            trend={card.trend}
+            trendValue={card.trendValue}
+            icon={card.icon}
+            color={card.color}
+          />
+        ))}
+        </div>
       </div>
 
-      <Tabs defaultValue="vendas" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="vendas">Vendas</TabsTrigger>
-          <TabsTrigger value="financeiro">Financeiro</TabsTrigger>
-          <TabsTrigger value="produtos">Produtos</TabsTrigger>
-          <TabsTrigger value="entregas">Entregas</TabsTrigger>
+      <Tabs defaultValue="vendas" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4 rounded-2xl border border-border bg-white/90 p-1 shadow-sm">
+          <TabsTrigger value="vendas" className="gap-2 rounded-xl data-[state=active]:bg-sky-600 data-[state=active]:text-white">
+            <LineIcon className="h-4 w-4" />
+            Vendas
+          </TabsTrigger>
+          <TabsTrigger value="financeiro" className="gap-2 rounded-xl data-[state=active]:bg-sky-600 data-[state=active]:text-white">
+            <DollarSign className="h-4 w-4" />
+            Financeiro
+          </TabsTrigger>
+          <TabsTrigger value="produtos" className="gap-2 rounded-xl data-[state=active]:bg-sky-600 data-[state=active]:text-white">
+            <Package className="h-4 w-4" />
+            Produtos
+          </TabsTrigger>
+          <TabsTrigger value="entregas" className="gap-2 rounded-xl data-[state=active]:bg-sky-600 data-[state=active]:text-white">
+            <Truck className="h-4 w-4" />
+            Entregas
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="vendas" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Gráfico de Vendas Diárias */}
-            <Card>
+        <TabsContent value="vendas" className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card className="juga-card border border-slate-200 bg-gradient-to-br from-white to-slate-50 shadow-sm">
               <CardHeader>
-                <CardTitle>Vendas por Dia</CardTitle>
+                <CardTitle className="text-heading">Volume diário de vendas</CardTitle>
               </CardHeader>
               <CardContent>
-                <ChartContainer config={chartConfig} className="h-[300px]">
+                <ChartContainer config={{ amount: { label: 'Valor', color: 'hsl(var(--chart-1))' } }} className="h-[320px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={dailySalesChart}>
                       <XAxis dataKey="date" />
                       <YAxis tickFormatter={(value) => formatCurrency(value)} />
                       <ChartTooltip
-                        content={<ChartTooltipContent 
-                          formatter={(value) => formatCurrency(value as number)}
-                        />}
+                        content={<ChartTooltipContent formatter={(value) => formatCurrency(value as number)} />}
                       />
-                      <Bar dataKey="amount" fill="var(--color-amount)" />
+                      <Bar dataKey="amount" fill="var(--color-amount)" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </ChartContainer>
               </CardContent>
             </Card>
 
-            {/* Gráfico de Formas de Pagamento */}
-            <Card>
+            <Card className="juga-card border border-slate-200 bg-gradient-to-br from-white to-slate-50 shadow-sm">
               <CardHeader>
-                <CardTitle>Vendas por Forma de Pagamento</CardTitle>
+                <CardTitle className="text-heading">Vendas por forma de pagamento</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
+              <CardContent className="flex flex-col items-center gap-4">
+                <div className="h-[320px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -324,8 +290,7 @@ export default function RelatoriosPage() {
                         cy="50%"
                         labelLine={false}
                         label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
+                        outerRadius={110}
                         dataKey="value"
                       >
                         {paymentMethodData.map((entry, index) => (
@@ -336,9 +301,11 @@ export default function RelatoriosPage() {
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
                             return (
-                              <div className="bg-background border rounded-lg p-2 shadow-md">
-                                <p className="font-medium">{payload[0].name}</p>
-                                <p className="text-sm">{formatCurrency(payload[0].value as number)}</p>
+                              <div className="rounded-lg border bg-background/95 p-2 shadow">
+                                <p className="text-sm font-medium">{payload[0].name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatCurrency(payload[0].value as number)}
+                                </p>
                               </div>
                             );
                           }
@@ -352,334 +319,329 @@ export default function RelatoriosPage() {
             </Card>
           </div>
 
-          {/* Tabela de Vendas */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Detalhes das Vendas</CardTitle>
-              <Button
-                variant="outline"
-                onClick={() => exportToCSV(
-                  filteredSales.map(sale => ({
-                    'Número': sale.sale_number,
-                    'Data': new Date(sale.sold_at).toLocaleDateString('pt-BR'),
-                    'Valor Total': sale.final_amount,
-                    'Desconto': sale.discount_amount,
-                    'Valor Final': sale.final_amount,
-                    'Pagamento': sale.payment_method,
-                    'Tipo': sale.sale_type,
-                    'Status': sale.status,
-                  })),
-                  'vendas'
-                )}
-              >
-                <Download className="h-4 w-4 mr-2" />
+          <Card className="juga-card">
+            <CardHeader className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-heading">Detalhamento de vendas</CardTitle>
+                <p className="text-caption text-sm">Principais vendas no período filtrado</p>
+              </div>
+              <Button variant="outline" className="gap-2">
+                <Download className="h-4 w-4" />
                 Exportar CSV
               </Button>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Número</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Pagamento</TableHead>
-                    <TableHead>Tipo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredSales.slice(0, 10).map((sale) => (
-                    <TableRow key={sale.id}>
-                      <TableCell className="font-medium">{sale.sale_number}</TableCell>
-                      <TableCell>
-                        {new Date(sale.sold_at).toLocaleDateString('pt-BR')}
-                      </TableCell>
-                      <TableCell>{formatCurrency(sale.final_amount)}</TableCell>
-                      <TableCell className="capitalize">
-                        {sale.payment_method.replace('_', ' ')}
-                      </TableCell>
-                      <TableCell className="capitalize">{sale.sale_type}</TableCell>
+              <ScrollArea className="max-h-[360px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Número</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Valor</TableHead>
+                      <TableHead>Pagamento</TableHead>
+                      <TableHead>Tipo</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSales.slice(0, 20).map((sale) => (
+                      <TableRow key={sale.id}>
+                        <TableCell className="font-medium">{sale.sale_number}</TableCell>
+                        <TableCell>{new Date(sale.sold_at).toLocaleDateString('pt-BR')}</TableCell>
+                        <TableCell>{formatCurrency(sale.final_amount)}</TableCell>
+                        <TableCell className="capitalize">{sale.payment_method.replace('_', ' ')}</TableCell>
+                        <TableCell className="capitalize">{sale.sale_type}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="financeiro" className="space-y-4">
-          {/* Gráfico de Fluxo de Caixa */}
-          <Card>
+        <TabsContent value="financeiro" className="space-y-6">
+          <Card className="juga-card border border-slate-200 bg-gradient-to-br from-white to-slate-50 shadow-sm">
             <CardHeader>
-              <CardTitle>Fluxo de Caixa</CardTitle>
+              <CardTitle className="text-heading">Fluxo de caixa consolidado</CardTitle>
             </CardHeader>
             <CardContent>
-              <ChartContainer config={chartConfig} className="h-[400px]">
+              <ChartContainer
+                config={{
+                  receitas: { label: 'Receitas', color: 'hsl(var(--chart-1))' },
+                  despesas: { label: 'Despesas', color: 'hsl(var(--chart-2))' },
+                  saldo: { label: 'Saldo', color: 'hsl(var(--chart-3))' },
+                }}
+                className="h-[340px]"
+              >
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={cashFlowChart}>
                     <XAxis dataKey="date" />
                     <YAxis tickFormatter={(value) => formatCurrency(value)} />
-                    <ChartTooltip
-                      content={<ChartTooltipContent 
-                        formatter={(value) => formatCurrency(value as number)}
-                      />}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="receitas" 
-                      stroke="var(--color-receitas)" 
-                      strokeWidth={2}
-                      name="Receitas"
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="despesas" 
-                      stroke="var(--color-despesas)" 
-                      strokeWidth={2}
-                      name="Despesas"
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="saldo" 
-                      stroke="var(--color-saldo)" 
-                      strokeWidth={2}
-                      name="Saldo"
-                    />
+                    <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value as number)} />} />
+                    <Line type="monotone" dataKey="receitas" stroke="var(--color-receitas)" strokeWidth={2} />
+                    <Line type="monotone" dataKey="despesas" stroke="var(--color-despesas)" strokeWidth={2} />
+                    <Line type="monotone" dataKey="saldo" stroke="var(--color-saldo)" strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
               </ChartContainer>
             </CardContent>
           </Card>
 
-          {/* Resumo Financeiro */}
           <div className="grid gap-4 md:grid-cols-3">
-            <Card>
+            <Card className="juga-card">
               <CardHeader>
-                <CardTitle className="text-green-600">Total de Receitas</CardTitle>
+                <CardTitle className="text-heading text-green-600">Receitas recebidas</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
                   {formatCurrency(
                     filteredTransactions
-                      .filter(t => t.transaction_type === 'receita' && t.status === 'pago')
-                      .reduce((sum, t) => sum + t.amount, 0)
+                      .filter((t) => t.transaction_type === 'receita' && t.status === 'pago')
+                      .reduce((sum, t) => sum + t.amount, 0),
                   )}
                 </div>
+                <p className="text-xs text-muted-foreground">Considera apenas valores contabilizados</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="juga-card">
               <CardHeader>
-                <CardTitle className="text-red-600">Total de Despesas</CardTitle>
+                <CardTitle className="text-heading text-red-600">Despesas pagas</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-red-600">
                   {formatCurrency(
                     filteredTransactions
-                      .filter(t => t.transaction_type === 'despesa' && t.status === 'pago')
-                      .reduce((sum, t) => sum + t.amount, 0)
+                      .filter((t) => t.transaction_type === 'despesa' && t.status === 'pago')
+                      .reduce((sum, t) => sum + t.amount, 0),
                   )}
                 </div>
+                <p className="text-xs text-muted-foreground">Inclui custos operacionais e fornecedores</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="juga-card">
               <CardHeader>
-                <CardTitle>Saldo Líquido</CardTitle>
+                <CardTitle className="text-heading">Saldo líquido</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${
-                  (filteredTransactions
-                    .filter(t => t.transaction_type === 'receita' && t.status === 'pago')
-                    .reduce((sum, t) => sum + t.amount, 0) -
-                  filteredTransactions
-                    .filter(t => t.transaction_type === 'despesa' && t.status === 'pago')
-                    .reduce((sum, t) => sum + t.amount, 0)) >= 0 
-                    ? 'text-green-600' : 'text-red-600'
-                }`}>
+                <div
+                  className={`text-2xl font-bold ${
+                    filteredTransactions
+                      .filter((t) => t.transaction_type === 'receita' && t.status === 'pago')
+                      .reduce((sum, t) => sum + t.amount, 0) -
+                      filteredTransactions
+                        .filter((t) => t.transaction_type === 'despesa' && t.status === 'pago')
+                        .reduce((sum, t) => sum + t.amount, 0) >=
+                    0
+                      ? 'text-green-600'
+                      : 'text-red-600'
+                  }`}
+                >
                   {formatCurrency(
                     filteredTransactions
-                      .filter(t => t.transaction_type === 'receita' && t.status === 'pago')
+                      .filter((t) => t.transaction_type === 'receita' && t.status === 'pago')
                       .reduce((sum, t) => sum + t.amount, 0) -
-                    filteredTransactions
-                      .filter(t => t.transaction_type === 'despesa' && t.status === 'pago')
-                      .reduce((sum, t) => sum + t.amount, 0)
+                      filteredTransactions
+                        .filter((t) => t.transaction_type === 'despesa' && t.status === 'pago')
+                        .reduce((sum, t) => sum + t.amount, 0),
                   )}
                 </div>
+                <p className="text-xs text-muted-foreground">Receitas - Despesas</p>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="produtos" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Relatório de Produtos</CardTitle>
-              <Button
-                variant="outline"
-                onClick={() => exportToCSV(
-                  products.map(product => ({
-                    'Nome': product.name,
-                    'SKU': product.sku || '',
-                    'Preço Custo': product.cost_price,
-                    'Preço Venda': product.sale_price,
-                    'Estoque': product.stock_quantity,
-                    'Estoque Mínimo': product.min_stock,
-                    'Status': product.is_active ? 'Ativo' : 'Inativo',
-                  })),
-                  'produtos'
-                )}
-              >
-                <Download className="h-4 w-4 mr-2" />
+        <TabsContent value="produtos" className="space-y-6">
+          <Card className="juga-card">
+            <CardHeader className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-heading">Desempenho por produto</CardTitle>
+                <p className="text-caption text-sm">Produtos com maior valor em estoque</p>
+              </div>
+              <Button variant="outline" className="gap-2">
+                <Download className="h-4 w-4" />
                 Exportar CSV
               </Button>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Produto</TableHead>
-                    <TableHead>Preço Venda</TableHead>
-                    <TableHead>Estoque</TableHead>
-                    <TableHead>Valor em Estoque</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {products.slice(0, 10).map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{product.name}</div>
-                          {product.sku && (
-                            <div className="text-sm text-muted-foreground">SKU: {product.sku}</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{formatCurrency(product.sale_price)}</TableCell>
-                      <TableCell>
-                        <span className={product.stock_quantity <= product.min_stock ? 'text-red-600 font-medium' : ''}>
-                          {product.stock_quantity} {product.unit}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {formatCurrency(product.stock_quantity * product.cost_price)}
-                      </TableCell>
-                      <TableCell>
-                        <span className={product.is_active ? 'text-green-600' : 'text-gray-500'}>
-                          {product.is_active ? 'Ativo' : 'Inativo'}
-                        </span>
-                      </TableCell>
+              <ScrollArea className="max-h-[360px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Produto</TableHead>
+                      <TableHead>Estoque</TableHead>
+                      <TableHead>Valor em estoque</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {mockProducts.slice(0, 20).map((product) => (
+                      <TableRow key={product.id}>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium text-heading">{product.name}</span>
+                            <span className="text-xs text-muted-foreground">SKU: {product.sku}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={product.stock_quantity <= product.min_stock ? 'destructive' : 'default'}>
+                            {product.stock_quantity} {product.unit}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {formatCurrency(product.stock_quantity * product.cost_price)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={product.is_active ? 'default' : 'secondary'}>
+                            {product.is_active ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="entregas" className="space-y-4">
-          {/* Stats de Entregas */}
+        <TabsContent value="entregas" className="space-y-6">
           <div className="grid gap-4 md:grid-cols-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Total de Entregas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{deliveryStats.total}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Entregues</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{deliveryStats.completed}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Em Rota</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">{deliveryStats.inRoute}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Aguardando</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-yellow-600">{deliveryStats.pending}</div>
-              </CardContent>
-            </Card>
+            <JugaKPICard
+              title="Entregas realizadas"
+              value={`${filteredDeliveries.filter((d) => d.status === 'entregue').length}`}
+              description="Força de logística"
+              color="success"
+              icon={<Truck className="h-5 w-5" />}
+              trend="up"
+              trendValue="+3 entregas"
+            />
+            <JugaKPICard
+              title="Em rota"
+              value={`${filteredDeliveries.filter((d) => d.status === 'em_rota').length}`}
+              description="Monitoramento em tempo real"
+              color="accent"
+              icon={<Truck className="h-5 w-5" />}
+              trend="neutral"
+              trendValue="Atualizado agora"
+            />
+            <JugaKPICard
+              title="Pendentes"
+              value={`${filteredDeliveries.filter((d) => d.status === 'aguardando').length}`}
+              description="Aguardando envio"
+              color="warning"
+              icon={<Truck className="h-5 w-5" />}
+              trend="down"
+              trendValue="-1 pendência"
+            />
+            <JugaKPICard
+              title="Canceladas"
+              value={`${filteredDeliveries.filter((d) => d.status === 'cancelada').length}`}
+              description="Ocorrências extraordinárias"
+              color="error"
+              icon={<Truck className="h-5 w-5" />}
+              trend="down"
+              trendValue="-2 ocorrências"
+            />
           </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Detalhes das Entregas</CardTitle>
-              <Button
-                variant="outline"
-                onClick={() => exportToCSV(
-                  filteredDeliveries.map(delivery => ({
-                    'Cliente': delivery.customer_name,
-                    'Endereço': delivery.delivery_address,
-                    'Telefone': delivery.phone || '',
-                    'Status': delivery.status,
-                    'Data': new Date(delivery.created_at).toLocaleDateString('pt-BR'),
-                    'Entregue em': delivery.delivered_at ? 
-                      new Date(delivery.delivered_at).toLocaleDateString('pt-BR') : '',
-                  })),
-                  'entregas'
-                )}
-              >
-                <Download className="h-4 w-4 mr-2" />
+          <Card className="juga-card">
+            <CardHeader className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-heading">Detalhes das entregas</CardTitle>
+                <p className="text-caption text-sm">Status das entregas dentro do período selecionado</p>
+              </div>
+              <Button variant="outline" className="gap-2">
+                <Download className="h-4 w-4" />
                 Exportar CSV
               </Button>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Endereço</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Data</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredDeliveries.slice(0, 10).map((delivery) => (
-                    <TableRow key={delivery.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{delivery.customer_name}</div>
-                          {delivery.phone && (
-                            <div className="text-sm text-muted-foreground">{delivery.phone}</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {delivery.delivery_address}
-                      </TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          delivery.status === 'entregue' ? 'bg-green-100 text-green-800' :
-                          delivery.status === 'em_rota' ? 'bg-blue-100 text-blue-800' :
-                          delivery.status === 'aguardando' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {delivery.status.replace('_', ' ').toUpperCase()}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(delivery.created_at).toLocaleDateString('pt-BR')}
-                      </TableCell>
+              <ScrollArea className="max-h-[360px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Endereço</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Data</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredDeliveries.slice(0, 20).map((delivery) => (
+                      <TableRow key={delivery.id}>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium text-heading">{delivery.customer_name}</span>
+                            <span className="text-xs text-muted-foreground">{delivery.phone || 'Sem contato'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-[220px] truncate">{delivery.delivery_address}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              delivery.status === 'entregue'
+                                ? 'default'
+                                : delivery.status === 'em_rota'
+                                ? 'accent'
+                                : delivery.status === 'aguardando'
+                                ? 'warning'
+                                : 'destructive'
+                            }
+                            className="capitalize"
+                          >
+                            {delivery.status.replace('_', ' ')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{new Date(delivery.created_at).toLocaleDateString('pt-BR')}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Card className="juga-card">
+        <CardHeader className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-heading">Exportações inteligentes</CardTitle>
+            <p className="text-caption text-sm">Selecione rapidamente o relatório desejado e faça o download dos dados</p>
+          </div>
+          <Button className="gap-2 juga-gradient text-white">
+            <Download className="h-4 w-4" />
+            Exportar todos
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 md:grid-cols-3">
+            {[
+              {
+                label: 'Relatório financeiro completo',
+                description: 'Receitas, despesas e fluxo de caixa consolidado',
+              },
+              {
+                label: 'Vendas detalhadas',
+                description: 'Ticket médio, formatos de pagamento e produtos',
+              },
+              {
+                label: 'Logística e entregas',
+                description: 'Tempo médio de entrega e status por motorista',
+              },
+            ].map((item) => (
+              <Button key={item.label} variant="outline" className="justify-between gap-3">
+                <div className="text-left">
+                  <div className="font-medium text-heading">{item.label}</div>
+                  <div className="text-xs text-muted-foreground">{item.description}</div>
+                </div>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

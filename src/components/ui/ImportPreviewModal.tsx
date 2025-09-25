@@ -4,7 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FileText, Download, Upload, X, Save, Database, Plus, UserPlus, CheckSquare, Square } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { FileText, Download, Upload, X, Save, Database, Plus, UserPlus, CheckSquare, Square, AlertTriangle, CheckCircle, Users, FileSpreadsheet } from 'lucide-react';
 
 interface ImportPreviewModalProps {
   isOpen: boolean;
@@ -101,10 +105,12 @@ export function ImportPreviewModal({
       if (selectedRows.size > 0) {
         const selectedData = Array.from(selectedRows).map(index => data[index]);
         console.log('📊 Dados selecionados para cadastro:', selectedData.length);
+        console.log('📊 Primeiro item selecionado:', JSON.stringify(selectedData[0], null, 2));
         onRegister(selectedData);
       } else {
         // Se nenhuma linha está selecionada, cadastra todos os dados
         console.log('📊 Nenhuma linha selecionada, cadastrando todos os dados:', data.length);
+        console.log('📊 Primeiro item de todos os dados:', JSON.stringify(data[0], null, 2));
         onRegister(data);
       }
     } else {
@@ -114,79 +120,145 @@ export function ImportPreviewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[100vw] h-[100vh] max-w-none max-h-none m-0 rounded-none p-0.5 overflow-hidden">
-        <DialogHeader className="pb-0.5 flex-shrink-0 px-1">
-          <DialogTitle className="flex items-center gap-1 text-xs">
-            <FileText className="h-3 w-3" />
-            <span className="truncate">Preview - {fileName}</span>
+      <DialogContent className="w-[98vw] h-[95vh] max-w-none max-h-[95vh] p-0 overflow-hidden flex flex-col">
+        {/* Header - Fixo */}
+        <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50 flex-shrink-0">
+          <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl font-semibold text-gray-800">
+            <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg">
+              <FileSpreadsheet className="h-4 w-4 sm:h-6 sm:w-6 text-blue-600" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-base sm:text-xl">Preview de Importação</span>
+              <span className="text-xs sm:text-sm font-normal text-gray-600 truncate">
+                {fileName}
+              </span>
+            </div>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col h-full space-y-0.5">
-          {/* Estatísticas */}
-          <div className="grid grid-cols-4 gap-0.5 flex-shrink-0 px-1 h-6">
-            <div className="bg-blue-50 p-0.5 rounded text-center flex flex-col justify-center">
-              <div className="text-xs text-blue-600 leading-none">Total</div>
-              <div className="text-xs font-bold text-blue-900 leading-none">{totalRows}</div>
-            </div>
-            <div className="bg-green-50 p-0.5 rounded text-center flex flex-col justify-center">
-              <div className="text-xs text-green-600 leading-none">Válidas</div>
-              <div className="text-xs font-bold text-green-900 leading-none">{validRows}</div>
-            </div>
-            <div className="bg-red-50 p-0.5 rounded text-center flex flex-col justify-center">
-              <div className="text-xs text-red-600 leading-none">Inválidas</div>
-              <div className="text-xs font-bold text-red-900 leading-none">{invalidRows}</div>
-            </div>
-            <div className="bg-gray-50 p-0.5 rounded text-center flex flex-col justify-center">
-              <div className="text-xs text-gray-600 leading-none">Dados</div>
-              <div className="text-xs font-bold text-gray-900 leading-none">{data.length}</div>
-            </div>
-          </div>
+        {/* Conteúdo Scrollável */}
+        <div className="flex-1 overflow-auto">
+          <div className="flex flex-col min-h-full">
+            {/* Estatísticas Cards */}
+            <div className="px-3 sm:px-6 py-3 sm:py-4 bg-gray-50/50 flex-shrink-0">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+                <Card className="border-l-4 border-l-blue-500 shadow-sm">
+                  <CardContent className="p-2 sm:p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs sm:text-sm font-medium text-gray-600">Total</p>
+                        <p className="text-lg sm:text-2xl font-bold text-blue-600">{totalRows}</p>
+                      </div>
+                      <div className="p-1 sm:p-2 bg-blue-100 rounded-full">
+                        <FileText className="h-3 w-3 sm:h-5 sm:w-5 text-blue-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-          {/* Erros se houver */}
-          {errors.length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded p-0.5 flex-shrink-0 mx-1">
-              <h4 className="font-medium text-red-800 mb-0.5 text-xs">Erros encontrados:</h4>
-              <ul className="text-xs text-red-700 space-y-0.5 max-h-12 overflow-y-auto">
-                {errors.map((error, index) => (
-                  <li key={index}>• {error}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+                <Card className="border-l-4 border-l-green-500 shadow-sm">
+                  <CardContent className="p-2 sm:p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs sm:text-sm font-medium text-gray-600">Válidos</p>
+                        <p className="text-lg sm:text-2xl font-bold text-green-600">{validRows}</p>
+                      </div>
+                      <div className="p-1 sm:p-2 bg-green-100 rounded-full">
+                        <CheckCircle className="h-3 w-3 sm:h-5 sm:w-5 text-green-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-          {/* Tabela de Preview */}
-          <div className="border rounded overflow-hidden flex-1 flex flex-col min-h-0 mx-1">
-            <div className="bg-gray-50 px-1 py-0.5 border-b flex-shrink-0 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h4 className="font-medium text-gray-800 text-xs">
-                  Dados Completos ({data.length} linhas)
-                </h4>
-                <div className="flex items-center gap-1">
+                <Card className="border-l-4 border-l-red-500 shadow-sm">
+                  <CardContent className="p-2 sm:p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs sm:text-sm font-medium text-gray-600">Inválidos</p>
+                        <p className="text-lg sm:text-2xl font-bold text-red-600">{invalidRows}</p>
+                      </div>
+                      <div className="p-1 sm:p-2 bg-red-100 rounded-full">
+                        <AlertTriangle className="h-3 w-3 sm:h-5 sm:w-5 text-red-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-l-4 border-l-purple-500 shadow-sm">
+                  <CardContent className="p-2 sm:p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs sm:text-sm font-medium text-gray-600">Selecionados</p>
+                        <p className="text-lg sm:text-2xl font-bold text-purple-600">{selectedRows.size}</p>
+                      </div>
+                      <div className="p-1 sm:p-2 bg-purple-100 rounded-full">
+                        <Users className="h-3 w-3 sm:h-5 sm:w-5 text-purple-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {/* Erros se houver */}
+            {errors.length > 0 && (
+              <div className="px-3 sm:px-6 pb-3 sm:pb-4 flex-shrink-0">
+                <Alert variant="destructive" className="border-red-200 bg-red-50">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <div className="font-medium mb-2 text-sm">Erros encontrados:</div>
+                    <ScrollArea className="h-16 sm:h-20">
+                      <ul className="text-xs sm:text-sm space-y-1">
+                        {errors.map((error, index) => (
+                          <li key={index} className="flex items-start gap-2">
+                            <span className="text-red-500 mt-0.5">•</span>
+                            <span>{error}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </ScrollArea>
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
+
+            {/* Controles da Tabela */}
+            <div className="px-3 sm:px-6 py-2 sm:py-3 bg-white border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 flex-shrink-0">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                <h3 className="font-semibold text-gray-800 text-sm sm:text-base">
+                  Dados ({data.length} registros)
+                </h3>
+                <div className="flex items-center gap-2">
                   <Checkbox
                     id="select-all"
                     checked={selectAll}
                     onCheckedChange={handleSelectAll}
-                    className="h-3 w-3"
+                    className="h-4 w-4"
                   />
-                  <label htmlFor="select-all" className="text-xs text-gray-600 cursor-pointer">
+                  <label htmlFor="select-all" className="text-xs sm:text-sm text-gray-600 cursor-pointer font-medium">
                     Selecionar Todos
                   </label>
                 </div>
               </div>
-              <div className="text-xs text-gray-500">
-                ↕️ Scroll vertical | ↔️ Scroll horizontal
-              </div>
+              <Badge variant="secondary" className="text-xs self-start sm:self-auto">
+                {selectedRows.size} de {data.length} selecionados
+              </Badge>
             </div>
-            <div className="overflow-auto flex-1 max-h-[75vh]">
-              <div className="min-w-full">
+
+            {/* Tabela de Preview */}
+            <div className="flex-1 min-h-[300px]">
+              <div className="h-full overflow-auto">
                 <Table>
-                  <TableHeader className="sticky top-0 bg-white z-10">
-                    <TableRow>
-                      <TableHead className="w-6 text-xs py-0.5 sticky left-0 bg-white border-r z-20">#</TableHead>
-                      <TableHead className="w-8 text-xs py-0.5 sticky left-6 bg-white border-r z-20">✓</TableHead>
+                  <TableHeader className="sticky top-0 bg-white shadow-sm z-10">
+                    <TableRow className="border-b-2">
+                      <TableHead className="w-12 sm:w-16 text-center font-semibold text-gray-700 sticky left-0 bg-white border-r z-20 text-xs sm:text-sm">
+                        #
+                      </TableHead>
+                      <TableHead className="w-10 sm:w-12 text-center font-semibold text-gray-700 sticky left-12 sm:left-16 bg-white border-r z-20">
+                        <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 mx-auto" />
+                      </TableHead>
                       {headers.map((header, index) => (
-                        <TableHead key={index} className="min-w-[60px] text-xs py-0.5 whitespace-nowrap">
+                        <TableHead key={index} className="min-w-[100px] sm:min-w-[120px] font-semibold text-gray-700 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-4">
                           {header}
                         </TableHead>
                       ))}
@@ -195,25 +267,36 @@ export function ImportPreviewModal({
                   <TableBody>
                     {data.map((row: any, rowIndex) => {
                       const isArrayRow = Array.isArray(row);
+                      const isSelected = selectedRows.has(rowIndex);
                       return (
-                        <TableRow key={rowIndex} className="hover:bg-gray-50">
-                          <TableCell className="font-medium text-gray-500 text-xs py-0.5 sticky left-0 bg-white border-r z-10">
-                            {rowIndex + 1}
+                        <TableRow 
+                          key={rowIndex} 
+                          className={`hover:bg-blue-50/50 transition-colors ${
+                            isSelected ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
+                          }`}
+                        >
+                          <TableCell className="font-medium text-gray-600 text-center sticky left-0 bg-white border-r py-2 sm:py-3">
+                            <Badge variant={isSelected ? "default" : "secondary"} className="text-xs">
+                              {rowIndex + 1}
+                            </Badge>
                           </TableCell>
-                          <TableCell className="w-8 text-xs py-0.5 sticky left-6 bg-white border-r z-10">
+                          <TableCell className="text-center sticky left-12 sm:left-16 bg-white border-r py-2 sm:py-3">
                             <Checkbox
                               checked={selectedRows.has(rowIndex)}
                               onCheckedChange={(checked) => handleRowSelect(rowIndex, checked as boolean)}
-                              className="h-3 w-3"
+                              className="h-3 w-3 sm:h-4 sm:w-4"
                             />
                           </TableCell>
-                          {headers.map((header, cellIndex) => (
-                            <TableCell key={cellIndex} className="min-w-[60px] max-w-[100px] text-xs py-0.5">
-                              <div className="truncate" title={isArrayRow ? (row[cellIndex] ?? '-') : (row[header] ?? '-')}>
-                                {isArrayRow ? (row[cellIndex] ?? '-') : (row[header] ?? '-')}
-                              </div>
-                            </TableCell>
-                          ))}
+                          {headers.map((header, cellIndex) => {
+                            const cellValue = isArrayRow ? (row[cellIndex] ?? '') : (row[header] ?? '');
+                            return (
+                              <TableCell key={cellIndex} className="min-w-[100px] sm:min-w-[120px] max-w-[150px] sm:max-w-[200px] py-2 sm:py-3 px-2 sm:px-4">
+                                <div className="truncate font-medium text-gray-800 text-xs sm:text-sm" title={cellValue}>
+                                  {cellValue || <span className="text-gray-400 italic">—</span>}
+                                </div>
+                              </TableCell>
+                            );
+                          })}
                         </TableRow>
                       );
                     })}
@@ -222,40 +305,57 @@ export function ImportPreviewModal({
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Ações */}
-          <div className="flex flex-col gap-0.5 pt-0.5 border-t flex-shrink-0 px-1">
-            <div className="text-xs text-gray-600 text-center">
+        {/* Footer com Ações - Fixo */}
+        <div className="px-3 sm:px-6 py-3 sm:py-4 bg-gray-50 border-t flex-shrink-0">
+          <div className="flex flex-col gap-3 sm:gap-4">
+            {/* Status */}
+            <div className="flex items-center justify-center">
               {validRows > 0 ? (
-                <span className="text-green-600">
-                  ✓ {validRows} válidos | {selectedRows.size} selecionados | onRegister: {onRegister ? '✅' : '❌'}
-                </span>
+                <div className="flex items-center gap-2 text-green-700 bg-green-50 px-3 sm:px-4 py-2 rounded-lg">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="font-medium text-xs sm:text-sm">
+                    {validRows} registros válidos prontos
+                  </span>
+                </div>
               ) : (
-                <span className="text-red-600">
-                  ⚠ Nenhum válido
-                </span>
+                <div className="flex items-center gap-2 text-red-700 bg-red-50 px-3 sm:px-4 py-2 rounded-lg">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="font-medium text-xs sm:text-sm">Nenhum registro válido</span>
+                </div>
               )}
             </div>
-            <div className="grid grid-cols-4 gap-0.5">
-              <Button variant="outline" onClick={onClose} className="w-full text-xs h-4 px-0.5">
-                <X className="h-2 w-2" />
-                <span className="hidden sm:inline ml-0.5 text-xs">Cancelar</span>
+
+            {/* Botões de Ação */}
+            <div className="flex flex-wrap gap-2 sm:gap-3 justify-center">
+              <Button 
+                variant="outline" 
+                onClick={onClose} 
+                className="flex items-center gap-1 sm:gap-2 px-3 sm:px-6 text-xs sm:text-sm h-8 sm:h-10"
+              >
+                <X className="h-3 w-3 sm:h-4 sm:w-4" />
+                Cancelar
               </Button>
               
               {onRegister && (
                 <Button 
-                  variant="default"
                   onClick={() => {
                     console.log('👤 Botão Cadastrar clicado');
                     console.log('📊 Estado do botão - isRegistering:', isRegistering, 'selectedRows.size:', selectedRows.size);
                     handleRegister();
                   }}
-                  disabled={isRegistering}
-                  className="w-full text-xs h-4 px-0.5 bg-green-600 hover:bg-green-700"
+                  disabled={isRegistering || validRows === 0}
+                  className="flex items-center gap-1 sm:gap-2 px-3 sm:px-6 bg-green-600 hover:bg-green-700 text-xs sm:text-sm h-8 sm:h-10"
                 >
-                  <UserPlus className="h-2 w-2" />
-                  <span className="hidden sm:inline ml-0.5 text-xs">
-                    {isRegistering ? 'Cadastrando...' : selectedRows.size > 0 ? `Cadastrar (${selectedRows.size})` : `Cadastrar Todos (${data.length})`}
+                  <UserPlus className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">
+                    {isRegistering ? 'Cadastrando...' : 
+                     selectedRows.size > 0 ? `Cadastrar (${selectedRows.size})` : 
+                     `Cadastrar (${data.length})`}
+                  </span>
+                  <span className="sm:hidden">
+                    {isRegistering ? 'Salvando...' : 'Cadastrar'}
                   </span>
                 </Button>
               )}
@@ -266,23 +366,22 @@ export function ImportPreviewModal({
                   console.log('💾 Botão Salvar clicado');
                   handleSave();
                 }}
-                className="w-full text-xs h-4 px-0.5"
+                className="flex items-center gap-1 sm:gap-2 px-3 sm:px-6 text-xs sm:text-sm h-8 sm:h-10"
               >
-                <Save className="h-2 w-2" />
-                <span className="hidden sm:inline ml-0.5 text-xs">Salvar</span>
+                <Save className="h-3 w-3 sm:h-4 sm:w-4" />
+                Salvar
               </Button>
               
               <Button 
-                variant="default"
                 onClick={() => {
                   console.log('📥 Botão Importar clicado');
                   onConfirm();
                 }}
                 disabled={validRows === 0}
-                className="w-full text-xs h-4 px-0.5 bg-blue-600 hover:bg-blue-700"
+                className="flex items-center gap-1 sm:gap-2 px-3 sm:px-6 bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm h-8 sm:h-10"
               >
-                <Upload className="h-2 w-2" />
-                <span className="hidden sm:inline ml-0.5 text-xs">Importar</span>
+                <Upload className="h-3 w-3 sm:h-4 sm:w-4" />
+                Importar
               </Button>
             </div>
           </div>

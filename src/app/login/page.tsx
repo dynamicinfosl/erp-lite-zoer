@@ -7,27 +7,27 @@ import { RegisterForm } from '@/components/auth/RegisterForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useAuth } from '@/components/auth/AuthProvider';
+import { useAuth } from '@/contexts/AuthContext';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { Loader2, ArrowLeft, Shield, Users, BarChart3, Settings } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('login');
 
   // Redirecionar se já estiver logado (apenas quando autenticação estiver habilitada)
   useEffect(() => {
-    if (ENABLE_AUTH && !isLoading && user) {
+    if (ENABLE_AUTH && !loading && user) {
       // Verificar se há um parâmetro de redirecionamento
       const urlParams = new URLSearchParams(window.location.search);
       const redirectTo = urlParams.get('redirect') || '/dashboard';
       router.push(redirectTo);
     }
-  }, [user, isLoading, router]);
+  }, [user, loading, router]);
 
   // Mostrar loading enquanto verifica autenticação
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
         <div className="text-center">
@@ -72,11 +72,11 @@ export default function LoginPage() {
               <Shield className="h-8 w-8 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            ERP Lite Zoer
+          <h1 className="text-3xl font-bold juga-heading mb-2">
+            JUGA
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Sistema de gestão empresarial
+            Sistema de gestão empresarial moderno
           </p>
         </div>
 

@@ -1,112 +1,92 @@
-import CrudOperations from '@/lib/crud-operations';
-import { createSuccessResponse, createErrorResponse } from '@/lib/create-response';
-import { requestMiddleware, parseQueryParams, validateRequestBody } from "@/lib/api-utils";
+import { NextRequest } from "next/server";
+import { CrudOperations } from "@/lib/crud-operations";
+import { createSuccessResponse, createErrorResponse } from "@/lib/create-response";
+import { getTenantContext, ensureTenantId } from "@/lib/tenant-utils";
 
-// GET status da sessão atual por register_id
+interface CashSessionQuery {
+  register_id?: string;
+  status?: string;
+}
+
 export const GET = requestMiddleware(async (request, context) => {
   try {
-    const { register_id } = parseQueryParams(request);
-    const sessionsCrud = new CrudOperations('cash_sessions', context.token);
+    const { searchParams } = new URL(request.url);
+    const query: CashSessionQuery = {
+      register_id: searchParams.get("register_id") ?? undefined,
+      status: searchParams.get("status") ?? undefined,
+    };
 
-    let session = null;
-    if (register_id) {
-      const list = await sessionsCrud.findMany({ user_id: context.payload?.sub, register_id, status: 'open' }, { limit: 1 });
-      session = list?.[0] || null;
-    } else {
-      const list = await sessionsCrud.findMany({ user_id: context.payload?.sub, status: 'open' }, { limit: 1 });
-      session = list?.[0] || null;
-    }
+    const tenantContext = await getTenantContext(context.token);
+    const cashSessionsCrud = new CrudOperations("cash_sessions", context.token);
+    const filters = ensureTenantId({ ...query }, tenantContext.tenantId);
+    const { rows } = await cashSessionsCrud.findMany(filters, { limit: 100 });
 
-    return createSuccessResponse(session);
+    return createSuccessResponse({ data: rows });
   } catch (error) {
-    console.error('Erro ao obter sessão de caixa:', error);
-    return createErrorResponse({ errorMessage: 'Erro ao obter sessão de caixa', status: 500 });
+    console.error("Erro ao listar sessões de caixa:", error);
+    return createErrorResponse("Erro ao listar sessões de caixa", 500);
   }
 }, true);
 
-// POST /open - abrir sessão
+interface CashSessionBody {
+  register_id: string;
+  opened_at: string;
+  initial_amount: number;
+  status?: string;
+  notes?: string;
+}
+
 export const POST = requestMiddleware(async (request, context) => {
   try {
-    const body = await validateRequestBody(request);
-    const { action } = parseQueryParams(request);
-    const sessionsCrud = new CrudOperations('cash_sessions', context.token);
-    const transactionsCrud = new CrudOperations('cash_transactions', context.token);
+    const body: CashSessionBody = await request.json();
+    const tenantContext = await getTenantContext(context.token);
 
-    if (action === 'open') {
-      if (!body.register_id) {
-        return createErrorResponse({ errorMessage: 'register_id é obrigatório', status: 400 });
-      }
+    const cashSessionsCrud = new CrudOperations("cash_sessions", context.token);
+    const data = ensureTenantId(body, tenantContext.tenantId);
 
-      // verificar sessão aberta existente
-      const openExists = await sessionsCrud.findMany({ user_id: context.payload?.sub, register_id: body.register_id, status: 'open' }, { limit: 1 });
-      if (openExists && openExists.length > 0) {
-        return createErrorResponse({ errorMessage: 'Já existe uma sessão aberta para este caixa', status: 400 });
-      }
-
-      const openingAmount = parseFloat(body.opening_amount || '0');
-
-      const session = await sessionsCrud.create({
-        user_id: context.payload?.sub,
-        register_id: body.register_id,
-        status: 'open',
-        opened_by: context.payload?.sub,
-        opening_amount: openingAmount,
-        notes: body.notes || null,
-      });
-
-      await transactionsCrud.create({
-        user_id: context.payload?.sub,
-        session_id: session.id,
-        type: 'opening',
-        method: 'cash',
-        amount: openingAmount,
-        description: 'Abertura de caixa',
-        created_by: context.payload?.sub,
-      });
-
-      return createSuccessResponse(session, 201);
-    }
-
-    if (action === 'close') {
-      const { session_id } = body;
-      if (!session_id) {
-        return createErrorResponse({ errorMessage: 'session_id é obrigatório', status: 400 });
-      }
-
-      const existing = await sessionsCrud.findById(session_id);
-      if (!existing || existing.user_id !== parseInt(context.payload?.sub || '0')) {
-        return createErrorResponse({ errorMessage: 'Sessão não encontrada', status: 404 });
-      }
-
-      const closing = {
-        status: 'closed',
-        closed_by: context.payload?.sub,
-        closed_at: new Date().toISOString(),
-        closing_amount_cash: parseFloat(body.closing_amount_cash || '0'),
-        closing_amount_card: parseFloat(body.closing_amount_card || '0'),
-        closing_amount_pix: parseFloat(body.closing_amount_pix || '0'),
-        difference_amount: parseFloat(body.difference_amount || '0'),
-        difference_reason: body.difference_reason || null,
-      };
-
-      const updated = await sessionsCrud.update(session_id, closing);
-
-      await transactionsCrud.create({
-        user_id: context.payload?.sub,
-        session_id,
-        type: 'closing',
-        amount: closing.closing_amount_cash + closing.closing_amount_card + closing.closing_amount_pix,
-        description: 'Fechamento de caixa',
-        created_by: context.payload?.sub,
-      });
-
-      return createSuccessResponse(updated);
-    }
-
-    return createErrorResponse({ errorMessage: 'Ação inválida', status: 400 });
+    const created = await cashSessionsCrud.create(data);
+    return createSuccessResponse({ data: created }, 201);
   } catch (error) {
-    console.error('Erro em cash-sessions:', error);
-    return createErrorResponse({ errorMessage: 'Erro em cash-sessions', status: 500 });
+    console.error("Erro ao criar sessão de caixa:", error);
+    return createErrorResponse("Erro ao criar sessão de caixa", 500);
+  }
+}, true);
+
+interface CashSessionParams {
+  params: { id: string };
+}
+
+export const PATCH = requestMiddleware(async (request, context, { params }: CashSessionParams) => {
+  try {
+    const body = (await request.json()) as Partial<CashSessionBody> & {
+      closed_at?: string;
+      closing_amount?: number;
+      action?: string;
+    };
+
+    const tenantContext = await getTenantContext(context.token);
+    const cashSessionsCrud = new CrudOperations("cash_sessions", context.token);
+
+    const data = ensureTenantId(body, tenantContext.tenantId);
+    const updated = await cashSessionsCrud.update(params.id, data);
+
+    return createSuccessResponse({ data: updated });
+  } catch (error) {
+    console.error("Erro ao atualizar sessão de caixa:", error);
+    return createErrorResponse("Erro ao atualizar sessão de caixa", 500);
+  }
+}, true);
+
+export const DELETE = requestMiddleware(async (_request, context, { params }: CashSessionParams) => {
+  try {
+    const tenantContext = await getTenantContext(context.token);
+    const cashSessionsCrud = new CrudOperations("cash_sessions", context.token);
+
+    await cashSessionsCrud.delete(params.id, tenantContext.tenantId);
+    return createSuccessResponse({ success: true });
+  } catch (error) {
+    console.error("Erro ao excluir sessão de caixa:", error);
+    return createErrorResponse("Erro ao excluir sessão de caixa", 500);
   }
 }, true);
 

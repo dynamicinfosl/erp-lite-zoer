@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,12 +12,58 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, DollarSign, TrendingUp, TrendingDown, Calendar, CreditCard } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Plus, Search, DollarSign, TrendingUp, TrendingDown, Calendar, CreditCard, Receipt, ArrowRight } from 'lucide-react';
 import { FinancialTransaction } from '@/types';
 import { api } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { mockFinancialTransactions } from '@/lib/mock-data';
+import { JugaKPICard } from '@/components/dashboard/JugaComponents';
+
+interface FinancialRecord {
+  id: string
+  type: 'receita' | 'despesa'
+  description: string
+  amount: number
+  userId: string
+  category: string
+  date: string
+  status: 'pendente' | 'pago'
+}
+
+const mockFinancialRecords: FinancialRecord[] = [
+  {
+    id: '1',
+    type: 'receita',
+    description: 'Venda PDV 2541',
+    amount: 259.9,
+    userId: '5f34ff91-dc0f-4fe2-a5c7-6e8f9a6fdc01',
+    category: 'Venda',
+    date: '2025-09-24',
+    status: 'pago',
+  },
+  {
+    id: '2',
+    type: 'despesa',
+    description: 'Pagamento fornecedor',
+    amount: 1299.0,
+    userId: '5f34ff91-dc0f-4fe2-a5c7-6e8f9a6fdc01',
+    category: 'Fornecedores',
+    date: '2025-09-23',
+    status: 'pendente',
+  },
+  {
+    id: '3',
+    type: 'receita',
+    description: 'Venda online 8891',
+    amount: 899.9,
+    userId: '5f34ff91-dc0f-4fe2-a5c7-6e8f9a6fdc01',
+    category: 'E-commerce',
+    date: '2025-09-22',
+    status: 'pago',
+  },
+]
 
 export default function FinanceiroPage() {
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
@@ -36,19 +82,30 @@ export default function FinanceiroPage() {
     notes: '',
   });
 
-  useEffect(() => {
-    fetchTransactions();
-  }, []);
-
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       if (ENABLE_AUTH) {
         const data = await api.get<FinancialTransaction[]>('/financial-transactions');
         setTransactions(data);
       } else {
-        setTransactions(mockFinancialTransactions);
+        setTransactions(
+          mockFinancialRecords.map((record) => ({
+            id: record.id,
+            transaction_type: record.type,
+            description: record.description,
+            amount: record.amount,
+            user_id: Number(record.userId) || 0,
+            category: record.category,
+            created_at: record.date,
+            status: record.status,
+            notes: '',
+            payment_method: '',
+            due_date: record.date,
+            paid_date: record.status === 'pago' ? record.date : null,
+          })),
+        );
       }
     } catch (error) {
       console.error('Erro ao carregar transações:', error);
@@ -58,7 +115,11 @@ export default function FinanceiroPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,19 +196,24 @@ export default function FinanceiroPage() {
     });
   };
 
-  const filteredTransactions = transactions.filter(transaction =>
-    transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    transaction.category.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredTransactions = useMemo(
+    () =>
+      transactions.filter(
+        (transaction) =>
+          transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          transaction.category.toLowerCase().includes(searchTerm.toLowerCase()),
+      ),
+    [transactions, searchTerm],
   );
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = useCallback((value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
     }).format(value);
-  };
+  }, []);
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = useCallback((status: string) => {
     switch (status) {
       case 'pago':
         return <Badge variant="default" className="bg-green-600">Pago</Badge>;
@@ -158,48 +224,130 @@ export default function FinanceiroPage() {
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
-  };
+  }, []);
 
-  // Cálculos financeiros
-  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-  const monthlyTransactions = transactions.filter(t => 
-    t.created_at.startsWith(currentMonth)
+  const currentMonth = useMemo(() => new Date().toISOString().slice(0, 7), []);
+
+  const monthlyTransactions = useMemo(
+    () =>
+      transactions.filter((t) =>
+        t.created_at ? t.created_at.startsWith(currentMonth) : false,
+      ),
+    [transactions, currentMonth],
   );
 
-  const monthlyStats = {
-    totalReceitas: monthlyTransactions
-      .filter(t => t.transaction_type === 'receita' && t.status === 'pago')
-      .reduce((sum, t) => sum + t.amount, 0),
-    totalDespesas: monthlyTransactions
-      .filter(t => t.transaction_type === 'despesa' && t.status === 'pago')
-      .reduce((sum, t) => sum + t.amount, 0),
-    receitasPendentes: monthlyTransactions
-      .filter(t => t.transaction_type === 'receita' && t.status === 'pendente')
-      .reduce((sum, t) => sum + t.amount, 0),
-    despesasPendentes: monthlyTransactions
-      .filter(t => t.transaction_type === 'despesa' && t.status === 'pendente')
-      .reduce((sum, t) => sum + t.amount, 0),
-  };
+  const monthlyStats = useMemo(() => {
+    const totalReceitas = monthlyTransactions
+      .filter((t) => t.transaction_type === 'receita' && t.status === 'pago')
+      .reduce((sum, t) => sum + t.amount, 0);
 
-  const saldoMensal = monthlyStats.totalReceitas - monthlyStats.totalDespesas;
+    const totalDespesas = monthlyTransactions
+      .filter((t) => t.transaction_type === 'despesa' && t.status === 'pago')
+      .reduce((sum, t) => sum + t.amount, 0);
 
-  const receitas = filteredTransactions.filter(t => t.transaction_type === 'receita');
-  const despesas = filteredTransactions.filter(t => t.transaction_type === 'despesa');
+    const receitasPendentes = monthlyTransactions
+      .filter((t) => t.transaction_type === 'receita' && t.status === 'pendente')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const despesasPendentes = monthlyTransactions
+      .filter((t) => t.transaction_type === 'despesa' && t.status === 'pendente')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    return {
+      totalReceitas,
+      totalDespesas,
+      receitasPendentes,
+      despesasPendentes,
+      saldoMensal: totalReceitas - totalDespesas,
+    };
+  }, [monthlyTransactions]);
+
+  const receitas = useMemo(
+    () => filteredTransactions.filter((t) => t.transaction_type === 'receita'),
+    [filteredTransactions],
+  );
+
+  const despesas = useMemo(
+    () => filteredTransactions.filter((t) => t.transaction_type === 'despesa'),
+    [filteredTransactions],
+  );
+
+  const upcomingPayments = useMemo(
+    () =>
+      filteredTransactions
+        .filter((t) => t.due_date && new Date(t.due_date) >= new Date())
+        .sort((a, b) => new Date(a.due_date || '').getTime() - new Date(b.due_date || '').getTime())
+        .slice(0, 5),
+    [filteredTransactions],
+  );
+
+  const overduePayments = useMemo(
+    () =>
+      filteredTransactions
+        .filter((t) => t.status === 'pendente' && t.due_date && new Date(t.due_date) < new Date())
+        .slice(0, 5),
+    [filteredTransactions],
+  );
+
+  const summaryCards = useMemo(
+    () => [
+      {
+        title: 'Receitas do Mês',
+        value: formatCurrency(monthlyStats.totalReceitas),
+        description: `${formatCurrency(monthlyStats.receitasPendentes)} pendentes`,
+        color: 'success' as const,
+        trend: monthlyStats.receitasPendentes > 0 ? 'neutral' : 'up',
+        trendValue:
+          monthlyStats.receitasPendentes > 0
+            ? `${formatCurrency(monthlyStats.receitasPendentes)}`
+            : '+100%',
+        icon: <TrendingUp className="h-5 w-5" />,
+      },
+      {
+        title: 'Despesas do Mês',
+        value: formatCurrency(monthlyStats.totalDespesas),
+        description: `${formatCurrency(monthlyStats.despesasPendentes)} pendentes`,
+        color: 'warning' as const,
+        trend: 'neutral' as const,
+        trendValue: formatCurrency(monthlyStats.despesasPendentes),
+        icon: <TrendingDown className="h-5 w-5" />,
+      },
+      {
+        title: 'Saldo Mensal',
+        value: formatCurrency(monthlyStats.saldoMensal),
+        description: monthlyStats.saldoMensal >= 0 ? 'Situação saudável' : 'Despesas acima das receitas',
+        color: monthlyStats.saldoMensal >= 0 ? 'accent' : 'error',
+        trend: monthlyStats.saldoMensal >= 0 ? 'up' : 'down',
+        trendValue: monthlyStats.saldoMensal >= 0 ? '+8.4%' : '-4.2%',
+        icon: <DollarSign className="h-5 w-5" />,
+      },
+      {
+        title: 'Transações Registradas',
+        value: `${transactions.length}`,
+        description: `${monthlyTransactions.length} neste mês`,
+        color: 'primary' as const,
+        trend: 'neutral' as const,
+        trendValue: `${receitas.length} receitas / ${despesas.length} despesas`,
+        icon: <CreditCard className="h-5 w-5" />,
+      },
+    ],
+    [despesas.length, formatCurrency, monthlyStats, monthlyTransactions.length, receitas.length, transactions.length],
+  );
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Controle Financeiro</h1>
-          <p className="text-muted-foreground">
-            Gerencie receitas, despesas e fluxo de caixa
+    <div className="space-y-6 p-4 sm:p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <Badge className="w-fit bg-blue-600">Financeiro</Badge>
+          <h1 className="text-3xl font-bold text-heading">Visão Financeira Consolidada</h1>
+          <p className="text-muted-foreground max-w-2xl">
+            Acompanhe receitas, despesas, fluxo de caixa e vencimentos críticos do seu negócio em um painel moderno.
           </p>
         </div>
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogTrigger asChild>
-            <Button onClick={() => { resetForm(); setEditingTransaction(null); }}>
-              <Plus className="h-4 w-4 mr-2" />
+            <Button className="gap-2 juga-gradient text-white" onClick={() => { resetForm(); setEditingTransaction(null); }}>
+              <Plus className="h-4 w-4" />
               Nova Transação
             </Button>
           </DialogTrigger>
@@ -359,145 +507,171 @@ export default function FinanceiroPage() {
         </Dialog>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receitas do Mês</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(monthlyStats.totalReceitas)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Pendente: {formatCurrency(monthlyStats.receitasPendentes)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Despesas do Mês</CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {formatCurrency(monthlyStats.totalDespesas)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Pendente: {formatCurrency(monthlyStats.despesasPendentes)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo do Mês</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${saldoMensal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {formatCurrency(saldoMensal)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {saldoMensal >= 0 ? 'Lucro' : 'Prejuízo'}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Transações</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{transactions.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Este mês: {monthlyTransactions.length}
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 lg:grid-cols-4">
+        {summaryCards.map((card) => (
+          <JugaKPICard
+            key={card.title}
+            title={card.title}
+            value={card.value}
+            description={card.description}
+            trend={card.trend}
+            trendValue={card.trendValue}
+            icon={card.icon}
+            color={card.color}
+          />
+        ))}
       </div>
 
-      <Tabs defaultValue="todas" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="todas">Todas Transações</TabsTrigger>
-          <TabsTrigger value="receitas">Receitas</TabsTrigger>
-          <TabsTrigger value="despesas">Despesas</TabsTrigger>
-        </TabsList>
-
-        {/* Filtros */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por descrição ou categoria..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Button variant="outline" onClick={fetchTransactions}>
-                Atualizar
-              </Button>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2 juga-card">
+          <CardHeader className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-heading">Fluxo de Caixa</CardTitle>
+              <p className="text-caption text-sm">Monitoramento diário das entradas e saídas financeiras</p>
             </div>
+            <Button variant="outline" className="gap-2" onClick={fetchTransactions}>
+              <Receipt className="h-4 w-4" />
+              Atualizar
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Tabs defaultValue="todas" className="space-y-4">
+              <TabsList className="w-full justify-start overflow-x-auto">
+                <TabsTrigger value="todas">Todas</TabsTrigger>
+                <TabsTrigger value="receitas">Receitas</TabsTrigger>
+                <TabsTrigger value="despesas">Despesas</TabsTrigger>
+              </TabsList>
+
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por descrição ou categoria..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              <TabsContent value="todas" className="space-y-3">
+                <TransactionTable
+                  transactions={filteredTransactions}
+                  loading={loading}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  formatCurrency={formatCurrency}
+                  getStatusBadge={getStatusBadge}
+                />
+              </TabsContent>
+
+              <TabsContent value="receitas">
+                <TransactionTable
+                  transactions={receitas}
+                  loading={loading}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  formatCurrency={formatCurrency}
+                  getStatusBadge={getStatusBadge}
+                />
+              </TabsContent>
+
+              <TabsContent value="despesas">
+                <TransactionTable
+                  transactions={despesas}
+                  loading={loading}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  formatCurrency={formatCurrency}
+                  getStatusBadge={getStatusBadge}
+                />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
 
-        <TabsContent value="todas">
-          <Card>
-            <CardHeader>
-              <CardTitle>Todas as Transações ({filteredTransactions.length})</CardTitle>
+        <div className="space-y-6">
+          <Card className="juga-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-heading">Próximos Vencimentos</CardTitle>
+              <p className="text-caption text-sm">Pagamentos e recebimentos previstos</p>
             </CardHeader>
             <CardContent>
-              <TransactionTable 
-                transactions={filteredTransactions}
-                loading={loading}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                formatCurrency={formatCurrency}
-                getStatusBadge={getStatusBadge}
-              />
+              {upcomingPayments.length === 0 ? (
+                <div className="text-sm text-muted-foreground">Nenhum vencimento futuro.</div>
+              ) : (
+                <div className="space-y-3">
+                  {upcomingPayments.map((transaction) => (
+                    <div key={transaction.id} className="rounded-lg border p-3 juga-gradient-surface">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-heading">{transaction.description}</p>
+                          <p className="text-xs text-muted-foreground capitalize">
+                            {transaction.category} • {transaction.payment_method?.replace('_', ' ') || 'Sem método'}
+                          </p>
+                        </div>
+                        <Badge variant={transaction.transaction_type === 'receita' ? 'default' : 'destructive'}>
+                          {transaction.transaction_type === 'receita' ? 'Receita' : 'Despesa'}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between">
+                        <div className="text-caption text-xs text-muted-foreground flex items-center gap-2">
+                          <Calendar className="h-3 w-3" />
+                          {transaction.due_date
+                            ? new Date(transaction.due_date).toLocaleDateString('pt-BR')
+                            : new Date(transaction.created_at).toLocaleDateString('pt-BR')}
+                        </div>
+                        <div className="text-sm font-semibold text-heading">
+                          {transaction.transaction_type === 'receita' ? '+' : '-'}
+                          {formatCurrency(transaction.amount)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="receitas">
-          <Card>
-            <CardHeader>
-              <CardTitle>Receitas ({receitas.length})</CardTitle>
+          <Card className="juga-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-heading">Alertas de Atraso</CardTitle>
+              <p className="text-caption text-sm">Transações pendentes com vencimento expirado</p>
             </CardHeader>
             <CardContent>
-              <TransactionTable 
-                transactions={receitas}
-                loading={loading}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                formatCurrency={formatCurrency}
-                getStatusBadge={getStatusBadge}
-              />
+              {overduePayments.length === 0 ? (
+                <div className="text-sm text-muted-foreground">Nenhuma transação em atraso.</div>
+              ) : (
+                <div className="space-y-3">
+                  {overduePayments.map((transaction) => (
+                    <div key={transaction.id} className="rounded-lg border border-red-200 bg-red-50 p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-heading">{transaction.description}</p>
+                          <p className="text-xs text-muted-foreground">{transaction.category}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-2 text-xs"
+                          onClick={() => handleEdit(transaction)}
+                        >
+                          Resolver
+                          <ArrowRight className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Atrasado desde {transaction.due_date ? new Date(transaction.due_date).toLocaleDateString('pt-BR') : '--'}</span>
+                        <span className="font-semibold text-red-600">{formatCurrency(transaction.amount)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="despesas">
-          <Card>
-            <CardHeader>
-              <CardTitle>Despesas ({despesas.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TransactionTable 
-                transactions={despesas}
-                loading={loading}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                formatCurrency={formatCurrency}
-                getStatusBadge={getStatusBadge}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
     </div>
   );
 }
@@ -527,91 +701,84 @@ function TransactionTable({
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Data</TableHead>
-          <TableHead>Descrição</TableHead>
-          <TableHead>Categoria</TableHead>
-          <TableHead>Tipo</TableHead>
-          <TableHead>Valor</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead className="text-right">Ações</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {transactions.map((transaction) => (
-          <TableRow key={transaction.id}>
-            <TableCell>
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <div className="text-sm">
-                    {transaction.due_date ? 
-                      new Date(transaction.due_date).toLocaleDateString('pt-BR') :
-                      new Date(transaction.created_at).toLocaleDateString('pt-BR')
-                    }
+    <ScrollArea className="max-h-[420px]">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Data</TableHead>
+            <TableHead>Descrição</TableHead>
+            <TableHead>Categoria</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Valor</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Ações</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {transactions.map((transaction) => (
+            <TableRow key={transaction.id} className="hover:bg-muted/50">
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <div className="text-sm">
+                      {transaction.due_date
+                        ? new Date(transaction.due_date).toLocaleDateString('pt-BR')
+                        : new Date(transaction.created_at).toLocaleDateString('pt-BR')}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </TableCell>
-            <TableCell>
-              <div>
-                <div className="font-medium">{transaction.description}</div>
-                {transaction.payment_method && (
-                  <div className="text-sm text-muted-foreground capitalize">
-                    {transaction.payment_method.replace('_', ' ')}
-                  </div>
-                )}
-              </div>
-            </TableCell>
-            <TableCell>
-              <Badge variant="outline">{transaction.category}</Badge>
-            </TableCell>
-            <TableCell>
-              <div className="flex items-center gap-2">
-                {transaction.transaction_type === 'receita' ? (
-                  <TrendingUp className="h-4 w-4 text-green-600" />
-                ) : (
-                  <TrendingDown className="h-4 w-4 text-red-600" />
-                )}
-                <Badge variant={transaction.transaction_type === 'receita' ? 'default' : 'destructive'}>
-                  {transaction.transaction_type === 'receita' ? 'Receita' : 'Despesa'}
-                </Badge>
-              </div>
-            </TableCell>
-            <TableCell>
-              <div className={`font-semibold ${
-                transaction.transaction_type === 'receita' ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {transaction.transaction_type === 'receita' ? '+' : '-'}
-                {formatCurrency(transaction.amount)}
-              </div>
-            </TableCell>
-            <TableCell>
-              {getStatusBadge(transaction.status)}
-            </TableCell>
-            <TableCell className="text-right">
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onEdit(transaction)}
+              </TableCell>
+              <TableCell>
+                <div>
+                  <div className="font-medium text-heading">{transaction.description}</div>
+                  {transaction.payment_method && (
+                    <div className="text-xs text-muted-foreground capitalize">
+                      {transaction.payment_method.replace('_', ' ')}
+                    </div>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline">{transaction.category}</Badge>
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  {transaction.transaction_type === 'receita' ? (
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-red-600" />
+                  )}
+                  <Badge variant={transaction.transaction_type === 'receita' ? 'default' : 'destructive'}>
+                    {transaction.transaction_type === 'receita' ? 'Receita' : 'Despesa'}
+                  </Badge>
+                </div>
+              </TableCell>
+              <TableCell>
+                <div
+                  className={`font-semibold ${
+                    transaction.transaction_type === 'receita' ? 'text-green-600' : 'text-red-600'
+                  }`}
                 >
-                  Editar
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => onDelete(transaction.id)}
-                >
-                  Excluir
-                </Button>
-              </div>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+                  {transaction.transaction_type === 'receita' ? '+' : '-'}
+                  {formatCurrency(transaction.amount)}
+                </div>
+              </TableCell>
+              <TableCell>{getStatusBadge(transaction.status)}</TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => onEdit(transaction)}>
+                    Editar
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={() => onDelete(transaction.id)}>
+                    Excluir
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </ScrollArea>
   );
 }

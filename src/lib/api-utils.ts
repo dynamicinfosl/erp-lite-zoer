@@ -49,7 +49,8 @@ export function validateEnv(): void {
 export function parseQueryParams(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   return {
-    limit: parseInt(searchParams.get("limit") || "10"),
+    // Limite padrão maior para listagens
+    limit: parseInt(searchParams.get("limit") || "50"),
     offset: parseInt(searchParams.get("offset") || "0"),
     id: searchParams.get("id"),
     search: searchParams.get("search"),

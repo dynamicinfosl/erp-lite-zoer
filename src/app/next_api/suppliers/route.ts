@@ -8,7 +8,7 @@ export const GET = requestMiddleware(async (request, context) => {
     const { limit, offset, search } = parseQueryParams(request);
     const crud = new CrudOperations("suppliers", context.token);
 
-    const filters: Record<string, any> = { user_id: context.payload?.sub };
+    const filters: Record<string, any> = { user_id: context.payload?.sub || '00000000-0000-0000-0000-000000000000' };
 
     let result = await crud.findMany(filters, {
       limit: limit || 100,
@@ -30,7 +30,7 @@ export const GET = requestMiddleware(async (request, context) => {
     console.error('Erro ao buscar fornecedores:', error);
     return createErrorResponse({ errorMessage: 'Erro ao buscar fornecedores', status: 500 });
   }
-}, true);
+}, false);
 
 // POST - criar fornecedor
 export const POST = requestMiddleware(async (request, context) => {
@@ -41,10 +41,12 @@ export const POST = requestMiddleware(async (request, context) => {
     }
 
     const crud = new CrudOperations("suppliers", context.token);
+    const userId = context.payload?.sub || '00000000-0000-0000-0000-000000000000';
+    
     // Evitar duplicado por documento (quando informado)
     if (body.document) {
       const existing = await crud.findMany({
-        user_id: context.payload?.sub,
+        user_id: userId,
         document: body.document,
       }, { limit: 1, offset: 0 });
       if (existing && existing.length > 0) {
@@ -52,7 +54,7 @@ export const POST = requestMiddleware(async (request, context) => {
       }
     }
     const data = await crud.create({
-      user_id: context.payload?.sub,
+      user_id: userId,
       name: body.name,
       email: body.email || null,
       phone: body.phone || null,
@@ -71,7 +73,7 @@ export const POST = requestMiddleware(async (request, context) => {
     console.error('Erro ao criar fornecedor:', error);
     return createErrorResponse({ errorMessage: 'Erro ao criar fornecedor', status: 500 });
   }
-}, true);
+}, false);
 
 // PUT - atualizar fornecedor
 export const PUT = requestMiddleware(async (request, context) => {
@@ -102,7 +104,7 @@ export const PUT = requestMiddleware(async (request, context) => {
     console.error('Erro ao atualizar fornecedor:', error);
     return createErrorResponse({ errorMessage: 'Erro ao atualizar fornecedor', status: 500 });
   }
-}, true);
+}, false);
 
 // DELETE - excluir fornecedor
 export const DELETE = requestMiddleware(async (request, context) => {
@@ -118,6 +120,6 @@ export const DELETE = requestMiddleware(async (request, context) => {
     console.error('Erro ao excluir fornecedor:', error);
     return createErrorResponse({ errorMessage: 'Erro ao excluir fornecedor', status: 500 });
   }
-}, true);
+}, false);
 
 

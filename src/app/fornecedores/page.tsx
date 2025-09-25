@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { api } from '@/lib/api-client';
 import type { Supplier } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -41,17 +41,7 @@ export default function FornecedoresPage() {
   const [importLoading, setImportLoading] = useState(false);
   const [isAllSelected, setIsAllSelected] = useState(false);
 
-  useEffect(() => {
-    fetchSuppliers();
-  }, []);
-
-  // Reset selection when suppliers change
-  useEffect(() => {
-    setSelectedSuppliers([]);
-    setIsAllSelected(false);
-  }, [search, suppliers]);
-
-  const fetchSuppliers = async () => {
+  const fetchSuppliers = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.get<Supplier[]>(`/suppliers${search ? `?search=${encodeURIComponent(search)}` : ''}`);
@@ -62,7 +52,17 @@ export default function FornecedoresPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [search]);
+
+  useEffect(() => {
+    fetchSuppliers();
+  }, [fetchSuppliers]);
+
+  // Reset selection when suppliers change
+  useEffect(() => {
+    setSelectedSuppliers([]);
+    setIsAllSelected(false);
+  }, [search, suppliers]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,7 +194,7 @@ export default function FornecedoresPage() {
 
   const exportXLSX = async () => {
     try {
-      // @ts-ignore: dependência opcional carregada dinamicamente
+      // @ts-expect-error dependência opcional carregada dinamicamente
       const XLSX = await import('xlsx');
       const rows = [
         ['Nome', 'Doc', 'Telefone', 'Situação'],
@@ -431,7 +431,7 @@ export default function FornecedoresPage() {
       let headers: string[] = [];
 
       if (ext === 'xlsx' || ext === 'xls') {
-        // @ts-ignore: dependência opcional carregada dinamicamente
+        // @ts-expect-error dependência opcional carregada dinamicamente
         const XLSX = await import('xlsx');
         const data = await file.arrayBuffer();
         const wb = XLSX.read(data);

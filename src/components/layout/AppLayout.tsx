@@ -1,10 +1,10 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
-import { AuthenticatedLayout } from './AuthenticatedLayout';
+import { useAuth } from '@/contexts/AuthContext';
 import { usePathname } from 'next/navigation';
 import { ENABLE_AUTH } from '@/constants/auth';
 
@@ -15,38 +15,26 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const [isClient, setIsClient] = useState(false);
+  const { user, loading } = useAuth();
 
-  // Garantir que a lógica de layout só seja aplicada no cliente
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Páginas que não devem ter sidebar (login, registro, etc.)
-  const noSidebarPages = ['/login', '/register', '/forgot-password', '/reset-password'];
-  const shouldHideSidebar = isClient && noSidebarPages.some(page => pathname?.startsWith(page));
+  const shouldHideSidebar = useMemo(() => {
+    const noSidebarPages = ['/login', '/register', '/forgot-password', '/reset-password'];
+    return noSidebarPages.some((page) => pathname?.startsWith(page));
+  }, [pathname]);
 
-  // Se for uma página sem sidebar, renderizar apenas o conteúdo
+  const isPDV = useMemo(() => pathname?.startsWith('/pdv') ?? false, [pathname]);
+
   if (shouldHideSidebar) {
-    return (
-      <main className="min-h-screen w-full">
-        <div className="w-full h-full">
-          {children}
-        </div>
-      </main>
-    );
+    return <main className="min-h-screen w-full">{children}</main>;
   }
 
-  // Se autenticação estiver desabilitada, usar sidebar sem autenticação
   if (!ENABLE_AUTH) {
-    // PDV fullscreen sem sidebar
-    if (isClient && pathname?.startsWith('/pdv')) {
-      return (
-        <main className="min-h-screen w-full">
-          <div className="w-full h-full">
-            {children}
-          </div>
-        </main>
-      );
+    if (isClient && isPDV) {
+      return <main className="min-h-screen w-full">{children}</main>;
     }
 
     return (
@@ -54,15 +42,33 @@ export function AppLayout({ children }: AppLayoutProps) {
         <AppSidebar />
         <SidebarInset>
           <main className="flex-1 overflow-auto min-h-screen">
-            <div className="w-full h-full">
-              {children}
-            </div>
+            <div className="w-full h-full p-6">{children}</div>
           </main>
         </SidebarInset>
       </SidebarProvider>
     );
   }
 
-  // Se autenticação estiver habilitada, usar o layout autenticado
-  return <AuthenticatedLayout>{children}</AuthenticatedLayout>;
+  if (!isClient || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (!user || isPDV) {
+    return <main className="min-h-screen w-full">{children}</main>;
+  }
+
+  return (
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <main className="flex-1 overflow-auto min-h-screen">
+          <div className="w-full h-full p-6">{children}</div>
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
+  );
 }
