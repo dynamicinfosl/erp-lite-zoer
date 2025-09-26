@@ -394,9 +394,9 @@ export function AnalyticsDashboard() {
 
         <TabsContent value="overview" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
-                <CardTitle>Vendas e Receita (Últimos 12 Meses)</CardTitle>
+                <CardTitle className="text-juga-text-secondary">Vendas e Receita (Últimos 12 Meses)</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-80">
@@ -422,9 +422,9 @@ export function AnalyticsDashboard() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
-                <CardTitle>Distribuição por Dispositivo</CardTitle>
+                <CardTitle className="text-juga-text-secondary">Distribuição por Dispositivo</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-80">
@@ -451,9 +451,9 @@ export function AnalyticsDashboard() {
             </Card>
           </div>
 
-          <Card>
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
-              <CardTitle>Atividade de Usuários por Hora</CardTitle>
+              <CardTitle className="text-juga-text-secondary">Atividade de Usuários por Hora</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-80">
@@ -474,9 +474,9 @@ export function AnalyticsDashboard() {
 
         <TabsContent value="realtime" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Usuários Online</CardTitle>
+                <CardTitle className="text-sm font-medium text-juga-text-secondary">Usuários Online</CardTitle>
                 <Activity className="h-4 w-4 text-juga-primary" />
               </CardHeader>
               <CardContent>
@@ -485,32 +485,32 @@ export function AnalyticsDashboard() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Visualizações</CardTitle>
-                <Eye className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium text-juga-text-secondary">Visualizações</CardTitle>
+                <Eye className="h-4 w-4 text-juga-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{formatNumber(data.realtimeData.pageViews)}</div>
+                <div className="text-3xl font-bold text-juga-primary">{formatNumber(data.realtimeData.pageViews)}</div>
                 <p className="text-xs text-muted-foreground">Nas últimas 24 horas</p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Páginas Ativas</CardTitle>
-                <MousePointer className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium text-juga-text-secondary">Páginas Ativas</CardTitle>
+                <MousePointer className="h-4 w-4 text-juga-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{data.realtimeData.currentlyViewing.length}</div>
+                <div className="text-3xl font-bold text-juga-primary">{data.realtimeData.currentlyViewing.length}</div>
                 <p className="text-xs text-muted-foreground">Sendo visualizadas agora</p>
               </CardContent>
             </Card>
           </div>
 
-          <Card>
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
-              <CardTitle>Páginas Sendo Visualizadas Agora</CardTitle>
+              <CardTitle className="text-juga-text-secondary">Páginas Sendo Visualizadas Agora</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -532,56 +532,56 @@ export function AnalyticsDashboard() {
 
         <TabsContent value="users" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-4">
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Taxa de Rejeição</CardTitle>
-                <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium text-juga-text-secondary">Taxa de Rejeição</CardTitle>
+                <TrendingDown className="h-4 w-4 text-juga-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{data.overview.bounceRate}%</div>
+                <div className="text-2xl font-bold text-juga-primary">{data.overview.bounceRate}%</div>
                 <Progress value={data.overview.bounceRate} className="mt-2" />
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Duração Média</CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium text-juga-text-secondary">Duração Média</CardTitle>
+                <Clock className="h-4 w-4 text-juga-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatDuration(data.overview.avgSessionDuration)}</div>
+                <div className="text-2xl font-bold text-juga-primary">{formatDuration(data.overview.avgSessionDuration)}</div>
                 <p className="text-xs text-muted-foreground">Por sessão</p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Visualizações</CardTitle>
-                <Eye className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium text-juga-text-secondary">Visualizações</CardTitle>
+                <Eye className="h-4 w-4 text-juga-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatNumber(data.overview.pageViews)}</div>
+                <div className="text-2xl font-bold text-juga-primary">{formatNumber(data.overview.pageViews)}</div>
                 <p className="text-xs text-muted-foreground">Total de páginas</p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Taxa de Conversão</CardTitle>
-                <Target className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium text-juga-text-secondary">Taxa de Conversão</CardTitle>
+                <Target className="h-4 w-4 text-juga-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{data.overview.conversionRate}%</div>
+                <div className="text-2xl font-bold text-juga-primary">{data.overview.conversionRate}%</div>
                 <Progress value={data.overview.conversionRate * 10} className="mt-2" />
               </CardContent>
             </Card>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Monitor className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
+                  <Monitor className="h-5 w-5 text-juga-primary" />
                   Dispositivos
                 </CardTitle>
               </CardHeader>
@@ -605,9 +605,9 @@ export function AnalyticsDashboard() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
-                <CardTitle>Novos vs Retornando</CardTitle>
+                <CardTitle className="text-juga-text-secondary">Novos vs Retornando</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-60">
@@ -638,9 +638,9 @@ export function AnalyticsDashboard() {
         </TabsContent>
 
         <TabsContent value="sales" className="space-y-4">
-          <Card>
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
-              <CardTitle>Performance de Vendas</CardTitle>
+              <CardTitle className="text-juga-text-secondary">Performance de Vendas</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-80">
@@ -666,9 +666,9 @@ export function AnalyticsDashboard() {
         </TabsContent>
 
         <TabsContent value="content" className="space-y-4">
-          <Card>
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
-              <CardTitle>Páginas Mais Visitadas</CardTitle>
+              <CardTitle className="text-juga-text-secondary">Páginas Mais Visitadas</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -703,10 +703,10 @@ export function AnalyticsDashboard() {
         </TabsContent>
 
         <TabsContent value="geographic" className="space-y-4">
-          <Card>
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
+                <MapPin className="h-5 w-5 text-juga-primary" />
                 Distribuição Geográfica
               </CardTitle>
             </CardHeader>

@@ -335,7 +335,7 @@ export function AuditLogs() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
-            <FileText className="h-6 w-6" />
+            <FileText className="h-6 w-6 text-juga-primary" />
             Logs de Auditoria
           </h2>
           <p className="text-muted-foreground">Monitore todas as atividades e alterações do sistema</p>
@@ -448,11 +448,11 @@ export function AuditLogs() {
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
+              <Filter className="h-5 w-5 text-juga-primary" />
               Filtros
             </CardTitle>
             <Button variant="outline" size="sm" onClick={clearFilters}>
@@ -465,7 +465,7 @@ export function AuditLogs() {
             <div className="lg:col-span-2">
               <Label htmlFor="search">Buscar</Label>
               <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-juga-primary" />
                 <Input
                   id="search"
                   placeholder="Descrição, usuário, ação..."
@@ -547,9 +547,9 @@ export function AuditLogs() {
       </Card>
 
       {/* Logs Table */}
-      <Card>
+      <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
         <CardHeader>
-          <CardTitle>Logs de Atividade ({filteredLogs.length})</CardTitle>
+          <CardTitle className="text-juga-text-secondary">Logs de Atividade ({filteredLogs.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -586,7 +586,7 @@ export function AuditLogs() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <ActionIcon className="h-4 w-4" />
+                          <ActionIcon className="h-4 w-4 text-juga-primary" />
                           {log.action}
                         </div>
                       </TableCell>
@@ -617,7 +617,7 @@ export function AuditLogs() {
                             setIsDetailsOpen(true);
                           }}
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-4 w-4 text-juga-primary" />
                         </Button>
                       </TableCell>
                     </TableRow>

@@ -274,7 +274,7 @@ export function SystemSettings() {
         </TabsList>
 
         <TabsContent value="general" className="space-y-4">
-          <Card>
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
                 <Globe className="h-5 w-5 text-juga-primary" />
@@ -390,7 +390,7 @@ export function SystemSettings() {
         </TabsContent>
 
         <TabsContent value="security" className="space-y-4">
-          <Card>
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
                 <Shield className="h-5 w-5 text-juga-primary" />
@@ -493,7 +493,7 @@ export function SystemSettings() {
         </TabsContent>
 
         <TabsContent value="notifications" className="space-y-4">
-          <Card>
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
                 <Bell className="h-5 w-5 text-juga-primary" />
@@ -590,7 +590,7 @@ export function SystemSettings() {
         </TabsContent>
 
         <TabsContent value="integrations" className="space-y-4">
-          <Card>
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
                 <Zap className="h-5 w-5 text-juga-primary" />
@@ -690,7 +690,7 @@ export function SystemSettings() {
         </TabsContent>
 
         <TabsContent value="backup" className="space-y-4">
-          <Card>
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
                 <Database className="h-5 w-5 text-juga-primary" />
@@ -782,7 +782,7 @@ export function SystemSettings() {
         </TabsContent>
 
         <TabsContent value="performance" className="space-y-4">
-          <Card>
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
                 <Zap className="h-5 w-5 text-juga-primary" />

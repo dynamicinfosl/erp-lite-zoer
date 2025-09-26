@@ -402,9 +402,9 @@ export function SystemMonitoring() {
         </TabsList>
 
         <TabsContent value="performance" className="space-y-4">
-          <Card>
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
-              <CardTitle>Histórico de Performance (Última Hora)</CardTitle>
+              <CardTitle className="text-juga-text-secondary">Histórico de Performance (Última Hora)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-80">
@@ -433,9 +433,9 @@ export function SystemMonitoring() {
         </TabsContent>
 
         <TabsContent value="services" className="space-y-4">
-          <Card>
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
-              <CardTitle>Status dos Serviços</CardTitle>
+              <CardTitle className="text-juga-text-secondary">Status dos Serviços</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -474,10 +474,10 @@ export function SystemMonitoring() {
 
         <TabsContent value="network" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Wifi className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
+                  <Wifi className="h-5 w-5 text-juga-primary" />
                   Tráfego de Rede
                 </CardTitle>
               </CardHeader>
@@ -507,10 +507,10 @@ export function SystemMonitoring() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <HardDrive className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
+                  <HardDrive className="h-5 w-5 text-juga-primary" />
                   I/O do Disco
                 </CardTitle>
               </CardHeader>
@@ -538,10 +538,10 @@ export function SystemMonitoring() {
 
         <TabsContent value="details" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Cpu className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
+                  <Cpu className="h-5 w-5 text-juga-primary" />
                   Detalhes do CPU
                 </CardTitle>
               </CardHeader>
@@ -565,10 +565,10 @@ export function SystemMonitoring() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
+                  <Database className="h-5 w-5 text-juga-primary" />
                   Detalhes da Memória
                 </CardTitle>
               </CardHeader>
@@ -592,10 +592,10 @@ export function SystemMonitoring() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
+                  <Shield className="h-5 w-5 text-juga-primary" />
                   Segurança
                 </CardTitle>
               </CardHeader>

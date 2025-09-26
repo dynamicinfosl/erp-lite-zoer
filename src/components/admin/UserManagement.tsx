@@ -369,16 +369,16 @@ export function UserManagement() {
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
         <CardHeader>
-          <CardTitle className="text-lg">Filtros e Busca</CardTitle>
+          <CardTitle className="text-lg text-juga-text-secondary">Filtros e Busca</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex gap-4 flex-wrap">
             <div className="flex-1 min-w-[200px]">
               <Label htmlFor="search">Buscar usuário</Label>
               <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-juga-primary" />
                 <Input
                   id="search"
                   placeholder="Nome ou email..."
@@ -425,9 +425,9 @@ export function UserManagement() {
       </Card>
 
       {/* Users Table */}
-      <Card>
+      <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
         <CardHeader>
-          <CardTitle>Lista de Usuários ({filteredUsers.length})</CardTitle>
+          <CardTitle className="text-juga-text-secondary">Lista de Usuários ({filteredUsers.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
