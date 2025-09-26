@@ -22,10 +22,19 @@ import {
   HardDrive,
   Cpu,
   Wifi,
+  FileText,
+  Monitor,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { toast } from 'sonner';
+
+// Import dos novos componentes
+import { UserManagement } from '@/components/admin/UserManagement';
+import { SystemMonitoring } from '@/components/admin/SystemMonitoring';
+import { SystemSettings } from '@/components/admin/SystemSettings';
+import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
+import { AuditLogs } from '@/components/admin/AuditLogs';
 
 interface SystemStats {
   totalUsers: number;
@@ -39,7 +48,9 @@ interface SystemStats {
 function checkIsAdmin(user: unknown): boolean {
   if (!user) return false;
   if (typeof user === 'object' && user !== null) {
-    return Boolean((user as { isAdmin?: boolean }).isAdmin);
+    const userObj = user as { user_metadata?: { role?: string }; isAdmin?: boolean };
+    // Verifica se tem role 'admin' nos metadados ou se tem isAdmin
+    return userObj.user_metadata?.role === 'admin' || Boolean(userObj.isAdmin);
   }
   return false;
 }
@@ -132,7 +143,7 @@ export default function AdminPage() {
           </h1>
           <p className="text-muted-foreground">Controle total do sistema ERP Lite</p>
         </div>
-        <Badge variant="default" className="bg-green-600">
+        <Badge variant="default" className="bg-juga-primary">
           <CheckCircle className="h-3 w-3 mr-1" />
           Sistema Online
         </Badge>
@@ -140,130 +151,164 @@ export default function AdminPage() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-juga-text-secondary">Total de Usuários</CardTitle>
+              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
+                <Users className="h-5 w-5" />
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalUsers}</div>
-            <p className="text-xs text-muted-foreground">{stats?.activeUsers} ativos</p>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              <div className="text-2xl font-bold text-heading">{stats?.totalUsers}</div>
+              <p className="text-sm text-caption">{stats?.activeUsers} ativos</p>
+            </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Vendas Totais</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-juga-text-secondary">Vendas Totais</CardTitle>
+              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
+                <BarChart3 className="h-5 w-5" />
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalSales}</div>
-            <p className="text-xs text-muted-foreground">Todas as vendas</p>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              <div className="text-2xl font-bold text-heading">{stats?.totalSales}</div>
+              <p className="text-sm text-caption">Todas as vendas</p>
+            </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Produtos</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
+        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-juga-text-secondary">Produtos</CardTitle>
+              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
+                <Database className="h-5 w-5" />
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalProducts}</div>
-            <p className="text-xs text-muted-foreground">Cadastrados</p>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              <div className="text-2xl font-bold text-heading">{stats?.totalProducts}</div>
+              <p className="text-sm text-caption">Cadastrados</p>
+            </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Status do Sistema</CardTitle>
-            <Activity className="h-4 w-4 text-green-600" />
+        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-juga-text-secondary">Status do Sistema</CardTitle>
+              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
+                <Activity className="h-5 w-5" />
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">Saudável</div>
-            <p className="text-xs text-muted-foreground">Todos os serviços OK</p>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              <div className="text-2xl font-bold text-juga-primary">Saudável</div>
+              <p className="text-sm text-caption">Todos os serviços OK</p>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-          <TabsTrigger value="system">Sistema</TabsTrigger>
-          <TabsTrigger value="maintenance">Manutenção</TabsTrigger>
+          <TabsTrigger value="users">Usuários</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="monitoring">Monitoramento</TabsTrigger>
+          <TabsTrigger value="settings">Configurações</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
-                <CardTitle>Status dos Serviços</CardTitle>
+                <CardTitle className="text-juga-text-secondary">Status dos Serviços</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Server className="h-4 w-4" />
-                    <span>Servidor Web</span>
+                    <div className="p-1 rounded text-juga-primary bg-juga-primary/10">
+                      <Server className="h-4 w-4" />
+                    </div>
+                    <span className="text-heading">Servidor Web</span>
                   </div>
-                  <Badge variant="default" className="bg-green-600">
+                  <Badge variant="default" className="bg-juga-primary">
                     Online
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Database className="h-4 w-4" />
-                    <span>Banco de Dados</span>
+                    <div className="p-1 rounded text-juga-primary bg-juga-primary/10">
+                      <Database className="h-4 w-4" />
+                    </div>
+                    <span className="text-heading">Banco de Dados</span>
                   </div>
-                  <Badge variant="default" className="bg-green-600">
+                  <Badge variant="default" className="bg-juga-primary">
                     Online
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Wifi className="h-4 w-4" />
-                    <span>API</span>
+                    <div className="p-1 rounded text-juga-primary bg-juga-primary/10">
+                      <Wifi className="h-4 w-4" />
+                    </div>
+                    <span className="text-heading">API</span>
                   </div>
-                  <Badge variant="default" className="bg-green-600">
+                  <Badge variant="default" className="bg-juga-primary">
                     Online
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <HardDrive className="h-4 w-4" />
-                    <span>Armazenamento</span>
+                    <div className="p-1 rounded text-juga-primary bg-juga-primary/10">
+                      <HardDrive className="h-4 w-4" />
+                    </div>
+                    <span className="text-heading">Armazenamento</span>
                   </div>
                   <Badge variant="secondary">75% usado</Badge>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
-                <CardTitle>Atividade Recente</CardTitle>
+                <CardTitle className="text-juga-text-secondary">Atividade Recente</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
+                  <div className="p-2 bg-juga-primary/10 rounded-lg">
+                    <CheckCircle className="h-4 w-4 text-juga-primary" />
                   </div>
                   <div>
-                    <div className="text-sm font-medium">Sistema iniciado</div>
-                    <div className="text-xs text-muted-foreground">Há 2 horas</div>
+                    <div className="text-sm font-medium text-heading">Sistema iniciado</div>
+                    <div className="text-xs text-caption">Há 2 horas</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Users className="h-4 w-4 text-blue-600" />
+                  <div className="p-2 bg-juga-primary/10 rounded-lg">
+                    <Users className="h-4 w-4 text-juga-primary" />
                   </div>
                   <div>
-                    <div className="text-sm font-medium">Novo usuário cadastrado</div>
-                    <div className="text-xs text-muted-foreground">Há 4 horas</div>
+                    <div className="text-sm font-medium text-heading">Novo usuário cadastrado</div>
+                    <div className="text-xs text-caption">Há 4 horas</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <Database className="h-4 w-4 text-purple-600" />
+                  <div className="p-2 bg-juga-primary/10 rounded-lg">
+                    <Database className="h-4 w-4 text-juga-primary" />
                   </div>
                   <div>
-                    <div className="text-sm font-medium">Backup automático realizado</div>
-                    <div className="text-xs text-muted-foreground">Há 6 horas</div>
+                    <div className="text-sm font-medium text-heading">Backup automático realizado</div>
+                    <div className="text-xs text-caption">Há 6 horas</div>
                   </div>
                 </div>
               </CardContent>
@@ -271,152 +316,24 @@ export default function AdminPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="system" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Cpu className="h-5 w-5" />
-                  Performance
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm">CPU:</span>
-                  <span className="text-sm font-medium">25%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Memória:</span>
-                  <span className="text-sm font-medium">60%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Disco:</span>
-                  <span className="text-sm font-medium">75%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Rede:</span>
-                  <span className="text-sm font-medium">Normal</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Configurações</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm">Versão:</span>
-                  <span className="text-sm font-medium">1.0.0</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Ambiente:</span>
-                  <span className="text-sm font-medium">Produção</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Debug:</span>
-                  <span className="text-sm font-medium">Desabilitado</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">SSL:</span>
-                  <span className="text-sm font-medium text-green-600">Ativo</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Backup</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm">Último backup:</span>
-                  <span className="text-sm font-medium">
-                    {stats?.lastBackup ? new Date(stats.lastBackup).toLocaleDateString('pt-BR') : 'N/A'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Frequência:</span>
-                  <span className="text-sm font-medium">Diário</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Status:</span>
-                  <Badge variant="default" className="bg-green-600">
-                    Ativo
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <TabsContent value="users">
+          <UserManagement />
         </TabsContent>
 
-        <TabsContent value="maintenance" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Ações de Manutenção</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-3">
-                  <h3 className="font-semibold">Backup e Restauração</h3>
-                  <div className="space-y-2">
-                    <Button onClick={() => handleSystemAction('backup')} className="w-full justify-start">
-                      Fazer Backup Manual
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start">
-                      Restaurar Backup
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <h3 className="font-semibold">Sistema</h3>
-                  <div className="space-y-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => handleSystemAction('clear-cache')}
-                      className="w-full justify-start"
-                    >
-                      Limpar Cache
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={() => handleSystemAction('restart')}
-                      className="w-full justify-start"
-                    >
-                      Reiniciar Sistema
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Atenção:</strong> Algumas ações podem afetar o funcionamento do sistema. Execute apenas se necessário e
-                  durante horários de baixo movimento.
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
+        <TabsContent value="analytics">
+          <AnalyticsDashboard />
         </TabsContent>
 
-        <TabsContent value="logs" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Logs do Sistema</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 font-mono text-sm bg-muted p-4 rounded-lg max-h-96 overflow-y-auto">
-                <div className="text-green-600">[INFO] {new Date().toISOString()} - Sistema iniciado com sucesso</div>
-                <div className="text-blue-600">[INFO] {new Date().toISOString()} - Usuário admin@erplite.com fez login</div>
-                <div className="text-green-600">[INFO] {new Date().toISOString()} - Backup automático concluído</div>
-                <div className="text-yellow-600">[WARN] {new Date().toISOString()} - Produto com estoque baixo detectado</div>
-                <div className="text-green-600">[INFO] {new Date().toISOString()} - Nova venda registrada: V{Date.now()}</div>
-                <div className="text-blue-600">[INFO] {new Date().toISOString()} - Cache limpo automaticamente</div>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="monitoring">
+          <SystemMonitoring />
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <SystemSettings />
+        </TabsContent>
+
+        <TabsContent value="logs">
+          <AuditLogs />
         </TabsContent>
       </Tabs>
     </div>

@@ -11,7 +11,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { Edit, Trash2, CheckSquare, Square, Trash, FileSpreadsheet, Upload, ChevronDown, Eye } from 'lucide-react';
-import { useRef } from 'react';
 import { getErrorMessage } from '@/lib/error-handler';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
 import { ENABLE_AUTH } from '@/constants/auth';
