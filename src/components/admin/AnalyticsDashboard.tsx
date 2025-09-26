@@ -47,7 +47,8 @@ import {
   Smartphone,
   Monitor,
   MapPin,
-  Star
+  Star,
+  Shield
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -115,18 +116,18 @@ const mockAnalyticsData: AnalyticsData = {
     pageViews: 28947,
   },
   salesData: [
-    { month: 'Jan', sales: 245, revenue: 15820, customers: 89 },
-    { month: 'Fev', sales: 312, revenue: 19840, customers: 124 },
-    { month: 'Mar', sales: 298, revenue: 18920, customers: 108 },
-    { month: 'Abr', sales: 387, revenue: 24670, customers: 165 },
-    { month: 'Mai', sales: 456, revenue: 29180, customers: 201 },
-    { month: 'Jun', sales: 534, revenue: 34210, customers: 248 },
-    { month: 'Jul', sales: 612, revenue: 39180, customers: 289 },
-    { month: 'Ago', sales: 589, revenue: 37650, customers: 275 },
-    { month: 'Set', sales: 648, revenue: 41420, customers: 312 },
-    { month: 'Out', sales: 701, revenue: 44890, customers: 348 },
-    { month: 'Nov', sales: 768, revenue: 49120, customers: 389 },
-    { month: 'Dez', sales: 834, revenue: 53340, customers: 421 },
+    { month: 'Jan', sales: 1245, revenue: 25820, customers: 189 },
+    { month: 'Fev', sales: 1312, revenue: 29840, customers: 224 },
+    { month: 'Mar', sales: 1298, revenue: 28920, customers: 208 },
+    { month: 'Abr', sales: 1387, revenue: 34670, customers: 265 },
+    { month: 'Mai', sales: 1456, revenue: 39180, customers: 301 },
+    { month: 'Jun', sales: 1534, revenue: 44210, customers: 348 },
+    { month: 'Jul', sales: 1612, revenue: 49180, customers: 389 },
+    { month: 'Ago', sales: 1589, revenue: 47650, customers: 375 },
+    { month: 'Set', sales: 1648, revenue: 51420, customers: 412 },
+    { month: 'Out', sales: 1701, revenue: 54890, customers: 448 },
+    { month: 'Nov', sales: 1768, revenue: 59120, customers: 489 },
+    { month: 'Dez', sales: 1834, revenue: 63340, customers: 521 },
   ],
   userActivity: Array.from({length: 24}, (_, i) => ({
     hour: `${i.toString().padStart(2, '0')}:00`,
@@ -135,32 +136,34 @@ const mockAnalyticsData: AnalyticsData = {
   })),
   topPages: [
     { page: '/dashboard', views: 8947, uniqueViews: 6234, avgTime: '3m 24s' },
-    { page: '/produtos', views: 6521, uniqueViews: 4876, avgTime: '2m 18s' },
-    { page: '/vendas', views: 5234, uniqueViews: 3912, avgTime: '4m 12s' },
-    { page: '/clientes', views: 4156, uniqueViews: 3287, avgTime: '2m 56s' },
-    { page: '/relatorios', views: 3847, uniqueViews: 2901, avgTime: '5m 43s' },
+    { page: '/estoque-bebidas', views: 7521, uniqueViews: 5676, avgTime: '4m 18s' },
+    { page: '/vendas-bebidas', views: 6234, uniqueViews: 4712, avgTime: '3m 45s' },
+    { page: '/controle-temperatura', views: 5156, uniqueViews: 3987, avgTime: '2m 56s' },
+    { page: '/relatorios-fiscais', views: 4847, uniqueViews: 3601, avgTime: '6m 12s' },
+    { page: '/compliance', views: 3847, uniqueViews: 2901, avgTime: '5m 43s' },
   ],
   deviceStats: [
-    { device: 'Desktop', users: 7528, percentage: 60, color: '#3b82f6' },
-    { device: 'Mobile', users: 3762, percentage: 30, color: '#ef4444' },
-    { device: 'Tablet', users: 1258, percentage: 10, color: '#10b981' },
+    { device: 'Cervejas', users: 4528, percentage: 45, color: '#3b82f6' },
+    { device: 'Destilados', users: 2762, percentage: 28, color: '#ef4444' },
+    { device: 'Vinhos', users: 1858, percentage: 18, color: '#10b981' },
+    { device: 'Refrigerantes', users: 852, percentage: 9, color: '#f59e0b' },
   ],
   geographicData: [
-    { country: 'Brasil', users: 8947, sessions: 12456, revenue: 45780 },
-    { country: 'Argentina', users: 1234, sessions: 1876, revenue: 8920 },
-    { country: 'Chile', users: 987, sessions: 1456, revenue: 6540 },
-    { country: 'Uruguai', users: 456, sessions: 678, revenue: 2890 },
-    { country: 'Paraguai', users: 234, sessions: 345, revenue: 1240 },
+    { country: 'Controle de Idade', users: 8947, sessions: 12456, revenue: 45780 },
+    { country: 'Licenças e Alvarás', users: 1234, sessions: 1876, revenue: 8920 },
+    { country: 'Relatórios Fiscais', users: 987, sessions: 1456, revenue: 6540 },
+    { country: 'Auditoria de Vendas', users: 456, sessions: 678, revenue: 2890 },
+    { country: 'Controle de Temperatura', users: 234, sessions: 345, revenue: 1240 },
   ],
   realtimeData: {
     activeUsers: 147,
     pageViews: 2847,
     currentlyViewing: [
       { page: '/dashboard', users: 45 },
-      { page: '/produtos', users: 32 },
-      { page: '/vendas', users: 28 },
-      { page: '/clientes', users: 21 },
-      { page: '/relatorios', users: 21 },
+      { page: '/estoque-bebidas', users: 38 },
+      { page: '/vendas-bebidas', users: 32 },
+      { page: '/controle-temperatura', users: 25 },
+      { page: '/compliance', users: 18 },
     ],
   },
 };
@@ -388,15 +391,15 @@ export function AnalyticsDashboard() {
           <TabsTrigger value="realtime">Tempo Real</TabsTrigger>
           <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="sales">Vendas</TabsTrigger>
-          <TabsTrigger value="content">Conteúdo</TabsTrigger>
-          <TabsTrigger value="geographic">Geografia</TabsTrigger>
+          <TabsTrigger value="content">Estoque</TabsTrigger>
+          <TabsTrigger value="geographic">Compliance</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
-                <CardTitle className="text-juga-text-secondary">Vendas e Receita (Últimos 12 Meses)</CardTitle>
+                <CardTitle className="text-juga-text-secondary">Vendas de Bebidas (Últimos 12 Meses)</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-80">
@@ -424,7 +427,7 @@ export function AnalyticsDashboard() {
 
             <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
-                <CardTitle className="text-juga-text-secondary">Distribuição por Dispositivo</CardTitle>
+                <CardTitle className="text-juga-text-secondary">Vendas por Categoria de Bebidas</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-80">
@@ -453,7 +456,7 @@ export function AnalyticsDashboard() {
 
           <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
-              <CardTitle className="text-juga-text-secondary">Atividade de Usuários por Hora</CardTitle>
+              <CardTitle className="text-juga-text-secondary">Movimentação de Estoque por Hora</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-80">
@@ -510,7 +513,7 @@ export function AnalyticsDashboard() {
 
           <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
-              <CardTitle className="text-juga-text-secondary">Páginas Sendo Visualizadas Agora</CardTitle>
+              <CardTitle className="text-juga-text-secondary">Seções Mais Acessadas</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -581,8 +584,8 @@ export function AnalyticsDashboard() {
             <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
-                  <Monitor className="h-5 w-5 text-juga-primary" />
-                  Dispositivos
+                  <ShoppingCart className="h-5 w-5 text-juga-primary" />
+                  Categorias de Bebidas
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -590,9 +593,10 @@ export function AnalyticsDashboard() {
                   {data.deviceStats.map((device, index) => (
                     <div key={index} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        {device.device === 'Desktop' && <Monitor className="h-4 w-4" />}
-                        {device.device === 'Mobile' && <Smartphone className="h-4 w-4" />}
-                        {device.device === 'Tablet' && <Smartphone className="h-4 w-4" />}
+                        {device.device === 'Cervejas' && <ShoppingCart className="h-4 w-4" />}
+                        {device.device === 'Destilados' && <DollarSign className="h-4 w-4" />}
+                        {device.device === 'Vinhos' && <Star className="h-4 w-4" />}
+                        {device.device === 'Refrigerantes' && <Activity className="h-4 w-4" />}
                         <span>{device.device}</span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -607,7 +611,7 @@ export function AnalyticsDashboard() {
 
             <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
-                <CardTitle className="text-juga-text-secondary">Novos vs Retornando</CardTitle>
+                <CardTitle className="text-juga-text-secondary">Vendas por Categoria</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-60">
@@ -615,15 +619,15 @@ export function AnalyticsDashboard() {
                     <PieChart>
                       <Pie
                         data={[
-                          { name: 'Novos Usuários', value: 7528, color: '#3b82f6' },
-                          { name: 'Usuários Retornando', value: 5020, color: '#10b981' }
+                          { name: 'Cervejas', value: 7528, color: '#3b82f6' },
+                          { name: 'Destilados', value: 5020, color: '#10b981' }
                         ]}
                         cx="50%"
                         cy="50%"
                         outerRadius={80}
                         fill="var(--juga-primary)"
                         dataKey="value"
-                        label={({name, value}) => `${name}: ${formatNumber(value)}`}
+                        label={({name, value}) => `${name}: ${formatNumber(value)} unidades`}
                       >
                         <Cell fill="var(--juga-primary)" />
                         <Cell fill="var(--juga-primary-light)" />
@@ -640,7 +644,7 @@ export function AnalyticsDashboard() {
         <TabsContent value="sales" className="space-y-4">
           <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
-              <CardTitle className="text-juga-text-secondary">Performance de Vendas</CardTitle>
+              <CardTitle className="text-juga-text-secondary">Performance de Vendas de Bebidas</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-80">
@@ -668,7 +672,7 @@ export function AnalyticsDashboard() {
         <TabsContent value="content" className="space-y-4">
           <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
-              <CardTitle className="text-juga-text-secondary">Páginas Mais Visitadas</CardTitle>
+              <CardTitle className="text-juga-text-secondary">Produtos Mais Movimentados</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -706,8 +710,8 @@ export function AnalyticsDashboard() {
           <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
-                <MapPin className="h-5 w-5 text-juga-primary" />
-                Distribuição Geográfica
+                <Shield className="h-5 w-5 text-juga-primary" />
+                Relatórios de Compliance
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -721,18 +725,18 @@ export function AnalyticsDashboard() {
                       <div>
                         <div className="font-medium">{country.country}</div>
                         <div className="text-sm text-muted-foreground">
-                          {formatNumber(country.sessions)} sessões
+                          {formatNumber(country.sessions)} verificações
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-6 text-sm">
                       <div className="text-center">
                         <div className="font-medium">{formatNumber(country.users)}</div>
-                        <div className="text-muted-foreground">Usuários</div>
+                        <div className="text-muted-foreground">Conformidade</div>
                       </div>
                       <div className="text-center">
                         <div className="font-medium">{formatCurrency(country.revenue)}</div>
-                        <div className="text-muted-foreground">Receita</div>
+                        <div className="text-muted-foreground">Multas</div>
                       </div>
                     </div>
                   </div>

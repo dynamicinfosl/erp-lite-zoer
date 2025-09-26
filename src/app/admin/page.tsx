@@ -35,6 +35,8 @@ import { SystemMonitoring } from '@/components/admin/SystemMonitoring';
 import { SystemSettings } from '@/components/admin/SystemSettings';
 import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
 import { AuditLogs } from '@/components/admin/AuditLogs';
+import { BeverageInventory } from '@/components/admin/BeverageInventory';
+import { BeverageCompliance } from '@/components/admin/BeverageCompliance';
 
 interface SystemStats {
   totalUsers: number;
@@ -43,6 +45,13 @@ interface SystemStats {
   totalProducts: number;
   systemHealth: 'healthy' | 'warning' | 'error';
   lastBackup: string;
+  // Métricas específicas de bebidas
+  totalBeverages: number;
+  lowStockAlerts: number;
+  expiringProducts: number;
+  complianceRate: number;
+  temperatureAlerts: number;
+  totalInventoryValue: number;
 }
 
 function checkIsAdmin(user: unknown): boolean {
@@ -79,6 +88,13 @@ export default function AdminPage() {
         totalProducts: 45,
         systemHealth: 'healthy',
         lastBackup: new Date().toISOString(),
+        // Métricas específicas de bebidas
+        totalBeverages: 1250,
+        lowStockAlerts: 3,
+        expiringProducts: 8,
+        complianceRate: 95,
+        temperatureAlerts: 0,
+        totalInventoryValue: 125000
       };
       setStats(mockStats);
     } catch (error) {
@@ -150,7 +166,7 @@ export default function AdminPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-6">
         <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -215,19 +231,121 @@ export default function AdminPage() {
             </div>
           </CardContent>
         </Card>
+        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-juga-text-secondary">Total de Bebidas</CardTitle>
+              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
+                <Database className="h-5 w-5" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              <div className="text-2xl font-bold text-heading">{stats?.totalBeverages}</div>
+              <p className="text-sm text-caption">Unidades em estoque</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-juga-text-secondary">Valor do Estoque</CardTitle>
+              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
+                <BarChart3 className="h-5 w-5" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              <div className="text-2xl font-bold text-heading">R$ {stats?.totalInventoryValue?.toLocaleString('pt-BR')}</div>
+              <p className="text-sm text-caption">Valor total</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="monitoring">Monitoramento</TabsTrigger>
+          <TabsTrigger value="inventory">Estoque</TabsTrigger>
+          <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="settings">Configurações</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
+          {/* Alertas Específicos de Bebidas */}
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-juga-text-secondary">Estoque Baixo</CardTitle>
+                  <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
+                    <AlertTriangle className="h-4 w-4" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-2">
+                  <div className="text-2xl font-bold text-juga-primary">{stats?.lowStockAlerts}</div>
+                  <p className="text-sm text-caption">Produtos críticos</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-juga-text-secondary">Vencendo em 30 dias</CardTitle>
+                  <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
+                    <Clock className="h-4 w-4" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-2">
+                  <div className="text-2xl font-bold text-juga-primary">{stats?.expiringProducts}</div>
+                  <p className="text-sm text-caption">Produtos próximos do vencimento</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-juga-text-secondary">Conformidade</CardTitle>
+                  <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
+                    <Shield className="h-4 w-4" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-2">
+                  <div className="text-2xl font-bold text-juga-primary">{stats?.complianceRate}%</div>
+                  <p className="text-sm text-caption">Taxa de conformidade</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-juga-text-secondary">Temperatura</CardTitle>
+                  <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
+                    <Monitor className="h-4 w-4" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-2">
+                  <div className="text-2xl font-bold text-juga-primary">{stats?.temperatureAlerts}</div>
+                  <p className="text-sm text-caption">Alertas de temperatura</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
               <CardHeader>
@@ -330,6 +448,14 @@ export default function AdminPage() {
 
         <TabsContent value="settings">
           <SystemSettings />
+        </TabsContent>
+
+        <TabsContent value="inventory">
+          <BeverageInventory />
+        </TabsContent>
+
+        <TabsContent value="compliance">
+          <BeverageCompliance />
         </TabsContent>
 
         <TabsContent value="logs">

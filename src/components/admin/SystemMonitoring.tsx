@@ -394,10 +394,11 @@ export function SystemMonitoring() {
       </div>
 
       <Tabs defaultValue="performance" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="performance">Performance</TabsTrigger>
           <TabsTrigger value="services">Serviços</TabsTrigger>
           <TabsTrigger value="network">Rede</TabsTrigger>
+          <TabsTrigger value="temperature">Temperatura</TabsTrigger>
           <TabsTrigger value="details">Detalhes</TabsTrigger>
         </TabsList>
 
@@ -530,6 +531,83 @@ export function SystemMonitoring() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Espaço Usado:</span>
                   <span className="font-medium">{formatBytes(metrics.disk.used * 1024 * 1024)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="temperature" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
+                  <Activity className="h-5 w-5 text-juga-primary" />
+                  Controle de Temperatura
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Cervejas (Geladeira):</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-juga-primary">2°C</span>
+                    <Badge className="bg-juga-primary/10 text-juga-primary">Ideal</Badge>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Vinhos (Adega):</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-juga-primary">12°C</span>
+                    <Badge className="bg-juga-primary/10 text-juga-primary">Ideal</Badge>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Destilados (Estoque):</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-juga-primary">18°C</span>
+                    <Badge className="bg-juga-primary/10 text-juga-primary">Ideal</Badge>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Refrigerantes (Estoque):</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-juga-primary">8°C</span>
+                    <Badge className="bg-juga-primary/10 text-juga-primary">Ideal</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-juga-text-secondary">
+                  <AlertTriangle className="h-5 w-5 text-juga-primary" />
+                  Alertas de Temperatura
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 p-3 border rounded-lg">
+                    <CheckCircle className="h-4 w-4 text-juga-primary" />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">Sistema funcionando normalmente</div>
+                      <div className="text-xs text-muted-foreground">Todas as temperaturas dentro do ideal</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 border rounded-lg">
+                    <CheckCircle className="h-4 w-4 text-juga-primary" />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">Backup de energia ativo</div>
+                      <div className="text-xs text-muted-foreground">Gerador funcionando</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 border rounded-lg">
+                    <CheckCircle className="h-4 w-4 text-juga-primary" />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">Sensores calibrados</div>
+                      <div className="text-xs text-muted-foreground">Última calibração: há 7 dias</div>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
