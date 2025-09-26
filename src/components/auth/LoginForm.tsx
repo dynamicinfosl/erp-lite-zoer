@@ -31,7 +31,7 @@ export function LoginForm({
   onSwitchToRegister,
   onForgotPassword,
 }: LoginFormProps) {
-  const { login } = useAuth();
+  const { signIn } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +47,10 @@ export function LoginForm({
     try {
       setIsLoading(true);
       setError(null);
-      await login(data.email, data.password);
+      const result = await signIn(data.email, data.password);
+      if (result.error) {
+        throw result.error;
+      }
       onSuccess?.();
     } catch (err: any) {
       const msg = err?.message || err?.errorMessage;
