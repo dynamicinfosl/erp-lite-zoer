@@ -8,8 +8,8 @@ export const mockProducts: Product[] = [
     sku: 'COCA350',
     barcode: '7891234567890',
     description: 'Refrigerante Coca-Cola 350ml',
-    cost_price: 2.50,
-    sale_price: 4.50,
+    cost_price: 2.5,
+    sale_price: 4.5,
     stock_quantity: 50,
     min_stock: 10,
     unit: 'UN',
@@ -17,7 +17,7 @@ export const mockProducts: Product[] = [
     category_id: 1,
     user_id: '1',
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   },
   {
     id: 2,
@@ -91,7 +91,7 @@ export const mockProducts: Product[] = [
 
 export const mockCustomers = [
   {
-    id: 1,
+    id: '1',
     name: 'João Silva',
     email: 'joao@email.com',
     phone: '(11) 99999-9999',
@@ -105,10 +105,10 @@ export const mockCustomers = [
     is_active: true,
     user_id: '1',
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   },
   {
-    id: 2,
+    id: '2',
     name: 'Maria Santos',
     email: 'maria@email.com',
     phone: '(11) 88888-8888',
@@ -122,70 +122,70 @@ export const mockCustomers = [
     is_active: true,
     user_id: '1',
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   }
 ];
 
 export const mockSales = [
   {
-    id: 1,
+    id: '1',
     user_id: '1',
-    customer_id: 1,
+    customer_id: '1',
     sale_number: 'V001',
-    total_amount: 45.50,
+    total_amount: 45.5,
     discount_amount: 0,
-    final_amount: 45.50,
+    final_amount: 45.5,
     payment_method: 'pix',
     sale_type: 'balcao',
     status: 'finalizada',
     notes: 'Venda normal',
     sold_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   },
   {
-    id: 2,
+    id: '2',
     user_id: '1',
-    customer_id: 2,
+    customer_id: '2',
     sale_number: 'V002',
-    total_amount: 89.00,
-    discount_amount: 5.00,
-    final_amount: 84.00,
+    total_amount: 89.0,
+    discount_amount: 5.0,
+    final_amount: 84.0,
     payment_method: 'cartao_credito',
     sale_type: 'entrega',
     status: 'finalizada',
     notes: 'Entrega agendada',
     sold_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   }
 ];
 
 export const mockFinancialTransactions = [
   {
-    id: 1,
+    id: '1',
     user_id: '1',
     transaction_type: 'receita',
     category: 'Vendas',
     description: 'Venda de produtos',
-    amount: 1250.50,
+    amount: 1250.5,
     payment_method: 'pix',
     reference_type: 'venda',
-    reference_id: 1,
+    reference_id: '1',
     due_date: new Date().toISOString().split('T')[0],
     paid_date: new Date().toISOString().split('T')[0],
     status: 'pago',
     notes: 'Receita do dia',
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   },
   {
-    id: 2,
+    id: '2',
     user_id: '1',
     transaction_type: 'despesa',
     category: 'Aluguel',
     description: 'Aluguel do depósito',
-    amount: 800.00,
+    amount: 800.0,
     payment_method: 'pix',
     reference_type: 'despesa_operacional',
     reference_id: null,
@@ -194,26 +194,26 @@ export const mockFinancialTransactions = [
     status: 'pago',
     notes: 'Aluguel mensal',
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   }
 ];
 
 export const mockDeliveries = [
   {
-    id: 1,
+    id: '1',
     user_id: '1',
-    sale_id: 2,
-    driver_id: 1,
+    sale_id: '2',
+    driver_id: '1',
     customer_name: 'Maria Santos',
     delivery_address: 'Av. Paulista, 456',
     neighborhood: 'Bela Vista',
     phone: '(11) 88888-8888',
-    delivery_fee: 5.00,
+    delivery_fee: 5.0,
     status: 'em_rota',
     notes: 'Entregar após 14h',
     delivered_at: null,
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   }
 ];
 
@@ -245,12 +245,12 @@ export const mockDashboardData = {
 
 // Dados mockados do usuário logado
 export const mockUserProfile = {
-  id: 1,
+  id: '1',
   name: 'Gabriel de Souza',
   email: 'gabrieldesouza104@gmail.com',
   role: 'vendedor',
   isAdmin: false,
   avatar: null,
   created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString()
+  updated_at: new Date().toISOString(),
 };

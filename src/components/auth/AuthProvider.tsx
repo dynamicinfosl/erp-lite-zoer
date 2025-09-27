@@ -61,11 +61,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       await api.post('/auth/logout');
       setUser(null);
-      router.push('/login');
+      router.push('/');
     } catch (error) {
       console.error('Logout failed:', error);
       setUser(null);
-      router.push('/login');
+      router.push('/');
     }
   };
 
@@ -90,7 +90,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [refreshUser]);
 
   if (!ENABLE_AUTH) {
-    return children;
+    // Quando autenticação está desabilitada, fornecer um contexto vazio
+    const mockValue = {
+      user: null,
+      isLoading: false,
+      login: async () => {},
+      register: async () => {},
+      logout: async () => {},
+      refreshUser: async () => {},
+    };
+    
+    return (
+      <AuthContext.Provider value={mockValue}>
+        {children}
+      </AuthContext.Provider>
+    );
   }
 
   if (isLoading) {

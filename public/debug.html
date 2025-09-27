@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Debug</title>
+    <style>
+        body {
+            background-color: red;
+            color: white;
+            font-size: 24px;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .box {
+            background-color: yellow;
+            color: black;
+            padding: 20px;
+            margin: 20px 0;
+            border: 5px solid blue;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔴 TESTE DE DEBUG - PÁGINA ESTÁTICA</h1>
+    <div class="box">
+        <h2>Se você consegue ver esta página com fundo VERMELHO e esta caixa AMARELA, o servidor Next.js está funcionando!</h2>
+        <p>Data: <span id="date"></span></p>
+        <p>Navegador detectado: <span id="browser"></span></p>
+    </div>
+    <p>✅ Arquivo estático funcionando</p>
+    <p>✅ CSS funcionando</p>
+    <p>✅ JavaScript funcionando (se você ver a data abaixo)</p>
+    
+    <script>
+        document.getElementById('date').textContent = new Date().toString();
+        document.getElementById('browser').textContent = navigator.userAgent;
+    </script>
+</body>
+</html>
+
+

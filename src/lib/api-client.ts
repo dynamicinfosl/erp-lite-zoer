@@ -53,12 +53,8 @@ async function refreshToken(): Promise<boolean> {
 
 function redirectToLogin() {
   if (typeof window !== 'undefined') {
-    const currentPath = window.location.pathname;
-    if(currentPath === '/login') {
-      return;
-    }
-    const loginUrl = `/login?redirect=${encodeURIComponent(currentPath)}`;
-    window.location.href = loginUrl;
+    // Redirecionar para a página inicial quando não autenticado
+    window.location.href = '/';
   }
 }
 
@@ -76,14 +72,35 @@ async function apiRequest<T = any>(
       ...options,
     });
 
-    const result: ApiResponse<T> = await response.json();
-
-    if ([AUTH_CODE.TOKEN_MISSING].includes(result.errorCode || '')) {
-      redirectToLogin();
+    // Parsing seguro do corpo, lidando com respostas não-JSON e corpo vazio
+    const contentType = response.headers.get('content-type') || '';
+    let result: ApiResponse<T> | null = null;
+    if (contentType.includes('application/json')) {
+      try {
+        result = await response.json();
+      } catch {
+        // JSON inválido
+        result = { success: response.ok, errorMessage: 'Invalid JSON response' } as ApiResponse<T>;
+      }
+    } else {
+      try {
+        const text = await response.text();
+        if (text && text.trim().length > 0) {
+          result = { success: response.ok, errorMessage: text } as ApiResponse<T>;
+        } else {
+          // Sem corpo (ex.: 204 No Content)
+          result = { success: response.ok } as ApiResponse<T>;
+        }
+      } catch {
+        result = { success: response.ok } as ApiResponse<T>;
+      }
     }
 
+    // Não redirecionar automaticamente em TOKEN_MISSING para evitar loops;
+    // deixar o caller decidir o que fazer.
+
     if (response.status === 401 && 
-        result.errorCode === AUTH_CODE.TOKEN_EXPIRED && 
+        (result?.errorCode === AUTH_CODE.TOKEN_EXPIRED) && 
         !isRetry) {
       
       if (isRefreshing && refreshPromise) {
@@ -91,9 +108,8 @@ async function apiRequest<T = any>(
         if (refreshSuccess) {
           return apiRequest<T>(endpoint, options, true);
         } else {
-          console.error('Token refresh failed, redirecting to login');
-          redirectToLogin();
-          throw new ApiError(401, 'Token refresh failed, redirecting to login', AUTH_CODE.TOKEN_EXPIRED);
+          console.error('Token refresh failed');
+          throw new ApiError(401, 'Token refresh failed', AUTH_CODE.TOKEN_EXPIRED);
         }
       }
 
@@ -107,9 +123,8 @@ async function apiRequest<T = any>(
           if (refreshSuccess) {
             return apiRequest<T>(endpoint, options, true);
           } else {
-            console.error('Token refresh failed, redirecting to login');
-            redirectToLogin();
-            throw new ApiError(401, 'Token refresh failed, redirecting to login', AUTH_CODE.TOKEN_EXPIRED);
+            console.error('Token refresh failed');
+            throw new ApiError(401, 'Token refresh failed', AUTH_CODE.TOKEN_EXPIRED);
           }
         } finally {
           isRefreshing = false;
@@ -118,11 +133,15 @@ async function apiRequest<T = any>(
       }
     }
 
-    if (!response.ok || !result.success) {
-      throw new ApiError(response.status, result.errorMessage || 'API request failed', result.errorCode || '');
+    if (!response.ok || !result?.success) {
+      throw new ApiError(
+        response.status,
+        (result && result.errorMessage) ? result.errorMessage : 'API request failed',
+        result?.errorCode || ''
+      );
     }
 
-    return result.data as T;
+    return (result?.data as T) ?? (undefined as unknown as T);
   } catch (error) {
     if (error instanceof ApiError) {
       throw error;

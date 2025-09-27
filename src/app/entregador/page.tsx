@@ -9,6 +9,18 @@ import { MapPin, Phone, Clock, CheckCircle, Truck, Navigation } from 'lucide-rea
 import { Delivery } from '@/types';
 import { api } from '@/lib/api-client';
 import { toast } from 'sonner';
+import { ENABLE_AUTH } from '@/constants/auth';
+
+interface Delivery {
+  id: string
+  orderId: string
+  customerName: string
+  address: string
+  status: 'pending' | 'in-progress' | 'delivered' | 'cancelled'
+  scheduledAt: string
+  deliveredAt?: string | null
+  notes?: string
+}
 
 export default function EntregadorPage() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -24,16 +36,51 @@ export default function EntregadorPage() {
   const fetchMyDeliveries = async () => {
     try {
       setLoading(true);
-      // Buscar entregas do entregador logado
-      const data = await api.get<Delivery[]>('/deliveries');
-      // Filtrar apenas entregas atribuídas ao entregador atual
-      // Em um cenário real, isso seria filtrado no backend
-      const today = new Date().toISOString().split('T')[0];
-      const myDeliveries = data.filter(delivery => 
-        delivery.created_at.startsWith(today) && 
-        (delivery.status === 'em_rota' || delivery.status === 'aguardando')
-      );
-      setDeliveries(myDeliveries);
+      
+      if (ENABLE_AUTH) {
+        // Buscar entregas do entregador logado
+        const data = await api.get<Delivery[]>('/deliveries');
+        // Filtrar apenas entregas atribuídas ao entregador atual
+        // Em um cenário real, isso seria filtrado no backend
+        const today = new Date().toISOString().split('T')[0];
+        const myDeliveries = data.filter(delivery => 
+          delivery.created_at.startsWith(today) && 
+          (delivery.status === 'em_rota' || delivery.status === 'aguardando')
+        );
+        setDeliveries(myDeliveries);
+      } else {
+        // Usar dados mockados quando autenticação estiver desabilitada
+        const mockDeliveries: Delivery[] = [
+          {
+            id: '1',
+            orderId: 'PED-1024',
+            customerName: 'Gabriel Oliveira',
+            address: 'Av. Paulista, 1500 - São Paulo/SP',
+            status: 'pending',
+            scheduledAt: '2025-09-24T10:00:00',
+            notes: 'Cliente prefere entrega na parte da tarde',
+          },
+          {
+            id: '2',
+            orderId: 'PED-1025',
+            customerName: 'Mariana Santos',
+            address: 'Rua das Flores, 250 - Belo Horizonte/MG',
+            status: 'in-progress',
+            scheduledAt: '2025-09-24T09:30:00',
+            notes: 'Condomínio com porteiro',
+          },
+          {
+            id: '3',
+            orderId: 'PED-1026',
+            customerName: 'Carlos Souza',
+            address: 'Rua XV de Novembro, 780 - Curitiba/PR',
+            status: 'delivered',
+            scheduledAt: '2025-09-23T14:00:00',
+            deliveredAt: '2025-09-23T15:25:00',
+          },
+        ];
+        setDeliveries(mockDeliveries);
+      }
     } catch (error) {
       console.error('Erro ao carregar entregas:', error);
       toast.error('Erro ao carregar entregas');
@@ -44,9 +91,20 @@ export default function EntregadorPage() {
 
   const handleStartDelivery = async (deliveryId: number) => {
     try {
-      await api.put(`/deliveries?id=${deliveryId}`, { status: 'em_rota' });
+      if (ENABLE_AUTH) {
+        await api.put(`/deliveries?id=${deliveryId}`, { status: 'em_rota' });
+      } else {
+        // Simular atualização com dados mockados
+        setDeliveries(prev => prev.map(delivery => 
+          delivery.id === deliveryId 
+            ? { ...delivery, status: 'em_rota' as const, updated_at: new Date().toISOString() }
+            : delivery
+        ));
+      }
       toast.success('Entrega iniciada!');
-      fetchMyDeliveries();
+      if (ENABLE_AUTH) {
+        fetchMyDeliveries();
+      }
     } catch (error) {
       console.error('Erro ao iniciar entrega:', error);
       toast.error('Erro ao iniciar entrega');
@@ -57,9 +115,25 @@ export default function EntregadorPage() {
     if (!confirm('Confirmar que a entrega foi realizada?')) return;
 
     try {
-      await api.put(`/deliveries?id=${deliveryId}`, { status: 'entregue' });
+      if (ENABLE_AUTH) {
+        await api.put(`/deliveries?id=${deliveryId}`, { status: 'entregue' });
+      } else {
+        // Simular atualização com dados mockados
+        setDeliveries(prev => prev.map(delivery => 
+          delivery.id === deliveryId 
+            ? { 
+                ...delivery, 
+                status: 'entregue' as const, 
+                updated_at: new Date().toISOString(),
+                delivered_at: new Date().toISOString()
+              }
+            : delivery
+        ));
+      }
       toast.success('Entrega finalizada com sucesso!');
-      fetchMyDeliveries();
+      if (ENABLE_AUTH) {
+        fetchMyDeliveries();
+      }
     } catch (error) {
       console.error('Erro ao finalizar entrega:', error);
       toast.error('Erro ao finalizar entrega');
@@ -144,26 +218,28 @@ export default function EntregadorPage() {
                       <div className="flex items-start justify-between">
                         <div className="space-y-3 flex-1">
                           <div>
-                            <h3 className="font-semibold text-lg">{delivery.customer_name}</h3>
+                            <h3 className="font-semibold text-lg">{delivery.customerName}</h3>
                             {getStatusBadge(delivery.status)}
                           </div>
                           
                           <div className="flex items-start gap-2">
                             <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
                             <div>
-                              <div className="font-medium">{delivery.delivery_address}</div>
-                              {delivery.neighborhood && (
+                              <div className="font-medium">{delivery.address}</div>
+                              {/* Assuming neighborhood is not directly available in the new mock data */}
+                              {/* {delivery.neighborhood && (
                                 <div className="text-sm text-muted-foreground">{delivery.neighborhood}</div>
-                              )}
+                              )} */}
                             </div>
                           </div>
 
-                          {delivery.phone && (
+                          {/* Assuming phone is not directly available in the new mock data */}
+                          {/* {delivery.phone && (
                             <div className="flex items-center gap-2">
                               <Phone className="h-4 w-4 text-muted-foreground" />
                               <span className="text-sm">{delivery.phone}</span>
                             </div>
-                          )}
+                          )} */}
 
                           {delivery.notes && (
                             <div className="text-sm text-muted-foreground">
@@ -174,7 +250,7 @@ export default function EntregadorPage() {
 
                         <div className="flex flex-col gap-2 ml-4">
                           <Button
-                            onClick={() => openMaps(delivery.delivery_address)}
+                            onClick={() => openMaps(delivery.address)}
                             variant="outline"
                             size="sm"
                           >
@@ -182,7 +258,7 @@ export default function EntregadorPage() {
                             Ver no Mapa
                           </Button>
                           <Button
-                            onClick={() => handleStartDelivery(delivery.id)}
+                            onClick={() => handleStartDelivery(Number(delivery.id))}
                             size="sm"
                           >
                             <Truck className="h-4 w-4 mr-2" />
@@ -208,21 +284,23 @@ export default function EntregadorPage() {
                       <div className="flex items-start justify-between">
                         <div className="space-y-3 flex-1">
                           <div>
-                            <h3 className="font-semibold text-lg">{delivery.customer_name}</h3>
+                            <h3 className="font-semibold text-lg">{delivery.customerName}</h3>
                             {getStatusBadge(delivery.status)}
                           </div>
                           
                           <div className="flex items-start gap-2">
                             <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
                             <div>
-                              <div className="font-medium">{delivery.delivery_address}</div>
-                              {delivery.neighborhood && (
+                              <div className="font-medium">{delivery.address}</div>
+                              {/* Assuming neighborhood is not directly available in the new mock data */}
+                              {/* {delivery.neighborhood && (
                                 <div className="text-sm text-muted-foreground">{delivery.neighborhood}</div>
-                              )}
+                              )} */}
                             </div>
                           </div>
 
-                          {delivery.phone && (
+                          {/* Assuming phone is not directly available in the new mock data */}
+                          {/* {delivery.phone && (
                             <div className="flex items-center gap-2">
                               <Phone className="h-4 w-4 text-muted-foreground" />
                               <a 
@@ -232,7 +310,7 @@ export default function EntregadorPage() {
                                 {delivery.phone}
                               </a>
                             </div>
-                          )}
+                          )} */}
 
                           {delivery.notes && (
                             <div className="text-sm text-muted-foreground">
@@ -243,7 +321,7 @@ export default function EntregadorPage() {
 
                         <div className="flex flex-col gap-2 ml-4">
                           <Button
-                            onClick={() => openMaps(delivery.delivery_address)}
+                            onClick={() => openMaps(delivery.address)}
                             variant="outline"
                             size="sm"
                           >
@@ -251,7 +329,7 @@ export default function EntregadorPage() {
                             Ver no Mapa
                           </Button>
                           <Button
-                            onClick={() => handleCompleteDelivery(delivery.id)}
+                            onClick={() => handleCompleteDelivery(Number(delivery.id))}
                             className="bg-green-600 hover:bg-green-700"
                             size="sm"
                           >

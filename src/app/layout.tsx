@@ -2,10 +2,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { ConditionalAuthProvider } from "@/components/auth/ConditionalAuthProvider";
+import { AuthProvider } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Toaster } from "@/components/ui/toaster";
 import ZoerCopilot from "@/components/ZoerCopilot";
+import { ErrorHandler } from "@/components/ErrorHandler";
 
 import "./globals.css";
 
@@ -20,8 +21,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ERP Lite - Gestão de Bebidas",
-  description: "Sistema completo de gestão para depósitos de bebidas",
+  title: "JUGA - Sistema de Gestão Empresarial",
+  description: "Sistema moderno de gestão empresarial - JUGA",
 };
 
 export default function RootLayout({
@@ -40,13 +41,15 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ConditionalAuthProvider>
+          <AuthProvider>
             <AppLayout>
               {children}
             </AppLayout>
+            <ErrorHandler />
             <Toaster />
-            <ZoerCopilot />
-          </ConditionalAuthProvider>
+            {/* Renderizar ZoerCopilot apenas quando habilitado por envs */}
+            {process.env.NEXT_PUBLIC_ENABLE_ZOER === 'true' && <ZoerCopilot />}
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

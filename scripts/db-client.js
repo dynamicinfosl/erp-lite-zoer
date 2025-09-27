@@ -6,7 +6,7 @@ const connectionConfig = {
   port: 5432,
   database: 'postgres',
   user: 'postgres',
-  password: '[97872715Ga!]',
+  password: '97872715Ga!',
   ssl: {
     rejectUnauthorized: false
   }

@@ -8,6 +8,17 @@ export interface Product {
   sku?: string;
   barcode?: string;
   description?: string;
+  // novos campos opcionais
+  internal_code?: string;
+  product_group?: string;
+  has_variations?: boolean;
+  fiscal_note?: string; // NCM/CFOP ou referência fiscal
+  unit_conversion?: string; // ex.: 1 CX = 12 UN
+  moves_stock?: boolean;
+  width_cm?: number;
+  height_cm?: number;
+  length_cm?: number;
+  weight_kg?: number;
   cost_price: number;
   sale_price: number;
   stock_quantity: number;
@@ -69,6 +80,12 @@ export interface Customer {
   state?: string;
   zipcode?: string;
   notes?: string;
+  responsible_seller?: string;
+  responsible_financial?: string;
+  photo?: string;
+  attachments?: string[];
+  observations?: string;
+  credit_limit?: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -145,12 +162,82 @@ export interface UserProfile {
   updated_at: string;
 }
 
+export interface Supplier {
+  id: number;
+  user_id: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  document?: string;
+  address?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  zipcode?: string;
+  notes?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Caixa (PDV)
+export interface CashRegister {
+  id: number;
+  user_id: number | string;
+  name: string;
+  location?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CashSession {
+  id: number;
+  user_id: number | string;
+  register_id: number;
+  status: 'open' | 'closed';
+  opened_by: string;
+  opened_at: string;
+  opening_amount: number;
+  notes?: string;
+  closed_by?: string;
+  closed_at?: string;
+  closing_amount_cash?: number;
+  closing_amount_card?: number;
+  closing_amount_pix?: number;
+  difference_amount?: number;
+  difference_reason?: string;
+}
+
+export interface CashTransaction {
+  id: number;
+  user_id: number | string;
+  session_id: number;
+  type: 'opening' | 'sale' | 'supply' | 'withdrawal' | 'expense' | 'refund' | 'adjustment' | 'closing';
+  method?: 'cash' | 'card' | 'pix' | 'other';
+  amount: number;
+  reference_type?: string;
+  reference_id?: number;
+  description?: string;
+  created_by: string;
+  created_at: string;
+}
+
 // Tipos para PDV
 export interface CartItem {
   product: Product;
   quantity: number;
   unit_price: number;
   total_price: number;
+}
+
+export interface PDVItem {
+  id: number
+  name: string
+  price: number
+  code: string
+  quantity: number
+  discount: number
 }
 
 // Tipos para Dashboard

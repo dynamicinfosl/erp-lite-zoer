@@ -16,10 +16,10 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !user && pathname !== '/login') {
-      router.push('/login');
+    if (!loading && !user) {
+      router.push('/');
     }
-  }, [user, loading, router, pathname]);
+  }, [user, loading, router]);
 
   if (loading) {
     return (
@@ -29,22 +29,28 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
     );
   }
 
-  if (!user && pathname !== '/login') {
+  if (!user) {
     return null; // Será redirecionado pelo useEffect
   }
 
-  if (pathname === '/login') {
-    return <>{children}</>;
-  }
-
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <main className="flex-1 overflow-auto">
+    pathname?.startsWith('/pdv') ? (
+      <main className="min-h-screen w-full">
+        <div className="w-full h-full">
           {children}
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+        </div>
+      </main>
+    ) : (
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <main className="flex-1 overflow-auto min-h-screen">
+            <div className="w-full h-full">
+              {children}
+            </div>
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
+    )
   );
 }

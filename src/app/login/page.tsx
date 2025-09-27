@@ -1,210 +1,150 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { LoginForm } from '@/components/auth/LoginForm';
+import { RegisterForm } from '@/components/auth/RegisterForm';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Store, Mail, Lock, User, Phone } from 'lucide-react';
-import { useSupabaseAuth } from '@/components/auth/SupabaseAuthProvider';
-import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { ENABLE_AUTH } from '@/constants/auth';
+import { Loader2, ArrowLeft, Shield, Users, BarChart3, Settings } from 'lucide-react';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  
-  const { signIn, signUp } = useSupabaseAuth();
   const router = useRouter();
+  const { user, loading } = useAuth();
+  const [activeTab, setActiveTab] = useState('login');
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+  // Redirecionar se já estiver logado (apenas quando autenticação estiver habilitada)
+  useEffect(() => {
+    if (ENABLE_AUTH && !loading && user) {
+      // Verificar se há um parâmetro de redirecionamento
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectTo = urlParams.get('redirect') || '/dashboard';
+      router.push(redirectTo);
+    }
+  }, [user, loading, router]);
 
-    try {
-      await signIn(email, password);
+  // Mostrar loading enquanto verifica autenticação
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600 dark:text-gray-400">Verificando autenticação...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Quando autenticação não estiver habilitada, mostrar página de login normalmente
+
+  const handleLoginSuccess = () => {
+    if (ENABLE_AUTH) {
+      // Verificar se há um parâmetro de redirecionamento
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectTo = urlParams.get('redirect') || '/dashboard';
+      router.push(redirectTo);
+    } else {
+      // Quando autenticação está desabilitada, apenas redirecionar para dashboard
       router.push('/dashboard');
-    } catch (error: any) {
-      setError(error.message || 'Erro ao fazer login');
-    } finally {
-      setLoading(false);
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    try {
-      await signUp(email, password, {
-        name,
-        phone,
-        role: 'vendedor' // Role padrão para novos usuários
-      });
-      // Não redirecionar automaticamente, aguardar confirmação por email
-    } catch (error: any) {
-      setError(error.message || 'Erro ao criar conta');
-    } finally {
-      setLoading(false);
+  const handleRegisterSuccess = () => {
+    if (ENABLE_AUTH) {
+      setActiveTab('login');
+      // Mostrar mensagem de sucesso ou redirecionar
+    } else {
+      // Quando autenticação está desabilitada, redirecionar para dashboard
+      router.push('/dashboard');
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Store className="h-6 w-6" />
+      <div className="w-full max-w-md">
+        {/* Header com logo e título */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center mb-4">
+            <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
+              <Shield className="h-8 w-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">ERP Lite</CardTitle>
-          <CardDescription>
-            Sistema de gestão para depósitos de bebidas
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent>
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Entrar</TabsTrigger>
-              <TabsTrigger value="register">Registrar</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-                
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="seu@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10"
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="password">Senha</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10"
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Entrando...' : 'Entrar'}
-                </Button>
-              </form>
-            </TabsContent>
-            
-            <TabsContent value="register">
-              <form onSubmit={handleRegister} className="space-y-4">
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-                
-                <div className="space-y-2">
-                  <Label htmlFor="reg-name">Nome</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="reg-name"
-                      type="text"
-                      placeholder="Seu nome completo"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="pl-10"
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="reg-phone">Telefone</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="reg-phone"
-                      type="tel"
-                      placeholder="(11) 99999-9999"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="reg-email">Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="reg-email"
-                      type="email"
-                      placeholder="seu@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10"
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="reg-password">Senha</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="reg-password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10"
-                      required
-                      minLength={6}
-                    />
-                  </div>
-                </div>
-                
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Criando conta...' : 'Criar conta'}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+          <h1 className="text-3xl font-bold juga-heading mb-2">
+            JUGA
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Sistema de gestão empresarial moderno
+          </p>
+        </div>
+
+        {/* Card principal com tabs */}
+        <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+          <CardHeader className="pb-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="login" className="text-sm font-medium">
+                  Entrar
+                </TabsTrigger>
+                <TabsTrigger value="register" className="text-sm font-medium">
+                  Registrar
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </CardHeader>
+
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsContent value="login" className="space-y-4">
+                <LoginForm 
+                  onSuccess={handleLoginSuccess}
+                  onSwitchToRegister={() => setActiveTab('register')}
+                />
+              </TabsContent>
+
+              <TabsContent value="register" className="space-y-4">
+                <RegisterForm 
+                  onSuccess={handleRegisterSuccess}
+                  onSwitchToLogin={() => setActiveTab('login')}
+                />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Features destacadas */}
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+          <div className="flex flex-col items-center p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
+            <Users className="h-6 w-6 text-blue-600 mb-2" />
+            <h3 className="text-sm font-medium text-gray-900 dark:text-white">Clientes</h3>
+            <p className="text-xs text-gray-600 dark:text-gray-400">Gerencie sua base</p>
+          </div>
+          <div className="flex flex-col items-center p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
+            <BarChart3 className="h-6 w-6 text-green-600 mb-2" />
+            <h3 className="text-sm font-medium text-gray-900 dark:text-white">Relatórios</h3>
+            <p className="text-xs text-gray-600 dark:text-gray-400">Análise completa</p>
+          </div>
+          <div className="flex flex-col items-center p-4 rounded-lg bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
+            <Settings className="h-6 w-6 text-purple-600 mb-2" />
+            <h3 className="text-sm font-medium text-gray-900 dark:text-white">Configurações</h3>
+            <p className="text-xs text-gray-600 dark:text-gray-400">Personalize o sistema</p>
+          </div>
+        </div>
+
+        {/* Botão de voltar */}
+        <div className="mt-6 text-center">
+          <Button
+            variant="ghost"
+            onClick={() => router.push('/')}
+            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar ao início
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,10 +1,10 @@
 
 'use client';
 
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
-import { AuthenticatedLayout } from './AuthenticatedLayout';
+import { useAuth } from '@/contexts/AuthContext';
 import { usePathname } from 'next/navigation';
 import { ENABLE_AUTH } from '@/constants/auth';
 
@@ -14,25 +14,61 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
+  const [isClient, setIsClient] = useState(false);
+  const { user, loading } = useAuth();
 
-  // Se autenticação estiver desabilitada, usar sidebar sem autenticação
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  const shouldHideSidebar = useMemo(() => {
+    const noSidebarPages = ['/login', '/register', '/forgot-password', '/reset-password'];
+    return noSidebarPages.some((page) => pathname?.startsWith(page));
+  }, [pathname]);
+
+  const isPDV = useMemo(() => pathname?.startsWith('/pdv') ?? false, [pathname]);
+
+  if (shouldHideSidebar) {
+    return <main className="min-h-screen w-full">{children}</main>;
+  }
+
   if (!ENABLE_AUTH) {
-    if (pathname === '/login') {
-      return <>{children}</>;
+    if (isClient && isPDV) {
+      return <main className="min-h-screen w-full">{children}</main>;
     }
-    
+
     return (
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>
-          <main className="flex-1 overflow-auto">
-            {children}
+          <main className="flex-1 overflow-auto min-h-screen">
+            <div className="w-full h-full p-6">{children}</div>
           </main>
         </SidebarInset>
       </SidebarProvider>
     );
   }
 
-  // Se autenticação estiver habilitada, usar o layout autenticado
-  return <AuthenticatedLayout>{children}</AuthenticatedLayout>;
+  if (!isClient || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (!user || isPDV) {
+    return <main className="min-h-screen w-full">{children}</main>;
+  }
+
+  return (
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <main className="flex-1 overflow-auto min-h-screen">
+          <div className="w-full h-full p-6">{children}</div>
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
+  );
 }

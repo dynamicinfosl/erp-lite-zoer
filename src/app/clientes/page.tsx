@@ -1,429 +1,568 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Edit, Trash2, User, Phone, MapPin, Mail } from 'lucide-react';
-import { Customer } from '@/types';
-import { api } from '@/lib/api-client';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+} from '@/components/ui/dropdown-menu';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { 
+  Plus, 
+  MoreHorizontal, 
+  Search, 
+  Settings2, 
+  Upload, 
+  Download, 
+  Filter,
+  Users,
+  Trash2,
+  Edit,
+  Eye,
+  Phone,
+  Mail
+} from 'lucide-react';
 import { toast } from 'sonner';
-import { ENABLE_AUTH } from '@/constants/auth';
-import { mockCustomers } from '@/lib/mock-data';
+import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
+import * as XLSX from 'xlsx';
+
+interface Customer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  document: string;
+  city: string;
+  type: 'PF' | 'PJ';
+  status: 'active' | 'inactive';
+  created_at: string;
+}
+
+interface ColumnVisibility {
+  type: boolean;
+  phone: boolean;
+  document: boolean;
+  email: boolean;
+  city: boolean;
+  status: boolean;
+}
 
 export default function ClientesPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showDialog, setShowDialog] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [formData, setFormData] = useState({
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showImportPreview, setShowImportPreview] = useState(false);
+  const [importFileName, setImportFileName] = useState('');
+  const [importHeaders, setImportHeaders] = useState<string[]>([]);
+  const [importRows, setImportRows] = useState<any[]>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [isRegistering, setIsRegistering] = useState(false);
+
+  // Normalização de cabeçalhos para chaves previsíveis
+  const normalizeHeader = (raw: string): string => {
+    return String(raw || '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s\/]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
+    type: true,
+    phone: true,
+    document: true,
+    email: true,
+    city: true,
+    status: true,
+  });
+
+  // Filtros avançados
+  const [advancedFilters, setAdvancedFilters] = useState({
+    phone: '',
+    email: '',
+    city: '',
+    type: '',
+    status: ''
+  });
+
+  // Estados para formulário
+  const [newCustomer, setNewCustomer] = useState({
     name: '',
     email: '',
     phone: '',
     document: '',
-    address: '',
-    neighborhood: '',
     city: '',
-    state: '',
-    zipcode: '',
-    notes: '',
+    type: 'PF' as 'PF' | 'PJ',
   });
 
+  // Carregar clientes
   useEffect(() => {
-    fetchCustomers();
+    loadCustomers();
   }, []);
 
-  const fetchCustomers = async () => {
+  const loadCustomers = async () => {
     try {
       setLoading(true);
+      const response = await fetch('/next_api/customers');
+      if (!response.ok) throw new Error('Erro ao carregar clientes');
       
-      if (ENABLE_AUTH) {
-        const data = await api.get<Customer[]>('/customers');
-        setCustomers(data);
-      } else {
-        setCustomers(mockCustomers);
-      }
+      const data = await response.json();
+      const rows = Array.isArray(data?.data) ? data.data : (data?.rows || data || []);
+      setCustomers(rows);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
-      if (ENABLE_AUTH) {
-        toast.error('Erro ao carregar clientes');
-      }
+      toast.error('Erro ao carregar clientes');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.name) {
-      toast.error('Nome é obrigatório');
-      return;
-    }
+  // Filtrar clientes
+  const filteredCustomers = Array.isArray(customers) ? customers.filter(customer => {
+    const name = (customer.name || '').toString();
+    const email = (customer.email || '').toString();
+    const document = (customer.document || '').toString();
+    const phone = (customer.phone || '').toString();
+    const city = (customer.city || '').toString();
+    const type = (customer.type || '').toString();
+    const status = (customer.status || '').toString();
 
+    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         document.includes(searchTerm);
+
+    const matchesAdvanced = (!advancedFilters.phone || phone.includes(advancedFilters.phone)) &&
+                           (!advancedFilters.email || email.toLowerCase().includes(advancedFilters.email.toLowerCase())) &&
+                           (!advancedFilters.city || city.toLowerCase().includes(advancedFilters.city.toLowerCase())) &&
+                           (!advancedFilters.type || type === advancedFilters.type) &&
+                           (!advancedFilters.status || status === advancedFilters.status);
+
+    return matchesSearch && matchesAdvanced;
+  }) : [];
+
+  // Adicionar cliente
+  const handleAddCustomer = async () => {
     try {
-      if (editingCustomer) {
-        await api.put(`/customers?id=${editingCustomer.id}`, formData);
-        toast.success('Cliente atualizado com sucesso');
+      const response = await fetch('/next_api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCustomer)
+      });
+
+      if (!response.ok) throw new Error('Erro ao adicionar cliente');
+
+      await loadCustomers();
+      setShowAddDialog(false);
+      setNewCustomer({ name: '', email: '', phone: '', document: '', city: '', type: 'PF' });
+      toast.success('Cliente adicionado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao adicionar cliente:', error);
+      toast.error('Erro ao adicionar cliente');
+    }
+  };
+
+  // Handle import
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      let headers: string[] = [];
+      let rows: any[] = [];
+      if (ext === 'xlsx' || ext === 'xls') {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer);
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[];
+        if (json.length < 2) {
+          toast.error('Planilha precisa de cabeçalho e ao menos uma linha');
+          return;
+        }
+        headers = (json[0] as any[]).map(h => String(h || '').trim());
+        rows = json.slice(1);
+      } else if (ext === 'csv') {
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        if (lines.length < 2) {
+          toast.error('CSV inválido');
+          return;
+        }
+        const delimiter = (lines[0].split(';').length - 1) > (lines[0].split(',').length - 1) ? ';' : ',';
+        headers = lines[0].split(delimiter).map(h => h.replace(/"/g, '').trim());
+        rows = lines.slice(1).map(line => {
+          const values: string[] = [];
+          let cur = '';
+          let quoted = false;
+          for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (ch === '"') {
+              if (quoted && line[i+1] === '"') { cur += '"'; i++; }
+              else { quoted = !quoted; }
+            } else if (ch === delimiter && !quoted) { values.push(cur); cur = ''; }
+            else { cur += ch; }
+          }
+          values.push(cur);
+          return values;
+        });
       } else {
-        await api.post('/customers', formData);
-        toast.success('Cliente criado com sucesso');
+        toast.error('Envie um arquivo .xlsx, .xls ou .csv');
+        return;
       }
 
-      setShowDialog(false);
-      setEditingCustomer(null);
-      resetForm();
-      fetchCustomers();
-    } catch (error) {
-      console.error('Erro ao salvar cliente:', error);
-      toast.error('Erro ao salvar cliente');
+      setImportFileName(file.name);
+      setImportHeaders(headers);
+      setImportRows(rows);
+      setImportErrors([]);
+      setShowImportPreview(true);
+      setShowImportDialog(false);
+    } catch (err) {
+      console.error(err);
+      toast.error('Falha ao ler arquivo');
     }
   };
 
-  const handleEdit = (customer: Customer) => {
-    setEditingCustomer(customer);
-    setFormData({
-      name: customer.name,
-      email: customer.email || '',
-      phone: customer.phone || '',
-      document: customer.document || '',
-      address: customer.address || '',
-      neighborhood: customer.neighborhood || '',
-      city: customer.city || '',
-      state: customer.state || '',
-      zipcode: customer.zipcode || '',
-      notes: customer.notes || '',
-    });
-    setShowDialog(true);
+  const formatDocument = (doc: string, type: 'PF' | 'PJ') => {
+    if (type === 'PF') {
+      return doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    } else {
+      return doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+    }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Tem certeza que deseja excluir este cliente?')) return;
+  const formatPhone = (phone: string) => {
+    return phone.replace(/(\d{2})(\d{4,5})(\d{4})/, '($1) $2-$3');
+  };
 
+  // Botão de diagnóstico: cria um cliente simples para validar a rota
+  const testCreateCustomer = async () => {
     try {
-      await api.delete(`/customers?id=${id}`);
-      toast.success('Cliente excluído com sucesso');
-      fetchCustomers();
-    } catch (error) {
-      console.error('Erro ao excluir cliente:', error);
-      toast.error('Erro ao excluir cliente');
+      console.log('🧪 Teste API: criando cliente de teste...');
+      const res = await fetch('/next_api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Cliente Teste API', email: 'teste@example.com' })
+      });
+      const text = await res.text();
+      console.log('🧪 Teste API status:', res.status, 'body:', text);
+      if (res.ok) {
+        toast.success('API OK: cliente de teste criado');
+        await loadCustomers();
+      } else {
+        toast.error(`API erro ${res.status}: ${text}`);
+      }
+    } catch (err: any) {
+      console.error('🧪 Teste API falhou:', err);
+      toast.error('Falha ao chamar API: ' + (err?.message || err));
     }
   };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      document: '',
-      address: '',
-      neighborhood: '',
-      city: '',
-      state: '',
-      zipcode: '',
-      notes: '',
-    });
-  };
-
-  const filteredCustomers = customers.filter(customer =>
-    customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.phone?.includes(searchTerm) ||
-    customer.document?.includes(searchTerm)
-  );
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Clientes</h1>
-          <p className="text-muted-foreground">
-            Gerencie sua base de clientes
-          </p>
-        </div>
-        <Dialog open={showDialog} onOpenChange={setShowDialog}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { resetForm(); setEditingCustomer(null); }}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Cliente
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
-                {editingCustomer ? 'Editar Cliente' : 'Novo Cliente'}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">E-mail</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Telefone</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="document">CPF/CNPJ</Label>
-                  <Input
-                    id="document"
-                    value={formData.document}
-                    onChange={(e) => setFormData(prev => ({ ...prev, document: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="address">Endereço</Label>
-                <Textarea
-                  id="address"
-                  value={formData.address}
-                  onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                  rows={2}
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="neighborhood">Bairro</Label>
-                  <Input
-                    id="neighborhood"
-                    value={formData.neighborhood}
-                    onChange={(e) => setFormData(prev => ({ ...prev, neighborhood: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="city">Cidade</Label>
-                  <Input
-                    id="city"
-                    value={formData.city}
-                    onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="state">Estado</Label>
-                  <Input
-                    id="state"
-                    value={formData.state}
-                    onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
-                    maxLength={2}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="zipcode">CEP</Label>
-                  <Input
-                    id="zipcode"
-                    value={formData.zipcode}
-                    onChange={(e) => setFormData(prev => ({ ...prev, zipcode: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes">Observações</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit">
-                  {editingCustomer ? 'Atualizar' : 'Criar'} Cliente
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Clientes</CardTitle>
-            <User className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{customers.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
-            <User className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {customers.filter(c => c.is_active).length}
+      <Card className="border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-white">
+        <CardContent className="pt-6 pb-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-blue-900">Clientes</h1>
+              <p className="text-sm text-blue-900/70">
+                Gerencie seus clientes e informações de contato
+              </p>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Com E-mail</CardTitle>
-            <Mail className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {customers.filter(c => c.email).length}
+            <div className="flex items-center gap-2">
+              <Badge className="px-3 py-1 bg-blue-600 text-white">
+                <Users className="h-3 w-3 mr-1" />
+                {customers.length} clientes
+              </Badge>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filtros */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome, e-mail, telefone ou documento..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Button variant="outline" onClick={fetchCustomers}>
-              Atualizar
-            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Lista de Clientes */}
-      <Card>
+      {/* Toolbar */}
+      <Card className="border-blue-100">
+        <CardContent className="pt-6">
+          <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+            {/* Lado esquerdo - Botões de ação */}
+            <div className="flex items-center gap-2">
+              <Button 
+                className="juga-gradient text-white"
+                onClick={() => setShowAddDialog(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Cliente
+              </Button>
+
+              <Button variant="outline" onClick={testCreateCustomer} title="Diagnóstico: testar POST /next_api/customers">
+                Teste API
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="border-blue-200 hover:bg-blue-50">
+                    <MoreHorizontal className="h-4 w-4 mr-2" />
+                    Mais Ações
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setShowImportDialog(true)} className="cursor-pointer">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importar Clientes
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar Lista
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-red-600">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir Selecionados
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="border-blue-200 hover:bg-blue-50">
+                    <Settings2 className="h-4 w-4 mr-2" />
+                    Colunas
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>Mostrar Colunas</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.type}
+                    onCheckedChange={(checked) => 
+                      setColumnVisibility(prev => ({ ...prev, type: checked || false }))
+                    }
+                  >
+                    Tipo de Pessoa
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.phone}
+                    onCheckedChange={(checked) => 
+                      setColumnVisibility(prev => ({ ...prev, phone: checked || false }))
+                    }
+                  >
+                    Telefone
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.document}
+                    onCheckedChange={(checked) => 
+                      setColumnVisibility(prev => ({ ...prev, document: checked || false }))
+                    }
+                  >
+                    CPF/CNPJ
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.email}
+                    onCheckedChange={(checked) => 
+                      setColumnVisibility(prev => ({ ...prev, email: checked || false }))
+                    }
+                  >
+                    E-mail
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.city}
+                    onCheckedChange={(checked) => 
+                      setColumnVisibility(prev => ({ ...prev, city: checked || false }))
+                    }
+                  >
+                    Cidade
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.status}
+                    onCheckedChange={(checked) => 
+                      setColumnVisibility(prev => ({ ...prev, status: checked || false }))
+                    }
+                  >
+                    Status
+                  </DropdownMenuCheckboxItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Lado direito - Busca */}
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Buscar clientes..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-80"
+                />
+              </div>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Busca Avançada
+              </Button>
+            </div>
+          </div>
+
+          {/* Busca Avançada */}
+          {showAdvancedSearch && (
+            <div className="mt-4 p-4 bg-blue-50/40 rounded-lg border border-blue-100">
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <Input
+                  placeholder="Telefone..."
+                  value={advancedFilters.phone}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, phone: e.target.value }))}
+                />
+                <Input
+                  placeholder="E-mail..."
+                  value={advancedFilters.email}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, email: e.target.value }))}
+                />
+                <Input
+                  placeholder="Cidade..."
+                  value={advancedFilters.city}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, city: e.target.value }))}
+                />
+                <select 
+                  className="px-3 py-2 border rounded-md"
+                  value={advancedFilters.type}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, type: e.target.value }))}
+                >
+                  <option value="">Todos os tipos</option>
+                  <option value="PF">Pessoa Física</option>
+                  <option value="PJ">Pessoa Jurídica</option>
+                </select>
+                <select 
+                  className="px-3 py-2 border rounded-md"
+                  value={advancedFilters.status}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))}
+                >
+                  <option value="">Todos os status</option>
+                  <option value="active">Ativo</option>
+                  <option value="inactive">Inativo</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tabela */}
+      <Card className="border-blue-100">
         <CardHeader>
-          <CardTitle>Lista de Clientes ({filteredCustomers.length})</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Lista de Clientes ({filteredCustomers.length})
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
+            <div className="text-center py-8">Carregando clientes...</div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Contato</TableHead>
-                  <TableHead>Localização</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead>Nome</TableHead>
+                  {columnVisibility.type && <TableHead>Tipo</TableHead>}
+                  {columnVisibility.document && <TableHead>CPF/CNPJ</TableHead>}
+                  {columnVisibility.phone && <TableHead>Telefone</TableHead>}
+                  {columnVisibility.email && <TableHead>E-mail</TableHead>}
+                  {columnVisibility.city && <TableHead>Cidade</TableHead>}
+                  {columnVisibility.status && <TableHead>Status</TableHead>}
+                  <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredCustomers.map((customer) => (
                   <TableRow key={customer.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-lg">
-                          <User className="h-4 w-4 text-primary" />
+                    <TableCell className="font-medium">{customer.name}</TableCell>
+                    {columnVisibility.type && (
+                      <TableCell>
+                        <Badge variant={customer.type === 'PF' ? 'default' : 'secondary'}>
+                          {customer.type === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica'}
+                        </Badge>
+                      </TableCell>
+                    )}
+                    {columnVisibility.document && (
+                      <TableCell>{formatDocument(customer.document, customer.type)}</TableCell>
+                    )}
+                    {columnVisibility.phone && (
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Phone className="h-3 w-3 text-gray-400" />
+                          {formatPhone(customer.phone)}
                         </div>
-                        <div>
-                          <div className="font-medium">{customer.name}</div>
-                          {customer.document && (
-                            <div className="text-sm text-muted-foreground">
-                              {customer.document}
-                            </div>
-                          )}
+                      </TableCell>
+                    )}
+                    {columnVisibility.email && (
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Mail className="h-3 w-3 text-gray-400" />
+                          {customer.email}
                         </div>
-                      </div>
-                    </TableCell>
+                      </TableCell>
+                    )}
+                    {columnVisibility.city && <TableCell>{customer.city}</TableCell>}
+                    {columnVisibility.status && (
+                      <TableCell>
+                        <Badge variant={customer.status === 'active' ? 'default' : 'secondary'}>
+                          {customer.status === 'active' ? 'Ativo' : 'Inativo'}
+                        </Badge>
+                      </TableCell>
+                    )}
                     <TableCell>
-                      <div className="space-y-1">
-                        {customer.email && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Mail className="h-3 w-3 text-muted-foreground" />
-                            {customer.email}
-                          </div>
-                        )}
-                        {customer.phone && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Phone className="h-3 w-3 text-muted-foreground" />
-                            {customer.phone}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {customer.address && (
-                        <div className="flex items-start gap-2">
-                          <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                          <div className="text-sm">
-                            <div>{customer.address}</div>
-                            {(customer.neighborhood || customer.city) && (
-                              <div className="text-muted-foreground">
-                                {customer.neighborhood && `${customer.neighborhood}, `}
-                                {customer.city}
-                                {customer.state && ` - ${customer.state}`}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={customer.is_active ? 'default' : 'secondary'}>
-                        {customer.is_active ? 'Ativo' : 'Inativo'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(customer)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDelete(customer.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Ver Detalhes
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -431,13 +570,225 @@ export default function ClientesPage() {
             </Table>
           )}
 
-          {!loading && filteredCustomers.length === 0 && (
+          {filteredCustomers.length === 0 && !loading && (
             <div className="text-center py-8 text-muted-foreground">
-              {searchTerm ? 'Nenhum cliente encontrado com os filtros aplicados.' : 'Nenhum cliente cadastrado.'}
+              Nenhum cliente encontrado
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Dialog Adicionar Cliente */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Adicionar Novo Cliente</DialogTitle>
+            <DialogDescription>
+              Preencha as informações do cliente abaixo
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="name">Nome *</label>
+              <Input
+                id="name"
+                value={newCustomer.name}
+                onChange={(e) => setNewCustomer(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Nome do cliente"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label htmlFor="type">Tipo</label>
+                <select 
+                  className="px-3 py-2 border rounded-md"
+                  value={newCustomer.type}
+                  onChange={(e) => setNewCustomer(prev => ({ ...prev, type: e.target.value as 'PF' | 'PJ' }))}
+                >
+                  <option value="PF">Pessoa Física</option>
+                  <option value="PJ">Pessoa Jurídica</option>
+                </select>
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="document">CPF/CNPJ</label>
+                <Input
+                  id="document"
+                  value={newCustomer.document}
+                  onChange={(e) => setNewCustomer(prev => ({ ...prev, document: e.target.value }))}
+                  placeholder="000.000.000-00"
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="email">E-mail</label>
+              <Input
+                id="email"
+                type="email"
+                value={newCustomer.email}
+                onChange={(e) => setNewCustomer(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="email@exemplo.com"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label htmlFor="phone">Telefone</label>
+                <Input
+                  id="phone"
+                  value={newCustomer.phone}
+                  onChange={(e) => setNewCustomer(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="(11) 99999-9999"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="city">Cidade</label>
+                <Input
+                  id="city"
+                  value={newCustomer.city}
+                  onChange={(e) => setNewCustomer(prev => ({ ...prev, city: e.target.value }))}
+                  placeholder="São Paulo"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAddCustomer} className="bg-emerald-600 hover:bg-emerald-700">
+              Adicionar Cliente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Importar */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Importar Clientes</DialogTitle>
+            <DialogDescription>
+              Selecione um arquivo CSV ou Excel com os dados dos clientes
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="file">Arquivo</label>
+              <Input
+                id="file"
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={handleFileUpload}
+              />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <p>O arquivo deve conter as colunas:</p>
+              <ul className="list-disc pl-4 mt-2">
+                <li>nome (obrigatório)</li>
+                <li>email</li>
+                <li>telefone</li>
+                <li>documento (CPF/CNPJ)</li>
+                <li>cidade</li>
+                <li>tipo (PF ou PJ)</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImportDialog(false)}>
+              Cancelar
+            </Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => document.getElementById('file')?.click()}>
+              Selecionar Arquivo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Preview da Importação */}
+      <ImportPreviewModal
+        isOpen={showImportPreview}
+        onClose={() => setShowImportPreview(false)}
+        onConfirm={async () => {
+          // Importação direta simples
+          await handleRegisterSelected(importRows);
+        }}
+        onRegister={async (selected) => {
+          try {
+            setIsRegistering(true);
+            let success = 0, fail = 0;
+            const errors: string[] = [];
+            for (const row of selected) {
+              const obj: any = Array.isArray(row)
+                ? (() => {
+                    const keys = importHeaders.map(normalizeHeader);
+                    return Object.fromEntries(keys.map((h, i) => [h, row[i]]));
+                  })()
+                : (() => {
+                    const out: Record<string, any> = {};
+                    Object.entries(row as Record<string, any>).forEach(([k, v]) => {
+                      out[normalizeHeader(k)] = v;
+                    });
+                    return out;
+                  })();
+              const pick = (cands: string[]): string => {
+                for (const key of cands) {
+                  const val = obj[key];
+                  if (val !== undefined && val !== null && String(val).trim() !== '') return String(val);
+                }
+                for (const [k, v] of Object.entries(obj)) {
+                  if (cands.some((c) => k.includes(c))) {
+                    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
+                  }
+                }
+                return '';
+              };
+              const customerData = {
+                name: pick(['nome', 'name', 'fantasia']),
+                email: pick(['email', 'e mail']),
+                phone: pick(['telefone', 'celular', 'phone']),
+                document: pick(['cpf/cnpj', 'cpf', 'cnpj', 'documento']).replace(/\D/g, ''),
+                address: pick(['endereco', 'endereco completo', 'address', 'logradouro', 'rua']),
+                neighborhood: pick(['bairro']),
+                city: pick(['cidade', 'city']),
+                state: (pick(['estado', 'uf']).slice(0,2).toUpperCase() || null) as any,
+                zipcode: pick(['cep', 'zip']).replace(/\D/g, ''),
+                notes: pick(['observacoes', 'observacoes adicionais', 'notes']),
+                is_active: true,
+              } as any;
+
+              if (!customerData.name) { fail++; errors.push('Nome ausente'); continue; }
+
+              const res = await fetch('/next_api/customers', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(customerData) 
+              });
+
+              if (res.ok) {
+                success++;
+              } else {
+                fail++;
+                let txt = await res.text();
+                console.error('Falha ao cadastrar cliente:', txt);
+                errors.push(txt);
+              }
+            }
+            if (success > 0) toast.success(`${success} clientes cadastrados`);
+            if (fail > 0) toast.error(`${fail} falhas no cadastro`);
+            setShowImportPreview(false);
+            await loadCustomers();
+          } finally {
+            setIsRegistering(false);
+          }
+        }}
+        fileName={importFileName}
+        headers={importHeaders}
+        data={importRows}
+        totalRows={importRows.length}
+        validRows={importRows.length}
+        invalidRows={importErrors.length}
+        errors={importErrors}
+        isRegistering={isRegistering}
+      />
     </div>
   );
 }

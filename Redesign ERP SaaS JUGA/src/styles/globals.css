@@ -1,0 +1,329 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 16px;
+  
+  /* JUGA Brand Colors */
+  --juga-primary: #1e40af;
+  --juga-primary-light: #3b82f6;
+  --juga-primary-dark: #1e3a8a;
+  --juga-secondary: #64748b;
+  --juga-accent: #06b6d4;
+  --juga-success: #10b981;
+  --juga-warning: #f59e0b;
+  --juga-error: #ef4444;
+  
+  /* JUGA Surface Colors */
+  --juga-surface: #ffffff;
+  --juga-surface-elevated: #f8fafc;
+  --juga-surface-card: #ffffff;
+  --juga-surface-overlay: rgba(255, 255, 255, 0.95);
+  
+  /* JUGA Text Colors */
+  --juga-text-primary: #0f172a;
+  --juga-text-secondary: #475569;
+  --juga-text-muted: #94a3b8;
+  --juga-text-inverse: #ffffff;
+  
+  /* JUGA Border Colors */
+  --juga-border: #e2e8f0;
+  --juga-border-light: #f1f5f9;
+  --juga-border-strong: #cbd5e1;
+  
+  /* JUGA Gradients */
+  --juga-gradient-primary: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  --juga-gradient-accent: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+  --juga-gradient-surface: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  
+  /* JUGA Shadows */
+  --juga-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --juga-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --juga-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --juga-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --juga-shadow-glow: 0 0 0 1px rgba(30, 64, 175, 0.05), 0 4px 16px rgba(30, 64, 175, 0.12);
+  
+  /* Base Theme Variables */
+  --background: var(--juga-surface);
+  --foreground: var(--juga-text-primary);
+  --card: var(--juga-surface-card);
+  --card-foreground: var(--juga-text-primary);
+  --popover: var(--juga-surface);
+  --popover-foreground: var(--juga-text-primary);
+  --primary: var(--juga-primary);
+  --primary-foreground: var(--juga-text-inverse);
+  --secondary: #f1f5f9;
+  --secondary-foreground: var(--juga-text-primary);
+  --muted: #f8fafc;
+  --muted-foreground: var(--juga-text-muted);
+  --accent: var(--juga-surface-elevated);
+  --accent-foreground: var(--juga-text-primary);
+  --destructive: var(--juga-error);
+  --destructive-foreground: var(--juga-text-inverse);
+  --border: var(--juga-border);
+  --input: transparent;
+  --input-background: var(--juga-surface-elevated);
+  --switch-background: #cbd5e1;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: var(--juga-primary);
+  --chart-1: var(--juga-primary);
+  --chart-2: var(--juga-accent);
+  --chart-3: var(--juga-success);
+  --chart-4: var(--juga-warning);
+  --chart-5: var(--juga-secondary);
+  --radius: 0.75rem;
+  --sidebar: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%);
+  --sidebar-foreground: var(--juga-text-inverse);
+  --sidebar-primary: var(--juga-primary-light);
+  --sidebar-primary-foreground: var(--juga-text-inverse);
+  --sidebar-accent: rgba(255, 255, 255, 0.1);
+  --sidebar-accent-foreground: var(--juga-text-inverse);
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: var(--juga-primary-light);
+}
+
+.dark {
+  /* JUGA Dark Theme */
+  --juga-surface: #0f172a;
+  --juga-surface-elevated: #1e293b;
+  --juga-surface-card: #1e293b;
+  --juga-surface-overlay: rgba(15, 23, 42, 0.95);
+  
+  --juga-text-primary: #f8fafc;
+  --juga-text-secondary: #cbd5e1;
+  --juga-text-muted: #64748b;
+  
+  --juga-border: #334155;
+  --juga-border-light: #1e293b;
+  --juga-border-strong: #475569;
+  
+  --juga-primary: #3b82f6;
+  --juga-primary-light: #60a5fa;
+  --juga-primary-dark: #2563eb;
+  
+  --background: var(--juga-surface);
+  --foreground: var(--juga-text-primary);
+  --card: var(--juga-surface-card);
+  --card-foreground: var(--juga-text-primary);
+  --popover: var(--juga-surface-card);
+  --popover-foreground: var(--juga-text-primary);
+  --primary: var(--juga-primary);
+  --primary-foreground: var(--juga-text-inverse);
+  --secondary: #334155;
+  --secondary-foreground: var(--juga-text-primary);
+  --muted: #1e293b;
+  --muted-foreground: var(--juga-text-muted);
+  --accent: #334155;
+  --accent-foreground: var(--juga-text-primary);
+  --destructive: var(--juga-error);
+  --destructive-foreground: var(--juga-text-inverse);
+  --border: var(--juga-border);
+  --input: var(--juga-surface-elevated);
+  --ring: var(--juga-primary);
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --chart-1: var(--juga-primary);
+  --chart-2: var(--juga-accent);
+  --chart-3: var(--juga-success);
+  --chart-4: var(--juga-warning);
+  --chart-5: var(--juga-secondary);
+  --sidebar: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  --sidebar-foreground: var(--juga-text-primary);
+  --sidebar-primary: var(--juga-primary);
+  --sidebar-primary-foreground: var(--juga-text-inverse);
+  --sidebar-accent: rgba(59, 130, 246, 0.1);
+  --sidebar-accent-foreground: var(--juga-text-primary);
+  --sidebar-border: var(--juga-border);
+  --sidebar-ring: var(--juga-primary);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  
+  /* JUGA Custom Classes */
+  --color-juga-primary: var(--juga-primary);
+  --color-juga-primary-light: var(--juga-primary-light);
+  --color-juga-primary-dark: var(--juga-primary-dark);
+  --color-juga-secondary: var(--juga-secondary);
+  --color-juga-accent: var(--juga-accent);
+  --color-juga-success: var(--juga-success);
+  --color-juga-warning: var(--juga-warning);
+  --color-juga-error: var(--juga-error);
+  --color-juga-surface: var(--juga-surface);
+  --color-juga-surface-elevated: var(--juga-surface-elevated);
+  --color-juga-surface-card: var(--juga-surface-card);
+  --color-juga-text-primary: var(--juga-text-primary);
+  --color-juga-text-secondary: var(--juga-text-secondary);
+  --color-juga-text-muted: var(--juga-text-muted);
+  --color-juga-text-inverse: var(--juga-text-inverse);
+  --color-juga-border: var(--juga-border);
+  --color-juga-border-light: var(--juga-border-light);
+  --color-juga-border-strong: var(--juga-border-strong);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+/* JUGA Utilities */
+@layer utilities {
+  .juga-gradient {
+    background: var(--juga-gradient-primary);
+  }
+  
+  .juga-gradient-accent {
+    background: var(--juga-gradient-accent);
+  }
+  
+  .juga-gradient-surface {
+    background: var(--juga-gradient-surface);
+  }
+  
+  .juga-sidebar-gradient {
+    background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%);
+  }
+  
+  .dark .juga-sidebar-gradient {
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  }
+  
+  .juga-shadow-glow {
+    box-shadow: var(--juga-shadow-glow);
+  }
+  
+  .juga-card {
+    @apply bg-juga-surface-card border border-juga-border rounded-lg p-6;
+    box-shadow: var(--juga-shadow-md);
+  }
+  
+  .juga-card-elevated {
+    @apply bg-juga-surface-card border border-juga-border rounded-lg p-6;
+    box-shadow: var(--juga-shadow-lg);
+  }
+  
+  .juga-surface {
+    @apply bg-juga-surface-elevated border border-juga-border-light;
+  }
+  
+  .text-heading {
+    @apply text-juga-text-primary font-medium;
+  }
+  
+  .text-body {
+    @apply text-juga-text-secondary;
+  }
+  
+  .text-caption {
+    @apply text-juga-text-muted;
+  }
+}
+
+/**
+ * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
+ */
+@layer base {
+  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
+    h1 {
+      font-size: 2rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.4;
+      color: var(--juga-text-primary);
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.4;
+      color: var(--juga-text-primary);
+    }
+
+    h3 {
+      font-size: 1.25rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.4;
+      color: var(--juga-text-primary);
+    }
+
+    h4 {
+      font-size: 1rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.4;
+      color: var(--juga-text-primary);
+    }
+
+    p {
+      font-size: 1rem;
+      font-weight: var(--font-weight-normal);
+      line-height: 1.6;
+      color: var(--juga-text-secondary);
+    }
+
+    label {
+      font-size: 0.875rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.4;
+      color: var(--juga-text-primary);
+    }
+
+    button {
+      font-size: 0.875rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.4;
+    }
+
+    input {
+      font-size: 0.875rem;
+      font-weight: var(--font-weight-normal);
+      line-height: 1.4;
+      color: var(--juga-text-primary);
+    }
+  }
+}
+
+html {
+  font-size: var(--font-size);
+  scroll-behavior: smooth;
+}

@@ -60,6 +60,50 @@ export default class CrudOperations {
   }
 
   /**
+   * Busca registros com contagem total (ignora paginação para o total)
+   */
+  async findManyWithCount(
+    filters?: Record<string, any>,
+    params?: {
+      limit?: number;
+      offset?: number;
+      orderBy?: { column: string; direction: "asc" | "desc" };
+    },
+  ): Promise<{ rows: any[]; total: number }> {
+    validateEnv();
+    const { limit, offset, orderBy } = params || {};
+
+    let query = this.client
+      .from(this.tableName)
+      .select("*", { count: "exact", head: false });
+
+    if (orderBy) {
+      query = query.order(orderBy.column, {
+        ascending: orderBy.direction === "asc",
+      });
+    }
+
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          query = query.eq(key, value);
+        }
+      });
+    }
+
+    if (limit && offset !== undefined) {
+      query = query.range(offset, offset + limit - 1);
+    }
+
+    const { data, error, count } = await query;
+    if (error) {
+      throw new Error(`Failed to fetch ${this.tableName}: ${error.message}`);
+    }
+
+    return { rows: data || [], total: count || 0 };
+  }
+
+  /**
    * Fetches a single record by its ID
    */
   async findById(id: string | number) {

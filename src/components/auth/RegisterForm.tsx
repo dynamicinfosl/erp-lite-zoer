@@ -12,7 +12,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { useAuth } from "./AuthProvider";
+import { useAuth } from "@/contexts/AuthContext";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { z } from "zod";
