@@ -29,7 +29,7 @@ CREATE TABLE products (
     category_id BIGINT,
     name VARCHAR(200) NOT NULL,
     sku VARCHAR(100) UNIQUE,
-    barcode VARCHAR(100),
+    barcode VARCHAR(100),image.png
     description TEXT,
     cost_price DECIMAL(10,2) NOT NULL DEFAULT 0,
     sale_price DECIMAL(10,2) NOT NULL,
