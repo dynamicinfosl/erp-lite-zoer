@@ -58,7 +58,7 @@ export function ComplianceStatCard({
   className
 }: ComplianceStatCardProps) {
   const colors = VARIANT_COLORS[variant];
-  const displayValue = typeof value === 'number' ? value.toLocaleString() : value;
+  const displayValue = typeof value === 'number' ? value.toLocaleString('pt-BR') : value;
 
   return (
     <Card className={cn(

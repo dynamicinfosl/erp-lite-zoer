@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Shield, Eye, EyeOff, ExternalLink } from 'lucide-react';
+import { Shield, Eye, EyeOff, ExternalLink, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface AdminPopupProps {

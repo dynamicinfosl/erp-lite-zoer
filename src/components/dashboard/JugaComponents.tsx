@@ -168,7 +168,7 @@ export function JugaProgressCard({
               <div className="font-bold text-base sm:text-lg text-heading">{progress}%</div>
               {typeof total === "number" && typeof current === "number" ? (
                 <div className="text-caption text-xs">
-                  <span className="hidden sm:inline">{current.toLocaleString()} / {total.toLocaleString()}</span>
+                  <span className="hidden sm:inline">{current.toLocaleString('pt-BR')} / {total.toLocaleString('pt-BR')}</span>
                   <span className="sm:hidden">{Math.round(current/1000)}k / {Math.round(total/1000)}k</span>
                 </div>
               ) : null}

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { JugaKPICard, JugaProgressCard } from '@/components/dashboard/JugaComponents';
 import { 
   Dialog, 
   DialogContent, 
@@ -44,7 +45,24 @@ import {
   Edit,
   Eye,
   DollarSign,
-  BarChart3
+  BarChart3,
+  PackagePlus,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  CheckCircle,
+  ShoppingCart,
+  Warehouse,
+  Hash,
+  Tag,
+  Building2,
+  CreditCard,
+  TrendingUp as TrendingUpIcon,
+  Package2,
+  Barcode,
+  FileText,
+  Ruler,
+  Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -397,98 +415,375 @@ export default function ProdutosPage() {
     return { label: 'Em estoque', variant: 'default' as const };
   };
 
+  // Função para obter ícone específico de cada coluna
+  const getColumnIcon = (key: string) => {
+    const iconMap: { [key: string]: React.ReactNode } = {
+      sku: <Hash className="h-4 w-4 mr-3 text-gray-400" />,
+      category: <Tag className="h-4 w-4 mr-3 text-gray-400" />,
+      brand: <Building2 className="h-4 w-4 mr-3 text-gray-400" />,
+      cost_price: <DollarSign className="h-4 w-4 mr-3 text-gray-400" />,
+      sale_price: <TrendingUpIcon className="h-4 w-4 mr-3 text-gray-400" />,
+      stock_quantity: <Package2 className="h-4 w-4 mr-3 text-gray-400" />,
+      barcode: <Barcode className="h-4 w-4 mr-3 text-gray-400" />,
+      ncm: <FileText className="h-4 w-4 mr-3 text-gray-400" />,
+      unit: <Ruler className="h-4 w-4 mr-3 text-gray-400" />,
+      status: <Activity className="h-4 w-4 mr-3 text-gray-400" />
+    };
+    return iconMap[key] || <Settings2 className="h-4 w-4 mr-3 text-gray-400" />;
+  };
+
+  // Calcular estatísticas dos produtos
+  const productStats = {
+    total: Array.isArray(products) ? products.length : 0,
+    active: Array.isArray(products) ? products.filter(p => p.status === 'active').length : 0,
+    inactive: Array.isArray(products) ? products.filter(p => p.status === 'inactive').length : 0,
+    lowStock: Array.isArray(products) ? products.filter(p => p.stock_quantity <= 10).length : 0,
+    outOfStock: Array.isArray(products) ? products.filter(p => p.stock_quantity === 0).length : 0,
+    totalValue: Array.isArray(products) ? products.reduce((acc, p) => acc + (p.sale_price * p.stock_quantity), 0) : 0,
+    avgPrice: Array.isArray(products) && products.length > 0 ? products.reduce((acc, p) => acc + p.sale_price, 0) / products.length : 0,
+    newThisMonth: Array.isArray(products) ? products.filter(p => {
+      const created = new Date(p.created_at);
+      const now = new Date();
+      return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+    }).length : 0
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <Card className="border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-white">
-        <CardContent className="pt-6 pb-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-blue-900">Produtos</h1>
-              <p className="text-sm text-blue-900/70">
-                Gerencie seu catálogo de produtos e controle de estoque
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge className="px-3 py-1 bg-blue-600 text-white">
-                <Package className="h-3 w-3 mr-1" />
-                {products.length} produtos
-              </Badge>
-              <Badge variant="outline" className="px-3 py-1 border-blue-200">
-                <BarChart3 className="h-3 w-3 mr-1" />
-                {products.filter(p => p.stock_quantity <= 10).length} estoque baixo
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Header com Título */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-heading">Produtos</h1>
+          <p className="text-muted-foreground">
+            Gerencie seu catálogo de produtos e controle de estoque
+          </p>
+        </div>
+        <Button 
+          className="juga-gradient text-white"
+          onClick={() => setShowAddDialog(true)}
+        >
+          <PackagePlus className="h-4 w-4 mr-2" />
+          Adicionar Produto
+        </Button>
+      </div>
+
+      {/* Cards de Estatísticas */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+        <JugaKPICard
+          title="Total Produtos"
+          value={productStats.total.toLocaleString('pt-BR')}
+          description="Produtos cadastrados"
+          icon={<Package className="h-4 w-4" />}
+          color="primary"
+        />
+        
+        <JugaKPICard
+          title="Produtos Ativos"
+          value={productStats.active.toLocaleString('pt-BR')}
+          description="Status ativo"
+          icon={<CheckCircle className="h-4 w-4" />}
+          color="success"
+          trend="up"
+          trendValue="+8%"
+        />
+        
+        <JugaKPICard
+          title="Estoque Baixo"
+          value={productStats.lowStock.toLocaleString('pt-BR')}
+          description="≤ 10 unidades"
+          icon={<AlertTriangle className="h-4 w-4" />}
+          color="warning"
+          trend={productStats.lowStock > 0 ? "down" : "up"}
+          trendValue={productStats.lowStock > 0 ? "Atenção" : "OK"}
+        />
+        
+        <JugaKPICard
+          title="Sem Estoque"
+          value={productStats.outOfStock.toLocaleString('pt-BR')}
+          description="0 unidades"
+          icon={<TrendingDown className="h-4 w-4" />}
+          color="error"
+          trend={productStats.outOfStock > 0 ? "down" : "up"}
+          trendValue={productStats.outOfStock > 0 ? "Crítico" : "OK"}
+        />
+        
+        <JugaKPICard
+          title="Valor Total"
+          value={formatCurrency(productStats.totalValue)}
+          description="Estoque total"
+          icon={<DollarSign className="h-4 w-4" />}
+          color="accent"
+          trend="up"
+          trendValue="+12%"
+        />
+        
+        <JugaKPICard
+          title="Novos Este Mês"
+          value={productStats.newThisMonth.toLocaleString('pt-BR')}
+          description="Cadastros recentes"
+          icon={<TrendingUp className="h-4 w-4" />}
+          color="success"
+          trend="up"
+          trendValue="+15%"
+        />
+      </div>
+
+      {/* Progress Cards */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <JugaProgressCard
+          title="Status dos Produtos"
+          description="Ativos vs Inativos"
+          progress={productStats.total > 0 ? Math.round((productStats.active / productStats.total) * 100) : 0}
+          total={productStats.total}
+          current={productStats.active}
+          color="success"
+        />
+        
+        <JugaProgressCard
+          title="Controle de Estoque"
+          description="Em estoque vs Baixo"
+          progress={productStats.total > 0 ? Math.round(((productStats.total - productStats.lowStock - productStats.outOfStock) / productStats.total) * 100) : 0}
+          total={productStats.total}
+          current={productStats.total - productStats.lowStock - productStats.outOfStock}
+          color="primary"
+        />
+        
+        <JugaProgressCard
+          title="Crescimento Mensal"
+          description="Novos produtos"
+          progress={productStats.total > 0 ? Math.round((productStats.newThisMonth / productStats.total) * 100) : 0}
+          total={productStats.total}
+          current={productStats.newThisMonth}
+          color="accent"
+        />
+      </div>
 
       {/* Toolbar */}
-      <Card className="border-blue-100">
+      <Card className="juga-card">
         <CardContent className="pt-6">
           <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
             {/* Lado esquerdo - Botões de ação */}
             <div className="flex items-center gap-2">
-              <Button 
-                className="juga-gradient text-white"
-                onClick={() => setShowAddDialog(true)}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Produto
-              </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="border-blue-200 hover:bg-blue-50">
+                  <Button 
+                    variant="outline" 
+                    className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+                  >
                     <MoreHorizontal className="h-4 w-4 mr-2" />
                     Mais Ações
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setShowImportDialog(true)} className="cursor-pointer">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Importar Produtos
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportar Lista
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-red-600">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Excluir Selecionados
-                  </DropdownMenuItem>
+                <DropdownMenuContent className="w-52 z-50 bg-white border border-gray-200 shadow-xl rounded-lg">
+                  <DropdownMenuLabel className="px-3 py-2 text-sm font-semibold text-gray-900 bg-gray-50 border-b border-gray-100">
+                    <MoreHorizontal className="h-4 w-4 inline mr-2" />
+                    Ações
+                  </DropdownMenuLabel>
+                  
+                  <div className="py-1">
+                    <DropdownMenuItem 
+                      onClick={() => setShowImportDialog(true)} 
+                      className="cursor-pointer px-3 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 flex items-center"
+                    >
+                      <Upload className="h-4 w-4 mr-3 text-gray-400" />
+                      Importar Produtos
+                    </DropdownMenuItem>
+                    
+                    <DropdownMenuItem className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center">
+                      <Download className="h-4 w-4 mr-3 text-gray-400" />
+                      Exportar Lista
+                    </DropdownMenuItem>
+                  </div>
+                  
+                  <div className="border-t border-gray-100 pt-1">
+                    <DropdownMenuItem className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center">
+                      <Trash2 className="h-4 w-4 mr-3 text-red-400" />
+                      Excluir Selecionados
+                    </DropdownMenuItem>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="border-blue-200 hover:bg-blue-50">
+                  <Button 
+                    variant="outline" 
+                    className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+                  >
                     <Settings2 className="h-4 w-4 mr-2" />
                     Colunas
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuLabel>Mostrar Colunas</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {Object.entries(columnVisibility).map(([key, value]) => (
-                    <DropdownMenuCheckboxItem
-                      key={key}
-                      checked={value}
-                      onCheckedChange={(checked) => 
-                        setColumnVisibility(prev => ({ ...prev, [key]: checked || false }))
-                      }
-                    >
-                      {key === 'sku' ? 'SKU' : 
-                       key === 'cost_price' ? 'Preço Custo' :
-                       key === 'sale_price' ? 'Preço Venda' :
-                       key === 'stock_quantity' ? 'Estoque' :
-                       key === 'barcode' ? 'Código de Barras' :
-                       key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}
-                    </DropdownMenuCheckboxItem>
-                  ))}
+                <DropdownMenuContent className="w-60 z-50 bg-white border border-gray-200 shadow-xl rounded-lg">
+                  <DropdownMenuLabel className="px-3 py-2 text-sm font-semibold text-gray-900 bg-gray-50 border-b border-gray-100">
+                    <Settings2 className="h-4 w-4 inline mr-2" />
+                    Mostrar Colunas
+                  </DropdownMenuLabel>
+                  
+                  <div className="py-1">
+                    {/* Seção: Identificação */}
+                    <div className="px-3 py-1">
+                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                        Identificação
+                      </div>
+                      <div className="space-y-0.5">
+                        <DropdownMenuCheckboxItem
+                          checked={columnVisibility.sku}
+                          onCheckedChange={(checked) => 
+                            setColumnVisibility(prev => ({ ...prev, sku: checked || false }))
+                          }
+                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                        >
+                          {getColumnIcon('sku')}
+                          SKU
+                        </DropdownMenuCheckboxItem>
+                        
+                        <DropdownMenuCheckboxItem
+                          checked={columnVisibility.category}
+                          onCheckedChange={(checked) => 
+                            setColumnVisibility(prev => ({ ...prev, category: checked || false }))
+                          }
+                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                        >
+                          {getColumnIcon('category')}
+                          Categoria
+                        </DropdownMenuCheckboxItem>
+                        
+                        <DropdownMenuCheckboxItem
+                          checked={columnVisibility.brand}
+                          onCheckedChange={(checked) => 
+                            setColumnVisibility(prev => ({ ...prev, brand: checked || false }))
+                          }
+                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                        >
+                          {getColumnIcon('brand')}
+                          Marca
+                        </DropdownMenuCheckboxItem>
+                      </div>
+                    </div>
+                    
+                    {/* Separador */}
+                    <div className="border-t border-gray-100 my-1"></div>
+                    
+                    {/* Seção: Preços */}
+                    <div className="px-3 py-1">
+                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                        Preços
+                      </div>
+                      <div className="space-y-0.5">
+                        <DropdownMenuCheckboxItem
+                          checked={columnVisibility.cost_price}
+                          onCheckedChange={(checked) => 
+                            setColumnVisibility(prev => ({ ...prev, cost_price: checked || false }))
+                          }
+                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                        >
+                          {getColumnIcon('cost_price')}
+                          Preço Custo
+                        </DropdownMenuCheckboxItem>
+                        
+                        <DropdownMenuCheckboxItem
+                          checked={columnVisibility.sale_price}
+                          onCheckedChange={(checked) => 
+                            setColumnVisibility(prev => ({ ...prev, sale_price: checked || false }))
+                          }
+                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                        >
+                          {getColumnIcon('sale_price')}
+                          Preço Venda
+                        </DropdownMenuCheckboxItem>
+                      </div>
+                    </div>
+                    
+                    {/* Separador */}
+                    <div className="border-t border-gray-100 my-1"></div>
+                    
+                    {/* Seção: Estoque */}
+                    <div className="px-3 py-1">
+                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                        Estoque
+                      </div>
+                      <div className="space-y-0.5">
+                        <DropdownMenuCheckboxItem
+                          checked={columnVisibility.stock_quantity}
+                          onCheckedChange={(checked) => 
+                            setColumnVisibility(prev => ({ ...prev, stock_quantity: checked || false }))
+                          }
+                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                        >
+                          {getColumnIcon('stock_quantity')}
+                          Estoque
+                        </DropdownMenuCheckboxItem>
+                        
+                        <DropdownMenuCheckboxItem
+                          checked={columnVisibility.unit}
+                          onCheckedChange={(checked) => 
+                            setColumnVisibility(prev => ({ ...prev, unit: checked || false }))
+                          }
+                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                        >
+                          {getColumnIcon('unit')}
+                          Unidade
+                        </DropdownMenuCheckboxItem>
+                      </div>
+                    </div>
+                    
+                    {/* Separador */}
+                    <div className="border-t border-gray-100 my-1"></div>
+                    
+                    {/* Seção: Documentos */}
+                    <div className="px-3 py-1">
+                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                        Documentos
+                      </div>
+                      <div className="space-y-0.5">
+                        <DropdownMenuCheckboxItem
+                          checked={columnVisibility.barcode}
+                          onCheckedChange={(checked) => 
+                            setColumnVisibility(prev => ({ ...prev, barcode: checked || false }))
+                          }
+                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                        >
+                          {getColumnIcon('barcode')}
+                          Código de Barras
+                        </DropdownMenuCheckboxItem>
+                        
+                        <DropdownMenuCheckboxItem
+                          checked={columnVisibility.ncm}
+                          onCheckedChange={(checked) => 
+                            setColumnVisibility(prev => ({ ...prev, ncm: checked || false }))
+                          }
+                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                        >
+                          {getColumnIcon('ncm')}
+                          NCM
+                        </DropdownMenuCheckboxItem>
+                      </div>
+                    </div>
+                    
+                    {/* Separador */}
+                    <div className="border-t border-gray-100 my-1"></div>
+                    
+                    {/* Seção: Status */}
+                    <div className="px-3 py-1">
+                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                        Status
+                      </div>
+                      <div className="space-y-0.5">
+                        <DropdownMenuCheckboxItem
+                          checked={columnVisibility.status}
+                          onCheckedChange={(checked) => 
+                            setColumnVisibility(prev => ({ ...prev, status: checked || false }))
+                          }
+                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                        >
+                          {getColumnIcon('status')}
+                          Status
+                        </DropdownMenuCheckboxItem>
+                      </div>
+                    </div>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -507,6 +802,7 @@ export default function ProdutosPage() {
               <Button 
                 variant="outline" 
                 onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
               >
                 <Filter className="h-4 w-4 mr-2" />
                 Busca Avançada
@@ -516,7 +812,7 @@ export default function ProdutosPage() {
 
           {/* Busca Avançada */}
           {showAdvancedSearch && (
-            <div className="mt-4 p-4 bg-blue-50/40 rounded-lg border border-blue-100">
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <Input
                   placeholder="Categoria..."
@@ -556,7 +852,7 @@ export default function ProdutosPage() {
       </Card>
 
       {/* Tabela */}
-      <Card>
+      <Card className="juga-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
@@ -565,7 +861,12 @@ export default function ProdutosPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8">Carregando produtos...</div>
+            <div className="text-center py-8 text-muted-foreground">
+              <div className="flex items-center justify-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                Carregando produtos...
+              </div>
+            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -636,24 +937,32 @@ export default function ProdutosPage() {
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
+                            <Button 
+                              variant="ghost" 
+                              className="h-8 w-8 p-0 hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+                            >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="h-4 w-4 mr-2" />
-                              Ver Detalhes
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600">
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Excluir
-                            </DropdownMenuItem>
+                          <DropdownMenuContent align="end" className="w-44 z-50 bg-white border border-gray-200 shadow-xl rounded-lg">
+                            <div className="py-1">
+                              <DropdownMenuItem className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center">
+                                <Eye className="h-4 w-4 mr-3 text-gray-400" />
+                                Ver Detalhes
+                              </DropdownMenuItem>
+                              
+                              <DropdownMenuItem className="px-3 py-2 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700 flex items-center">
+                                <Edit className="h-4 w-4 mr-3 text-gray-400" />
+                                Editar
+                              </DropdownMenuItem>
+                            </div>
+                            
+                            <div className="border-t border-gray-100 pt-1">
+                              <DropdownMenuItem className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center">
+                                <Trash2 className="h-4 w-4 mr-3 text-red-400" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </div>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -665,8 +974,15 @@ export default function ProdutosPage() {
           )}
 
           {filteredProducts.length === 0 && !loading && (
-            <div className="text-center py-8 text-muted-foreground">
-              Nenhum produto encontrado
+            <div className="text-center py-12 text-muted-foreground">
+              <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium mb-2">Nenhum produto encontrado</h3>
+              <p className="text-sm">
+                {searchTerm || Object.values(advancedFilters).some(v => v) 
+                  ? "Tente ajustar os filtros de busca"
+                  : "Adicione produtos para começar"
+                }
+              </p>
             </div>
           )}
         </CardContent>

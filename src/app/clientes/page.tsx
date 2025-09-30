@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { JugaKPICard, JugaProgressCard } from '@/components/dashboard/JugaComponents';
 import { 
   Dialog, 
   DialogContent, 
@@ -44,7 +45,16 @@ import {
   Edit,
   Eye,
   Phone,
-  Mail
+  Mail,
+  UserPlus,
+  TrendingUp,
+  Building,
+  UserCheck,
+  Activity,
+  User,
+  CreditCard,
+  MapPin,
+  CheckCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
@@ -285,130 +295,262 @@ export default function ClientesPage() {
     }
   };
 
+  // Calcular estatísticas dos clientes
+  const customerStats = {
+    total: Array.isArray(customers) ? customers.length : 0,
+    active: Array.isArray(customers) ? customers.filter(c => c.status === 'active').length : 0,
+    inactive: Array.isArray(customers) ? customers.filter(c => c.status === 'inactive').length : 0,
+    pf: Array.isArray(customers) ? customers.filter(c => c.type === 'PF').length : 0,
+    pj: Array.isArray(customers) ? customers.filter(c => c.type === 'PJ').length : 0,
+    newThisMonth: Array.isArray(customers) ? customers.filter(c => {
+      const created = new Date(c.created_at);
+      const now = new Date();
+      return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+    }).length : 0
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <Card className="border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-white">
-        <CardContent className="pt-6 pb-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-blue-900">Clientes</h1>
-              <p className="text-sm text-blue-900/70">
-                Gerencie seus clientes e informações de contato
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge className="px-3 py-1 bg-blue-600 text-white">
-                <Users className="h-3 w-3 mr-1" />
-                {customers.length} clientes
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Header com Título */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-heading">Clientes</h1>
+          <p className="text-muted-foreground">
+            Gerencie seus clientes e informações de contato
+          </p>
+        </div>
+        <Button 
+          className="juga-gradient text-white"
+          onClick={() => setShowAddDialog(true)}
+        >
+          <UserPlus className="h-4 w-4 mr-2" />
+          Adicionar Cliente
+        </Button>
+      </div>
+
+      {/* Cards de Estatísticas */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+        <JugaKPICard
+          title="Total Clientes"
+          value={customerStats.total.toLocaleString('pt-BR')}
+          description="Clientes cadastrados"
+          icon={<Users className="h-4 w-4" />}
+          color="primary"
+        />
+        
+        <JugaKPICard
+          title="Clientes Ativos"
+          value={customerStats.active.toLocaleString('pt-BR')}
+          description="Status ativo"
+          icon={<UserCheck className="h-4 w-4" />}
+          color="success"
+          trend="up"
+          trendValue="+12%"
+        />
+        
+        <JugaKPICard
+          title="Pessoa Física"
+          value={customerStats.pf.toLocaleString('pt-BR')}
+          description="Clientes PF"
+          icon={<Users className="h-4 w-4" />}
+          color="accent"
+        />
+        
+        <JugaKPICard
+          title="Pessoa Jurídica"
+          value={customerStats.pj.toLocaleString('pt-BR')}
+          description="Clientes PJ"
+          icon={<Building className="h-4 w-4" />}
+          color="warning"
+        />
+        
+        <JugaKPICard
+          title="Novos Este Mês"
+          value={customerStats.newThisMonth.toLocaleString('pt-BR')}
+          description="Cadastros recentes"
+          icon={<TrendingUp className="h-4 w-4" />}
+          color="success"
+          trend="up"
+          trendValue="+8%"
+        />
+        
+        <JugaKPICard
+          title="Taxa Ativação"
+          value={`${customerStats.total > 0 ? Math.round((customerStats.active / customerStats.total) * 100) : 0}%`}
+          description="Clientes ativos"
+          icon={<Activity className="h-4 w-4" />}
+          color="primary"
+        />
+      </div>
+
+      {/* Progress Cards */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <JugaProgressCard
+          title="Distribuição por Tipo"
+          description="PF vs PJ"
+          progress={customerStats.total > 0 ? Math.round((customerStats.pf / customerStats.total) * 100) : 0}
+          total={customerStats.total}
+          current={customerStats.pf}
+          color="accent"
+        />
+        
+        <JugaProgressCard
+          title="Status dos Clientes"
+          description="Ativos vs Inativos"
+          progress={customerStats.total > 0 ? Math.round((customerStats.active / customerStats.total) * 100) : 0}
+          total={customerStats.total}
+          current={customerStats.active}
+          color="success"
+        />
+        
+        <JugaProgressCard
+          title="Crescimento Mensal"
+          description="Novos clientes"
+          progress={customerStats.total > 0 ? Math.round((customerStats.newThisMonth / customerStats.total) * 100) : 0}
+          total={customerStats.total}
+          current={customerStats.newThisMonth}
+          color="primary"
+        />
+      </div>
 
       {/* Toolbar */}
-      <Card className="border-blue-100">
+      <Card className="juga-card">
         <CardContent className="pt-6">
           <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
             {/* Lado esquerdo - Botões de ação */}
             <div className="flex items-center gap-2">
               <Button 
-                className="juga-gradient text-white"
-                onClick={() => setShowAddDialog(true)}
+                variant="outline" 
+                onClick={testCreateCustomer} 
+                title="Diagnóstico: testar POST /next_api/customers"
+                className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Cliente
-              </Button>
-
-              <Button variant="outline" onClick={testCreateCustomer} title="Diagnóstico: testar POST /next_api/customers">
                 Teste API
               </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="border-blue-200 hover:bg-blue-50">
+                  <Button 
+                    variant="outline" 
+                    className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+                  >
                     <MoreHorizontal className="h-4 w-4 mr-2" />
                     Mais Ações
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setShowImportDialog(true)} className="cursor-pointer">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Importar Clientes
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportar Lista
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-red-600">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Excluir Selecionados
-                  </DropdownMenuItem>
+                <DropdownMenuContent className="w-52 z-50 bg-white border border-gray-200 shadow-xl rounded-lg">
+                  <DropdownMenuLabel className="px-3 py-2 text-sm font-semibold text-gray-900 bg-gray-50 border-b border-gray-100">
+                    <MoreHorizontal className="h-4 w-4 inline mr-2" />
+                    Ações
+                  </DropdownMenuLabel>
+                  
+                  <div className="py-1">
+                    <DropdownMenuItem 
+                      onClick={() => setShowImportDialog(true)} 
+                      className="cursor-pointer px-3 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 flex items-center"
+                    >
+                      <Upload className="h-4 w-4 mr-3 text-gray-400" />
+                      Importar Clientes
+                    </DropdownMenuItem>
+                    
+                    <DropdownMenuItem className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center">
+                      <Download className="h-4 w-4 mr-3 text-gray-400" />
+                      Exportar Lista
+                    </DropdownMenuItem>
+                  </div>
+                  
+                  <div className="border-t border-gray-100 pt-1">
+                    <DropdownMenuItem className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center">
+                      <Trash2 className="h-4 w-4 mr-3 text-red-400" />
+                      Excluir Selecionados
+                    </DropdownMenuItem>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="border-blue-200 hover:bg-blue-50">
+                  <Button 
+                    variant="outline" 
+                    className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+                  >
                     <Settings2 className="h-4 w-4 mr-2" />
                     Colunas
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuLabel>Mostrar Colunas</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuCheckboxItem
-                    checked={columnVisibility.type}
-                    onCheckedChange={(checked) => 
-                      setColumnVisibility(prev => ({ ...prev, type: checked || false }))
-                    }
-                  >
-                    Tipo de Pessoa
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={columnVisibility.phone}
-                    onCheckedChange={(checked) => 
-                      setColumnVisibility(prev => ({ ...prev, phone: checked || false }))
-                    }
-                  >
-                    Telefone
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={columnVisibility.document}
-                    onCheckedChange={(checked) => 
-                      setColumnVisibility(prev => ({ ...prev, document: checked || false }))
-                    }
-                  >
-                    CPF/CNPJ
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={columnVisibility.email}
-                    onCheckedChange={(checked) => 
-                      setColumnVisibility(prev => ({ ...prev, email: checked || false }))
-                    }
-                  >
-                    E-mail
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={columnVisibility.city}
-                    onCheckedChange={(checked) => 
-                      setColumnVisibility(prev => ({ ...prev, city: checked || false }))
-                    }
-                  >
-                    Cidade
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={columnVisibility.status}
-                    onCheckedChange={(checked) => 
-                      setColumnVisibility(prev => ({ ...prev, status: checked || false }))
-                    }
-                  >
-                    Status
-                  </DropdownMenuCheckboxItem>
+                <DropdownMenuContent className="w-64 z-50 bg-white border border-gray-200 shadow-xl rounded-lg">
+                  <DropdownMenuLabel className="px-3 py-2 text-sm font-semibold text-gray-900 bg-gray-50 border-b border-gray-100">
+                    <Settings2 className="h-4 w-4 inline mr-2" />
+                    Mostrar Colunas
+                  </DropdownMenuLabel>
+                  
+                  <div className="py-1">
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.type}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, type: checked || false }))
+                      }
+                      className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center"
+                    >
+                      <User className="h-4 w-4 mr-3 text-gray-400" />
+                      Tipo de Pessoa
+                    </DropdownMenuCheckboxItem>
+                    
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.phone}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, phone: checked || false }))
+                      }
+                      className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center"
+                    >
+                      <Phone className="h-4 w-4 mr-3 text-gray-400" />
+                      Telefone
+                    </DropdownMenuCheckboxItem>
+                    
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.document}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, document: checked || false }))
+                      }
+                      className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center"
+                    >
+                      <CreditCard className="h-4 w-4 mr-3 text-gray-400" />
+                      CPF/CNPJ
+                    </DropdownMenuCheckboxItem>
+                    
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.email}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, email: checked || false }))
+                      }
+                      className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center"
+                    >
+                      <Mail className="h-4 w-4 mr-3 text-gray-400" />
+                      E-mail
+                    </DropdownMenuCheckboxItem>
+                    
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.city}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, city: checked || false }))
+                      }
+                      className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center"
+                    >
+                      <MapPin className="h-4 w-4 mr-3 text-gray-400" />
+                      Cidade
+                    </DropdownMenuCheckboxItem>
+                    
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.status}
+                      onCheckedChange={(checked) => 
+                        setColumnVisibility(prev => ({ ...prev, status: checked || false }))
+                      }
+                      className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-3 text-gray-400" />
+                      Status
+                    </DropdownMenuCheckboxItem>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -427,6 +569,7 @@ export default function ClientesPage() {
               <Button 
                 variant="outline" 
                 onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
               >
                 <Filter className="h-4 w-4 mr-2" />
                 Busca Avançada
@@ -436,7 +579,7 @@ export default function ClientesPage() {
 
           {/* Busca Avançada */}
           {showAdvancedSearch && (
-            <div className="mt-4 p-4 bg-blue-50/40 rounded-lg border border-blue-100">
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <Input
                   placeholder="Telefone..."
@@ -478,9 +621,9 @@ export default function ClientesPage() {
       </Card>
 
       {/* Tabela */}
-      <Card className="border-blue-100">
+      <Card className="juga-card">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-heading">
             <Users className="h-5 w-5" />
             Lista de Clientes ({filteredCustomers.length})
           </CardTitle>
@@ -543,24 +686,32 @@ export default function ClientesPage() {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
+                          <Button 
+                            variant="ghost" 
+                            className="h-8 w-8 p-0 hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+                          >
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="h-4 w-4 mr-2" />
-                            Ver Detalhes
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600">
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Excluir
-                          </DropdownMenuItem>
+                        <DropdownMenuContent align="end" className="w-44 z-50 bg-white border border-gray-200 shadow-xl rounded-lg">
+                          <div className="py-1">
+                            <DropdownMenuItem className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center">
+                              <Eye className="h-4 w-4 mr-3 text-gray-400" />
+                              Ver Detalhes
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuItem className="px-3 py-2 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700 flex items-center">
+                              <Edit className="h-4 w-4 mr-3 text-gray-400" />
+                              Editar
+                            </DropdownMenuItem>
+                          </div>
+                          
+                          <div className="border-t border-gray-100 pt-1">
+                            <DropdownMenuItem className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center">
+                              <Trash2 className="h-4 w-4 mr-3 text-red-400" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </div>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -651,10 +802,17 @@ export default function ClientesPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowAddDialog(false)}
+              className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+            >
               Cancelar
             </Button>
-            <Button onClick={handleAddCustomer} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button 
+              onClick={handleAddCustomer} 
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
               Adicionar Cliente
             </Button>
           </DialogFooter>
@@ -693,10 +851,17 @@ export default function ClientesPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowImportDialog(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowImportDialog(false)}
+              className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+            >
               Cancelar
             </Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => document.getElementById('file')?.click()}>
+            <Button 
+              className="bg-emerald-600 hover:bg-emerald-700 text-white" 
+              onClick={() => document.getElementById('file')?.click()}
+            >
               Selecionar Arquivo
             </Button>
           </DialogFooter>
