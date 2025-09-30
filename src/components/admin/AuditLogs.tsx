@@ -38,6 +38,7 @@ import {
   Edit
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { AdminStatCard } from './AdminStatCard';
 
 interface LogEntry {
   id: string;
@@ -358,93 +359,48 @@ export function AuditLogs() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-5">
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Total de Logs</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <FileText className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-heading">{filteredLogs.length}</div>
-            </div>
-          </CardContent>
-        </Card>
+        <AdminStatCard
+          title="Total de Logs"
+          value={filteredLogs.length}
+          subtitle="Todos os eventos"
+          icon={<FileText className="h-5 w-5" />}
+          trend={{
+            value: "+15% esta semana",
+            direction: "up"
+          }}
+          variant="primary"
+        />
+        <AdminStatCard
+          title="Erros"
+          value={filteredLogs.filter(log => log.level === 'error').length}
+          subtitle="Eventos críticos"
+          icon={<XCircle className="h-5 w-5" />}
+          variant="error"
+        />
 
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Erros</CardTitle>
-              <div className="p-2 rounded-lg text-red-600 bg-red-100">
-                <XCircle className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-red-600">
-                {filteredLogs.filter(log => log.level === 'error').length}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <AdminStatCard
+          title="Avisos"
+          value={filteredLogs.filter(log => log.level === 'warning').length}
+          subtitle="Eventos de atenção"
+          icon={<AlertTriangle className="h-5 w-5" />}
+          variant="warning"
+        />
 
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Avisos</CardTitle>
-              <div className="p-2 rounded-lg text-yellow-600 bg-yellow-100">
-                <AlertTriangle className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-yellow-600">
-                {filteredLogs.filter(log => log.level === 'warning').length}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <AdminStatCard
+          title="Sucessos"
+          value={filteredLogs.filter(log => log.level === 'success').length}
+          subtitle="Operações concluídas"
+          icon={<CheckCircle className="h-5 w-5" />}
+          variant="success"
+        />
 
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Sucessos</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <CheckCircle className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-juga-primary">
-                {filteredLogs.filter(log => log.level === 'success').length}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Usuários Ativos</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <Users className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-heading">
-                {new Set(filteredLogs.filter(log => log.user).map(log => log.user!.id)).size}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <AdminStatCard
+          title="Usuários Ativos"
+          value={new Set(filteredLogs.filter(log => log.user).map(log => log.user!.id)).size}
+          subtitle="Únicos nos logs"
+          icon={<Users className="h-5 w-5" />}
+          variant="primary"
+        />
       </div>
 
       {/* Filters */}

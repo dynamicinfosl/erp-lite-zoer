@@ -32,6 +32,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, metadata?: any) => Promise<{ error?: any }>;
   signOut: () => Promise<void>;
   switchTenant: (tenantId: string) => Promise<void>;
+  clearAuthData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -79,7 +80,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const {
           data: { session },
+          error
         } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Erro ao carregar sessão:', error);
+          // Se for erro de refresh token, limpar dados de auth
+          if (error.message?.includes('Refresh Token') || error.message?.includes('Invalid Refresh Token')) {
+            console.log('Limpeza de dados de auth devido a refresh token inválido');
+            await supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
+            setCurrentTenant(null);
+            setMemberships([]);
+          }
+          return;
+        }
+        
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -88,6 +105,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.error('Erro ao carregar sessão:', error);
+        // Em caso de erro, garantir que não há sessão ativa
+        setSession(null);
+        setUser(null);
+        setCurrentTenant(null);
+        setMemberships([]);
       } finally {
         setLoading(false);
       }
@@ -98,22 +120,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      try {
+        console.log('Auth state change:', event, session?.user?.email || 'no user');
+        
+        setSession(session);
+        setUser(session?.user ?? null);
 
-      if (session?.user) {
-        await loadUserData(session.user);
-      } else {
-        setCurrentTenant(null);
-        setMemberships([]);
-      }
+        if (session?.user) {
+          await loadUserData(session.user);
+        } else {
+          setCurrentTenant(null);
+          setMemberships([]);
+        }
 
-      setLoading(false);
+        setLoading(false);
 
-      if (event === 'SIGNED_IN' && session) {
-        router.push('/dashboard');
-      } else if (event === 'SIGNED_OUT') {
-        router.push('/login');
+        if (event === 'SIGNED_IN' && session) {
+          router.push('/dashboard');
+        } else if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+          // Não redirecionar automaticamente para login em TOKEN_REFRESHED
+          if (event === 'SIGNED_OUT') {
+            router.push('/login');
+          }
+        }
+      } catch (error) {
+        console.error('Erro no auth state change:', error);
+        setLoading(false);
       }
     });
 
@@ -184,6 +216,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const clearAuthData = async () => {
+    try {
+      setLoading(true);
+      await supabase.auth.signOut();
+      
+      // Limpar dados do localStorage
+      if (typeof window !== 'undefined') {
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (key.includes('supabase') || key.includes('sb-')) {
+            localStorage.removeItem(key);
+          }
+        });
+        
+        // Limpar dados do sessionStorage
+        const sessionKeys = Object.keys(sessionStorage);
+        sessionKeys.forEach(key => {
+          if (key.includes('supabase') || key.includes('sb-')) {
+            sessionStorage.removeItem(key);
+          }
+        });
+      }
+      
+      setUser(null);
+      setSession(null);
+      setCurrentTenant(null);
+      setMemberships([]);
+      
+      console.log('Dados de autenticação limpos com sucesso');
+      router.push('/login');
+    } catch (error) {
+      console.error('Erro ao limpar dados de autenticação:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const value = {
     user,
     session,
@@ -194,6 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signOut,
     switchTenant,
+    clearAuthData,
   } as const;
 
   return (

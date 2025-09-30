@@ -22,7 +22,13 @@ export function AppLayout({ children }: AppLayoutProps) {
   }, []);
 
   const shouldHideSidebar = useMemo(() => {
-    const noSidebarPages = ['/login', '/register', '/forgot-password', '/reset-password'];
+    const noSidebarPages = [
+      '/login', 
+      '/register', 
+      '/forgot-password', 
+      '/reset-password',
+      '/admin'  // Excluir painel admin do sidebar
+    ];
     return noSidebarPages.some((page) => pathname?.startsWith(page));
   }, [pathname]);
 

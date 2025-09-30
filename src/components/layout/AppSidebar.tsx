@@ -73,7 +73,8 @@ const menuGroups = [
       { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin', 'financeiro'] },
       { title: 'Relatórios', url: '/relatorios', icon: BarChart3, roles: ['admin', 'financeiro'] },
       { title: 'Assinatura', url: '/assinatura', icon: CreditCard, roles: ['admin', 'vendedor', 'financeiro'] },
-      { title: 'Administração', url: '/admin', icon: Shield, roles: ['admin'] },
+      // Botão Administração oculto - acesso restrito apenas para usuário "julga"
+      // { title: 'Administração', url: '/admin', icon: Shield, roles: ['admin'] },
     ],
   },
 ];

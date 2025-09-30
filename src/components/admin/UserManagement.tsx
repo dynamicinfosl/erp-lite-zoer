@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { AdminStatCard } from './AdminStatCard';
 
 interface User {
   id: string;
@@ -279,93 +280,52 @@ export function UserManagement() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Total de Usuários</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <Users className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-heading">{users.length}</div>
-              <p className="text-sm text-caption">
-                +2 novos este mês
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Usuários Ativos</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <UserCheck className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-juga-primary">
-                {users.filter(u => u.status === 'active').length}
-              </div>
-              <p className="text-sm text-caption">
-                {Math.round((users.filter(u => u.status === 'active').length / users.length) * 100)}% do total
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Administradores</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-juga-primary">
-                {users.filter(u => u.role === 'admin').length}
-              </div>
-              <p className="text-sm text-caption">
-                Acesso completo
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Últimos Logins</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <Calendar className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-heading">
-                {users.filter(u => {
-                  const lastLogin = new Date(u.lastLogin);
-                  const today = new Date();
-                  const diffTime = Math.abs(today.getTime() - lastLogin.getTime());
-                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                  return diffDays <= 7;
-                }).length}
-              </div>
-              <p className="text-sm text-caption">
-                Nos últimos 7 dias
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <AdminStatCard
+          title="Total de Usuários"
+          value={users.length}
+          subtitle="Cadastrados no sistema"
+          icon={<Users className="h-5 w-5" />}
+          trend={{
+            value: "+2 novos esta semana",
+            direction: "up"
+          }}
+          variant="primary"
+        />
+        <AdminStatCard
+          title="Usuários Ativos"
+          value={users.filter(u => u.status === 'active').length}
+          subtitle="Online agora"
+          icon={<UserCheck className="h-5 w-5" />}
+          trend={{
+            value: "95% ativos",
+            direction: "up"
+          }}
+          variant="success"
+        />
+        <AdminStatCard
+          title="Administradores"
+          value={users.filter(u => u.role === 'admin').length}
+          subtitle="Acesso completo"
+          icon={<ShieldCheck className="h-5 w-5" />}
+          variant="primary"
+        />
+        <AdminStatCard
+          title="Últimos Logins"
+          value={users.filter(u => {
+            const lastLogin = new Date(u.lastLogin);
+            const today = new Date();
+            const diffTime = Math.abs(today.getTime() - lastLogin.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays <= 7;
+          }).length}
+          subtitle="Esta semana"
+          icon={<Calendar className="h-5 w-5" />}
+          trend={{
+            value: "+5 vs semana anterior",
+            direction: "up"
+          }}
+          variant="success"
+        />
       </div>
 
       {/* Filters */}

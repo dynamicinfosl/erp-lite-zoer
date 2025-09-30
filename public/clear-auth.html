@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Limpar Autenticação</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #c82333;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .info {
+            background-color: #e7f3ff;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Limpar Dados de Autenticação</h1>
+        
+        <div class="info">
+            <p><strong>Este utilitário limpa todos os dados de autenticação armazenados no navegador.</strong></p>
+            <p>Use isso quando encontrar erros de "Refresh Token Not Found" ou problemas de sessão.</p>
+        </div>
+
+        <div>
+            <button onclick="clearAuthData()">🧹 Limpar Dados de Auth</button>
+            <button onclick="clearAllStorage()">🗑️ Limpar Todo Storage</button>
+            <button onclick="checkAuthData()">🔍 Verificar Dados</button>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function clearAuthData() {
+            try {
+                // Limpar dados do Supabase
+                const keys = Object.keys(localStorage);
+                keys.forEach(key => {
+                    if (key.includes('supabase') || key.includes('sb-')) {
+                        localStorage.removeItem(key);
+                    }
+                });
+
+                // Limpar sessionStorage também
+                const sessionKeys = Object.keys(sessionStorage);
+                sessionKeys.forEach(key => {
+                    if (key.includes('supabase') || key.includes('sb-')) {
+                        sessionStorage.removeItem(key);
+                    }
+                });
+
+                document.getElementById('result').innerHTML = 
+                    '<div class="success">✅ Dados de autenticação limpos com sucesso!</div>';
+                
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    '<div style="color: red;">❌ Erro ao limpar dados: ' + error.message + '</div>';
+            }
+        }
+
+        function clearAllStorage() {
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                document.getElementById('result').innerHTML = 
+                    '<div class="success">✅ Todo o storage foi limpo!</div>';
+                
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    '<div style="color: red;">❌ Erro ao limpar storage: ' + error.message + '</div>';
+            }
+        }
+
+        function checkAuthData() {
+            const authKeys = [];
+            const allKeys = [...Object.keys(localStorage), ...Object.keys(sessionStorage)];
+            
+            allKeys.forEach(key => {
+                if (key.includes('supabase') || key.includes('sb-')) {
+                    authKeys.push(key);
+                }
+            });
+
+            if (authKeys.length === 0) {
+                document.getElementById('result').innerHTML = 
+                    '<div class="success">✅ Nenhum dado de autenticação encontrado.</div>';
+            } else {
+                document.getElementById('result').innerHTML = 
+                    '<div style="color: orange;">⚠️ Dados de auth encontrados:<br>' + 
+                    authKeys.join('<br>') + '</div>';
+            }
+        }
+
+        // Verificar dados ao carregar a página
+        checkAuthData();
+    </script>
+</body>
+</html>

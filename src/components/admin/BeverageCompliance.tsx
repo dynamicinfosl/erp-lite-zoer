@@ -39,6 +39,7 @@ import {
   Building
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ComplianceStatCard } from './ComplianceStatCard';
 
 interface ComplianceRecord {
   id: string;
@@ -332,84 +333,45 @@ export function BeverageCompliance() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Conformidade Geral</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <Shield className="h-4 w-4" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-juga-primary">{getCompliancePercentage()}%</div>
-              <Progress value={getCompliancePercentage()} className="h-2" />
-              <p className="text-sm text-caption">
-                Taxa de conformidade
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Stats Cards - Responsive Grid */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 xs:grid-cols-2 lg:grid-cols-4">
+        {/* Conformidade Geral */}
+        <ComplianceStatCard
+          title="Conformidade Geral"
+          value={`${getCompliancePercentage()}%`}
+          subtitle="Taxa de conformidade"
+          icon={<Shield className="h-3 w-3 sm:h-4 sm:w-4" />}
+          showProgress={true}
+          progressValue={getCompliancePercentage()}
+          variant="success"
+        />
 
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Licenças Ativas</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <FileText className="h-4 w-4" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-juga-primary">{licenses.filter(l => l.status === 'active').length}</div>
-              <p className="text-sm text-caption">
-                {licenses.length} total
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Licenças Ativas */}
+        <ComplianceStatCard
+          title="Licenças Ativas"
+          value={licenses.filter(l => l.status === 'active').length}
+          subtitle={`${licenses.length} total`}
+          icon={<FileText className="h-3 w-3 sm:h-4 sm:w-4" />}
+          variant="default"
+        />
 
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Problemas Críticos</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <AlertTriangle className="h-4 w-4" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-juga-primary">{getCriticalIssues()}</div>
-              <p className="text-sm text-caption">
-                Requer atenção
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Problemas Críticos */}
+        <ComplianceStatCard
+          title="Problemas Críticos"
+          value={getCriticalIssues()}
+          subtitle="Requer atenção"
+          icon={<AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" />}
+          variant="error"
+        />
 
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Revisões Pendentes</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <Calendar className="h-4 w-4" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-juga-primary">{getPendingReviews()}</div>
-              <p className="text-sm text-caption">
-                Próximas revisões
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Revisões Pendentes */}
+        <ComplianceStatCard
+          title="Revisões Pendentes"
+          value={getPendingReviews()}
+          subtitle="Próximas revisões"
+          icon={<Calendar className="h-3 w-3 sm:h-4 sm:w-4" />}
+          variant="warning"
+        />
       </div>
 
       <Tabs defaultValue="records" className="space-y-4">

@@ -8,7 +8,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
-    flowType: 'pkce'
+    flowType: 'pkce',
+    debug: process.env.NODE_ENV === 'development'
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'supabase-js-web'
+    }
   }
 })
 
@@ -46,4 +52,32 @@ export const signUp = async (email: string, password: string, userData: any) => 
   })
   if (error) throw error
   return data
+}
+
+// Função para limpar dados de autenticação
+export const clearAuthData = async () => {
+  try {
+    // Fazer sign out para limpar dados do Supabase
+    await supabase.auth.signOut()
+    
+    // Limpar dados do localStorage
+    const keys = Object.keys(localStorage)
+    keys.forEach(key => {
+      if (key.includes('supabase') || key.includes('sb-')) {
+        localStorage.removeItem(key)
+      }
+    })
+    
+    // Limpar dados do sessionStorage
+    const sessionKeys = Object.keys(sessionStorage)
+    sessionKeys.forEach(key => {
+      if (key.includes('supabase') || key.includes('sb-')) {
+        sessionStorage.removeItem(key)
+      }
+    })
+    
+    console.log('Dados de autenticação limpos com sucesso')
+  } catch (error) {
+    console.error('Erro ao limpar dados de autenticação:', error)
+  }
 }

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { ENABLE_AUTH } from '@/constants/auth';
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Shield, Users, BarChart3, Settings, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { AdminAccessButton } from '@/components/admin/AdminAccessButton';
 
 export default function HomePage() {
   const { user, loading } = useAuth();
@@ -53,7 +54,7 @@ export default function HomePage() {
           <p className="text-xl text-white/90 mb-8">
             Sistema Moderno de Gestão Empresarial
           </p>
-          <div className="flex justify-center gap-4">
+          <div className="flex justify-center gap-4 flex-wrap">
             <Button asChild size="lg" variant="secondary">
               <Link href="/login">
                 Entrar
@@ -65,6 +66,13 @@ export default function HomePage() {
                 Começar
               </Link>
             </Button>
+            <AdminAccessButton 
+              size="lg" 
+              variant="outline" 
+              className="bg-red-600/20 hover:bg-red-600/30 text-white border-red-400/30"
+            >
+              Admin
+            </AdminAccessButton>
           </div>
         </div>
 
@@ -112,6 +120,7 @@ export default function HomePage() {
           <p>&copy; 2025 JUGA. Todos os direitos reservados.</p>
         </div>
       </div>
+
     </div>
   );
 }

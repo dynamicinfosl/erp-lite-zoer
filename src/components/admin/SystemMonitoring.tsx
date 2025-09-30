@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { toast } from 'sonner';
+import { StorageCard } from './StorageCard';
+import { SystemStatCard } from './SystemStatCard';
 
 interface SystemMetrics {
   cpu: {
@@ -306,91 +308,46 @@ export function SystemMonitoring() {
         </Alert>
       )}
 
-      {/* Main Metrics Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">CPU</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <Cpu className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-heading">{metrics.cpu.usage}%</div>
-              <div className="text-sm text-caption mb-2">
-                {metrics.cpu.cores} cores, {metrics.cpu.temperature}°C
-              </div>
-              <Progress value={metrics.cpu.usage} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
+      {/* Main Metrics Cards - Responsive Grid */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 xs:grid-cols-2 lg:grid-cols-4">
+        {/* CPU Card */}
+        <SystemStatCard
+          title="CPU"
+          value={`${metrics.cpu.usage}%`}
+          details={`${metrics.cpu.cores} cores, ${metrics.cpu.temperature}°C`}
+          icon={<Cpu className="h-3 w-3 sm:h-4 sm:w-4" />}
+          showProgress={true}
+          progressValue={metrics.cpu.usage}
+          variant={metrics.cpu.usage > 80 ? 'error' : metrics.cpu.usage > 60 ? 'warning' : 'success'}
+        />
 
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Memória</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <Database className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-heading">
-                {Math.round((metrics.memory.used / metrics.memory.total) * 100)}%
-              </div>
-              <div className="text-sm text-caption mb-2">
-                {formatBytes(metrics.memory.used * 1024 * 1024)} / {formatBytes(metrics.memory.total * 1024 * 1024)}
-              </div>
-              <Progress value={(metrics.memory.used / metrics.memory.total) * 100} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Memory Card */}
+        <SystemStatCard
+          title="Memória"
+          value={`${Math.round((metrics.memory.used / metrics.memory.total) * 100)}%`}
+          details={`${formatBytes(metrics.memory.used * 1024 * 1024)} / ${formatBytes(metrics.memory.total * 1024 * 1024)}`}
+          icon={<Database className="h-3 w-3 sm:h-4 sm:w-4" />}
+          showProgress={true}
+          progressValue={(metrics.memory.used / metrics.memory.total) * 100}
+          variant={(metrics.memory.used / metrics.memory.total) > 0.9 ? 'error' : (metrics.memory.used / metrics.memory.total) > 0.7 ? 'warning' : 'success'}
+        />
 
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Armazenamento</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <HardDrive className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-heading">
-                {Math.round((metrics.disk.used / metrics.disk.total) * 100)}%
-              </div>
-              <div className="text-sm text-caption mb-2">
-                {formatBytes(metrics.disk.used * 1024 * 1024)} / {formatBytes(metrics.disk.total * 1024 * 1024)}
-              </div>
-              <Progress value={(metrics.disk.used / metrics.disk.total) * 100} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Storage Card */}
+        <StorageCard 
+          used={metrics.disk.used}
+          total={metrics.disk.total}
+        />
 
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Uptime</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <Clock className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-juga-primary">{metrics.uptime}%</div>
-              <div className="text-sm text-caption mb-2">
-                {formatUptime(7.5)} de operação
-              </div>
-              <Progress value={metrics.uptime} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Uptime Card */}
+        <SystemStatCard
+          title="Uptime"
+          value={`${metrics.uptime}%`}
+          details={`${formatUptime(7.5)} de operação`}
+          icon={<Clock className="h-3 w-3 sm:h-4 sm:w-4" />}
+          showProgress={true}
+          progressValue={metrics.uptime}
+          variant={metrics.uptime > 99 ? 'success' : metrics.uptime > 95 ? 'warning' : 'error'}
+        />
       </div>
 
       <Tabs defaultValue="performance" className="space-y-4">

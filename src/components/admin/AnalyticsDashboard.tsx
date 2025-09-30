@@ -51,6 +51,7 @@ import {
   Shield
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { KPIStatCard } from './KPIStatCard';
 
 interface AnalyticsData {
   overview: {
@@ -303,86 +304,55 @@ export function AnalyticsDashboard() {
         </div>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Total de Usuários</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <Users className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-heading">{formatNumber(data.overview.totalUsers)}</div>
-              <p className="text-sm text-caption flex items-center">
-                <TrendingUp className="h-3 w-3 mr-1 text-juga-primary" />
-                +12% desde o último mês
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Overview Cards - Responsive Grid with Semantic Colors */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 xs:grid-cols-2 lg:grid-cols-4">
+        {/* Total de Usuários */}
+        <KPIStatCard
+          title="Total de Usuários"
+          value={formatNumber(data.overview.totalUsers)}
+          subtitle="Cadastrados no sistema"
+          icon={<Users className="h-3 w-3 sm:h-4 sm:w-4" />}
+          trend={{
+            value: "+12%",
+            direction: "up"
+          }}
+          variant="primary"
+        />
 
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Receita Total</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <DollarSign className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-heading">{formatCurrency(data.overview.revenue)}</div>
-              <p className="text-sm text-caption flex items-center">
-                <TrendingUp className="h-3 w-3 mr-1 text-juga-primary" />
-                +18% desde o último mês
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Receita Total */}
+        <KPIStatCard
+          title="Receita Total"
+          value={formatCurrency(data.overview.revenue)}
+          subtitle="Faturamento total"
+          icon={<DollarSign className="h-3 w-3 sm:h-4 sm:w-4" />}
+          trend={{
+            value: "+18%",
+            direction: "up"
+          }}
+          variant="success"
+        />
 
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Taxa de Conversão</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <Target className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-heading">{data.overview.conversionRate}%</div>
-              <p className="text-sm text-caption flex items-center">
-                <TrendingUp className="h-3 w-3 mr-1 text-juga-primary" />
-                +0.5% desde o último mês
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Taxa de Conversão */}
+        <KPIStatCard
+          title="Taxa de Conversão"
+          value={`${data.overview.conversionRate}%`}
+          subtitle="Eficiência de vendas"
+          icon={<Target className="h-3 w-3 sm:h-4 sm:w-4" />}
+          trend={{
+            value: "+0.5%",
+            direction: "up"
+          }}
+          variant="info"
+        />
 
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Usuários Ativos</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <Activity className="h-5 w-5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-juga-primary">{formatNumber(data.overview.activeUsers)}</div>
-              <p className="text-sm text-caption">
-                Online agora: {data.realtimeData.activeUsers}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Usuários Ativos */}
+        <KPIStatCard
+          title="Usuários Ativos"
+          value={formatNumber(data.overview.activeUsers)}
+          subtitle={`Online agora: ${data.realtimeData.activeUsers}`}
+          icon={<Activity className="h-3 w-3 sm:h-4 sm:w-4" />}
+          variant="warning"
+        />
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">

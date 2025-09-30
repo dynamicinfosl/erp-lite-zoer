@@ -35,6 +35,7 @@ import {
   Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ProductStatCard } from './ProductStatCard';
 
 interface BeverageProduct {
   id: string;
@@ -290,83 +291,43 @@ export function BeverageInventory() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Total de Produtos</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <Package className="h-4 w-4" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-juga-primary">{products.length}</div>
-              <p className="text-sm text-caption">
-                {filteredProducts.length} filtrados
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Stats Cards - Responsive Grid with Semantic Colors */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 xs:grid-cols-2 lg:grid-cols-4">
+        {/* Total de Produtos */}
+        <ProductStatCard
+          title="Total de Produtos"
+          value={products.length}
+          subtitle={`${filteredProducts.length} filtrados`}
+          icon={<Package className="h-3 w-3 sm:h-4 sm:w-4" />}
+          variant="info"
+        />
 
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Valor Total</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <DollarSign className="h-4 w-4" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-juga-primary">R$ {getTotalValue().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-              <p className="text-sm text-caption">
-                Em estoque
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Valor Total */}
+        <ProductStatCard
+          title="Valor Total"
+          value={`R$ ${getTotalValue().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+          subtitle="Em estoque"
+          icon={<DollarSign className="h-3 w-3 sm:h-4 sm:w-4" />}
+          variant="success"
+        />
 
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Estoque Baixo</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <AlertTriangle className="h-4 w-4" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-juga-primary">{getLowStockCount()}</div>
-              <p className="text-sm text-caption">
-                Produtos críticos
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Estoque Baixo */}
+        <ProductStatCard
+          title="Estoque Baixo"
+          value={getLowStockCount()}
+          subtitle="Produtos críticos"
+          icon={<AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" />}
+          variant={getLowStockCount() > 5 ? 'error' : getLowStockCount() > 0 ? 'warning' : 'success'}
+        />
 
-        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-juga-text-secondary">Vencendo em 30 dias</CardTitle>
-              <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                <Calendar className="h-4 w-4" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-juga-primary">{getExpiringSoonCount()}</div>
-              <p className="text-sm text-caption">
-                Produtos próximos do vencimento
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Vencendo em 30 dias */}
+        <ProductStatCard
+          title="Vencendo em 30 dias"
+          value={getExpiringSoonCount()}
+          subtitle="Produtos próximos do vencimento"
+          icon={<Calendar className="h-3 w-3 sm:h-4 sm:w-4" />}
+          variant={getExpiringSoonCount() > 10 ? 'error' : getExpiringSoonCount() > 0 ? 'warning' : 'success'}
+        />
       </div>
 
       <Tabs defaultValue="inventory" className="space-y-4">

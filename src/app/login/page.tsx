@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { Loader2, ArrowLeft, Shield, Users, BarChart3, Settings } from 'lucide-react';
+import { AdminAccessButton } from '@/components/admin/AdminAccessButton';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -133,18 +134,30 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Botão de voltar */}
-        <div className="mt-6 text-center">
-          <Button
-            variant="ghost"
-            onClick={() => router.push('/')}
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar ao início
-          </Button>
+        {/* Botões de ação */}
+        <div className="mt-6 space-y-3">
+          <div className="text-center">
+            <Button
+              variant="ghost"
+              onClick={() => router.push('/')}
+              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Voltar ao início
+            </Button>
+          </div>
+          
+          <div className="text-center">
+            <AdminAccessButton
+              variant="outline"
+              className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20"
+            >
+              Acesso Administrativo
+            </AdminAccessButton>
+          </div>
         </div>
       </div>
+
     </div>
   );
 }
