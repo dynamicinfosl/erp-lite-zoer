@@ -1,12 +1,20 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Truck, Clock, CheckCircle, Filter, RefreshCw, MapPin } from 'lucide-react';
+import { Truck, Clock, CheckCircle, Filter, RefreshCw, MapPin, Package2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { JugaKPICard } from '@/components/dashboard/JugaComponents';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function EntregasPage() {
   const [deliveries, setDeliveries] = useState<any[]>([]);
@@ -38,116 +46,151 @@ export default function EntregasPage() {
     return matchesSearch && matchesStatus;
   });
 
+  const stats = useMemo(() => {
+    const emRota = deliveries.filter(d => d.status?.includes('rota')).length;
+    const pendentes = deliveries.filter(d => d.status?.includes('pend')).length;
+    const entregues = deliveries.filter(d => d.status?.includes('entreg')).length;
+    const total = deliveries.length;
+    
+    return { emRota, pendentes, entregues, total };
+  }, [deliveries]);
+
   return (
-    <div className="space-y-6">
-      <Card className="border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-white">
-        <CardContent className="pt-6 pb-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <Badge className="w-fit bg-blue-600">Entregas</Badge>
-              <h1 className="text-3xl font-bold text-blue-900">Visão geral das entregas</h1>
-              <p className="text-blue-900/70">Gerencie e acompanhe todas as entregas</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Input placeholder="Buscar por ID, cliente ou endereço" value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
-              <Button variant="outline" className="gap-2 border-blue-200 hover:bg-blue-50">
-                <Filter className="h-4 w-4" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
-                  className="bg-transparent focus:outline-none"
-                >
-                  <option value="todos">Todos status</option>
-                  <option value="pendente">Pendentes</option>
-                  <option value="em_rota">Em rota</option>
-                  <option value="entregue">Entregues</option>
-                </select>
-              </Button>
-              <Button className="juga-gradient text-white gap-2">
-                <RefreshCw className="h-4 w-4" />
-                Atualizar
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="border-blue-200 bg-gradient-to-br from-white via-blue-50/40 to-white shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Em Rota</CardTitle>
-            <Truck className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-500">12</div>
-            <p className="text-xs text-muted-foreground">Saíram para entrega</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-blue-200 bg-gradient-to-br from-white via-blue-50/40 to-white shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
-            <Clock className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-500">8</div>
-            <p className="text-xs text-muted-foreground">Aguardando saída</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-blue-200 bg-gradient-to-br from-white via-blue-50/40 to-white shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Entregues</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-500">156</div>
-            <p className="text-xs text-muted-foreground">Este mês</p>
-          </CardContent>
-        </Card>
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+      {/* Header - Responsivo */}
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-heading">Entregas</h1>
+          <p className="text-sm sm:text-base text-body">
+            Gerencie e acompanhe todas as entregas em tempo real
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+          <Input 
+            placeholder="Buscar por ID, cliente..." 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)} 
+            className="w-full sm:w-64" 
+          />
+          <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+            <SelectTrigger className="w-full sm:w-[180px] bg-transparent border border-white dark:border-white text-foreground shadow-none hover:bg-transparent focus:outline-none focus:ring-0">
+              <SelectValue placeholder="Filtrar por status" />
+            </SelectTrigger>
+            <SelectContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-lg">
+              <SelectItem value="todos">Todos status</SelectItem>
+              <SelectItem value="pendente">Pendentes</SelectItem>
+              <SelectItem value="em_rota">Em rota</SelectItem>
+              <SelectItem value="entregue">Entregues</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button className="juga-gradient text-white w-full sm:w-auto gap-2">
+            <RefreshCw className="h-4 w-4" />
+            <span className="hidden sm:inline">Atualizar</span>
+            <span className="sm:hidden">Atualizar</span>
+          </Button>
+        </div>
       </div>
 
-      <Card className="border-blue-200">
-        <CardHeader>
-          <CardTitle>Lista de Entregas ({filtered.length})</CardTitle>
+      {/* KPI Cards - Responsivo */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+        <JugaKPICard
+          title="Total de Entregas"
+          value={`${stats.total}`}
+          description="Entregas registradas"
+          trend="up"
+          trendValue="+8.2%"
+          icon={<Package2 className="h-4 w-4 sm:h-5 sm:w-5" />}
+          color="primary"
+          className="min-h-[120px] sm:min-h-[140px]"
+        />
+        <JugaKPICard
+          title="Em Rota"
+          value={`${stats.emRota}`}
+          description="Saíram para entrega"
+          trend="up"
+          trendValue="Ativas"
+          icon={<Truck className="h-4 w-4 sm:h-5 sm:w-5" />}
+          color="accent"
+          className="min-h-[120px] sm:min-h-[140px]"
+        />
+        <JugaKPICard
+          title="Pendentes"
+          value={`${stats.pendentes}`}
+          description="Aguardando saída"
+          trend="down"
+          trendValue="Requer atenção"
+          icon={<Clock className="h-4 w-4 sm:h-5 sm:w-5" />}
+          color="warning"
+          className="min-h-[120px] sm:min-h-[140px]"
+        />
+        <JugaKPICard
+          title="Entregues"
+          value={`${stats.entregues}`}
+          description="Finalizadas"
+          trend="up"
+          trendValue="+12.5%"
+          icon={<CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />}
+          color="success"
+          className="min-h-[120px] sm:min-h-[140px]"
+        />
+      </div>
+
+      {/* Lista de Entregas */}
+      <Card className="juga-card">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg sm:text-xl text-heading">Lista de Entregas</CardTitle>
+          <CardDescription className="text-sm">
+            {filtered.length} {filtered.length === 1 ? 'entrega encontrada' : 'entregas encontradas'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b-2 border-blue-100">
-                <TableHead>ID</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Endereço</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Aberta em</TableHead>
-                <TableHead>Previsão</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(!loading ? filtered : []).map((d: any) => (
-                <TableRow key={d.id} className="border-b border-blue-50 hover:bg-blue-50/40">
-                  <TableCell className="font-mono text-sm">{d.id}</TableCell>
-                  <TableCell>{d.customer_name || d.customer || d.receiver_name}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{d.address || d.delivery_address}</TableCell>
-                  <TableCell>
-                    {(d.status || '').includes('pend') && <Badge variant="outline">Pendente</Badge>}
-                    {(d.status || '').includes('rota') && <Badge className="bg-blue-600">Em rota</Badge>}
-                    {(d.status || '').includes('entreg') && <Badge className="bg-green-600">Entregue</Badge>}
-                  </TableCell>
-                  <TableCell className="text-sm">{d.created_at}</TableCell>
-                  <TableCell className="text-sm">{d.eta || d.expected_at || '—'}</TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Endereço</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Aberta em</TableHead>
+                  <TableHead>Previsão</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {(!loading ? filtered : []).map((d: any) => (
+                  <TableRow key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <TableCell className="font-mono text-sm text-body">{d.id}</TableCell>
+                    <TableCell className="font-medium text-heading">
+                      {d.customer_name || d.customer || d.receiver_name}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {d.address || d.delivery_address}
+                    </TableCell>
+                    <TableCell>
+                      {(d.status || '').includes('pend') && <Badge variant="outline">Pendente</Badge>}
+                      {(d.status || '').includes('rota') && <Badge variant="default">Em rota</Badge>}
+                      {(d.status || '').includes('entreg') && (
+                        <Badge className="bg-green-600 hover:bg-green-700">Entregue</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-body">{d.created_at}</TableCell>
+                    <TableCell className="text-sm text-body">{d.eta || d.expected_at || '—'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
           {!loading && filtered.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               <MapPin className="h-10 w-10 mx-auto mb-3 opacity-50" />
-              Nenhuma entrega encontrada
+              <p>Nenhuma entrega encontrada</p>
             </div>
           )}
           {loading && (
-            <div className="text-center py-8 text-muted-foreground">Carregando entregas...</div>
+            <div className="text-center py-8 text-muted-foreground">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100 mx-auto mb-3"></div>
+              <p>Carregando entregas...</p>
+            </div>
           )}
         </CardContent>
       </Card>

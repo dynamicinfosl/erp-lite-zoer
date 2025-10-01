@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 import {
   Menu,
   ShoppingCart,
@@ -209,13 +210,19 @@ export default function PDVPage() {
     { icon: Settings, label: 'Configurações', href: '/configuracoes' },
   ];
 
+  const kpi = {
+    itensCarrinho: cart.reduce((sum, i) => sum + i.quantity, 0),
+    totalItens: cart.length,
+    totalValor: total,
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 pb-10">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
 
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <div className="fixed top-4 left-4 z-40">
           <SheetTrigger asChild>
-            <Button variant="outline" size="sm" className="bg-white shadow-lg border-gray-200 hover:bg-gray-50">
+            <Button variant="outline" size="sm" className="shadow-lg">
               <Menu className="h-4 w-4" />
             </Button>
           </SheetTrigger>
@@ -261,18 +268,29 @@ export default function PDVPage() {
         </SheetContent>
       </Sheet>
 
-      <div className="pt-16 px-6 pb-6">
+      <div className="px-2 sm:px-4">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Ponto de Venda</h1>
-            <p className="text-gray-600">F1 - Menu | Ctrl+F - Buscar | Ctrl+Enter - Adicionar | Esc - Cancelar</p>
+          <div className="mb-4 sm:mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+            <div className="space-y-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-heading">Ponto de Venda</h1>
+              <p className="text-sm sm:text-base text-body">F1 - Menu | Ctrl+F - Buscar | Ctrl+Enter - Adicionar | Esc - Cancelar</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button className="juga-gradient text-white">Nova Venda</Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-2 sm:mb-4">
+            <JugaKPICard title="Itens no Carrinho" value={`${kpi.itensCarrinho}`} description="Quantidade total" icon={<ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />} color="primary" className="min-h-[120px] sm:min-h-[140px]" />
+            <JugaKPICard title="Produtos Selecionados" value={`${kpi.totalItens}`} description="Itens distintos" icon={<Package className="h-4 w-4 sm:h-5 sm:w-5" />} color="accent" className="min-h-[120px] sm:min-h-[140px]" />
+            <JugaKPICard title="Total Parcial" value={`R$ ${kpi.totalValor.toFixed(2)}`} description="Sem descontos" icon={<DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />} color="success" className="min-h-[120px] sm:min-h-[140px]" />
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2 space-y-6">
-              <Card className="shadow-sm border border-blue-200 bg-gradient-to-br from-white via-blue-50 to-white">
+              <Card className="juga-card">
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-lg text-blue-700 uppercase font-semibold">
+                  <CardTitle className="text-lg text-heading">
                     Localizar um produto/serviço abaixo
                   </CardTitle>
             </CardHeader>
@@ -291,48 +309,48 @@ export default function PDVPage() {
                   </div>
 
                   {!loading && searchTerm && (
-                    <div className="mt-4 border rounded-lg max-h-48 overflow-y-auto bg-white/90">
+                    <div className="mt-4 border rounded-lg max-h-48 overflow-y-auto bg-white dark:bg-gray-900">
                       {filteredProducts.length === 0 && (
-                        <div className="p-3 text-sm text-gray-500">Nenhum produto encontrado.</div>
+                        <div className="p-3 text-sm text-muted-foreground">Nenhum produto encontrado.</div>
                       )}
                       {filteredProducts.map((product) => (
                         <div
                           key={product.id}
-                          className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0 flex items-center justify-between"
+                          className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer border-b last:border-b-0 flex items-center justify-between"
                           onClick={() => selectProduct(product)}
                         >
                           <div>
-                            <p className="font-medium">{product.name}</p>
-                            <p className="text-sm text-gray-600">Código: {product.code}</p>
+                            <p className="font-medium text-heading">{product.name}</p>
+                            <p className="text-sm text-muted-foreground">Código: {product.code}</p>
                           </div>
-                          <p className="font-semibold text-blue-600">R$ {product.price.toFixed(2)}</p>
+                          <p className="font-semibold text-primary">R$ {product.price.toFixed(2)}</p>
                         </div>
                       ))}
                     </div>
                   )}
 
-                  {loading && <div className="mt-4 text-sm text-gray-500">Carregando produtos...</div>}
+                  {loading && <div className="mt-4 text-sm text-muted-foreground">Carregando produtos...</div>}
             </CardContent>
           </Card>
 
-              <Card className="shadow-sm min-h-[400px] border border-blue-200 bg-gradient-to-br from-white via-blue-50 to-white">
+              <Card className="juga-card min-h-[400px]">
                 <CardContent className="p-6">
                   {selectedProduct ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="flex items-center justify-center">
-                        <div className="w-full max-w-sm aspect-square bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300">
+                        <div className="w-full max-w-sm aspect-square bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-700">
                           <Package className="h-20 w-20 text-gray-400" />
                         </div>
                       </div>
 
                       <div className="space-y-4">
                 <div>
-                          <Label className="text-sm font-medium text-gray-600 uppercase">Código</Label>
-                          <p className="text-lg font-semibold">{selectedProduct.code}</p>
+                          <Label className="text-sm font-medium text-muted-foreground uppercase">Código</Label>
+                          <p className="text-lg font-semibold text-heading">{selectedProduct.code}</p>
                 </div>
 
                 <div>
-                          <Label className="text-sm font-medium text-gray-600 uppercase">Quantidade</Label>
+                          <Label className="text-sm font-medium text-muted-foreground uppercase">Quantidade</Label>
                           <Input
                             type="number"
                             min="1"
@@ -348,12 +366,12 @@ export default function PDVPage() {
                   </div>
 
                         <div>
-                          <Label className="text-sm font-medium text-gray-600 uppercase">Valor Unitário</Label>
-                          <Input value={`R$ ${selectedProduct.price.toFixed(2)}`} disabled className="mt-1 bg-gray-50" />
+                          <Label className="text-sm font-medium text-muted-foreground uppercase">Valor Unitário</Label>
+                          <Input value={`R$ ${selectedProduct.price.toFixed(2)}`} disabled className="mt-1 bg-gray-50 dark:bg-gray-900" />
                 </div>
 
                 <div>
-                          <Label className="text-sm font-medium text-gray-600 uppercase">Desconto (%)</Label>
+                          <Label className="text-sm font-medium text-muted-foreground uppercase">Desconto (%)</Label>
                           <Input
                             type="number"
                             min="0"
@@ -370,9 +388,9 @@ export default function PDVPage() {
                 </div>
 
                 <div>
-                          <Label className="text-sm font-medium text-gray-600 uppercase">Valor Total</Label>
-                          <div className="mt-1 p-3 bg-gray-50 rounded-md border text-center">
-                            <span className="text-xl font-bold text-blue-600">R$ {calculateItemTotal(selectedProduct).toFixed(2)}</span>
+                          <Label className="text-sm font-medium text-muted-foreground uppercase">Valor Total</Label>
+                          <div className="mt-1 p-3 bg-gray-50 dark:bg-gray-900 rounded-md border text-center">
+                            <span className="text-xl font-bold text-primary">R$ {calculateItemTotal(selectedProduct).toFixed(2)}</span>
                           </div>
                   </div>
                 </div>
@@ -380,14 +398,14 @@ export default function PDVPage() {
                   ) : (
                     <div className="flex items-center justify-center h-full min-h-[300px]">
                       <div className="text-center">
-                        <Package className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                        <p className="text-gray-500">Selecione um produto para visualizar</p>
+                        <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                        <p className="text-muted-foreground">Selecione um produto para visualizar</p>
                       </div>
                     </div>
                   )}
 
                   <div className="mt-6 pt-6 border-t">
-                    <Button className="w-full bg-gray-700 hover:bg-gray-800 text-white h-12" disabled={!selectedProduct} onClick={addSelectedToCart}>
+                    <Button className="w-full juga-gradient text-white h-12" disabled={!selectedProduct} onClick={addSelectedToCart}>
                       ADICIONAR PRODUTO/ITEM
                     </Button>
               </div>
@@ -396,24 +414,24 @@ export default function PDVPage() {
         </div>
 
             <div className="xl:col-span-1">
-              <Card className="shadow-sm h-full bg-white border border-blue-100">
+              <Card className="juga-card h-full">
                 <CardContent className="p-0 h-full flex flex-col">
                   <div className="flex-1 p-6">
-                    <h3 className="font-semibold text-lg mb-4">Itens do Pedido</h3>
+                    <h3 className="font-semibold text-lg mb-4 text-heading">Itens do Pedido</h3>
 
                     {cart.length === 0 ? (
-                      <div className="text-center py-12 text-gray-500">
+                      <div className="text-center py-12 text-muted-foreground">
                         <ShoppingCart className="h-12 w-12 mx-auto mb-3 opacity-50" />
                         <p>Nenhum item adicionado</p>
                       </div>
                     ) : (
                       <div className="space-y-3 max-h-80 overflow-y-auto">
                         {cart.map((item) => (
-                          <div key={item.id} className="bg-gray-50 rounded-lg p-3">
+                          <div key={item.id} className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
-                                <h5 className="font-medium text-sm">{item.name}</h5>
-                                <p className="text-xs text-gray-600">Cód: {item.code}</p>
+                                <h5 className="font-medium text-sm text-heading">{item.name}</h5>
+                                <p className="text-xs text-muted-foreground">Cód: {item.code}</p>
                               </div>
                               <Button
                                 variant="ghost"
@@ -436,9 +454,9 @@ export default function PDVPage() {
                                 </Button>
                               </div>
                               <div className="text-right">
-                                <p className="text-sm text-gray-600">R$ {item.price.toFixed(2)} un.</p>
+                                <p className="text-sm text-muted-foreground">R$ {item.price.toFixed(2)} un.</p>
                                 {item.discount > 0 && <p className="text-xs text-orange-600">-{item.discount}%</p>}
-                                <p className="font-semibold text-blue-600">R$ {calculateItemTotal(item).toFixed(2)}</p>
+                                <p className="font-semibold text-primary">R$ {calculateItemTotal(item).toFixed(2)}</p>
                               </div>
                             </div>
                           </div>
@@ -457,12 +475,12 @@ export default function PDVPage() {
 
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-gray-500" />
+                        <User className="h-4 w-4 text-muted-foreground" />
                         <Input
                           placeholder="Nome do cliente (opcional)"
                           value={customerName}
                           onChange={(e) => setCustomerName(e.target.value)}
-                          className="bg-white"
+                          className="bg-white dark:bg-gray-900"
                         />
                       </div>
 
@@ -494,17 +512,17 @@ export default function PDVPage() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
-                        <Button variant="outline" className="flex items-center justify-center gap-2 text-sm border-blue-200 hover:bg-blue-50">
-                          <CreditCard className="h-4 w-4 text-blue-600" />
+                        <Button variant="outline" className="flex items-center justify-center gap-2 text-sm">
+                          <CreditCard className="h-4 w-4 text-primary" />
                           Pagamento Rápido
                         </Button>
-                        <Button variant="outline" className="flex items-center justify-center gap-2 text-sm border-blue-200 hover:bg-blue-50">
-                          <Receipt className="h-4 w-4 text-blue-600" />
+                        <Button variant="outline" className="flex items-center justify-center gap-2 text-sm">
+                          <Receipt className="h-4 w-4 text-primary" />
                           Pré-Venda
                         </Button>
                       </div>
 
-                      <Button variant="outline" className="w-full border-blue-200 hover:bg-blue-50" onClick={clearCart} disabled={cart.length === 0}>
+                      <Button variant="outline" className="w-full" onClick={clearCart} disabled={cart.length === 0}>
                         Limpar Carrinho
             </Button>
                     </div>

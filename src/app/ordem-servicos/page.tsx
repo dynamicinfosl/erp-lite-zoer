@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 import { 
   Dialog, 
   DialogContent, 
@@ -47,7 +48,8 @@ import {
   CheckCircle,
   AlertCircle,
   User,
-  Calendar
+  Calendar,
+  Wrench
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -252,124 +254,107 @@ export default function OrdemServicosPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Ordens de Serviço</h1>
-          <p className="text-muted-foreground">
-            Gerencie ordens de serviço e manutenções
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+      {/* Header - Responsivo */}
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-heading">Ordens de Serviço</h1>
+          <p className="text-sm sm:text-base text-body">
+            Gerencie ordens de serviço e manutenções de forma eficiente
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="px-3 py-1">
-            <FileText className="h-3 w-3 mr-1" />
-            {ordens.length} ordens
-          </Badge>
-          <Badge variant="outline" className="px-3 py-1">
-            <Clock className="h-3 w-3 mr-1" />
-            {ordens.filter(o => o.status === 'aberta').length} abertas
-          </Badge>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+          <Button 
+            className="juga-gradient text-white w-full sm:w-auto gap-2"
+            onClick={() => setShowAddDialog(true)}
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Nova Ordem</span>
+            <span className="sm:hidden">Nova OS</span>
+          </Button>
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">OS Abertas</CardTitle>
-            <Clock className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{ordens.filter(o => o.status === 'aberta').length}</div>
-            <p className="text-xs text-muted-foreground">Aguardando atendimento</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Em Andamento</CardTitle>
-            <AlertCircle className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{ordens.filter(o => o.status === 'em_andamento').length}</div>
-            <p className="text-xs text-muted-foreground">Sendo executadas</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Concluídas</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{ordens.filter(o => o.status === 'concluida').length}</div>
-            <p className="text-xs text-muted-foreground">Este mês</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valor Estimado</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(ordens.reduce((acc, o) => acc + o.valor_estimado, 0))}
-            </div>
-            <p className="text-xs text-muted-foreground">Total em aberto</p>
-          </CardContent>
-        </Card>
+      {/* KPI Cards - Responsivo */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+        <JugaKPICard
+          title="OS Abertas"
+          value={`${ordens.filter(o => o.status === 'aberta').length}`}
+          description="Aguardando atendimento"
+          trend="down"
+          trendValue="Requer atenção"
+          icon={<Clock className="h-4 w-4 sm:h-5 sm:w-5" />}
+          color="warning"
+          className="min-h-[120px] sm:min-h-[140px]"
+        />
+        <JugaKPICard
+          title="Em Andamento"
+          value={`${ordens.filter(o => o.status === 'em_andamento').length}`}
+          description="Sendo executadas"
+          trend="up"
+          trendValue="Ativas"
+          icon={<Wrench className="h-4 w-4 sm:h-5 sm:w-5" />}
+          color="accent"
+          className="min-h-[120px] sm:min-h-[140px]"
+        />
+        <JugaKPICard
+          title="Concluídas"
+          value={`${ordens.filter(o => o.status === 'concluida').length}`}
+          description="Este mês"
+          trend="up"
+          trendValue="+15.2%"
+          icon={<CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />}
+          color="success"
+          className="min-h-[120px] sm:min-h-[140px]"
+        />
+        <JugaKPICard
+          title="Valor Estimado"
+          value={formatCurrency(ordens.reduce((acc, o) => acc + o.valor_estimado, 0))}
+          description="Total em aberto"
+          trend="up"
+          trendValue="+8.5%"
+          icon={<FileText className="h-4 w-4 sm:h-5 sm:w-5" />}
+          color="primary"
+          className="min-h-[120px] sm:min-h-[140px]"
+        />
       </div>
 
       {/* Toolbar */}
-      <Card>
+      <Card className="juga-card">
         <CardContent className="pt-6">
-          <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-            {/* Lado esquerdo - Botões de ação */}
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            {/* Busca e Filtros */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:flex-initial">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Buscar ordens de serviço..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-full sm:w-64"
+                />
+              </div>
               <Button 
-                className="bg-emerald-600 hover:bg-emerald-700"
-                onClick={() => setShowAddDialog(true)}
+                variant="outline" 
+                onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                className="w-full sm:w-auto"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Nova OS
+                <Filter className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Filtros Avançados</span>
+                <span className="sm:hidden">Filtros</span>
               </Button>
+            </div>
 
+            {/* Ações */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    <MoreHorizontal className="h-4 w-4 mr-2" />
-                    Mais Ações
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Importar OSs
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportar Lista
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-red-600">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Excluir Selecionadas
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="outline" className="flex-1 sm:flex-initial">
                     <Settings2 className="h-4 w-4 mr-2" />
-                    Colunas
+                    <span className="hidden sm:inline">Colunas</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent>
+                <DropdownMenuContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-lg" >
                   <DropdownMenuLabel>Mostrar Colunas</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   {Object.entries(columnVisibility).map(([key, value]) => (
@@ -379,6 +364,7 @@ export default function OrdemServicosPage() {
                       onCheckedChange={(checked) => 
                         setColumnVisibility(prev => ({ ...prev, [key]: checked || false }))
                       }
+                      className="hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-800 focus:text-gray-900 dark:focus:text-gray-100"
                     >
                       {key === 'numero' ? 'Número' :
                        key === 'cliente' ? 'Cliente' :
@@ -393,35 +379,32 @@ export default function OrdemServicosPage() {
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
-            </div>
 
-            {/* Lado direito - Busca */}
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Buscar ordens de serviço..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-80"
-                />
-              </div>
-              <Button 
-                variant="outline" 
-                onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Busca Avançada
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex-1 sm:flex-initial">
+                    <MoreHorizontal className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Mais</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-lg">
+                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-800">
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar Lista
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
           {/* Busca Avançada */}
           {showAdvancedSearch && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <select 
-                  className="px-3 py-2 border rounded-md"
+                  className="px-3 py-2 border rounded-md bg-white dark:bg-gray-900"
                   value={advancedFilters.status}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))}
                 >
@@ -432,7 +415,7 @@ export default function OrdemServicosPage() {
                   <option value="cancelada">Cancelada</option>
                 </select>
                 <select 
-                  className="px-3 py-2 border rounded-md"
+                  className="px-3 py-2 border rounded-md bg-white dark:bg-gray-900"
                   value={advancedFilters.prioridade}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, prioridade: e.target.value }))}
                 >
@@ -465,91 +448,95 @@ export default function OrdemServicosPage() {
       </Card>
 
       {/* Tabela */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Lista de Ordens de Serviço ({filteredOrdens.length})
-          </CardTitle>
+      <Card className="juga-card">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg sm:text-xl text-heading">Lista de Ordens de Serviço</CardTitle>
+          <CardDescription className="text-sm">
+            {filteredOrdens.length} {filteredOrdens.length === 1 ? 'ordem encontrada' : 'ordens encontradas'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8">Carregando ordens de serviço...</div>
+            <div className="text-center py-8 text-muted-foreground">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100 mx-auto mb-3"></div>
+              <p>Carregando ordens de serviço...</p>
+            </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {columnVisibility.numero && <TableHead>Número</TableHead>}
-                  {columnVisibility.cliente && <TableHead>Cliente</TableHead>}
-                  {columnVisibility.tipo && <TableHead>Tipo</TableHead>}
-                  <TableHead>Descrição</TableHead>
-                  {columnVisibility.status && <TableHead>Status</TableHead>}
-                  {columnVisibility.prioridade && <TableHead>Prioridade</TableHead>}
-                  {columnVisibility.tecnico && <TableHead>Técnico</TableHead>}
-                  {columnVisibility.valor_estimado && <TableHead>Valor Estimado</TableHead>}
-                  {columnVisibility.data_abertura && <TableHead>Data Abertura</TableHead>}
-                  {columnVisibility.data_prazo && <TableHead>Prazo</TableHead>}
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrdens.map((ordem) => (
-                  <TableRow key={ordem.id}>
-                    {columnVisibility.numero && (
-                      <TableCell className="font-mono text-sm font-medium">
-                        {ordem.numero}
-                      </TableCell>
-                    )}
-                    {columnVisibility.cliente && (
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <User className="h-3 w-3 text-gray-400" />
-                          {ordem.cliente}
-                        </div>
-                      </TableCell>
-                    )}
-                    {columnVisibility.tipo && <TableCell>{ordem.tipo}</TableCell>}
-                    <TableCell className="max-w-xs">
-                      <div className="truncate" title={ordem.descricao}>
-                        {ordem.descricao}
-                      </div>
-                    </TableCell>
-                    {columnVisibility.status && <TableCell>{getStatusBadge(ordem.status)}</TableCell>}
-                    {columnVisibility.prioridade && <TableCell>{getPrioridadeBadge(ordem.prioridade)}</TableCell>}
-                    {columnVisibility.tecnico && <TableCell>{ordem.tecnico || '-'}</TableCell>}
-                    {columnVisibility.valor_estimado && <TableCell>{formatCurrency(ordem.valor_estimado)}</TableCell>}
-                    {columnVisibility.data_abertura && (
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-gray-400" />
-                          {formatDate(ordem.data_abertura)}
-                        </div>
-                      </TableCell>
-                    )}
-                    {columnVisibility.data_prazo && (
-                      <TableCell>
-                        {ordem.data_prazo ? (
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3 text-gray-400" />
-                            {formatDate(ordem.data_prazo)}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {columnVisibility.numero && <TableHead>Número</TableHead>}
+                    {columnVisibility.cliente && <TableHead>Cliente</TableHead>}
+                    {columnVisibility.tipo && <TableHead>Tipo</TableHead>}
+                    <TableHead>Descrição</TableHead>
+                    {columnVisibility.status && <TableHead>Status</TableHead>}
+                    {columnVisibility.prioridade && <TableHead>Prioridade</TableHead>}
+                    {columnVisibility.tecnico && <TableHead>Técnico</TableHead>}
+                    {columnVisibility.valor_estimado && <TableHead>Valor Estimado</TableHead>}
+                    {columnVisibility.data_abertura && <TableHead>Data Abertura</TableHead>}
+                    {columnVisibility.data_prazo && <TableHead>Prazo</TableHead>}
+                    <TableHead>Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredOrdens.map((ordem) => (
+                    <TableRow key={ordem.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                      {columnVisibility.numero && (
+                        <TableCell className="font-mono text-sm font-medium text-heading">
+                          {ordem.numero}
+                        </TableCell>
+                      )}
+                      {columnVisibility.cliente && (
+                        <TableCell className="font-medium text-heading">
+                          <div className="flex items-center gap-2">
+                            <User className="h-3 w-3 text-muted-foreground" />
+                            {ordem.cliente}
                           </div>
-                        ) : '-'}
+                        </TableCell>
+                      )}
+                      {columnVisibility.tipo && <TableCell className="text-body">{ordem.tipo}</TableCell>}
+                      <TableCell className="max-w-xs text-body">
+                        <div className="truncate" title={ordem.descricao}>
+                          {ordem.descricao}
+                        </div>
                       </TableCell>
-                    )}
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="h-4 w-4 mr-2" />
-                            Ver Detalhes
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="h-4 w-4 mr-2" />
+                      {columnVisibility.status && <TableCell>{getStatusBadge(ordem.status)}</TableCell>}
+                      {columnVisibility.prioridade && <TableCell>{getPrioridadeBadge(ordem.prioridade)}</TableCell>}
+                      {columnVisibility.tecnico && <TableCell className="text-body">{ordem.tecnico || '-'}</TableCell>}
+                      {columnVisibility.valor_estimado && <TableCell className="text-body">{formatCurrency(ordem.valor_estimado)}</TableCell>}
+                      {columnVisibility.data_abertura && (
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-body">
+                            <Calendar className="h-3 w-3 text-muted-foreground" />
+                            {formatDate(ordem.data_abertura)}
+                          </div>
+                        </TableCell>
+                      )}
+                      {columnVisibility.data_prazo && (
+                        <TableCell>
+                          {ordem.data_prazo ? (
+                            <div className="flex items-center gap-1 text-body">
+                              <Clock className="h-3 w-3 text-muted-foreground" />
+                              {formatDate(ordem.data_prazo)}
+                            </div>
+                          ) : '-'}
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Eye className="h-4 w-4 mr-2" />
+                              Ver Detalhes
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Edit className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
@@ -564,11 +551,13 @@ export default function OrdemServicosPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
 
           {filteredOrdens.length === 0 && !loading && (
             <div className="text-center py-8 text-muted-foreground">
-              Nenhuma ordem de serviço encontrada
+              <FileText className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p>Nenhuma ordem de serviço encontrada</p>
             </div>
           )}
         </CardContent>
