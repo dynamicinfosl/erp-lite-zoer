@@ -14,11 +14,6 @@ const protectedRoutes = [
   '/pdv'
 ];
 
-// Rotas administrativas (precisam de autenticação + privilégios de admin)
-const adminRoutes = [
-  '/admin'
-];
-
 // Rotas públicas (não precisam de autenticação)
 const publicRoutes = [
   '/',
@@ -26,7 +21,8 @@ const publicRoutes = [
   '/register',
   '/forgot-password',
   '/reset-password',
-  '/admin/login'
+  '/admin/login',
+  '/admin' // Admin faz verificação client-side com sessionStorage
 ];
 
 export function middleware(request: NextRequest) {
@@ -45,62 +41,20 @@ export function middleware(request: NextRequest) {
     pathname.startsWith(route)
   );
 
-  // Verificar se é uma rota administrativa
-  const isAdminRoute = adminRoutes.some(route => 
-    pathname.startsWith(route) && pathname !== '/admin/login'
-  );
-
   // Verificar se é uma rota pública
   const isPublicRoute = publicRoutes.some(route => 
     pathname === route || pathname.startsWith(route + '/')
   );
 
-  // Se for uma rota administrativa, verificar autenticação e permissões
-  if (isAdminRoute) {
-    // Verificar se existe token de autenticação
-    const token = request.cookies.get('auth-token')?.value;
-    
-    if (!token) {
-      // Redirecionar para login de admin
-      const adminLoginUrl = new URL('/admin/login', request.url);
-      adminLoginUrl.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(adminLoginUrl);
-    }
-
-    // Verificar se o usuário é "julga" - acesso restrito apenas para este usuário
-    try {
-      // Tentar decodificar o token JWT para obter informações do usuário
-      const tokenData = JSON.parse(atob(token.split('.')[1]));
-      const userEmail = tokenData?.email || tokenData?.user_metadata?.email;
-      const userRole = tokenData?.user_metadata?.role;
-      
-      // Se for o usuário julga, permitir acesso independente do role
-      const isJulgaUser = userEmail === 'julga@julga.com' || userEmail === 'julga';
-      
-      if (isJulgaUser) {
-        // Permitir acesso para usuário julga
-        return NextResponse.next();
-      }
-      
-      // Para outros usuários, verificar se tem role admin
-      if (userRole !== 'admin') {
-        // Redirecionar para página de acesso negado ou dashboard
-        return NextResponse.redirect(new URL('/dashboard', request.url));
-      }
-    } catch (error) {
-      // Se houver erro ao decodificar o token, redirecionar para login
-      const adminLoginUrl = new URL('/admin/login', request.url);
-      adminLoginUrl.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(adminLoginUrl);
-    }
-  }
-
   // Se for uma rota protegida, verificar se o usuário está autenticado
   if (isProtectedRoute) {
-    // Verificar se existe token de autenticação
-    const token = request.cookies.get('auth-token')?.value;
+    // Verificar cookies do Supabase Auth
+    const supabaseToken = request.cookies.get('sb-access-token')?.value;
+    const supabaseAuth = request.cookies.getAll().find(cookie => 
+      cookie.name.includes('sb-') && cookie.name.includes('auth-token')
+    );
     
-    if (!token) {
+    if (!supabaseToken && !supabaseAuth) {
       // Redirecionar para login se não estiver autenticado
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
@@ -110,9 +64,12 @@ export function middleware(request: NextRequest) {
 
   // Se for uma rota pública de autenticação e o usuário já estiver logado
   if (isPublicRoute && (pathname === '/login' || pathname === '/register')) {
-    const token = request.cookies.get('auth-token')?.value;
+    const supabaseToken = request.cookies.get('sb-access-token')?.value;
+    const supabaseAuth = request.cookies.getAll().find(cookie => 
+      cookie.name.includes('sb-') && cookie.name.includes('auth-token')
+    );
     
-    if (token) {
+    if (supabaseToken || supabaseAuth) {
       // Redirecionar para dashboard se já estiver autenticado
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }

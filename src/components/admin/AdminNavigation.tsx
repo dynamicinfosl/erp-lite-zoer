@@ -17,7 +17,7 @@ import {
   User,
   Home
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 import { toast } from 'sonner';
 
 interface AdminNavigationProps {
@@ -26,7 +26,7 @@ interface AdminNavigationProps {
 }
 
 export function AdminNavigation({ activeTab = 'overview', onTabChange }: AdminNavigationProps) {
-  const { user, signOut } = useAuth();
+  const { user, signOut } = useSimpleAuth();
 
   const handleLogout = async () => {
     if (confirm('Tem certeza que deseja sair do painel administrativo?')) {

@@ -36,8 +36,9 @@ import {
   ChevronDown,
   Tag,
   CreditCard,
+  Building2,
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -72,6 +73,7 @@ const menuGroups = [
     items: [
       { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin', 'financeiro'] },
       { title: 'Relatórios', url: '/relatorios', icon: BarChart3, roles: ['admin', 'financeiro'] },
+      { title: 'Perfil da Empresa', url: '/perfil-empresa', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Assinatura', url: '/assinatura', icon: CreditCard, roles: ['admin', 'vendedor', 'financeiro'] },
       // Botão Administração oculto - acesso restrito apenas para usuário "julga"
       // { title: 'Administração', url: '/admin', icon: Shield, roles: ['admin'] },
@@ -82,10 +84,14 @@ const menuGroups = [
 // Componente interno do sidebar que será renderizado apenas no cliente
 function SidebarContentInternal() {
   const pathname = usePathname();
-  const { user, currentTenant, signOut } = useAuth();
+  const { user, tenant, signOut } = useSimpleAuth();
   
   // Simular perfil do usuário baseado no role ou usar um perfil padrão se auth estiver desabilitado
   const userRole = ENABLE_AUTH && user ? 'admin' : mockUserProfile.role;
+
+  // Nome para exibir (sempre tem algo)
+  const displayName = tenant?.name || 
+    (user?.email ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ') : 'Meu Negócio');
 
   const filteredGroups = menuGroups.map(group => ({
     title: group.title,
@@ -142,7 +148,7 @@ function SidebarContentInternal() {
                 {user?.email || mockUserProfile.email}
               </span>
               <span className="text-xs text-white/60 capitalize">
-                {currentTenant?.name || 'Empresa JUGA'}
+                {displayName}
               </span>
             </div>
             <ThemeToggle />

@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 import { usePathname } from 'next/navigation';
 import { ENABLE_AUTH } from '@/constants/auth';
 
@@ -15,7 +15,7 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const [isClient, setIsClient] = useState(false);
-  const { user, loading } = useAuth();
+  const { user, loading } = useSimpleAuth();
 
   useEffect(() => {
     setIsClient(true);
@@ -29,12 +29,23 @@ export function AppLayout({ children }: AppLayoutProps) {
       '/reset-password',
       '/admin'  // Excluir painel admin do sidebar
     ];
+    
+    // Landing page (/) não deve ter sidebar quando usuário não está logado
+    if (pathname === '/' && ENABLE_AUTH && !user) {
+      return true;
+    }
+    
     return noSidebarPages.some((page) => pathname?.startsWith(page));
-  }, [pathname]);
+  }, [pathname, user]);
 
   const isPDV = useMemo(() => pathname?.startsWith('/pdv') ?? false, [pathname]);
 
   if (shouldHideSidebar) {
+    return <main className="min-h-screen w-full">{children}</main>;
+  }
+  
+  // Se página inicial e usuário não logado, sem sidebar
+  if (pathname === '/' && !user) {
     return <main className="min-h-screen w-full">{children}</main>;
   }
 
@@ -55,6 +66,12 @@ export function AppLayout({ children }: AppLayoutProps) {
     );
   }
 
+  // Landing page SEMPRE renderiza sem loading
+  if (pathname === '/') {
+    return <main className="min-h-screen w-full">{children}</main>;
+  }
+
+  // Outras páginas podem mostrar loading
   if (!isClient || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">

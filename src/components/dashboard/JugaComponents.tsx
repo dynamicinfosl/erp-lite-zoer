@@ -21,19 +21,19 @@ interface JugaKPICardProps {
 }
 
 const KPI_COLORS: Record<NonNullable<JugaKPICardProps["color"]>, string> = {
-  primary: "border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent",
-  success: "border-juga-success/20 bg-gradient-to-br from-juga-success/5 to-transparent",
-  warning: "border-juga-warning/20 bg-gradient-to-br from-juga-warning/5 to-transparent",
-  error: "border-juga-error/20 bg-gradient-to-br from-juga-error/5 to-transparent",
-  accent: "border-juga-accent/20 bg-gradient-to-br from-juga-accent/5 to-transparent",
+  primary: "border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-white dark:from-blue-950 dark:to-transparent shadow-sm",
+  success: "border-green-200 dark:border-green-800 bg-gradient-to-br from-green-50 to-white dark:from-green-950 dark:to-transparent shadow-sm",
+  warning: "border-orange-200 dark:border-orange-800 bg-gradient-to-br from-orange-50 to-white dark:from-orange-950 dark:to-transparent shadow-sm",
+  error: "border-red-200 dark:border-red-800 bg-gradient-to-br from-red-50 to-white dark:from-red-950 dark:to-transparent shadow-sm",
+  accent: "border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 to-white dark:from-purple-950 dark:to-transparent shadow-sm",
 }
 
 const KPI_ICON_COLORS: Record<NonNullable<JugaKPICardProps["color"]>, string> = {
-  primary: "text-juga-primary bg-juga-primary/10",
-  success: "text-juga-success bg-juga-success/10",
-  warning: "text-juga-warning bg-juga-warning/10",
-  error: "text-juga-error bg-juga-error/10",
-  accent: "text-juga-accent bg-juga-accent/10",
+  primary: "text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-800",
+  success: "text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/50 border border-green-200 dark:border-green-800",
+  warning: "text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/50 border border-orange-200 dark:border-orange-800",
+  error: "text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50 border border-red-200 dark:border-red-800",
+  accent: "text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/50 border border-purple-200 dark:border-purple-800",
 }
 
 export function JugaKPICard({
@@ -47,28 +47,28 @@ export function JugaKPICard({
   className,
 }: JugaKPICardProps) {
   return (
-    <Card className={cn("juga-card transition-all hover:juga-shadow-glow", KPI_COLORS[color], className)}>
+    <Card className={cn("juga-card transition-all hover:juga-shadow-glow hover:shadow-md", KPI_COLORS[color], className)}>
       <CardHeader className="pb-2 sm:pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-xs sm:text-sm font-medium text-juga-text-secondary leading-tight">{title}</CardTitle>
-          {icon ? <div className={cn("p-1.5 sm:p-2 rounded-lg", KPI_ICON_COLORS[color])}>{icon}</div> : null}
+          <CardTitle className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300 leading-tight uppercase tracking-wide">{title}</CardTitle>
+          {icon ? <div className={cn("p-1.5 sm:p-2 rounded-lg shadow-sm", KPI_ICON_COLORS[color])}>{icon}</div> : null}
         </div>
       </CardHeader>
       <CardContent className="pt-0">
         <div className="space-y-1 sm:space-y-2">
-          <div className="text-lg sm:text-xl lg:text-2xl font-bold text-heading">{value}</div>
+          <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100">{value}</div>
           {(description || (trend && trendValue)) && (
             <div className="flex items-center justify-between gap-2">
-              {description ? <p className="text-xs sm:text-sm text-caption truncate">{description}</p> : <span />}
+              {description ? <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate font-medium">{description}</p> : <span />}
               {trend && trendValue ? (
                 <div
                   className={cn(
-                    "flex items-center gap-1 text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full flex-shrink-0",
+                    "flex items-center gap-1 text-xs font-semibold px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full flex-shrink-0 border",
                     trend === "up"
-                      ? "text-juga-success bg-juga-success/10"
+                      ? "text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/50 border-green-300 dark:border-green-700"
                       : trend === "down"
-                      ? "text-juga-error bg-juga-error/10"
-                      : "text-juga-text-muted bg-juga-text-muted/10",
+                      ? "text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/50 border-red-300 dark:border-red-700"
+                      : "text-gray-700 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600",
                   )}
                 >
                   {trend === "up" ? <TrendingUp className="h-3 w-3" /> : trend === "down" ? <TrendingDown className="h-3 w-3" /> : null}

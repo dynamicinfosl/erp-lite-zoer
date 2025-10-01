@@ -5,604 +5,466 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Users,
-  UserPlus,
   Search,
-  Filter,
-  MoreHorizontal,
-  Edit,
-  Trash2,
-  Shield,
-  ShieldCheck,
-  ShieldAlert,
   Mail,
-  Phone,
   Calendar,
-  UserCheck,
-  UserX,
-  Download,
-  Upload,
+  Building2,
+  Check,
+  X,
+  Loader2,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
-import { AdminStatCard } from './AdminStatCard';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'manager' | 'operator' | 'viewer';
-  status: 'active' | 'inactive' | 'suspended';
-  lastLogin: string;
-  createdAt: string;
-  phone?: string;
-  department?: string;
-  permissions: string[];
+interface TenantUser {
+  user_id: string;
+  user_email: string;
+  user_created_at: string;
+  user_last_login: string;
+  tenant_id: string;
+  tenant_name: string;
+  tenant_status: 'trial' | 'active' | 'suspended' | 'cancelled';
+  role: 'owner' | 'admin' | 'member';
+  is_active: boolean;
+  tenant_email?: string;
+  tenant_phone?: string;
+  tenant_document?: string;
 }
 
-const mockUsers: User[] = [
-  {
-    id: '1',
-    name: 'Admin do Sistema',
-    email: 'admin@erplite.com',
-    role: 'admin',
-    status: 'active',
-    lastLogin: '2024-01-15T10:30:00Z',
-    createdAt: '2024-01-01T00:00:00Z',
-    phone: '(11) 99999-9999',
-    department: 'TI',
-    permissions: ['all']
-  },
-  {
-    id: '2',
-    name: 'João Silva',
-    email: 'joao@erplite.com',
-    role: 'manager',
-    status: 'active',
-    lastLogin: '2024-01-15T09:15:00Z',
-    createdAt: '2024-01-05T00:00:00Z',
-    phone: '(11) 98888-8888',
-    department: 'Vendas',
-    permissions: ['sales', 'customers', 'reports']
-  },
-  {
-    id: '3',
-    name: 'Maria Santos',
-    email: 'maria@erplite.com',
-    role: 'operator',
-    status: 'active',
-    lastLogin: '2024-01-14T16:45:00Z',
-    createdAt: '2024-01-10T00:00:00Z',
-    phone: '(11) 97777-7777',
-    department: 'Estoque',
-    permissions: ['inventory', 'products']
-  },
-  {
-    id: '4',
-    name: 'Carlos Oliveira',
-    email: 'carlos@erplite.com',
-    role: 'viewer',
-    status: 'inactive',
-    lastLogin: '2024-01-10T14:20:00Z',
-    createdAt: '2024-01-08T00:00:00Z',
-    phone: '(11) 96666-6666',
-    department: 'Financeiro',
-    permissions: ['reports_view']
-  }
-];
-
-const roles = [
-  { value: 'admin', label: 'Administrador', icon: ShieldCheck, color: 'bg-juga-primary/10 text-juga-primary' },
-  { value: 'manager', label: 'Gerente', icon: Shield, color: 'bg-juga-primary/10 text-juga-primary' },
-  { value: 'operator', label: 'Operador', icon: UserCheck, color: 'bg-juga-primary/10 text-juga-primary' },
-  { value: 'viewer', label: 'Visualizador', icon: UserX, color: 'bg-gray-100 text-gray-800' }
-];
-
 export function UserManagement() {
-  const [users, setUsers] = useState<User[]>(mockUsers);
+  const supabase = createClientComponentClient();
+  const [users, setUsers] = useState<TenantUser[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<TenantUser[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<TenantUser | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const { user: currentUser } = useAuth();
+  useEffect(() => {
+    loadUsers();
+  }, []);
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  useEffect(() => {
+    const filtered = users.filter(user =>
+      user.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.tenant_name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredUsers(filtered);
+  }, [searchTerm, users]);
 
-  const getRoleIcon = (role: string) => {
-    const roleConfig = roles.find(r => r.value === role);
-    if (!roleConfig) return UserCheck;
-    return roleConfig.icon;
-  };
-
-  const getRoleColor = (role: string) => {
-    const roleConfig = roles.find(r => r.value === role);
-    return roleConfig?.color || 'bg-gray-100 text-gray-800';
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-juga-primary/10 text-juga-primary';
-      case 'inactive': return 'bg-gray-100 text-gray-800';
-      case 'suspended': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const handleCreateUser = async (userData: Partial<User>) => {
-    setLoading(true);
+  const loadUsers = async () => {
     try {
-      const newUser: User = {
-        id: Date.now().toString(),
-        name: userData.name || '',
-        email: userData.email || '',
-        role: userData.role || 'viewer',
-        status: 'active',
-        lastLogin: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        phone: userData.phone || '',
-        department: userData.department || '',
-        permissions: getDefaultPermissions(userData.role || 'viewer')
-      };
-      
-      setUsers(prev => [...prev, newUser]);
-      toast.success('Usuário criado com sucesso!');
-      setIsCreateDialogOpen(false);
+      setLoading(true);
+      console.log('🔍 Carregando usuários do Supabase...');
+
+      // Buscar todos os usuários com seus tenants
+      const { data, error } = await supabase
+        .from('user_memberships')
+        .select(`
+          user_id,
+          role,
+          is_active,
+          tenant:tenants (
+            id,
+            name,
+            status,
+            email,
+            phone,
+            document,
+            created_at
+          )
+        `);
+
+      if (error) {
+        console.error('❌ Erro ao buscar usuários:', error);
+        toast.error('Erro ao carregar usuários');
+        return;
+      }
+
+      console.log('📡 Dados recebidos:', data);
+
+      // Buscar emails dos usuários da tabela auth.users via RPC
+      const { data: authData, error: authError } = await supabase.rpc('get_all_system_users');
+
+      console.log('📡 Dados auth:', authData, authError);
+
+      // Mapear dados
+      const mappedUsers: TenantUser[] = (data || []).map((item: any) => {
+        const authUser = authData?.find((au: any) => au.user_id === item.user_id);
+        
+        return {
+          user_id: item.user_id,
+          user_email: authUser?.email || 'Desconhecido',
+          user_created_at: authUser?.created_at || item.tenant?.created_at,
+          user_last_login: authUser?.last_sign_in_at || '-',
+          tenant_id: item.tenant?.id || '',
+          tenant_name: item.tenant?.name || 'Sem empresa',
+          tenant_status: item.tenant?.status || 'trial',
+          role: item.role,
+          is_active: item.is_active,
+          tenant_email: item.tenant?.email,
+          tenant_phone: item.tenant?.phone,
+          tenant_document: item.tenant?.document,
+        };
+      });
+
+      console.log('✅ Usuários mapeados:', mappedUsers);
+      setUsers(mappedUsers);
+      setFilteredUsers(mappedUsers);
     } catch (error) {
-      toast.error('Erro ao criar usuário');
+      console.error('❌ Erro geral:', error);
+      toast.error('Erro ao carregar usuários');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpdateUser = async (userData: Partial<User>) => {
-    if (!selectedUser) return;
-    
-    setLoading(true);
+  const toggleTenantStatus = async (user: TenantUser) => {
     try {
-      const updatedUser = { ...selectedUser, ...userData };
-      setUsers(prev => prev.map(u => u.id === selectedUser.id ? updatedUser : u));
-      toast.success('Usuário atualizado com sucesso!');
-      setIsEditDialogOpen(false);
-      setSelectedUser(null);
-    } catch (error) {
-      toast.error('Erro ao atualizar usuário');
-    } finally {
-      setLoading(false);
-    }
-  };
+      const newStatus = user.tenant_status === 'active' ? 'suspended' : 'active';
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
-    
-    setLoading(true);
-    try {
-      setUsers(prev => prev.filter(u => u.id !== userId));
-      toast.success('Usuário excluído com sucesso!');
-    } catch (error) {
-      toast.error('Erro ao excluir usuário');
-    } finally {
-      setLoading(false);
-    }
-  };
+      const { error } = await supabase
+        .from('tenants')
+        .update({ status: newStatus })
+        .eq('id', user.tenant_id);
 
-  const handleToggleStatus = async (userId: string) => {
-    setLoading(true);
-    try {
-      setUsers(prev => prev.map(u => 
-        u.id === userId 
-          ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' as 'active' | 'inactive' | 'suspended' }
-          : u
-      ));
-      toast.success('Status do usuário atualizado!');
+      if (error) throw error;
+
+      toast.success(`Conta ${newStatus === 'active' ? 'ativada' : 'suspensa'} com sucesso!`);
+      await loadUsers();
+      setDialogOpen(false);
     } catch (error) {
+      console.error('Erro:', error);
       toast.error('Erro ao atualizar status');
-    } finally {
-      setLoading(false);
     }
   };
 
-  const getDefaultPermissions = (role: string): string[] => {
-    switch (role) {
-      case 'admin': return ['all'];
-      case 'manager': return ['sales', 'customers', 'reports', 'inventory'];
-      case 'operator': return ['sales', 'customers'];
-      case 'viewer': return ['reports_view'];
-      default: return [];
+  const getStatusBadge = (status: string) => {
+    const styles = {
+      active: 'bg-green-500 text-white',
+      trial: 'bg-blue-500 text-white',
+      suspended: 'bg-red-500 text-white',
+      cancelled: 'bg-gray-500 text-white',
+    };
+    
+    const labels = {
+      active: 'Ativo',
+      trial: 'Trial',
+      suspended: 'Suspenso',
+      cancelled: 'Cancelado',
+    };
+
+    return (
+      <Badge className={styles[status as keyof typeof styles] || styles.trial}>
+        {labels[status as keyof typeof labels] || status}
+      </Badge>
+    );
+  };
+
+  const getRoleBadge = (role: string) => {
+    const styles = {
+      owner: 'bg-purple-500 text-white',
+      admin: 'bg-blue-500 text-white',
+      member: 'bg-gray-500 text-white',
+    };
+
+    const labels = {
+      owner: 'Dono',
+      admin: 'Admin',
+      member: 'Membro',
+    };
+
+    return (
+      <Badge className={styles[role as keyof typeof styles] || styles.member}>
+        {labels[role as keyof typeof labels] || role}
+      </Badge>
+    );
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString || dateString === '-') return '-';
+    try {
+      return new Date(dateString).toLocaleDateString('pt-BR');
+    } catch {
+      return '-';
     }
   };
 
-  const exportUsers = () => {
-    const dataStr = JSON.stringify(users, null, 2);
-    const dataBlob = new Blob([dataStr], {type: 'application/json'});
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'usuarios-erp-lite.json';
-    link.click();
-    toast.success('Dados exportados com sucesso!');
-  };
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+            <p className="text-gray-600">Carregando usuários...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="h-6 w-6" />
-            Gestão de Usuários
-          </h2>
-          <p className="text-muted-foreground">Gerencie usuários, permissões e acessos do sistema</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={exportUsers}>
-            <Download className="h-4 w-4 mr-2" />
-            Exportar
-          </Button>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <UserPlus className="h-4 w-4 mr-2" />
-                Novo Usuário
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Criar Novo Usuário</DialogTitle>
-                <DialogDescription>
-                  Preencha os dados do novo usuário
-                </DialogDescription>
-              </DialogHeader>
-              <UserForm 
-                onSubmit={handleCreateUser}
-                loading={loading}
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <AdminStatCard
-          title="Total de Usuários"
-          value={users.length}
-          subtitle="Cadastrados no sistema"
-          icon={<Users className="h-5 w-5" />}
-          trend={{
-            value: "+2 novos esta semana",
-            direction: "up"
-          }}
-          variant="primary"
-        />
-        <AdminStatCard
-          title="Usuários Ativos"
-          value={users.filter(u => u.status === 'active').length}
-          subtitle="Online agora"
-          icon={<UserCheck className="h-5 w-5" />}
-          trend={{
-            value: "95% ativos",
-            direction: "up"
-          }}
-          variant="success"
-        />
-        <AdminStatCard
-          title="Administradores"
-          value={users.filter(u => u.role === 'admin').length}
-          subtitle="Acesso completo"
-          icon={<ShieldCheck className="h-5 w-5" />}
-          variant="primary"
-        />
-        <AdminStatCard
-          title="Últimos Logins"
-          value={users.filter(u => {
-            const lastLogin = new Date(u.lastLogin);
-            const today = new Date();
-            const diffTime = Math.abs(today.getTime() - lastLogin.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            return diffDays <= 7;
-          }).length}
-          subtitle="Esta semana"
-          icon={<Calendar className="h-5 w-5" />}
-          trend={{
-            value: "+5 vs semana anterior",
-            direction: "up"
-          }}
-          variant="success"
-        />
-      </div>
-
-      {/* Filters */}
-      <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-        <CardHeader>
-          <CardTitle className="text-lg text-juga-text-secondary">Filtros e Busca</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 flex-wrap">
-            <div className="flex-1 min-w-[200px]">
-              <Label htmlFor="search">Buscar usuário</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-juga-primary" />
-                <Input
-                  id="search"
-                  placeholder="Nome ou email..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total de Clientes</p>
+                <p className="text-2xl font-bold">{users.length}</p>
               </div>
+              <Users className="h-8 w-8 text-blue-600" />
             </div>
-            
-            <div className="min-w-[150px]">
-              <Label>Função</Label>
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas as funções" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as funções</SelectItem>
-                  {roles.map(role => (
-                    <SelectItem key={role.value} value={role.value}>
-                      {role.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          </CardContent>
+        </Card>
 
-            <div className="min-w-[150px]">
-              <Label>Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos os status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os status</SelectItem>
-                  <SelectItem value="active">Ativo</SelectItem>
-                  <SelectItem value="inactive">Inativo</SelectItem>
-                  <SelectItem value="suspended">Suspenso</SelectItem>
-                </SelectContent>
-              </Select>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Ativos</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {users.filter(u => u.tenant_status === 'active').length}
+                </p>
+              </div>
+              <Check className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Trial</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {users.filter(u => u.tenant_status === 'trial').length}
+                </p>
+              </div>
+              <Calendar className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Suspensos</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {users.filter(u => u.tenant_status === 'suspended').length}
+                </p>
+              </div>
+              <X className="h-8 w-8 text-red-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tabela de Usuários */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Gerenciar Clientes
+            </CardTitle>
+            <Button onClick={loadUsers} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Atualizar
+            </Button>
+          </div>
+          
+          <div className="mt-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Buscar por email ou empresa..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Users Table */}
-      <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-        <CardHeader>
-          <CardTitle className="text-juga-text-secondary">Lista de Usuários ({filteredUsers.length})</CardTitle>
         </CardHeader>
+
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Função</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Último Login</TableHead>
-                  <TableHead>Departamento</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map((user) => {
-                  const RoleIcon = getRoleIcon(user.role);
-                  return (
-                    <TableRow key={user.id}>
+          {filteredUsers.length === 0 ? (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Nenhum usuário encontrado.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Empresa</TableHead>
+                    <TableHead>Papel</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Cadastro</TableHead>
+                    <TableHead>Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.map((user) => (
+                    <TableRow key={user.user_id}>
                       <TableCell>
-                        <div>
-                          <div className="font-medium">{user.name}</div>
-                          <div className="text-sm text-muted-foreground flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            {user.email}
-                          </div>
-                          {user.phone && (
-                            <div className="text-sm text-muted-foreground flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              {user.phone}
-                            </div>
-                          )}
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-gray-400" />
+                          <span className="font-medium">{user.user_email}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className={getRoleColor(user.role)}>
-                          <RoleIcon className="h-3 w-3 mr-1" />
-                          {roles.find(r => r.value === user.role)?.label || user.role}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-gray-400" />
+                          <span>{user.tenant_name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{getRoleBadge(user.role)}</TableCell>
+                      <TableCell>{getStatusBadge(user.tenant_status)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Calendar className="h-4 w-4" />
+                          {formatDate(user.user_created_at)}
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className={getStatusColor(user.status)}>
-                          {user.status === 'active' ? 'Ativo' : 
-                           user.status === 'inactive' ? 'Inativo' : 'Suspenso'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          {new Date(user.lastLogin).toLocaleDateString('pt-BR')}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(user.lastLogin).toLocaleTimeString('pt-BR')}
-                        </div>
-                      </TableCell>
-                      <TableCell>{user.department || 'N/A'}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Switch
-                            checked={user.status === 'active'}
-                            onCheckedChange={() => handleToggleStatus(user.id)}
-                            disabled={loading}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setIsEditDialogOpen(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteUser(user.id)}
-                            disabled={user.id === currentUser?.id}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <Button
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setDialogOpen(true);
+                          }}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Gerenciar
+                        </Button>
                       </TableCell>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Edit User Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md">
+      {/* Dialog de Detalhes */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Editar Usuário</DialogTitle>
+            <DialogTitle>Gerenciar Cliente</DialogTitle>
             <DialogDescription>
-              Atualize os dados do usuário
+              Visualize e gerencie os detalhes do cliente
             </DialogDescription>
           </DialogHeader>
+
           {selectedUser && (
-            <UserForm
-              initialData={selectedUser}
-              onSubmit={handleUpdateUser}
-              loading={loading}
-            />
+            <div className="space-y-6">
+              {/* Informações do Usuário */}
+              <div className="space-y-4">
+                <h3 className="font-semibold">Informações do Usuário</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm text-gray-600">Email</Label>
+                    <p className="font-medium">{selectedUser.user_email}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-gray-600">Papel</Label>
+                    <div>{getRoleBadge(selectedUser.role)}</div>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-gray-600">Cadastrado em</Label>
+                    <p>{formatDate(selectedUser.user_created_at)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-gray-600">Último login</Label>
+                    <p>{formatDate(selectedUser.user_last_login)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Informações da Empresa */}
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-semibold">Informações da Empresa</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm text-gray-600">Nome</Label>
+                    <p className="font-medium">{selectedUser.tenant_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-gray-600">Status</Label>
+                    <div>{getStatusBadge(selectedUser.tenant_status)}</div>
+                  </div>
+                  {selectedUser.tenant_email && (
+                    <div>
+                      <Label className="text-sm text-gray-600">Email</Label>
+                      <p>{selectedUser.tenant_email}</p>
+                    </div>
+                  )}
+                  {selectedUser.tenant_phone && (
+                    <div>
+                      <Label className="text-sm text-gray-600">Telefone</Label>
+                      <p>{selectedUser.tenant_phone}</p>
+                    </div>
+                  )}
+                  {selectedUser.tenant_document && (
+                    <div>
+                      <Label className="text-sm text-gray-600">CPF/CNPJ</Label>
+                      <p>{selectedUser.tenant_document}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Ações */}
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-4">Ações</h3>
+                <div className="flex gap-2">
+                  {selectedUser.tenant_status === 'active' ? (
+                    <Button
+                      onClick={() => toggleTenantStatus(selectedUser)}
+                      variant="destructive"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Suspender Conta
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => toggleTenantStatus(selectedUser)}
+                      variant="default"
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Check className="h-4 w-4 mr-2" />
+                      Ativar Conta
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-// Componente de formulário de usuário
-interface UserFormProps {
-  initialData?: User;
-  onSubmit: (data: Partial<User>) => void;
-  loading: boolean;
-}
-
-function UserForm({ initialData, onSubmit, loading }: UserFormProps) {
-  const [formData, setFormData] = useState({
-    name: initialData?.name || '',
-    email: initialData?.email || '',
-    role: initialData?.role || 'viewer',
-    phone: initialData?.phone || '',
-    department: initialData?.department || '',
-    status: initialData?.status || 'active'
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(formData);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="name">Nome completo</Label>
-        <Input
-          id="name"
-          value={formData.name}
-          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-          required
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          value={formData.email}
-          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-          required
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="phone">Telefone</Label>
-        <Input
-          id="phone"
-          value={formData.phone}
-          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-          placeholder="(11) 99999-9999"
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="department">Departamento</Label>
-        <Input
-          id="department"
-          value={formData.department}
-          onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))}
-          placeholder="Ex: Vendas, TI, Financeiro"
-        />
-      </div>
-
-      <div>
-        <Label>Função</Label>
-        <Select value={formData.role} onValueChange={(value) => setFormData(prev => ({ ...prev, role: value as User['role'] }))}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {roles.map(role => (
-              <SelectItem key={role.value} value={role.value}>
-                {role.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {initialData && (
-        <div>
-          <Label>Status</Label>
-          <Select value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as User['status'] }))}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Ativo</SelectItem>
-              <SelectItem value="inactive">Inativo</SelectItem>
-              <SelectItem value="suspended">Suspenso</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      <DialogFooter>
-        <Button type="submit" disabled={loading}>
-          {loading ? 'Salvando...' : initialData ? 'Atualizar' : 'Criar'}
-        </Button>
-      </DialogFooter>
-    </form>
   );
 }

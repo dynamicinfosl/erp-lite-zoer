@@ -12,7 +12,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { useAuth } from "@/contexts/AuthContext";
+import { useSimpleAuth } from "@/contexts/SimpleAuthContext";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { z } from "zod";
@@ -43,7 +43,7 @@ export function RegisterForm({
   onSuccess,
   onSwitchToLogin,
 }: RegisterFormProps) {
-  const { register: registerUser } = useAuth();
+  const { signUp: registerUser } = useSimpleAuth();
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,10 +122,13 @@ export function RegisterForm({
       setIsLoading(true);
       setError(null);
 
+      // Usar email como nome da empresa temporariamente (usuário pode editar depois no perfil)
+      const companyName = userEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ');
+      
       await registerUser(
         userEmail,
         userPassword,
-        data.passcode
+        companyName || 'Minha Empresa'
       );
       onSuccess?.();
     } catch (err: any) {

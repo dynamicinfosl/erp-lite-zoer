@@ -14,6 +14,21 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     headers: {
       'X-Client-Info': 'supabase-js-web'
+    },
+    fetch: (url, options = {}) => {
+      return fetch(url, {
+        ...options,
+        // Timeout de 15 segundos para requests
+        signal: AbortSignal.timeout(15000)
+      })
+    }
+  },
+  db: {
+    schema: 'public'
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
     }
   }
 })

@@ -3,6 +3,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +32,7 @@ import {
   LogOut,
   User,
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { toast } from 'sonner';
 
@@ -61,6 +62,14 @@ interface SystemStats {
 }
 
 function checkIsAdmin(user: unknown): boolean {
+  // Verificar se está autenticado via sessão
+  if (typeof window !== 'undefined') {
+    const adminAuth = sessionStorage.getItem('adminAuthenticated');
+    if (adminAuth === 'true') {
+      return true;
+    }
+  }
+  
   if (!user) return false;
   if (typeof user === 'object' && user !== null) {
     const userObj = user as { 
@@ -87,6 +96,8 @@ function checkIsAdmin(user: unknown): boolean {
 }
 
 function AdminAccessDenied() {
+  const router = useRouter();
+  
   return (
     <div className="container mx-auto p-6">
       <div className="max-w-md mx-auto">
@@ -120,7 +131,7 @@ function AdminAccessDenied() {
             </div>
             <div className="flex gap-2">
               <Button 
-                onClick={() => window.location.href = '/admin/login'}
+                onClick={() => router.push('/admin/login')}
                 className="flex-1 bg-red-600 hover:bg-red-700"
               >
                 <Shield className="mr-2 h-4 w-4" />
@@ -128,7 +139,7 @@ function AdminAccessDenied() {
               </Button>
               <Button 
                 variant="outline" 
-                onClick={() => window.location.href = '/dashboard'}
+                onClick={() => router.push('/dashboard')}
                 className="flex-1"
               >
                 Ir para Dashboard
@@ -142,9 +153,10 @@ function AdminAccessDenied() {
 }
 
 export default function AdminPage() {
-  const { user, signOut } = useAuth();
+  const router = useRouter();
+  const { user, signOut } = useSimpleAuth();
   const isAdmin = useMemo(() => {
-    if (!ENABLE_AUTH) return true;
+    // Sempre verificar autenticação de admin, mesmo com auth desabilitado
     return checkIsAdmin(user);
   }, [user]);
 
@@ -208,8 +220,16 @@ export default function AdminPage() {
   const handleLogout = async () => {
     if (confirm('Tem certeza que deseja sair do painel administrativo?')) {
       try {
-        await signOut();
+        // Limpar autenticação de admin
+        sessionStorage.removeItem('adminAuthenticated');
+        sessionStorage.removeItem('adminUser');
+        
+        if (ENABLE_AUTH) {
+          await signOut();
+        }
+        
         toast.success('Logout realizado com sucesso');
+        router.push('/admin/login');
       } catch (error) {
         toast.error('Erro ao fazer logout');
       }

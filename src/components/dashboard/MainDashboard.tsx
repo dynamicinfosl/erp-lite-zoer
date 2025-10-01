@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { JugaKPICard, JugaTimeline, JugaProgressCard } from '@/components/dashboard/JugaComponents';
-import { AdminAccessButton } from '@/components/admin/AdminAccessButton';
 import {
   DollarSign,
   Users,
@@ -121,9 +120,6 @@ const MainDashboard: React.FC = () => {
             <span className="hidden sm:inline">Nova Venda</span>
             <span className="sm:hidden">Nova</span>
           </Button>
-          <div className="hidden sm:block">
-            <AdminAccessButton size="sm" variant="outline" />
-          </div>
         </div>
       </div>
 
@@ -410,11 +406,6 @@ const MainDashboard: React.FC = () => {
             </CardContent>
           </Card>
         </div>
-      </div>
-
-      {/* Admin Access Button - Mobile */}
-      <div className="block sm:hidden fixed bottom-4 right-4 z-50">
-        <AdminAccessButton size="sm" variant="outline" className="shadow-lg" />
       </div>
     </div>
   );
