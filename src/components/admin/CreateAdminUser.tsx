@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 import { Shield, UserPlus, Eye, EyeOff, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -15,7 +15,7 @@ interface CreateAdminUserProps {
 }
 
 export function CreateAdminUser({ onSuccess }: CreateAdminUserProps) {
-  const { signUp } = useAuth();
+  const { signUp } = useSimpleAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);

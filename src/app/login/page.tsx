@@ -7,14 +7,13 @@ import { RegisterForm } from '@/components/auth/RegisterForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { Loader2, ArrowLeft, Shield, Users, BarChart3, Settings } from 'lucide-react';
-import { AdminAccessButton } from '@/components/admin/AdminAccessButton';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading } = useSimpleAuth();
   const [activeTab, setActiveTab] = useState('login');
 
   // Redirecionar se já estiver logado (apenas quando autenticação estiver habilitada)
@@ -145,15 +144,6 @@ export default function LoginPage() {
               <ArrowLeft className="h-4 w-4 mr-2" />
               Voltar ao início
             </Button>
-          </div>
-          
-          <div className="text-center">
-            <AdminAccessButton
-              variant="outline"
-              className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20"
-            >
-              Acesso Administrativo
-            </AdminAccessButton>
           </div>
         </div>
       </div>

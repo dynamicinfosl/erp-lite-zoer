@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
   Menu,
   ShoppingCart,
@@ -29,12 +29,14 @@ import {
   Archive,
   DollarSign,
   Settings,
+  LogOut,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Product, PDVItem } from '@/types';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { api } from '@/lib/api-client';
-import { mockProducts as defaultMockProducts } from '@/lib/mock-data';
+import { mockProducts as defaultMockProducts, mockUserProfile } from '@/lib/mock-data';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 
 interface MenuItem {
   icon: React.ElementType;
@@ -43,6 +45,7 @@ interface MenuItem {
 }
 
 export default function PDVPage() {
+  const { user, tenant, signOut } = useSimpleAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<PDVItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<PDVItem | null>(null);
@@ -222,8 +225,8 @@ export default function PDVPage() {
         </div>
 
         <SheetContent side="left" className="w-64 p-0 juga-sidebar-gradient">
-          <div className="p-6 border-b border-white/10">
-            <div className="flex items-center gap-3">
+          <SheetHeader className="p-6 border-b border-white/10">
+            <SheetTitle className="flex items-center gap-3">
               <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
                 <span className="text-white font-bold text-lg">J</span>
               </div>
@@ -231,8 +234,8 @@ export default function PDVPage() {
                 <h1 className="text-white font-bold text-xl">JUGA</h1>
                 <p className="text-white/70 text-xs">ERP SaaS</p>
               </div>
-            </div>
-          </div>
+            </SheetTitle>
+          </SheetHeader>
 
           <div className="p-4 space-y-2">
             {menuItems.map((item) => {
@@ -251,13 +254,34 @@ export default function PDVPage() {
           </div>
 
           <div className="absolute bottom-4 left-4 right-4">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center border border-white/10">
-              <div className="text-white/90 text-xs mb-1">Usuário: Admin</div>
-              <Button size="sm" variant="ghost" className="w-full text-white hover:bg-white/10" onClick={() => toast.info('Logout não implementado')}>
-            Sair
-          </Button>
-        </div>
-      </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/10">
+              <div className="flex flex-col gap-2 mb-3">
+                <span className="text-xs font-semibold text-white truncate">
+                  {user?.email || mockUserProfile.email}
+                </span>
+                <span className="text-xs text-white/60">
+                  {tenant?.name || (user?.email ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ') : 'Meu Negócio')}
+                </span>
+              </div>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="w-full justify-center gap-2 text-white hover:bg-white/20 border border-white/30"
+                onClick={() => {
+                  if (confirm('Deseja sair do sistema?')) {
+                    if (ENABLE_AUTH) {
+                      signOut();
+                    } else {
+                      window.location.href = '/login';
+                    }
+                  }
+                }}
+              >
+                <LogOut className="h-3 w-3" />
+                Finalizar sessão
+              </Button>
+            </div>
+          </div>
         </SheetContent>
       </Sheet>
 

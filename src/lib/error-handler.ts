@@ -25,6 +25,11 @@ export function setupGlobalErrorHandlers() {
   }
 
   const consoleHandler: Handler = (...args) => {
+    // Filtrar avisos conhecidos de acessibilidade do Radix UI
+    const message = args[0]?.toString() || '';
+    if (message.includes('DialogContent') && message.includes('DialogTitle')) {
+      return; // Suprimir este aviso conhecido
+    }
     originalConsoleError(...args);
   };
 

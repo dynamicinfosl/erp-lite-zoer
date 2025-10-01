@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Limpar Cache Supabase</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            color: #333;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 500px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        .success {
+            background: #10b981;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Limpar Cache de Autenticação</h1>
+        <p>Clique no botão abaixo para limpar todo o cache do Supabase Auth</p>
+        
+        <button onclick="clearCache()">Limpar Cache</button>
+        <button onclick="location.href='/'">Voltar ao Site</button>
+        
+        <div id="success" class="success">
+            ✅ Cache limpo com sucesso! Você pode fazer login novamente.
+        </div>
+    </div>
+
+    <script>
+        function clearCache() {
+            // Limpar localStorage
+            Object.keys(localStorage).forEach(key => {
+                if (key.includes('supabase') || key.includes('sb-')) {
+                    localStorage.removeItem(key);
+                    console.log('Removido:', key);
+                }
+            });
+            
+            // Limpar sessionStorage
+            Object.keys(sessionStorage).forEach(key => {
+                if (key.includes('supabase') || key.includes('sb-') || key.includes('admin')) {
+                    sessionStorage.removeItem(key);
+                    console.log('Removido:', key);
+                }
+            });
+            
+            // Mostrar mensagem de sucesso
+            document.getElementById('success').style.display = 'block';
+            
+            // Redirecionar após 2 segundos
+            setTimeout(() => {
+                location.href = '/login';
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
+
+

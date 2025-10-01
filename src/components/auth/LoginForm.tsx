@@ -1,65 +1,71 @@
 "use client";
 
 import React, { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useAuth } from "@/contexts/AuthContext";
-import { Loader2 } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
-import { GoogleLoginButton } from "@/components/auth/GoogleLoginButton";
-
-const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(1, "Please enter your password"),
-});
-
-type LoginFormData = z.infer<typeof loginSchema>;
+import { useSimpleAuth } from "@/contexts/SimpleAuthContext";
+import { Loader2, Mail, Lock, AlertTriangle } from "lucide-react";
 
 interface LoginFormProps {
   onSuccess?: () => void;
   onSwitchToRegister?: () => void;
-  onForgotPassword?: () => void;
 }
 
 export function LoginForm({
   onSuccess,
   onSwitchToRegister,
-  onForgotPassword,
 }: LoginFormProps) {
-  const { signIn } = useAuth();
+  const { signIn } = useSimpleAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
   });
 
-  const onSubmit = async (data: LoginFormData) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
+    setError(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.email || !formData.password) {
+      setError('Por favor, preencha todos os campos');
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
-      const result = await signIn(data.email, data.password);
+      
+      console.log('🔐 Tentando fazer login com:', formData.email);
+      
+      const result = await signIn(formData.email, formData.password);
+      
       if (result.error) {
         throw result.error;
       }
+      
+      console.log('✅ Login bem-sucedido!');
       onSuccess?.();
+      
     } catch (err: any) {
-      const msg = err?.message || err?.errorMessage;
+      console.error('❌ Erro no login:', err);
+      const msg = err?.message || err?.errorMessage || '';
+      
       if (typeof msg === 'string' && /invalid login credentials|Invalid login credentials/i.test(msg)) {
-        setError('Credenciais inválidas. Verifique email e senha.');
-      } else if (typeof msg === 'string' && /email already registered|User already registered/i.test(msg)) {
-        setError('Usuário já cadastrado. Tente Entrar.');
+        setError('Email ou senha incorretos. Verifique e tente novamente.');
+      } else if (typeof msg === 'string' && /email not confirmed/i.test(msg)) {
+        setError('Email não confirmado. Verifique sua caixa de entrada.');
       } else {
-        setError('Falha no login. Tente novamente.');
+        setError('Erro ao fazer login. Tente novamente em alguns instantes.');
       }
     } finally {
       setIsLoading(false);
@@ -67,94 +73,82 @@ export function LoginForm({
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <div className="flex flex-col items-center justify-center gap-[10px] py-[20px]">
-        <div className="text-center text-2xl font-semibold">Welcome back</div>
-        <div className="text-center text-sm text-muted-foreground">Sign in to {process.env.NEXT_PUBLIC_APP_NAME}</div>
-      </div>
-      <CardContent>
-        {/* Google登录按钮 */}
-        <div className="">
-          <GoogleLoginButton />
-          <div className="my-[20px] flex items-center">
-            <Separator className="flex-1" />
-            <span className="mx-3 text-xs uppercase text-muted-foreground">OR</span>
-            <Separator className="flex-1" />
-          </div>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="space-y-2">
+        <Label htmlFor="email" className="text-sm font-semibold">
+          Email
+        </Label>
+        <div className="relative">
+          <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            placeholder="seu@email.com"
+            value={formData.email}
+            onChange={handleChange}
+            disabled={isLoading}
+            className="pl-10 h-11"
+            required
+          />
         </div>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+      </div>
 
-          <div className="space-y-2">
-            <div className="mb-[4px] h-[22px] text-sm font-medium">Email</div>
-            <Input
-              id="email"
-              type="email"
-              placeholder="email"
-              {...register("email")}
-              disabled={isLoading}
-            />
-            {errors.email && (
-              <p className="text-sm text-red-500">{errors.email.message}</p>
-            )}
-          </div>
+      <div className="space-y-2">
+        <Label htmlFor="password" className="text-sm font-semibold">
+          Senha
+        </Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            placeholder="Digite sua senha"
+            value={formData.password}
+            onChange={handleChange}
+            disabled={isLoading}
+            className="pl-10 h-11"
+            required
+          />
+        </div>
+      </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between mb-[4px] h-[22px] text-sm font-medium">
-              <span className="h-[22px]">Password</span>
-              {onForgotPassword && (
-                <button
-                  type="button"
-                  onClick={onForgotPassword}
-                  className="text-xs text-muted-foreground hover:underline cursor-pointer"
-                  disabled={isLoading}
-                >
-                  Forgot password?
-                </button>
-              )}
-            </div>
-            <Input
-              id="password"
-              type="password"
-              placeholder="password"
-              {...register("password")}
-              disabled={isLoading}
-            />
-            {errors.password && (
-              <p className="text-sm text-red-500">{errors.password.message}</p>
-            )}
-          </div>
+      <Button
+        type="submit"
+        className="w-full h-11 bg-blue-600 hover:bg-blue-700 font-semibold"
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Entrando...
+          </>
+        ) : (
+          'Entrar'
+        )}
+      </Button>
 
-          <Button
-            type="submit"
-            className="w-full my-[10px]"
+      {onSwitchToRegister && (
+        <div className="text-center text-sm">
+          <span className="text-gray-600">Não tem uma conta? </span>
+          <button
+            type="button"
+            onClick={onSwitchToRegister}
+            className="text-blue-600 hover:underline font-medium"
             disabled={isLoading}
           >
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Login
-          </Button>
-
-          {onSwitchToRegister && (
-            <div className="text-center text-sm flex items-center justify-center gap-2">
-              <span className="text-center text-muted-foreground">
-                Don't have an account?
-              </span>
-              <button
-                type="button"
-                onClick={onSwitchToRegister}
-                className="cursor-pointer hover:underline"
-                disabled={isLoading}
-              >
-                Register now
-              </button>
-            </div>
-          )}
-        </form>
-      </CardContent>
-    </Card>
+            Cadastre-se grátis
+          </button>
+        </div>
+      )}
+    </form>
   );
 }

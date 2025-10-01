@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { SimpleAuthProvider } from "@/contexts/SimpleAuthContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Toaster } from "@/components/ui/toaster";
 import ZoerCopilot from "@/components/ZoerCopilot";
@@ -41,7 +41,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
+          <SimpleAuthProvider>
             <AppLayout>
               {children}
             </AppLayout>
@@ -49,7 +49,7 @@ export default function RootLayout({
             <Toaster />
             {/* Renderizar ZoerCopilot apenas quando habilitado por envs */}
             {process.env.NEXT_PUBLIC_ENABLE_ZOER === 'true' && <ZoerCopilot />}
-          </AuthProvider>
+          </SimpleAuthProvider>
         </ThemeProvider>
       </body>
     </html>
