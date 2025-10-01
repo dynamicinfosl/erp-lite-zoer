@@ -15,7 +15,8 @@ import {
   Monitor,
   LogOut,
   User,
-  Home
+  Home,
+  CreditCard
 } from 'lucide-react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 import { toast } from 'sonner';
@@ -44,6 +45,7 @@ export function AdminNavigation({ activeTab = 'overview', onTabChange }: AdminNa
   const navigationItems = [
     { id: 'overview', label: 'Visão Geral', icon: Activity },
     { id: 'users', label: 'Usuários', icon: Users },
+    { id: 'plans', label: 'Planos', icon: CreditCard },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'monitoring', label: 'Monitoramento', icon: Monitor },
     { id: 'inventory', label: 'Estoque', icon: Database },

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AdminPageWrapper } from '@/components/admin/AdminPageWrapper';
 import { AdminNavigation } from '@/components/admin/AdminNavigation';
 import { AdminMobileHeader } from '@/components/admin/AdminMobileHeader';
 import { AdminStatCard } from '@/components/admin/AdminStatCard';
@@ -38,6 +39,7 @@ import { toast } from 'sonner';
 
 // Import dos novos componentes
 import { UserManagement } from '@/components/admin/UserManagement';
+import { PlanManagement } from '@/components/admin/PlanManagement';
 import { SystemMonitoring } from '@/components/admin/SystemMonitoring';
 import { SystemSettings } from '@/components/admin/SystemSettings';
 import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
@@ -61,104 +63,10 @@ interface SystemStats {
   totalInventoryValue: number;
 }
 
-function checkIsAdmin(user: unknown): boolean {
-  // Verificar se está autenticado via sessão
-  if (typeof window !== 'undefined') {
-    const adminAuth = sessionStorage.getItem('adminAuthenticated');
-    if (adminAuth === 'true') {
-      return true;
-    }
-  }
-  
-  if (!user) return false;
-  if (typeof user === 'object' && user !== null) {
-    const userObj = user as { 
-      user_metadata?: { role?: string }; 
-      isAdmin?: boolean;
-      email?: string;
-    };
-    
-    // Verificar se o usuário é "julga" - acesso restrito apenas para este usuário
-    const userEmail = userObj.email || userObj.user_metadata?.email;
-    const isJulgaUser = userEmail === 'julga@julga.com' || userEmail === 'julga';
-    
-    // Se for o usuário julga, permitir acesso independente do role
-    if (isJulgaUser) {
-      return true;
-    }
-    
-    // Para outros usuários, verificar se tem role 'admin' nos metadados ou se tem isAdmin
-    const hasAdminRole = userObj.user_metadata?.role === 'admin' || Boolean(userObj.isAdmin);
-    
-    return hasAdminRole;
-  }
-  return false;
-}
-
-function AdminAccessDenied() {
-  const router = useRouter();
-  
-  return (
-    <div className="container mx-auto p-6">
-      <div className="max-w-md mx-auto">
-        <Card className="shadow-xl border-red-200 bg-red-50 dark:bg-red-900/20">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="p-3 bg-red-600 rounded-xl">
-                <Shield className="h-8 w-8 text-white" />
-              </div>
-            </div>
-            <CardTitle className="text-red-800 dark:text-red-200">
-              Acesso Negado
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-center space-y-4">
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                Esta página é restrita a administradores do sistema.
-              </AlertDescription>
-            </Alert>
-            <div className="space-y-2">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Para acessar o painel administrativo, você precisa:
-              </p>
-              <ul className="text-sm text-gray-600 dark:text-gray-400 text-left">
-                <li>• Fazer login com uma conta de administrador</li>
-                <li>• Ter o código de acesso administrativo</li>
-                <li>• Possuir privilégios adequados no sistema</li>
-              </ul>
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                onClick={() => router.push('/admin/login')}
-                className="flex-1 bg-red-600 hover:bg-red-700"
-              >
-                <Shield className="mr-2 h-4 w-4" />
-                Login Admin
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => router.push('/dashboard')}
-                className="flex-1"
-              >
-                Ir para Dashboard
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
 
 export default function AdminPage() {
   const router = useRouter();
-  const { user, signOut } = useSimpleAuth();
-  const isAdmin = useMemo(() => {
-    // Sempre verificar autenticação de admin, mesmo com auth desabilitado
-    return checkIsAdmin(user);
-  }, [user]);
+  const { signOut } = useSimpleAuth();
 
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -264,9 +172,6 @@ export default function AdminPage() {
     return descriptions[tab] || 'Controle total do sistema ERP Lite';
   };
 
-  if (!isAdmin) {
-    return <AdminAccessDenied />;
-  }
 
   if (loading) {
     return (
@@ -277,7 +182,8 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <AdminPageWrapper>
+      <div className="flex h-screen bg-transparent">
       {/* Mobile Header */}
       <AdminMobileHeader 
         activeTab={activeTab}
@@ -532,6 +438,7 @@ export default function AdminPage() {
             )}
 
             {activeTab === 'users' && <UserManagement />}
+            {activeTab === 'plans' && <PlanManagement />}
             {activeTab === 'analytics' && <AnalyticsDashboard />}
             {activeTab === 'monitoring' && <SystemMonitoring />}
             {activeTab === 'inventory' && <BeverageInventory />}
@@ -542,6 +449,7 @@ export default function AdminPage() {
         </div>
       </div>
     </div>
+    </AdminPageWrapper>
   );
 }
 

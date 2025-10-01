@@ -32,12 +32,16 @@ interface TenantUser {
   user_last_login: string;
   tenant_id: string;
   tenant_name: string;
-  tenant_status: 'trial' | 'active' | 'suspended' | 'cancelled';
+  tenant_status: 'trial' | 'active' | 'suspended' | 'cancelled' | 'pending_approval';
   role: 'owner' | 'admin' | 'member';
   is_active: boolean;
   tenant_email?: string;
   tenant_phone?: string;
   tenant_document?: string;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  approved_at?: string;
+  rejected_at?: string;
+  rejection_reason?: string;
 }
 
 export function UserManagement() {
@@ -48,6 +52,8 @@ export function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<TenantUser | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   useEffect(() => {
     loadUsers();
@@ -148,12 +154,64 @@ export function UserManagement() {
     }
   };
 
+  const approveClient = async (user: TenantUser) => {
+    try {
+      const { error } = await supabase
+        .from('tenants')
+        .update({ 
+          status: 'active',
+          approval_status: 'approved',
+          approved_at: new Date().toISOString()
+        })
+        .eq('id', user.tenant_id);
+
+      if (error) throw error;
+
+      toast.success('Cliente aprovado com sucesso!');
+      await loadUsers();
+      setApprovalDialogOpen(false);
+    } catch (error) {
+      console.error('Erro:', error);
+      toast.error('Erro ao aprovar cliente');
+    }
+  };
+
+  const rejectClient = async (user: TenantUser) => {
+    if (!rejectionReason.trim()) {
+      toast.error('Informe o motivo da rejeição');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('tenants')
+        .update({ 
+          status: 'cancelled',
+          approval_status: 'rejected',
+          rejected_at: new Date().toISOString(),
+          rejection_reason: rejectionReason
+        })
+        .eq('id', user.tenant_id);
+
+      if (error) throw error;
+
+      toast.success('Cliente rejeitado com sucesso!');
+      await loadUsers();
+      setApprovalDialogOpen(false);
+      setRejectionReason('');
+    } catch (error) {
+      console.error('Erro:', error);
+      toast.error('Erro ao rejeitar cliente');
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const styles = {
       active: 'bg-green-500 text-white',
       trial: 'bg-blue-500 text-white',
       suspended: 'bg-red-500 text-white',
       cancelled: 'bg-gray-500 text-white',
+      pending_approval: 'bg-yellow-500 text-white',
     };
     
     const labels = {
@@ -161,6 +219,7 @@ export function UserManagement() {
       trial: 'Trial',
       suspended: 'Suspenso',
       cancelled: 'Cancelado',
+      pending_approval: 'Aguardando Aprovação',
     };
 
     return (
@@ -252,6 +311,20 @@ export function UserManagement() {
                 </p>
               </div>
               <Calendar className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Pendentes</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {users.filter(u => u.tenant_status === 'pending_approval').length}
+                </p>
+              </div>
+              <Clock className="h-8 w-8 text-yellow-600" />
             </div>
           </CardContent>
         </Card>
@@ -434,8 +507,34 @@ export function UserManagement() {
               {/* Ações */}
               <div className="border-t pt-4">
                 <h3 className="font-semibold mb-4">Ações</h3>
-                <div className="flex gap-2">
-                  {selectedUser.tenant_status === 'active' ? (
+                <div className="flex gap-2 flex-wrap">
+                  {selectedUser.tenant_status === 'pending_approval' && (
+                    <>
+                      <Button
+                        onClick={() => {
+                          setSelectedUser(selectedUser);
+                          setApprovalDialogOpen(true);
+                        }}
+                        variant="default"
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <Check className="h-4 w-4 mr-2" />
+                        Aprovar Cliente
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setSelectedUser(selectedUser);
+                          setApprovalDialogOpen(true);
+                        }}
+                        variant="destructive"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Rejeitar Cliente
+                      </Button>
+                    </>
+                  )}
+                  
+                  {selectedUser.tenant_status === 'active' && (
                     <Button
                       onClick={() => toggleTenantStatus(selectedUser)}
                       variant="destructive"
@@ -443,7 +542,9 @@ export function UserManagement() {
                       <X className="h-4 w-4 mr-2" />
                       Suspender Conta
                     </Button>
-                  ) : (
+                  )}
+                  
+                  {(selectedUser.tenant_status === 'suspended' || selectedUser.tenant_status === 'trial') && (
                     <Button
                       onClick={() => toggleTenantStatus(selectedUser)}
                       variant="default"
@@ -461,6 +562,74 @@ export function UserManagement() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Aprovação/Rejeição */}
+      <Dialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gerenciar Aprovação</DialogTitle>
+            <DialogDescription>
+              {selectedUser?.tenant_status === 'pending_approval' 
+                ? 'Aprovar ou rejeitar este cliente'
+                : 'Ações disponíveis para este cliente'
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedUser && (
+            <div className="space-y-4">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-medium mb-2">Cliente: {selectedUser.tenant_name}</h4>
+                <p className="text-sm text-gray-600">Email: {selectedUser.user_email}</p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => approveClient(selectedUser)}
+                    className="bg-green-600 hover:bg-green-700 flex-1"
+                  >
+                    <Check className="h-4 w-4 mr-2" />
+                    Aprovar Cliente
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const reason = prompt('Motivo da rejeição:');
+                      if (reason) {
+                        setRejectionReason(reason);
+                        rejectClient(selectedUser);
+                      }
+                    }}
+                    variant="destructive"
+                    className="flex-1"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Rejeitar Cliente
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="rejection_reason">Motivo da rejeição (opcional)</Label>
+                  <textarea
+                    id="rejection_reason"
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="Informe o motivo da rejeição..."
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    rows={3}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApprovalDialogOpen(false)}>
+              Cancelar
             </Button>
           </DialogFooter>
         </DialogContent>
