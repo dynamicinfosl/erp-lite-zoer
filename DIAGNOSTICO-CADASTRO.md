@@ -22,7 +22,7 @@
 
 ## ❌ **O QUE FALTA IMPLEMENTAR:**
 
-### **1. Cadastro Completo da Empresa**
+### **1. Cadastro Completo da Empresa**  
 
 **ATUAL:**
 ```
@@ -66,7 +66,7 @@
 - Vincular tenant → plan
 - Configurar data de expiração do trial
 
-### **3. Página de Perfil da Empresa**
+### **3. Página de Perfil da Empresa** !
 
 **EXISTE:** ✅ `/perfil-empresa` já foi criada!
 **MAS:** Precisa ser integrada ao fluxo

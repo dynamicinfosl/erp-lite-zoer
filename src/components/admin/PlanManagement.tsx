@@ -417,7 +417,7 @@ export function PlanManagement() {
 
       {/* Dialog de Criação/Edição */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto bg-gray-900 text-white dark:bg-gray-900 mx-4 sm:mx-0">
           <DialogHeader>
             <DialogTitle>
               {editingPlan ? 'Editar Plano' : 'Criar Novo Plano'}
@@ -430,105 +430,166 @@ export function PlanManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nome do Plano *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Ex: Plano Básico"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="price">Preço (R$) *</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  step="0.01"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                  placeholder="29.90"
-                />
-              </div>
-            </div>
+          <div className="space-y-6">
+            {/* Card de Informações Básicas */}
+            <Card className="bg-gray-800 border-gray-700">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-white flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-blue-400" />
+                  Informações Básicas do Plano
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-sm font-medium text-gray-200">Nome do Plano *</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Ex: Plano Básico"
+                      className="bg-gray-700 border-gray-600 text-white placeholder-gray-400 h-11 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="price" className="text-sm font-medium text-gray-200">Preço (R$) *</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      step="0.01"
+                      value={formData.price}
+                      onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                      placeholder="29.90"
+                      className="bg-gray-700 border-gray-600 text-white placeholder-gray-400 h-11 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="description" className="text-sm font-medium text-gray-200">Descrição</Label>
+                    <Input
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Descrição do plano"
+                      className="bg-gray-700 border-gray-600 text-white placeholder-gray-400 h-11 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="billing_cycle" className="text-sm font-medium text-gray-200">Ciclo de Cobrança</Label>
+                    <select
+                      id="billing_cycle"
+                      value={formData.billing_cycle}
+                      onChange={(e) => setFormData({ ...formData, billing_cycle: e.target.value as 'monthly' | 'yearly' })}
+                      className="w-full p-3 border border-gray-600 rounded-md bg-gray-700 text-white h-11 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="monthly">Mensal</option>
+                      <option value="yearly">Anual</option>
+                    </select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Descrição</Label>
-              <Input
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Descrição do plano"
-              />
-            </div>
+            {/* Card de Recursos */}
+            <Card className="bg-gray-800 border-gray-700">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Star className="h-5 w-5 text-yellow-400" />
+                  Recursos do Plano
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="features" className="text-sm font-medium text-gray-200">Lista de Recursos (um por linha)</Label>
+                  <Textarea
+                    id="features"
+                    value={formData.features}
+                    onChange={(e) => setFormData({ ...formData, features: e.target.value })}
+                    placeholder="Gestão de produtos&#10;Relatórios básicos&#10;Suporte por email&#10;Integração com APIs&#10;Suporte prioritário"
+                    rows={6}
+                    className="bg-gray-700 border-gray-600 text-white placeholder-gray-400 resize-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <p className="text-xs text-gray-400">Digite cada recurso em uma linha separada</p>
+                </div>
+              </CardContent>
+            </Card>
 
-            <div className="space-y-2">
-              <Label htmlFor="billing_cycle">Ciclo de Cobrança</Label>
-              <select
-                id="billing_cycle"
-                value={formData.billing_cycle}
-                onChange={(e) => setFormData({ ...formData, billing_cycle: e.target.value as 'monthly' | 'yearly' })}
-                className="w-full p-2 border border-gray-300 rounded-md"
-              >
-                <option value="monthly">Mensal</option>
-                <option value="yearly">Anual</option>
-              </select>
-            </div>
+            {/* Card de Limites */}
+            <Card className="bg-gray-800 border-gray-700">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Users className="h-5 w-5 text-green-400" />
+                  Limites do Plano
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="max_users" className="text-sm font-medium text-gray-200">Máx. Usuários</Label>
+                    <Input
+                      id="max_users"
+                      type="number"
+                      value={formData.max_users}
+                      onChange={(e) => setFormData({ ...formData, max_users: parseInt(e.target.value) || 1 })}
+                      placeholder="1"
+                      className="bg-gray-700 border-gray-600 text-white placeholder-gray-400 h-11 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-400">Use -1 para ilimitado</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="max_products" className="text-sm font-medium text-gray-200">Máx. Produtos</Label>
+                    <Input
+                      id="max_products"
+                      type="number"
+                      value={formData.max_products}
+                      onChange={(e) => setFormData({ ...formData, max_products: parseInt(e.target.value) || 100 })}
+                      placeholder="100"
+                      className="bg-gray-700 border-gray-600 text-white placeholder-gray-400 h-11 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-400">Use -1 para ilimitado</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="max_customers" className="text-sm font-medium text-gray-200">Máx. Clientes</Label>
+                    <Input
+                      id="max_customers"
+                      type="number"
+                      value={formData.max_customers}
+                      onChange={(e) => setFormData({ ...formData, max_customers: parseInt(e.target.value) || 1000 })}
+                      placeholder="1000"
+                      className="bg-gray-700 border-gray-600 text-white placeholder-gray-400 h-11 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-400">Use -1 para ilimitado</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-            <div className="space-y-2">
-              <Label htmlFor="features">Recursos (um por linha)</Label>
-              <Textarea
-                id="features"
-                value={formData.features}
-                onChange={(e) => setFormData({ ...formData, features: e.target.value })}
-                placeholder="Gestão de produtos&#10;Relatórios básicos&#10;Suporte por email"
-                rows={4}
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="max_users">Máx. Usuários</Label>
-                <Input
-                  id="max_users"
-                  type="number"
-                  value={formData.max_users}
-                  onChange={(e) => setFormData({ ...formData, max_users: parseInt(e.target.value) || 1 })}
-                  placeholder="1"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="max_products">Máx. Produtos</Label>
-                <Input
-                  id="max_products"
-                  type="number"
-                  value={formData.max_products}
-                  onChange={(e) => setFormData({ ...formData, max_products: parseInt(e.target.value) || 100 })}
-                  placeholder="100"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="max_customers">Máx. Clientes</Label>
-                <Input
-                  id="max_customers"
-                  type="number"
-                  value={formData.max_customers}
-                  onChange={(e) => setFormData({ ...formData, max_customers: parseInt(e.target.value) || 1000 })}
-                  placeholder="1000"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="is_active"
-                checked={formData.is_active}
-                onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-              />
-              <Label htmlFor="is_active">Plano ativo</Label>
-            </div>
+            {/* Card de Status */}
+            <Card className="bg-gray-800 border-gray-700">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-white flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-400" />
+                  Status do Plano
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center space-x-3 p-4 bg-gray-700 rounded-lg">
+                  <Switch
+                    id="is_active"
+                    checked={formData.is_active}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                  />
+                  <div>
+                    <Label htmlFor="is_active" className="text-sm font-medium text-gray-200 cursor-pointer">
+                      Plano ativo
+                    </Label>
+                    <p className="text-xs text-gray-400">Desative para ocultar o plano dos usuários</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           <DialogFooter>
