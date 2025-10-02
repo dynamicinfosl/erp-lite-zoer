@@ -1,202 +1,96 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { withPlanValidation } from '@/lib/plan-middleware';
 
-import CrudOperations from '@/lib/crud-operations';
-import { createSuccessResponse, createErrorResponse } from '@/lib/create-response';
-import { requestMiddleware, parseQueryParams, validateRequestBody } from "@/lib/api-utils";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-// GET - buscar produtos
-export const GET = requestMiddleware(async (request, context) => {
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+// Handler original para criar produto
+async function createProductHandler(request: NextRequest) {
   try {
-    const { limit, offset, search } = parseQueryParams(request);
-    const productsCrud = new CrudOperations("products", context.token);
-    
-    const filters: Record<string, any> = {
-      user_id: context.payload?.sub || '00000000-0000-0000-0000-000000000000',
-      is_active: true,
-    };
+    const body = await request.json();
+    const { tenant_id, name, description, price, stock, category } = body;
 
-    let products = await productsCrud.findMany(filters, { 
-      limit: limit || 100, 
-      offset,
-      orderBy: { column: 'name', direction: 'asc' }
-    });
-
-    // Filtro de busca no lado da aplicação
-    if (search && products) {
-      products = products.filter((product: any) =>
-        product.name.toLowerCase().includes(search.toLowerCase()) ||
-        product.sku?.toLowerCase().includes(search.toLowerCase()) ||
-        product.barcode?.includes(search)
+    if (!tenant_id || !name || !price) {
+      return NextResponse.json(
+        { error: 'Tenant ID, nome e preço são obrigatórios' },
+        { status: 400 }
       );
     }
 
-    return createSuccessResponse(products || []);
+    const { data, error } = await supabaseAdmin
+      .from('products')
+      .insert({
+        tenant_id,
+        name,
+        description,
+        price: parseFloat(price),
+        stock: parseInt(stock) || 0,
+        category,
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao criar produto:', error);
+      return NextResponse.json(
+        { error: 'Erro ao criar produto: ' + error.message },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({ success: true, data });
+
   } catch (error) {
-    console.error('Erro ao buscar produtos:', error);
-    return createErrorResponse({
-      errorMessage: "Erro ao buscar produtos",
-      status: 500,
-    });
+    console.error('Erro no handler de criação:', error);
+    return NextResponse.json(
+      { error: 'Erro interno do servidor' },
+      { status: 500 }
+    );
   }
-}, true);
+}
 
-// POST - criar produto
-export const POST = requestMiddleware(async (request, context) => {
+// Handler original para listar produtos
+async function listProductsHandler(request: NextRequest) {
   try {
-    const body = await validateRequestBody(request);
-    
-    if (!body.name || !body.sale_price) {
-      return createErrorResponse({
-        errorMessage: "Nome e preço de venda são obrigatórios",
-        status: 400,
-      });
+    const { searchParams } = new URL(request.url);
+    const tenant_id = searchParams.get('tenant_id');
+
+    if (!tenant_id) {
+      return NextResponse.json(
+        { error: 'Tenant ID é obrigatório' },
+        { status: 400 }
+      );
     }
 
-    const productsCrud = new CrudOperations("products", context.token);
-    // Somente colunas suportadas pelo schema
-    const allowedKeys = [
-      'user_id','name','sku','barcode','description','category_id','cost_price','sale_price','stock_quantity','min_stock','unit','is_active','ncm','imported_at'
-    ];
-    const normalized: any = {
-      user_id: context.payload?.sub || '00000000-0000-0000-0000-000000000000',
-      name: body.name,
-      sku: body.sku ?? null,
-      barcode: body.barcode ?? null,
-      description: body.description ?? null,
-      category_id: body.category_id ? Number(body.category_id) : null,
-      cost_price: body.cost_price !== undefined ? Number(body.cost_price) || 0 : 0,
-      sale_price: Number(body.sale_price),
-      stock_quantity: body.stock_quantity !== undefined ? parseInt(body.stock_quantity) || 0 : 0,
-      min_stock: body.min_stock !== undefined ? parseInt(body.min_stock) || 0 : 0,
-      unit: body.unit || 'UN',
-      is_active: body.is_active !== false,
-      ncm: body.ncm ?? null,
-      imported_at: body.imported_at ?? null,
-    };
-    const productData = Object.fromEntries(Object.entries(normalized).filter(([k]) => allowedKeys.includes(k)));
+    const { data, error } = await supabaseAdmin
+      .from('products')
+      .select('*')
+      .eq('tenant_id', tenant_id)
+      .order('created_at', { ascending: false });
 
-    // Duplicidade: tenta por SKU e depois por barcode; se existir, atualiza valores principais
-    const tryFind = async (filters: Record<string, any>) => {
-      const rows = await productsCrud.findMany(filters, { limit: 1, offset: 0 });
-      return rows && rows.length > 0 ? rows[0] : null;
-    };
-
-    let duplicate = null;
-    if (productData.sku) duplicate = await tryFind({ user_id: productData.user_id, sku: productData.sku });
-    if (!duplicate && normalized.barcode) duplicate = await tryFind({ user_id: productData.user_id, barcode: normalized.barcode });
-
-    let product;
-    if (duplicate) {
-      product = await productsCrud.update(duplicate.id, productData);
-    } else {
-      product = await productsCrud.create(productData);
+    if (error) {
+      console.error('Erro ao listar produtos:', error);
+      return NextResponse.json(
+        { error: 'Erro ao listar produtos: ' + error.message },
+        { status: 400 }
+      );
     }
 
-    // TODO: salvar extras (ncm, imported_at) quando a tabela auxiliar existir
-    return createSuccessResponse(product, 201);
-  } catch (error: any) {
-    console.error('Erro ao criar produto:', error);
-    return createErrorResponse({
-      errorMessage: error?.message || 'Erro ao criar produto',
-      status: 500,
-    });
-  }
-}, true);
+    return NextResponse.json({ success: true, data });
 
-// PUT - atualizar produto
-export const PUT = requestMiddleware(async (request, context) => {
-  try {
-    const { id } = parseQueryParams(request);
-    
-    if (!id) {
-      return createErrorResponse({
-        errorMessage: "ID do produto é obrigatório",
-        status: 400,
-      });
-    }
-
-    const body = await validateRequestBody(request);
-    const productsCrud = new CrudOperations("products", context.token);
-    
-    // Verificar se o produto existe e pertence ao usuário
-    const existing = await productsCrud.findById(id);
-    if (!existing || existing.user_id !== parseInt(context.payload?.sub || '0')) {
-      return createErrorResponse({
-        errorMessage: "Produto não encontrado",
-        status: 404,
-      });
-    }
-
-    const updateData = {
-      name: body.name,
-      sku: body.sku || null,
-      barcode: body.barcode || null,
-      description: body.description || null,
-      internal_code: body.internal_code || null,
-      product_group: body.product_group || null,
-      has_variations: body.has_variations === true,
-      fiscal_note: body.fiscal_note || null,
-      unit_conversion: body.unit_conversion || null,
-      moves_stock: body.moves_stock !== false,
-      width_cm: body.width_cm ? parseFloat(body.width_cm) : null,
-      height_cm: body.height_cm ? parseFloat(body.height_cm) : null,
-      length_cm: body.length_cm ? parseFloat(body.length_cm) : null,
-      weight_kg: body.weight_kg ? parseFloat(body.weight_kg) : null,
-      category_id: body.category_id || null,
-      cost_price: parseFloat(body.cost_price) || 0,
-      sale_price: parseFloat(body.sale_price),
-      stock_quantity: parseInt(body.stock_quantity) || 0,
-      min_stock: parseInt(body.min_stock) || 0,
-      unit: body.unit || 'UN',
-      is_active: body.is_active !== false,
-      updated_at: new Date().toISOString(),
-    };
-
-    const product = await productsCrud.update(id, updateData);
-    return createSuccessResponse(product);
   } catch (error) {
-    console.error('Erro ao atualizar produto:', error);
-    return createErrorResponse({
-      errorMessage: "Erro ao atualizar produto",
-      status: 500,
-    });
+    console.error('Erro no handler de listagem:', error);
+    return NextResponse.json(
+      { error: 'Erro interno do servidor' },
+      { status: 500 }
+    );
   }
-}, false);
+}
 
-// DELETE - excluir produto
-export const DELETE = requestMiddleware(async (request, context) => {
-  try {
-    const { id } = parseQueryParams(request);
-    
-    if (!id) {
-      return createErrorResponse({
-        errorMessage: "ID do produto é obrigatório",
-        status: 400,
-      });
-    }
-
-    const productsCrud = new CrudOperations("products", context.token);
-    
-    // Verificar se o produto existe e pertence ao usuário
-    const existing = await productsCrud.findById(id);
-    if (!existing || existing.user_id !== parseInt(context.payload?.sub || '0')) {
-      return createErrorResponse({
-        errorMessage: "Produto não encontrado",
-        status: 404,
-      });
-    }
-
-    // Soft delete - marcar como inativo
-    await productsCrud.update(id, { 
-      is_active: false,
-      updated_at: new Date().toISOString(),
-    });
-    
-    return createSuccessResponse({ id });
-  } catch (error) {
-    console.error('Erro ao excluir produto:', error);
-    return createErrorResponse({
-      errorMessage: "Erro ao excluir produto",
-      status: 500,
-    });
-  }
-}, false);
+// Exportar handlers com validação de plano
+export const POST = withPlanValidation(createProductHandler, 'create_product');
+export const GET = listProductsHandler;

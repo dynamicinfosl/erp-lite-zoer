@@ -29,12 +29,12 @@ export function AppLayout({ children }: AppLayoutProps) {
       '/reset-password',
       '/admin'  // Excluir painel admin do sidebar
     ];
-    
-    // Landing page (/) não deve ter sidebar quando usuário não está logado
-    if (pathname === '/' && ENABLE_AUTH && !user) {
-      return true;
-    }
-    
+    // Landing page SEMPRE sem sidebar
+    if (pathname === '/') return true;
+
+    // Landing page sem auth habilitada também sem sidebar
+    if (pathname === '/' && ENABLE_AUTH && !user) return true;
+
     return noSidebarPages.some((page) => pathname?.startsWith(page));
   }, [pathname, user]);
 
@@ -44,7 +44,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     return <main className="min-h-screen w-full">{children}</main>;
   }
   
-  // Se página inicial e usuário não logado, sem sidebar
+  // Se página inicial e usuário não logado, sem sidebar (redundância segura)
   if (pathname === '/' && !user) {
     return <main className="min-h-screen w-full">{children}</main>;
   }
@@ -66,7 +66,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     );
   }
 
-  // Landing page SEMPRE renderiza sem loading
+  // Landing page SEMPRE renderiza sem loading (redundância segura)
   if (pathname === '/') {
     return <main className="min-h-screen w-full">{children}</main>;
   }

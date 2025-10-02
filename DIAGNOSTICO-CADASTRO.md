@@ -65,7 +65,6 @@
 - Criar subscription automática (trial)
 - Vincular tenant → plan
 - Configurar data de expiração do trial
-
 ### **3. Página de Perfil da Empresa**
 
 **EXISTE:** ✅ `/perfil-empresa` já foi criada!

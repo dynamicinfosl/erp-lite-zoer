@@ -71,8 +71,8 @@ const menuGroups = [
   {
     title: 'Gestão',
     items: [
-      { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin', 'financeiro'] },
-      { title: 'Relatórios', url: '/relatorios', icon: BarChart3, roles: ['admin', 'financeiro'] },
+      { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Relatórios', url: '/relatorios', icon: BarChart3, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Perfil da Empresa', url: '/perfil-empresa', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Assinatura', url: '/assinatura', icon: CreditCard, roles: ['admin', 'vendedor', 'financeiro'] },
       // Botão Administração oculto - acesso restrito apenas para usuário "julga"

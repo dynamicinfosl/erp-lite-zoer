@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { User, Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
+import { SubscriptionData } from '@/hooks/usePlanLimits';
 
 interface Tenant {
   id: string;
@@ -17,11 +18,13 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   tenant: Tenant | null;
+  subscription: SubscriptionData | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: any }>;
   signUp: (email: string, password: string, companyName: string) => Promise<{ error?: any }>;
   signOut: () => Promise<void>;
   refreshTenant: () => Promise<void>;
+  refreshSubscription: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,6 +33,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
   
   const router = useRouter();
@@ -60,9 +64,9 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         });
         console.log('✅ Tenant configurado:', userName);
       } else {
-        // Fallback com ID padrão
+        // Fallback com UUID padrão válido
         setTenant({
-          id: 'default',
+          id: '00000000-0000-0000-0000-000000000000',
           name: userName,
           status: 'trial',
         });
@@ -72,7 +76,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       console.error('❌ Erro ao carregar tenant:', error);
       const userName = user?.email?.split('@')[0] || 'Meu Negócio';
       setTenant({
-        id: 'default',
+        id: '00000000-0000-0000-0000-000000000000',
         name: userName,
         status: 'trial',
       });
@@ -93,7 +97,10 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         
         // Só carregar tenant se houver usuário logado
         if (session?.user) {
-          loadTenant(session.user.id).catch(err => {
+          loadTenant(session.user.id).then(() => {
+            // Carregar subscription após carregar tenant
+            refreshSubscription();
+          }).catch(err => {
             console.error('Erro ao carregar tenant:', err);
           });
         }
@@ -112,11 +119,15 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       
       if (session?.user) {
         // Carregar tenant em background (não bloqueia)
-        loadTenant(session.user.id).catch(err => {
+        loadTenant(session.user.id).then(() => {
+          // Carregar subscription após carregar tenant
+          refreshSubscription();
+        }).catch(err => {
           console.error('Erro ao carregar tenant:', err);
         });
       } else {
         setTenant(null);
+        setSubscription(null);
       }
     });
 
@@ -200,6 +211,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setTenant(null);
+    setSubscription(null);
     router.push('/login');
   };
 
@@ -209,16 +221,81 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshSubscription = async () => {
+    if (tenant?.id) {
+      try {
+        const { data: subscriptionData, error } = await supabase
+          .from('subscriptions')
+          .select(`
+            id,
+            status,
+            trial_end,
+            current_period_end,
+            plan:plans(
+              id,
+              name,
+              slug,
+              price_monthly,
+              price_yearly,
+              features,
+              limits
+            )
+          `)
+          .eq('tenant_id', tenant.id)
+          .single();
+
+        if (error) {
+          // Se não encontrou subscription, criar uma trial padrão
+          if (error.code === 'PGRST116') {
+            console.log('Nenhuma subscription encontrada, criando trial padrão');
+            const defaultSubscription = {
+              id: 'trial-default',
+              status: 'trial',
+              trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+              plan: {
+                id: 'trial-plan',
+                name: 'Trial Gratuito',
+                slug: 'trial',
+                price_monthly: 0,
+                price_yearly: 0,
+                features: {},
+                limits: {
+                  max_users: 1,
+                  max_customers: 50,
+                  max_products: 100,
+                  max_sales_per_month: 100
+                }
+              }
+            };
+            setSubscription(defaultSubscription as any);
+          } else {
+            console.error('Erro ao carregar subscription:', error.message || error);
+          }
+        } else if (subscriptionData) {
+          const normalized = {
+            ...subscriptionData,
+            trial_ends_at: (subscriptionData as any)?.trial_end || null,
+          } as typeof subscriptionData;
+          setSubscription(normalized as any);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar subscription:', error instanceof Error ? error.message : error);
+      }
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
       session,
       tenant,
+      subscription,
       loading,
       signIn,
       signUp,
       signOut,
       refreshTenant,
+      refreshSubscription,
     }}>
       {children}
     </AuthContext.Provider>
