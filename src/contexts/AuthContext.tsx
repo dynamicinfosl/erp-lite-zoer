@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Mock data para desenvolvimento
   const mockTenant: Tenant = useMemo(() => ({
-    id: 'default-tenant',
+    id: '00000000-0000-0000-0000-000000000000',
     name: 'Empresa JUGA',
     status: 'trial',
     trial_ends_at: '2025-10-24T00:00:00Z'
@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const mockMembership: UserMembership = useMemo(() => ({
     id: 'mock-membership',
     user_id: 'mock-user',
-    tenant_id: 'default-tenant',
+    tenant_id: '00000000-0000-0000-0000-000000000000',
     role: 'owner',
     is_active: true,
     tenant: mockTenant
@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
       console.error(`⏱️ TIMEOUT após ${elapsed}s - usando fallback`);
       const fallbackTenant: Tenant = {
-        id: 'default-tenant',
+        id: '00000000-0000-0000-0000-000000000000',
         name: 'Empresa JUGA',
         status: 'trial',
         trial_ends_at: '2025-10-24T00:00:00Z'
@@ -263,7 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (memberError || !memberships) {
         console.error('❌ Erro ao buscar membership:', memberError);
         const fallbackTenant: Tenant = {
-          id: 'default-tenant',
+          id: '00000000-0000-0000-0000-000000000000',
           name: 'Empresa JUGA',
           status: 'trial',
           trial_ends_at: '2025-10-24T00:00:00Z'
@@ -289,7 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (tenantError || !tenantData) {
         console.error('❌ Erro ao buscar tenant:', tenantError);
         const fallbackTenant: Tenant = {
-          id: 'default-tenant',
+          id: '00000000-0000-0000-0000-000000000000',
           name: 'Empresa JUGA',
           status: 'trial',
           trial_ends_at: '2025-10-24T00:00:00Z'
@@ -331,7 +331,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(timeout);
       console.error('❌ Erro ao carregar dados:', error);
       const fallbackTenant: Tenant = {
-        id: 'default-tenant',
+        id: '00000000-0000-0000-0000-000000000000',
         name: 'Empresa JUGA',
         status: 'trial',
         trial_ends_at: '2025-10-24T00:00:00Z'
@@ -404,7 +404,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } catch (err) {
             console.error('❌ Timeout ao carregar dados iniciais:', err);
             const fallbackTenant: Tenant = {
-              id: 'default-tenant',
+              id: '00000000-0000-0000-0000-000000000000',
               name: 'Empresa JUGA',
               status: 'trial',
               trial_ends_at: '2025-10-24T00:00:00Z'
@@ -459,7 +459,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } catch (err) {
             console.error('❌ Timeout ao carregar dados no auth change:', err);
             const fallbackTenant: Tenant = {
-              id: 'default-tenant',
+              id: '00000000-0000-0000-0000-000000000000',
               name: 'Empresa JUGA',
               status: 'trial',
               trial_ends_at: '2025-10-24T00:00:00Z'
