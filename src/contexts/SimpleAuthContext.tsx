@@ -154,9 +154,11 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const normalizedPassword = password.trim();
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: normalizedEmail,
+        password: normalizedPassword,
       });
 
       if (error) return { error };
@@ -166,7 +168,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       }
 
       return { error: null };
-    } catch (error) {
+    } catch (error: any) {
       return { error };
     }
   };

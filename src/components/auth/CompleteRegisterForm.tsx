@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -148,6 +148,33 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
 
   const progress = (currentStep / STEPS.length) * 100;
 
+  // Validação sem efeitos colaterais (não altera estado de erro)
+  const isStepValid = (step: number): boolean => {
+    switch (step) {
+      case 1:
+        if (!responsibleData.name || !responsibleData.email || !responsibleData.password) return false;
+        if (responsibleData.password !== responsibleData.confirmPassword) return false;
+        if (responsibleData.password.length < 6) return false;
+        return true;
+      case 2:
+        return !!(companyData.name && companyData.document);
+      case 3:
+        return !!(
+          addressData.zip_code &&
+          addressData.address &&
+          addressData.number &&
+          addressData.city &&
+          addressData.state
+        );
+      case 4:
+        return !!selectedPlan;
+      case 5:
+        return !!acceptedTerms;
+      default:
+        return true;
+    }
+  };
+
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
@@ -171,7 +198,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
         }
         break;
       case 3:
-        if (!addressData.zip_code || !addressData.address || !addressData.city || !addressData.state) {
+        if (!addressData.zip_code || !addressData.address || !addressData.number || !addressData.city || !addressData.state) {
           setError('Preencha todos os campos obrigatórios');
           return false;
         }
@@ -192,6 +219,14 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
     setError(null);
     return true;
   };
+
+  // Limpa o erro automaticamente quando os campos da etapa atual ficarem válidos
+  useEffect(() => {
+    if (error && isStepValid(currentStep)) {
+      setError(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, responsibleData, companyData, addressData, selectedPlan, acceptedTerms]);
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
@@ -532,37 +567,50 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
         <p className="text-gray-600">Todos os planos incluem 14 dias de teste gratuito</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="space-y-4">
         {PLANS.map((plan) => (
           <Card 
             key={plan.id} 
             className={`cursor-pointer transition-all ${
               selectedPlan?.id === plan.id 
-                ? 'ring-2 ring-blue-500 border-blue-500' 
+                ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-50' 
                 : 'hover:border-gray-300'
             }`}
             onClick={() => setSelectedPlan(plan)}
           >
-            <CardHeader className="text-center">
-              <CardTitle className="text-lg">{plan.name}</CardTitle>
-              <CardDescription>{plan.description}</CardDescription>
-              <div className="text-2xl font-bold text-blue-600">
-                R$ {plan.price.toFixed(2).replace('.', ',')}
-                <span className="text-sm font-normal text-gray-500">/mês</span>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CreditCard className="h-4 w-4" />
+                  {plan.name}
+                </CardTitle>
+                {selectedPlan?.id === plan.id && (
+                  <Badge className="bg-blue-600 text-white">Selecionado</Badge>
+                )}
               </div>
             </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm">
-                {plan.features.map((feature, index) => (
-                  <li key={index} className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-              {selectedPlan?.id === plan.id && (
-                <Badge className="w-full mt-4 justify-center">Selecionado</Badge>
-              )}
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">{plan.description}</p>
+                  <div className="text-2xl font-bold text-blue-600">
+                    R$ {plan.price.toFixed(2).replace('.', ',')}
+                    <span className="text-sm font-normal text-gray-500">/mês</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="border-t pt-3">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Recursos incluídos:</h4>
+                <ul className="space-y-1 text-sm">
+                  {plan.features.map((feature, index) => (
+                    <li key={index} className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span className="text-gray-600">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </CardContent>
           </Card>
         ))}

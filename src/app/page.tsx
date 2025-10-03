@@ -33,32 +33,50 @@ const features = [
   {
     icon: Users,
     title: 'Gestão de Clientes',
-    description: 'Organize e gerencie sua base de clientes com facilidade e eficiência'
+    description:
+      'Cadastro completo com dados pessoais, endereço, histórico de compras e status de aprovação. Sistema de aprovação/rejeição para novos clientes.',
+    color: 'from-indigo-500 to-sky-500',
+    titleColor: 'text-indigo-700 dark:text-indigo-300',
   },
   {
     icon: Package,
     title: 'Controle de Estoque',
-    description: 'Monitore seu inventário em tempo real com alertas inteligentes'
+    description:
+      'Gestão completa de produtos com controle de entrada, saída, alertas de estoque baixo e produtos próximos do vencimento. Suporte a códigos de barras.',
+    color: 'from-emerald-500 to-teal-500',
+    titleColor: 'text-emerald-700 dark:text-emerald-300',
   },
   {
     icon: BarChart3,
     title: 'Relatórios Avançados',
-    description: 'Análises detalhadas para tomada de decisões estratégicas'
+    description:
+      'Relatórios de vendas, clientes, produtos, financeiro e operacional. Gráficos interativos e exportação para PDF/Excel. Análise de performance e tendências.',
+    color: 'from-violet-500 to-fuchsia-500',
+    titleColor: 'text-violet-700 dark:text-violet-300',
   },
   {
     icon: TrendingUp,
     title: 'Vendas e PDV',
-    description: 'Sistema completo de ponto de venda integrado'
+    description:
+      'Sistema de ponto de venda completo com carrinho de compras, cálculo automático de impostos, formas de pagamento e geração de cupons fiscais.',
+    color: 'from-amber-500 to-orange-500',
+    titleColor: 'text-amber-700 dark:text-amber-300',
   },
   {
     icon: Lock,
-    title: 'Segurança',
-    description: 'Dados protegidos com criptografia e backup automático'
+    title: 'Segurança e Multi-tenant',
+    description:
+      'Sistema SaaS com isolamento de dados por empresa. Autenticação robusta, criptografia de dados e backup automático. Controle de acesso por perfis.',
+    color: 'from-cyan-600 to-blue-600',
+    titleColor: 'text-cyan-700 dark:text-cyan-300',
   },
   {
     icon: Settings,
     title: 'Configuração Flexível',
-    description: 'Personalize o sistema conforme suas necessidades'
+    description:
+      'Planos de assinatura personalizáveis (Básico, Profissional, Enterprise). Configurações por empresa, integrações via API e customização de campos.',
+    color: 'from-purple-500 to-pink-500',
+    titleColor: 'text-purple-700 dark:text-purple-300',
   },
 ];
 
@@ -66,66 +84,68 @@ const plans = [
   {
     name: 'Trial',
     price: 0,
-    period: '30 dias grátis',
+    period: '14 dias grátis',
     description: 'Experimente todas as funcionalidades',
     icon: Zap,
     color: 'from-orange-500 to-red-500',
     features: [
       '1 usuário',
-      'Até 100 produtos',
+      'Até 50 produtos',
       'Até 100 clientes',
       'Suporte por email',
-      'Vendas ilimitadas'
+      'Vendas ilimitadas',
+      'Cadastro completo de empresa'
     ]
   },
   {
     name: 'Básico',
-    price: 29.90,
+    price: 49.90,
     period: '/mês',
     description: 'Ideal para pequenas empresas',
     icon: CheckCircle,
     color: 'from-green-500 to-emerald-500',
     features: [
-      'Até 3 usuários',
-      'Até 1.000 produtos',
-      'Até 1.000 clientes',
-      'Suporte email e chat',
-      'Relatórios básicos'
+      '1 usuário',
+      'Até 50 produtos',
+      'Até 100 clientes',
+      'Suporte por email',
+      'Relatórios básicos',
+      'Gestão de estoque'
     ]
   },
   {
     name: 'Profissional',
-    price: 59.90,
+    price: 99.90,
     period: '/mês',
     description: 'Para empresas em crescimento',
     icon: Crown,
     color: 'from-blue-500 to-indigo-500',
     popular: true,
     features: [
-      'Até 10 usuários',
-      'Até 10.000 produtos',
-      'Até 10.000 clientes',
+      'Até 5 usuários',
+      'Até 500 produtos',
+      'Até 1.000 clientes',
       'Suporte prioritário',
-      'API completa',
-      'Multi-usuários',
-      'Relatórios avançados'
+      'Relatórios avançados',
+      'Integração com APIs',
+      'Backup automático'
     ]
   },
   {
     name: 'Enterprise',
-    price: 99.90,
+    price: 299.90,
     period: '/mês',
-    description: 'Para grandes empresas',
+    description: 'Solução completa para grandes empresas',
     icon: Star,
     color: 'from-purple-500 to-pink-500',
     features: [
       'Usuários ilimitados',
       'Produtos ilimitados',
       'Clientes ilimitados',
-      'Suporte dedicado 24/7',
-      'API completa',
-      'White-label',
-      'Customizações'
+      'Suporte 24/7',
+      'Integrações personalizadas',
+      'Suporte dedicado',
+      'Customizações avançadas'
     ]
   },
 ];
@@ -242,17 +262,19 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <Card key={index} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                <CardHeader>
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center mb-4">
+              <div key={index} className={`rounded-2xl p-[1px] bg-gradient-to-br ${feature.color}`}>
+                <Card className="rounded-2xl bg-white dark:bg-gray-900 border border-transparent shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+              <CardHeader>
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4`}>
                     <feature.icon className="h-6 w-6 text-white" />
                   </div>
-                  <CardTitle className="text-xl">{feature.title}</CardTitle>
+                  <CardTitle className={`text-xl ${feature.titleColor || 'text-gray-900 dark:text-white'}`}>{feature.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <CardDescription className="text-base">{feature.description}</CardDescription>
+                  <p className="text-base text-gray-900 dark:text-gray-100 leading-relaxed">{feature.description}</p>
                 </CardContent>
-              </Card>
+                </Card>
+              </div>
             ))}
           </div>
         </div>
@@ -273,13 +295,26 @@ export default function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
             {plans.map((plan, index) => {
               const Icon = plan.icon;
-              return (
+              const buttonIconForPlan = (name: string) => {
+                switch (name) {
+                  case 'Trial':
+                    return Zap;
+                  case 'Básico':
+                    return CheckCircle;
+                  case 'Profissional':
+                    return Crown;
+                  default:
+                    return Star;
+                }
+              };
+              const ButtonIcon = buttonIconForPlan(plan.name);
+              const CardInner = (
                 <Card 
                   key={index} 
-                  className={`relative border-2 hover:shadow-2xl transition-all duration-300 ${
+                  className={`relative border-2 hover:shadow-2xl transition-all duration-300 rounded-2xl ${
                     plan.popular 
-                      ? 'border-blue-500 shadow-xl scale-105' 
-                      : 'border-gray-200 hover:border-blue-300'
+                      ? 'border-transparent shadow-xl scale-105 bg-gradient-to-b from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20' 
+                      : 'border-gray-200 hover:border-blue-300 bg-white dark:bg-gray-950'
                   }`}
                 >
                   {plan.popular && (
@@ -295,13 +330,26 @@ export default function HomePage() {
                       <Icon className="h-8 w-8 text-white" />
                     </div>
                     <CardTitle className="text-2xl mb-2">{plan.name}</CardTitle>
-                    <CardDescription className="text-sm">{plan.description}</CardDescription>
+                    <CardDescription className="text-sm text-white">{plan.description}</CardDescription>
                     
                     <div className="mt-6">
-                      <div className="text-5xl font-bold text-gray-900">
+                      <div className="text-5xl font-bold text-white">
                         {plan.price === 0 ? 'Grátis' : `R$ ${plan.price.toFixed(2)}`}
                       </div>
-                      <div className="text-gray-600 text-sm mt-1">{plan.period}</div>
+                      <div className="text-gray-600 dark:text-white text-sm mt-1">{plan.period}</div>
+                       {plan.price > 0 && (
+                         <div
+                           className={`inline-block mt-3 text-xs font-medium px-3 py-1 rounded-full bg-gradient-to-r text-white ${
+                             plan.name === 'Básico'
+                               ? 'from-emerald-600 to-teal-600'
+                               : plan.name === 'Profissional'
+                               ? 'from-blue-600 to-indigo-600'
+                               : 'from-purple-600 to-fuchsia-600'
+                           }`}
+                         >
+                           Economize 2 meses no anual
+                         </div>
+                       )}
                     </div>
                   </CardHeader>
 
@@ -310,22 +358,41 @@ export default function HomePage() {
                       {plan.features.map((feature, idx) => (
                         <li key={idx} className="flex items-start gap-3 text-sm">
                           <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-                          <span className="text-gray-700">{feature}</span>
+                          <span className="text-gray-700 dark:text-white">{feature}</span>
                         </li>
                       ))}
                     </ul>
 
                     <Button 
-                      className={`w-full ${plan.popular ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
-                      variant={plan.popular ? 'default' : 'outline'}
+                      className={`w-full text-white bg-gradient-to-r hover:brightness-110 transition rounded-2xl font-semibold inline-flex items-center justify-center gap-1 sm:gap-2 md:gap-3 py-4 sm:py-5 md:py-5 pl-5 sm:pl-6 md:pl-7 pr-4 sm:pr-5 md:pr-6 shadow-md hover:shadow-lg ring-1 ring-white/10 hover:ring-white/40 focus-visible:ring-2 focus-visible:ring-white/60 ${
+                        plan.name === 'Trial'
+                          ? 'from-orange-500 to-red-500'
+                          : plan.name === 'Básico'
+                          ? 'from-emerald-600 to-teal-600'
+                          : plan.name === 'Profissional'
+                          ? 'from-blue-600 to-indigo-600'
+                          : 'from-purple-600 to-fuchsia-600'
+                      }`}
+                      variant="default"
                       size="lg"
                       onClick={() => setShowRegisterForm(true)}
                     >
-                      {plan.price === 0 ? 'Começar Grátis' : 'Escolher Plano'}
-                      <ChevronRight className="ml-2 h-4 w-4" />
+                      <ButtonIcon className="h-4 w-4 sm:h-5 sm:w-5 md:h-5 md:w-5 flex-shrink-0" />
+                      <span className="text-xs sm:text-sm md:text-base whitespace-nowrap">
+                        {plan.price === 0 ? 'Começar Grátis' : 'Escolher Plano'}
+                      </span>
+                      <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 md:h-5 md:w-5 flex-shrink-0" />
                     </Button>
                   </CardContent>
                 </Card>
+              );
+
+              return plan.popular ? (
+                <div key={`wrap-${index}`} className={`rounded-2xl p-[2px] bg-gradient-to-br ${plan.color}`}>
+                  {CardInner}
+                </div>
+              ) : (
+                  CardInner
               );
             })}
           </div>

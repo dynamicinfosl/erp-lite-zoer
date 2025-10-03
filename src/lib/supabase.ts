@@ -1,9 +1,26 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co'
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImV4cCI6MjA3MjU5Mzc0M30.NBHrAlv8RPxu1QhLta76Uoh6Bc_OnqhfVydy8_TX6GQ'
+// Lê as variáveis de ambiente SEM fallback para evitar conectar no projeto errado
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+if (!supabaseUrl || !supabaseAnonKey) {
+  // Não lança erro aqui para não quebrar build; o erro ficará claro nos logs
+  // e nas chamadas de autenticação. Também ajuda durante setup local.
+  // Dica: configure .env.local com NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY
+  // Exemplos de arquivos: env.example, env.supabase.config
+  // eslint-disable-next-line no-console
+  console.error('[Supabase] Variáveis de ambiente ausentes: NEXT_PUBLIC_SUPABASE_URL/ANON_KEY')
+}
+
+// Loga a origem (mascara parte do domínio) para diagnóstico
+try {
+  const maskedUrl = supabaseUrl ? supabaseUrl.replace(/(https?:\/\/)([^.]+)/, '$1***') : 'undefined'
+  // eslint-disable-next-line no-console
+  console.log(`[Supabase] URL em uso: ${maskedUrl}`)
+} catch {}
+
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
@@ -42,9 +59,11 @@ export const getCurrentUser = async () => {
 
 // Função para fazer login
 export const signIn = async (email: string, password: string) => {
+  const normalizedEmail = email.trim().toLowerCase()
+  const normalizedPassword = password.trim()
   const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
+    email: normalizedEmail,
+    password: normalizedPassword,
   })
   if (error) throw error
   return data
