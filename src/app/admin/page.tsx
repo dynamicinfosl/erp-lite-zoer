@@ -79,25 +79,62 @@ export default function AdminPage() {
   const fetchSystemStats = async () => {
     try {
       setLoading(true);
-      const mockStats: SystemStats = {
-        totalUsers: 5,
-        activeUsers: 3,
-        totalSales: 150,
-        totalProducts: 45,
+      
+      // Buscar dados reais das APIs
+      const [usersRes, salesRes, productsRes] = await Promise.allSettled([
+        fetch('/next_api/users'),
+        fetch('/next_api/sales'),
+        fetch('/next_api/products')
+      ]);
+
+      const users = usersRes.status === 'fulfilled' ? await usersRes.value.json() : { data: [] };
+      const sales = salesRes.status === 'fulfilled' ? await salesRes.value.json() : { data: [] };
+      const products = productsRes.status === 'fulfilled' ? await productsRes.value.json() : { data: [] };
+
+      const usersData = Array.isArray(users?.data) ? users.data : [];
+      const salesData = Array.isArray(sales?.data) ? sales.data : [];
+      const productsData = Array.isArray(products?.data) ? products.data : [];
+
+      const realStats: SystemStats = {
+        totalUsers: usersData.length,
+        activeUsers: usersData.filter((u: any) => u.is_active !== false).length,
+        totalSales: salesData.length,
+        totalProducts: productsData.length,
         systemHealth: 'healthy',
         lastBackup: new Date().toISOString(),
         // Métricas específicas de bebidas
-        totalBeverages: 1250,
-        lowStockAlerts: 3,
-        expiringProducts: 8,
+        totalBeverages: productsData.filter((p: any) => p.category_id === 'bebidas').length,
+        lowStockAlerts: productsData.filter((p: any) => (p.stock_quantity || 0) <= (p.min_stock || 0)).length,
+        expiringProducts: productsData.filter((p: any) => {
+          if (!p.expiry_date) return false;
+          const expiry = new Date(p.expiry_date);
+          const thirtyDaysFromNow = new Date();
+          thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+          return expiry <= thirtyDaysFromNow;
+        }).length,
         complianceRate: 95,
         temperatureAlerts: 0,
-        totalInventoryValue: 125000
+        totalInventoryValue: productsData.reduce((sum: number, p: any) => sum + ((p.stock_quantity || 0) * (p.cost_price || 0)), 0)
       };
-      setStats(mockStats);
+      setStats(realStats);
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
       toast.error('Erro ao carregar estatísticas do sistema');
+      // Fallback para dados básicos
+      setStats({
+        totalUsers: 0,
+        activeUsers: 0,
+        totalSales: 0,
+        totalProducts: 0,
+        systemHealth: 'warning',
+        lastBackup: new Date().toISOString(),
+        totalBeverages: 0,
+        lowStockAlerts: 0,
+        expiringProducts: 0,
+        complianceRate: 0,
+        temperatureAlerts: 0,
+        totalInventoryValue: 0
+      });
     } finally {
       setLoading(false);
     }

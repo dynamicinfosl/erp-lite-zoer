@@ -64,6 +64,13 @@ export function usePlanLimits(): PlanLimitsHook {
   const loadSubscriptionData = async () => {
     if (!tenant?.id) {
       setLoading(false);
+      setSubscription(null);
+      setUsage({
+        users: 0,
+        customers: 0,
+        products: 0,
+        sales_this_month: 0,
+      });
       return;
     }
 
@@ -92,30 +99,33 @@ export function usePlanLimits(): PlanLimitsHook {
         .eq('tenant_id', tenant.id)
         .single();
 
-      if (subError) {
-        // Se não encontrou subscription, criar uma trial padrão
-        if (subError.code === 'PGRST116') {
-          console.log('Nenhuma subscription encontrada, criando trial padrão');
-          const defaultSubscription = {
-            id: 'trial-default',
-            status: 'trial',
-            trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-            plan: {
-              id: 'trial-plan',
-              name: 'Trial Gratuito',
-              slug: 'trial',
-              price_monthly: 0,
-              price_yearly: 0,
-              features: {},
-              limits: {
-                max_users: 1,
-                max_customers: 50,
-                max_products: 100,
-                max_sales_per_month: 100
-              }
-            }
-          };
-          setSubscription(defaultSubscription as any);
+             if (subError) {
+               // Se não encontrou subscription, criar uma trial padrão
+               if (subError.code === 'PGRST116') {
+                 console.log('Nenhuma subscription encontrada, criando trial padrão');
+                 // Criar trial com 14 dias reais
+                 const trialEndDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+                 const defaultSubscription = {
+                   id: 'trial-default',
+                   status: 'trial',
+                   trial_ends_at: trialEndDate.toISOString(),
+                   plan: {
+                     id: 'trial-plan',
+                     name: 'Trial Gratuito',
+                     slug: 'trial',
+                     price_monthly: 0,
+                     price_yearly: 0,
+                     features: {},
+                     limits: {
+                       max_users: 1,
+                       max_customers: 50,
+                       max_products: 100,
+                       max_sales_per_month: 100
+                     }
+                   }
+                 };
+                 console.log('Trial criado com data de fim:', trialEndDate.toISOString());
+                 setSubscription(defaultSubscription as any);
         } else {
           console.error('Erro ao buscar subscription:', subError.message || subError);
           throw subError;
@@ -152,13 +162,18 @@ export function usePlanLimits(): PlanLimitsHook {
           .eq('tenant_id', tenant.id),
         
         // Contar vendas do mês atual (tolerar base sem tabela sales)
-        supabase
-          .from('sales')
-          .select('id', { count: 'exact' })
-          .eq('tenant_id', tenant.id)
-          .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
-          .then(r => ({ ...r, count: r.count || 0 }))
-          .catch(() => ({ count: 0 }))
+        (async () => {
+          try {
+            const result = await supabase
+              .from('sales')
+              .select('id', { count: 'exact' })
+              .eq('tenant_id', tenant.id)
+              .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+            return { ...result, count: result.count || 0 };
+          } catch {
+            return { count: 0, error: null, data: null, status: 200, statusText: 'OK' };
+          }
+        })()
       ]);
 
       setUsage({
@@ -177,13 +192,15 @@ export function usePlanLimits(): PlanLimitsHook {
   };
 
   useEffect(() => {
+    // Sempre tentar carregar; a função já trata ausência de tenant.id e encerra o loading
     loadSubscriptionData();
+    // Recarrega quando o tenant mudar (inclusive de undefined -> valor)
   }, [tenant?.id]);
 
   // Verificar se trial expirou
-  const isTrialExpired = subscription?.status === 'trial' && 
+  const isTrialExpired = Boolean(subscription?.status === 'trial' && 
     subscription?.trial_ends_at && 
-    new Date(subscription.trial_ends_at) < new Date();
+    new Date(subscription.trial_ends_at) < new Date());
 
   // Calcular dias restantes no trial
   const daysLeftInTrial = subscription?.trial_ends_at 

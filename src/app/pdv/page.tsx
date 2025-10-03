@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,7 +36,6 @@ import { toast } from 'sonner';
 import { Product, PDVItem } from '@/types';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { api } from '@/lib/api-client';
-import { mockProducts as defaultMockProducts, mockUserProfile } from '@/lib/mock-data';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 
 interface MenuItem {
@@ -54,12 +54,6 @@ export default function PDVPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const mockProducts = useMemo(() => defaultMockProducts.map((p, index) => ({
-    id: index + 1,
-    name: p.name,
-    price: Number(p.sale_price || p.cost_price || 0),
-    code: p.sku || String(p.id),
-  })), []);
 
   const addSelectedToCart = useCallback(() => {
     if (!selectedProduct) return;
@@ -85,24 +79,29 @@ export default function PDVPage() {
 
   useEffect(() => {
     const loadProducts = async () => {
-    try {
-      setLoading(true);
-      if (ENABLE_AUTH) {
-          const response = await api.get<Product[]>('/products');
-          setProducts(response);
-      } else {
-          setProducts(mockProducts as unknown as Product[]);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
+      try {
+        setLoading(true);
+        if (!tenant?.id) { 
+          setProducts([]); 
+          return; 
+        }
+
+        const res = await fetch(`/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`);
+        if (!res.ok) throw new Error('Erro ao carregar produtos');
+        const json = await res.json();
+        const data = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
+        setProducts(data);
+      } catch (error) {
+        console.error('Erro ao carregar produtos:', error);
         toast.error('Erro ao carregar produtos');
-    } finally {
-      setLoading(false);
-    }
-  };
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
     loadProducts();
-  }, [mockProducts]);
+  }, [tenant?.id]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -139,7 +138,7 @@ export default function PDVPage() {
     return products
       .map((product, index) => ({
         id: product.id || index + 1,
-        name: product.name,
+        name: product.name || 'Produto sem nome',
         price: Number(product.sale_price || product.cost_price || 0),
         code: product.sku || product.barcode || String(product.id || index + 1),
       }))
@@ -263,7 +262,7 @@ export default function PDVPage() {
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/10">
               <div className="flex flex-col gap-2 mb-3">
                 <span className="text-xs font-semibold text-white truncate">
-                  {user?.email || mockUserProfile.email}
+                  {user?.email || 'Usuário'}
                 </span>
                 <span className="text-xs text-white/60">
                   {tenant?.name || (user?.email ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ') : 'Meu Negócio')}
@@ -488,66 +487,69 @@ export default function PDVPage() {
                     )}
                   </div>
 
-                  <div className="border-t p-6 space-y-4">
-                    <div className="bg-gray-800 text-white rounded-lg p-4">
+                  <div className="border-t p-6 space-y-5">
+                    <div className="bg-gray-800 text-white rounded-xl p-4 shadow-sm">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm opacity-90">TOTAL DO PEDIDO</span>
-                        <span className="text-2xl font-bold">R$ {total.toFixed(2)}</span>
+                        <span className="text-xs sm:text-sm opacity-90">TOTAL DO PEDIDO</span>
+                        <span className="text-2xl sm:text-3xl font-extrabold tracking-tight">R$ {total.toFixed(2)}</span>
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 rounded-lg border border-border bg-white/70 dark:bg-gray-900/60 px-3 py-2">
                         <User className="h-4 w-4 text-muted-foreground" />
                         <Input
                           placeholder="Nome do cliente (opcional)"
                           value={customerName}
                           onChange={(e) => setCustomerName(e.target.value)}
-                          className="bg-white dark:bg-gray-900"
+                          className="h-10 border-none bg-transparent focus-visible:ring-2 focus-visible:ring-primary/40"
                         />
                       </div>
 
                       <Separator />
 
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-stretch">
                         <Button
-                          className="bg-orange-500 hover:bg-orange-600 text-white text-xs py-2"
+                          className="h-11 w-full px-7 rounded-lg text-white text-xs sm:text-[13px] font-semibold shadow-sm disabled:opacity-100 disabled:saturate-75 disabled:brightness-95 disabled:cursor-not-allowed border border-white/10 bg-gradient-to-br from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors flex items-center justify-center"
                           onClick={() => selectedProduct && addSelectedToCart()}
                           disabled={!selectedProduct}
                         >
                           ADICIONAR
                         </Button>
 
-            <Button
-                          className="bg-red-500 hover:bg-red-600 text-white text-xs py-2"
+                        <Button
+                          className="h-11 w-full px-7 rounded-lg text-white text-xs sm:text-[13px] font-semibold shadow-sm border border-white/10 bg-gradient-to-br from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors flex items-center justify-center"
                           onClick={cancelSelection}
                         >
                           CANCELAR
-            </Button>
+                        </Button>
             
-            <Button
-                          className="bg-green-600 hover:bg-green-700 text-white text-xs py-2"
+                        <Button
+                          className="h-11 w-full px-7 rounded-lg text-white text-xs sm:text-[13px] font-semibold shadow-sm disabled:opacity-100 disabled:saturate-75 disabled:brightness-95 disabled:cursor-not-allowed border border-white/10 bg-gradient-to-br from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors flex items-center justify-center"
                           onClick={processPayment}
                           disabled={cart.length === 0}
                         >
-                          FINALIZAR VENDA
+                          <span className="flex flex-col leading-tight items-center">
+                            <span>FINALIZAR</span>
+                            <span>VENDA</span>
+                          </span>
                         </Button>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <Button variant="outline" className="flex items-center justify-center gap-2 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Button variant="outline" className="h-11 rounded-lg flex items-center justify-center gap-2 text-sm">
                           <CreditCard className="h-4 w-4 text-primary" />
                           Pagamento Rápido
                         </Button>
-                        <Button variant="outline" className="flex items-center justify-center gap-2 text-sm">
+                        <Button variant="outline" className="h-11 rounded-lg flex items-center justify-center gap-2 text-sm">
                           <Receipt className="h-4 w-4 text-primary" />
                           Pré-Venda
                         </Button>
                       </div>
 
-                      <Button variant="outline" className="w-full" onClick={clearCart} disabled={cart.length === 0}>
+                      <Button variant="outline" className="w-full h-11 rounded-lg" onClick={clearCart} disabled={cart.length === 0}>
                         Limpar Carrinho
-            </Button>
+                      </Button>
                     </div>
                   </div>
                 </CardContent>

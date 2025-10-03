@@ -85,53 +85,71 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
 
   // Carregar sessão inicial - SUPER SIMPLES
   useEffect(() => {
-    // Definir loading como false IMEDIATAMENTE
-    setLoading(false);
-    
+    let mounted = true;
+
     const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
         
-        setSession(session);
-        setUser(session?.user ?? null);
+        if (error) {
+          console.error('❌ Erro ao buscar sessão:', error);
+          if (mounted) {
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+        }
         
         // Só carregar tenant se houver usuário logado
-        if (session?.user) {
-          loadTenant(session.user.id).then(() => {
-            // Carregar subscription após carregar tenant
-            refreshSubscription();
-          }).catch(err => {
-            console.error('Erro ao carregar tenant:', err);
-          });
+        if (session?.user && mounted) {
+          await loadTenant(session.user.id);
+          await refreshSubscription();
+        }
+        
+        // Definir loading como false APÓS carregar tudo
+        if (mounted) {
+          setLoading(false);
         }
       } catch (error) {
-        console.error('Erro ao inicializar auth:', error);
+        console.error('❌ Erro ao inicializar auth:', error);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
-    // Executar em background (não espera)
+    // Executar inicialização
     initAuth();
 
     // Listener de mudanças
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (mounted) {
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
       
-      if (session?.user) {
-        // Carregar tenant em background (não bloqueia)
-        loadTenant(session.user.id).then(() => {
-          // Carregar subscription após carregar tenant
-          refreshSubscription();
-        }).catch(err => {
-          console.error('Erro ao carregar tenant:', err);
-        });
-      } else {
+      if (session?.user && mounted) {
+        // Carregar tenant e subscription
+        try {
+          await loadTenant(session.user.id);
+          await refreshSubscription();
+        } catch (err) {
+          console.error('❌ Erro ao carregar tenant:', err);
+        }
+      } else if (mounted) {
         setTenant(null);
         setSubscription(null);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {

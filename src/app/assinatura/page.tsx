@@ -141,6 +141,7 @@ export default function AssinaturaPage() {
   const currentInfo = subscriptionInfo[currentPlan];
   const CurrentIcon = currentInfo.icon;
 
+
   // Usar dados reais do hook
   const usageLimits = useMemo(
     () => [
@@ -196,15 +197,18 @@ export default function AssinaturaPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-heading">Assinatura</h1>
           <p className="text-sm sm:text-base text-body">Gerencie seu plano e faturamento</p>
         </div>
-        <div className="flex items-center gap-2 w-fit">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-fit">
           <Badge variant="secondary" className="px-3 py-1">
             <CurrentIcon className="h-3 w-3" />
             {currentInfo.name}
           </Badge>
           {currentPlan === 'trial' && daysLeftInTrial > 0 && (
-            <Badge variant="outline" className="px-3 py-1">
+            <Badge 
+              variant={daysLeftInTrial <= 3 ? "destructive" : daysLeftInTrial <= 7 ? "default" : "outline"} 
+              className="px-3 py-1 animate-pulse"
+            >
               <Clock className="h-3 w-3" />
-              {daysLeftInTrial} dias restantes
+              {daysLeftInTrial} {daysLeftInTrial === 1 ? 'dia restante' : 'dias restantes'}
             </Badge>
           )}
           {isTrialExpired && (
@@ -216,6 +220,7 @@ export default function AssinaturaPage() {
         </div>
       </div>
 
+
       {/* Quick Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
         <JugaKPICard
@@ -225,8 +230,16 @@ export default function AssinaturaPage() {
           color="primary"
           icon={<CurrentIcon className="h-5 w-5" />}
           trend="neutral"
-          trendValue={currentPlan === 'trial' ? `${daysLeftInTrial} dias` : 'Ativo'}
-          className="min-h-[120px] sm:min-h-[140px]"
+          trendValue={
+            currentPlan === 'trial' 
+              ? daysLeftInTrial > 0 
+                ? `${daysLeftInTrial} ${daysLeftInTrial === 1 ? 'dia' : 'dias'} restantes`
+                : 'Expirado'
+              : 'Ativo'
+          }
+          className={`min-h-[120px] sm:min-h-[140px] ${
+            currentPlan === 'trial' && daysLeftInTrial <= 3 ? 'ring-2 ring-red-200' : ''
+          }`}
         />
         <JugaKPICard
           title="Clientes"
@@ -272,28 +285,115 @@ export default function AssinaturaPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {currentPlan === 'trial' && daysLeftInTrial > 0 ? (
+          {currentPlan === 'trial' ? (
             <>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Dias restantes:</span>
-                <span className="text-2xl font-bold text-orange-600">{daysLeftInTrial} dias</span>
+              {/* Contagem de Dias - Layout Dashboard */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-6">
+                {/* Card Principal - Dias Restantes */}
+                <JugaKPICard
+                  title={isTrialExpired ? 'Trial Expirado' : 'Dias Restantes'}
+                  value={isTrialExpired ? '0' : daysLeftInTrial.toString()}
+                  description={isTrialExpired ? 'Período finalizado' : 
+                             daysLeftInTrial === 1 ? 'dia restante' : 'dias restantes'}
+                  trend={isTrialExpired ? 'down' : 
+                         daysLeftInTrial <= 3 ? 'down' : 
+                         daysLeftInTrial <= 7 ? 'neutral' : 'up'}
+                  trendValue={isTrialExpired ? 'Expirado' :
+                             daysLeftInTrial <= 3 ? 'Crítico' :
+                             daysLeftInTrial <= 7 ? 'Atenção' : 'Ativo'}
+                  icon={<Clock className="h-4 w-4 sm:h-5 sm:w-5" />}
+                  color={isTrialExpired ? 'error' : 
+                         daysLeftInTrial <= 3 ? 'error' : 
+                         daysLeftInTrial <= 7 ? 'warning' : 'success'}
+                  className="min-h-[120px] sm:min-h-[140px]"
+                />
+
+                {/* Card de Progresso */}
+                <JugaKPICard
+                  title="Progresso do Teste"
+                  value={isTrialExpired ? '100%' : `${Math.round(((14 - daysLeftInTrial) / 14) * 100)}%`}
+                  description={isTrialExpired ? '14 de 14 dias utilizados' : 
+                             `${14 - daysLeftInTrial} de 14 dias utilizados`}
+                  trend="neutral"
+                  trendValue="Completo"
+                  icon={<TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />}
+                  color="primary"
+                  className="min-h-[120px] sm:min-h-[140px]"
+                />
+
+                {/* Card de Status */}
+                <JugaKPICard
+                  title="Status do Trial"
+                  value={isTrialExpired ? 'Expirado' :
+                         daysLeftInTrial <= 3 ? 'Crítico' :
+                         daysLeftInTrial <= 7 ? 'Atenção' : 'Ativo'}
+                  description="Estado atual"
+                  trend={isTrialExpired ? 'down' : 
+                         daysLeftInTrial <= 3 ? 'down' : 
+                         daysLeftInTrial <= 7 ? 'neutral' : 'up'}
+                  trendValue={isTrialExpired ? 'Finalizado' :
+                             daysLeftInTrial <= 3 ? 'Urgente' :
+                             daysLeftInTrial <= 7 ? 'Próximo' : 'Normal'}
+                  icon={isTrialExpired ? 
+                        <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" /> :
+                        daysLeftInTrial <= 3 ? 
+                        <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" /> :
+                        daysLeftInTrial <= 7 ? 
+                        <Clock className="h-4 w-4 sm:h-5 sm:w-5" /> :
+                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />}
+                  color={isTrialExpired ? 'error' : 
+                         daysLeftInTrial <= 3 ? 'error' : 
+                         daysLeftInTrial <= 7 ? 'warning' : 'success'}
+                  className="min-h-[120px] sm:min-h-[140px]"
+                />
               </div>
-              <Progress value={(daysLeftInTrial / 14) * 100} className="h-2" />
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>{14 - daysLeftInTrial} de 14 dias usados</span>
-                <span>{daysLeftInTrial} dias restantes</span>
-              </div>
-              <div className="bg-juga-warning/5 border border-juga-warning/20 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-juga-warning mt-0.5" />
-                  <div>
-                    <p className="font-medium text-heading">Seu período de teste está acabando</p>
-                    <p className="text-sm text-body mt-1">
-                      Escolha um plano abaixo para continuar usando o sistema após o período gratuito.
-                    </p>
+
+              {/* Alerta de Urgência - Estilo Dashboard */}
+              {(isTrialExpired || daysLeftInTrial <= 7) && (
+                <div className={`juga-card border ${
+                  isTrialExpired
+                    ? 'border-juga-error/20 bg-juga-error/5'
+                    : daysLeftInTrial <= 3 
+                    ? 'border-juga-error/20 bg-juga-error/5' 
+                    : 'border-juga-warning/20 bg-juga-warning/5'
+                }`}>
+                  <div className="flex items-start gap-3 p-4">
+                    <div className={`p-2 rounded-lg ${
+                      isTrialExpired ? 'bg-juga-error/10' :
+                      daysLeftInTrial <= 3 ? 'bg-juga-error/10' : 'bg-juga-warning/10'
+                    }`}>
+                      <AlertCircle className={`h-5 w-5 ${
+                        isTrialExpired ? 'text-juga-error' :
+                        daysLeftInTrial <= 3 ? 'text-juga-error' : 'text-juga-warning'
+                      }`} />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className={`font-semibold text-heading ${
+                        isTrialExpired ? 'text-juga-error' :
+                        daysLeftInTrial <= 3 ? 'text-juga-error' : 'text-juga-warning'
+                      }`}>
+                        {isTrialExpired 
+                          ? 'Período de teste expirado' 
+                          : daysLeftInTrial <= 3 
+                          ? 'Seu período de teste está quase acabando!' 
+                          : 'Seu período de teste está chegando ao fim'
+                        }
+                      </h4>
+                      <p className={`text-sm mt-1 text-body ${
+                        isTrialExpired ? 'text-juga-error/80' :
+                        daysLeftInTrial <= 3 ? 'text-juga-error/80' : 'text-juga-warning/80'
+                      }`}>
+                        {isTrialExpired 
+                          ? 'Escolha um plano para continuar usando o sistema.'
+                          : daysLeftInTrial <= 3 
+                          ? 'Escolha um plano agora para não perder acesso ao sistema.'
+                          : 'Escolha um plano abaixo para continuar usando o sistema após o período gratuito.'
+                        }
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </>
           ) : isTrialExpired ? (
             <div className="bg-juga-error/5 border border-juga-error/20 rounded-lg p-4">
@@ -419,11 +519,27 @@ export default function AssinaturaPage() {
 
                 <div className="mt-auto">
                   <Button 
-                    className={`w-full px-4 py-2.5 sm:px-5 sm:py-3 ${plan.popular ? 'juga-gradient text-white' : ''}`}
-                    variant={plan.popular ? 'default' : 'outline'} 
+                    className={`w-full px-4 py-2.5 sm:px-5 sm:py-3 transition-all duration-200 ${
+                      currentPlan === plan.id 
+                        ? 'bg-gray-100 text-gray-600 border-gray-200 cursor-not-allowed' 
+                        : plan.popular 
+                        ? 'juga-gradient text-white hover:shadow-lg hover:scale-105' 
+                        : 'bg-white text-sky-600 border-sky-600 hover:bg-sky-50 hover:border-sky-700'
+                    }`}
+                    variant={currentPlan === plan.id ? 'outline' : plan.popular ? 'default' : 'outline'} 
                     disabled={currentPlan === plan.id}
                   >
-                    {currentPlan === plan.id ? 'Plano Atual' : 'Escolher Plano'}
+                    {currentPlan === plan.id ? (
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        Plano Atual
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Crown className="h-4 w-4" />
+                        Escolher Plano
+                      </div>
+                    )}
                   </Button>
                 </div>
               </CardContent>

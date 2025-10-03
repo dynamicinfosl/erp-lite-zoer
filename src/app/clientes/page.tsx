@@ -59,6 +59,7 @@ import {
 import { toast } from 'sonner';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
 import * as XLSX from 'xlsx';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 
 interface Customer {
   id: string;
@@ -82,6 +83,7 @@ interface ColumnVisibility {
 }
 
 export default function ClientesPage() {
+  const { tenant } = useSimpleAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -133,15 +135,23 @@ export default function ClientesPage() {
     type: 'PF' as 'PF' | 'PJ',
   });
 
-  // Carregar clientes
+  // Carregar clientes quando houver tenant
   useEffect(() => {
+    if (!tenant?.id) {
+      setLoading(false);
+      setCustomers([]);
+      return;
+    }
     loadCustomers();
-  }, []);
+  }, [tenant?.id]);
 
   const loadCustomers = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/next_api/customers');
+      const url = tenant?.id
+        ? `/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}`
+        : '/next_api/customers';
+      const response = await fetch(url);
       if (!response.ok) throw new Error('Erro ao carregar clientes');
       
       const data = await response.json();
@@ -184,7 +194,10 @@ export default function ClientesPage() {
       const response = await fetch('/next_api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCustomer)
+        body: JSON.stringify({
+          tenant_id: tenant?.id,
+          ...newCustomer,
+        })
       });
 
       if (!response.ok) throw new Error('Erro ao adicionar cliente');
@@ -279,7 +292,7 @@ export default function ClientesPage() {
       const res = await fetch('/next_api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Cliente Teste API', email: 'teste@example.com' })
+        body: JSON.stringify({ tenant_id: tenant?.id, name: 'Cliente Teste API', email: 'teste@example.com' })
       });
       const text = await res.text();
       console.log('🧪 Teste API status:', res.status, 'body:', text);

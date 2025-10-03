@@ -7,6 +7,8 @@ import { AppSidebar } from './AppSidebar';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 import { usePathname } from 'next/navigation';
 import { ENABLE_AUTH } from '@/constants/auth';
+import { TrialProtection } from '@/components/TrialProtection';
+import { AuthFallback } from '@/components/AuthFallback';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -27,7 +29,8 @@ export function AppLayout({ children }: AppLayoutProps) {
       '/register', 
       '/forgot-password', 
       '/reset-password',
-      '/admin'  // Excluir painel admin do sidebar
+      '/admin',  // Excluir painel admin do sidebar
+      '/trial-expirado'  // Página de trial expirado sem sidebar
     ];
     // Landing page SEMPRE sem sidebar
     if (pathname === '/') return true;
@@ -37,6 +40,27 @@ export function AppLayout({ children }: AppLayoutProps) {
 
     return noSidebarPages.some((page) => pathname?.startsWith(page));
   }, [pathname, user]);
+
+  // Páginas que precisam de proteção de trial
+  const needsTrialProtection = useMemo(() => {
+    const trialProtectedPages = [
+      '/dashboard',
+      '/clientes',
+      '/fornecedores',
+      '/produtos',
+      '/vendas',
+      '/financeiro',
+      '/relatorios',
+      '/configuracoes',
+      '/pdv',
+      '/estoque',
+      '/entregas',
+      '/entregador',
+      '/ordem-servicos',
+      '/perfil-empresa'
+    ];
+    return trialProtectedPages.some((page) => pathname?.startsWith(page));
+  }, [pathname]);
 
   const isPDV = useMemo(() => pathname?.startsWith('/pdv') ?? false, [pathname]);
 
@@ -59,7 +83,13 @@ export function AppLayout({ children }: AppLayoutProps) {
         <AppSidebar />
         <SidebarInset>
           <main className="flex-1 overflow-auto min-h-screen">
-            <div className="w-full h-full p-6">{children}</div>
+            <div className="w-full h-full p-6">
+              {needsTrialProtection ? (
+                <TrialProtection>{children}</TrialProtection>
+              ) : (
+                children
+              )}
+            </div>
           </main>
         </SidebarInset>
       </SidebarProvider>
@@ -80,7 +110,15 @@ export function AppLayout({ children }: AppLayoutProps) {
     );
   }
 
-  if (!user || isPDV) {
+  if (!user) {
+    return (
+      <AuthFallback>
+        <main className="min-h-screen w-full">{children}</main>
+      </AuthFallback>
+    );
+  }
+
+  if (isPDV) {
     return <main className="min-h-screen w-full">{children}</main>;
   }
 
@@ -89,7 +127,13 @@ export function AppLayout({ children }: AppLayoutProps) {
       <AppSidebar />
       <SidebarInset>
         <main className="flex-1 overflow-auto min-h-screen">
-          <div className="w-full h-full p-6">{children}</div>
+          <div className="w-full h-full p-6">
+            {needsTrialProtection ? (
+              <TrialProtection>{children}</TrialProtection>
+            ) : (
+              children
+            )}
+          </div>
         </main>
       </SidebarInset>
     </SidebarProvider>

@@ -6,6 +6,10 @@ import { requestMiddleware, parseQueryParams, validateRequestBody } from "@/lib/
 // GET - buscar entregas
 export const GET = requestMiddleware(async (request, context) => {
   try {
+    // Em desenvolvimento, se não houver sessão/token, retorne lista vazia para evitar 500
+    if (!context?.token || !context?.payload?.sub) {
+      return createSuccessResponse([]);
+    }
     const { limit, offset } = parseQueryParams(request);
     const deliveriesCrud = new CrudOperations("deliveries", context.token);
     

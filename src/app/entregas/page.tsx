@@ -25,9 +25,14 @@ export default function EntregasPage() {
       try {
         setLoading(true);
         const res = await fetch('/next_api/deliveries');
-        const data = await res.json();
-        const rows = Array.isArray(data?.data) ? data.data : (data?.rows || data || []);
-        setDeliveries(rows);
+        if (!res.ok) {
+          console.error('Falha na API /next_api/deliveries:', res.status);
+          setDeliveries([]);
+        } else {
+          const data = await res.json();
+          const rows = Array.isArray(data?.data) ? data.data : (data?.rows || data || []);
+          setDeliveries(Array.isArray(rows) ? rows : []);
+        }
       } catch (e) {
         console.error('Falha ao carregar entregas', e);
       } finally {
@@ -40,17 +45,18 @@ export default function EntregasPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'todos' | 'pendente' | 'em_rota' | 'entregue'>('todos');
 
-  const filtered = deliveries.filter((d) => {
+  const safeDeliveries = Array.isArray(deliveries) ? deliveries : [];
+  const filtered = safeDeliveries.filter((d) => {
     const matchesSearch = `${d.id} ${d.customer} ${d.address}`.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'todos' ? true : d.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
   const stats = useMemo(() => {
-    const emRota = deliveries.filter(d => d.status?.includes('rota')).length;
-    const pendentes = deliveries.filter(d => d.status?.includes('pend')).length;
-    const entregues = deliveries.filter(d => d.status?.includes('entreg')).length;
-    const total = deliveries.length;
+    const emRota = safeDeliveries.filter(d => d.status?.includes('rota')).length;
+    const pendentes = safeDeliveries.filter(d => d.status?.includes('pend')).length;
+    const entregues = safeDeliveries.filter(d => d.status?.includes('entreg')).length;
+    const total = safeDeliveries.length;
     
     return { emRota, pendentes, entregues, total };
   }, [deliveries]);

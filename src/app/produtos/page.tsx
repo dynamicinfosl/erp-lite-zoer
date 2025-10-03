@@ -67,6 +67,7 @@ import {
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 
 interface Product {
   id: string;
@@ -100,6 +101,7 @@ interface ColumnVisibility {
 }
 
 export default function ProdutosPage() {
+  const { tenant } = useSimpleAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -152,19 +154,28 @@ export default function ProdutosPage() {
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [isRegistering, setIsRegistering] = useState(false);
 
-  // Carregar produtos
+  // Carregar produtos quando houver tenant
   useEffect(() => {
+    if (!tenant?.id) {
+      setLoading(false);
+      setProducts([]);
+      return;
+    }
     loadProducts();
-  }, []);
+  }, [tenant?.id]);
 
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/next_api/products');
+      const url = tenant?.id
+        ? `/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`
+        : '/next_api/products';
+      const response = await fetch(url);
       if (!response.ok) throw new Error('Erro ao carregar produtos');
       
       const data = await response.json();
-      setProducts(data.rows || []);
+      const rows = Array.isArray(data?.data) ? data.data : (data?.rows || data || []);
+      setProducts(rows);
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
       toast.error('Erro ao carregar produtos');
@@ -201,7 +212,7 @@ export default function ProdutosPage() {
       const response = await fetch('/next_api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(productData)
+        body: JSON.stringify({ tenant_id: tenant?.id, ...productData })
       });
 
       if (!response.ok) throw new Error('Erro ao adicionar produto');
@@ -365,7 +376,7 @@ export default function ProdutosPage() {
         const response = await fetch('/next_api/products', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(productData),
+          body: JSON.stringify({ tenant_id: tenant?.id, ...productData }),
         });
 
         if (response.ok) {
@@ -418,16 +429,16 @@ export default function ProdutosPage() {
   // Função para obter ícone específico de cada coluna
   const getColumnIcon = (key: string) => {
     const iconMap: { [key: string]: React.ReactNode } = {
-      sku: <Hash className="h-4 w-4 mr-3 text-gray-400" />,
-      category: <Tag className="h-4 w-4 mr-3 text-gray-400" />,
-      brand: <Building2 className="h-4 w-4 mr-3 text-gray-400" />,
-      cost_price: <DollarSign className="h-4 w-4 mr-3 text-gray-400" />,
-      sale_price: <TrendingUpIcon className="h-4 w-4 mr-3 text-gray-400" />,
-      stock_quantity: <Package2 className="h-4 w-4 mr-3 text-gray-400" />,
-      barcode: <Barcode className="h-4 w-4 mr-3 text-gray-400" />,
-      ncm: <FileText className="h-4 w-4 mr-3 text-gray-400" />,
-      unit: <Ruler className="h-4 w-4 mr-3 text-gray-400" />,
-      status: <Activity className="h-4 w-4 mr-3 text-gray-400" />
+      sku: <Hash className="h-3 w-3 mr-2 text-gray-400" />,
+      category: <Tag className="h-3 w-3 mr-2 text-gray-400" />,
+      brand: <Building2 className="h-3 w-3 mr-2 text-gray-400" />,
+      cost_price: <DollarSign className="h-3 w-3 mr-2 text-gray-400" />,
+      sale_price: <TrendingUpIcon className="h-3 w-3 mr-2 text-gray-400" />,
+      stock_quantity: <Package2 className="h-3 w-3 mr-2 text-gray-400" />,
+      barcode: <Barcode className="h-3 w-3 mr-2 text-gray-400" />,
+      ncm: <FileText className="h-3 w-3 mr-2 text-gray-400" />,
+      unit: <Ruler className="h-3 w-3 mr-2 text-gray-400" />,
+      status: <Activity className="h-3 w-3 mr-2 text-gray-400" />
     };
     return iconMap[key] || <Settings2 className="h-4 w-4 mr-3 text-gray-400" />;
   };
@@ -615,16 +626,16 @@ export default function ProdutosPage() {
                     Colunas
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-60 z-50 bg-white border border-gray-200 shadow-xl rounded-lg">
-                  <DropdownMenuLabel className="px-3 py-2 text-sm font-semibold text-gray-900 bg-gray-50 border-b border-gray-100">
+                <DropdownMenuContent className="w-44 z-50 bg-white border border-gray-200 shadow-xl rounded-lg">
+                  <DropdownMenuLabel className="px-2 py-1.5 text-[13px] font-semibold text-gray-900 bg-gray-50 border-b border-gray-100">
                     <Settings2 className="h-4 w-4 inline mr-2" />
                     Mostrar Colunas
                   </DropdownMenuLabel>
                   
                   <div className="py-1">
                     {/* Seção: Identificação */}
-                    <div className="px-3 py-1">
-                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                    <div className="px-2 py-1">
+                      <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-0.5">
                         Identificação
                       </div>
                       <div className="space-y-0.5">
@@ -633,7 +644,7 @@ export default function ProdutosPage() {
                           onCheckedChange={(checked) => 
                             setColumnVisibility(prev => ({ ...prev, sku: checked || false }))
                           }
-                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                          className="px-2 py-0.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
                         >
                           {getColumnIcon('sku')}
                           SKU
@@ -644,7 +655,7 @@ export default function ProdutosPage() {
                           onCheckedChange={(checked) => 
                             setColumnVisibility(prev => ({ ...prev, category: checked || false }))
                           }
-                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                          className="px-2 py-0.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
                         >
                           {getColumnIcon('category')}
                           Categoria
@@ -655,7 +666,7 @@ export default function ProdutosPage() {
                           onCheckedChange={(checked) => 
                             setColumnVisibility(prev => ({ ...prev, brand: checked || false }))
                           }
-                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                          className="px-2 py-0.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
                         >
                           {getColumnIcon('brand')}
                           Marca
@@ -664,11 +675,11 @@ export default function ProdutosPage() {
                     </div>
                     
                     {/* Separador */}
-                    <div className="border-t border-gray-100 my-1"></div>
+                    <div className="border-t border-gray-100 my-0.5"></div>
                     
                     {/* Seção: Preços */}
-                    <div className="px-3 py-1">
-                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                    <div className="px-2 py-1">
+                      <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-0.5">
                         Preços
                       </div>
                       <div className="space-y-0.5">
@@ -677,7 +688,7 @@ export default function ProdutosPage() {
                           onCheckedChange={(checked) => 
                             setColumnVisibility(prev => ({ ...prev, cost_price: checked || false }))
                           }
-                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                          className="px-2 py-0.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
                         >
                           {getColumnIcon('cost_price')}
                           Preço Custo
@@ -688,7 +699,7 @@ export default function ProdutosPage() {
                           onCheckedChange={(checked) => 
                             setColumnVisibility(prev => ({ ...prev, sale_price: checked || false }))
                           }
-                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                          className="px-2 py-0.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
                         >
                           {getColumnIcon('sale_price')}
                           Preço Venda
@@ -697,11 +708,11 @@ export default function ProdutosPage() {
                     </div>
                     
                     {/* Separador */}
-                    <div className="border-t border-gray-100 my-1"></div>
+                    <div className="border-t border-gray-100 my-0.5"></div>
                     
                     {/* Seção: Estoque */}
-                    <div className="px-3 py-1">
-                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                    <div className="px-2 py-1">
+                      <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-0.5">
                         Estoque
                       </div>
                       <div className="space-y-0.5">
@@ -710,7 +721,7 @@ export default function ProdutosPage() {
                           onCheckedChange={(checked) => 
                             setColumnVisibility(prev => ({ ...prev, stock_quantity: checked || false }))
                           }
-                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                          className="px-2 py-0.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
                         >
                           {getColumnIcon('stock_quantity')}
                           Estoque
@@ -721,7 +732,7 @@ export default function ProdutosPage() {
                           onCheckedChange={(checked) => 
                             setColumnVisibility(prev => ({ ...prev, unit: checked || false }))
                           }
-                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                          className="px-2 py-0.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
                         >
                           {getColumnIcon('unit')}
                           Unidade
@@ -730,11 +741,11 @@ export default function ProdutosPage() {
                     </div>
                     
                     {/* Separador */}
-                    <div className="border-t border-gray-100 my-1"></div>
+                    <div className="border-t border-gray-100 my-0.5"></div>
                     
                     {/* Seção: Documentos */}
-                    <div className="px-3 py-1">
-                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                    <div className="px-2 py-1">
+                      <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-0.5">
                         Documentos
                       </div>
                       <div className="space-y-0.5">
@@ -743,7 +754,7 @@ export default function ProdutosPage() {
                           onCheckedChange={(checked) => 
                             setColumnVisibility(prev => ({ ...prev, barcode: checked || false }))
                           }
-                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                          className="px-2 py-0.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
                         >
                           {getColumnIcon('barcode')}
                           Código de Barras
@@ -754,7 +765,7 @@ export default function ProdutosPage() {
                           onCheckedChange={(checked) => 
                             setColumnVisibility(prev => ({ ...prev, ncm: checked || false }))
                           }
-                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                          className="px-2 py-0.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
                         >
                           {getColumnIcon('ncm')}
                           NCM
@@ -763,11 +774,11 @@ export default function ProdutosPage() {
                     </div>
                     
                     {/* Separador */}
-                    <div className="border-t border-gray-100 my-1"></div>
+                    <div className="border-t border-gray-100 my-0.5"></div>
                     
                     {/* Seção: Status */}
-                    <div className="px-3 py-1">
-                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                    <div className="px-2 py-1">
+                      <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-0.5">
                         Status
                       </div>
                       <div className="space-y-0.5">
@@ -776,7 +787,7 @@ export default function ProdutosPage() {
                           onCheckedChange={(checked) => 
                             setColumnVisibility(prev => ({ ...prev, status: checked || false }))
                           }
-                          className="px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
+                          className="px-2 py-0.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center rounded-md"
                         >
                           {getColumnIcon('status')}
                           Status

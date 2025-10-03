@@ -52,8 +52,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
-import { api } from '@/lib/api-client';
-import { ENABLE_AUTH } from '@/constants/auth';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 
 interface Sale {
   id: string;
@@ -86,6 +85,7 @@ interface ColumnVisibility {
 }
 
 export default function VendasPage() {
+  const { tenant } = useSimpleAuth();
   const [vendas, setVendas] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -120,95 +120,42 @@ export default function VendasPage() {
     observacoes: ''
   });
 
-  const mockVendas = useMemo<Sale[]>(() => [
-    {
-      id: '1',
-      numero: 'V-2024-001',
-      cliente: 'João Silva',
-      vendedor: 'Carlos Santos',
-      itens: [
-        { produto: 'Coca-Cola 2L', quantidade: 2, preco_unitario: 8.50, subtotal: 17.00 },
-        { produto: 'Skol 350ml - Pack 12', quantidade: 1, preco_unitario: 45.00, subtotal: 45.00 }
-      ],
-      subtotal: 62.00,
-      desconto: 2.00,
-      total: 60.00,
-      forma_pagamento: 'pix',
-      status: 'paga',
-      data_venda: '2024-01-15T14:30:00Z'
-    },
-    {
-      id: '2',
-      numero: 'V-2024-002',
-      cliente: 'Maria Oliveira',
-      vendedor: 'Pedro Costa',
-      itens: [
-        { produto: 'Água Crystal 500ml', quantidade: 12, preco_unitario: 2.50, subtotal: 30.00 }
-      ],
-      subtotal: 30.00,
-      desconto: 0,
-      total: 30.00,
-      forma_pagamento: 'cartao_debito',
-      status: 'paga',
-      data_venda: '2024-01-15T16:45:00Z'
-    },
-    {
-      id: '3',
-      numero: 'V-2024-003',
-      cliente: 'José Santos',
-      vendedor: 'Ana Silva',
-      itens: [
-        { produto: 'Guaraná Antarctica 2L', quantidade: 3, preco_unitario: 7.80, subtotal: 23.40 }
-      ],
-      subtotal: 23.40,
-      desconto: 0,
-      total: 23.40,
-      forma_pagamento: 'dinheiro',
-      status: 'pendente',
-      data_venda: '2024-01-15T17:20:00Z'
-    }
-  ], []);
-
   const loadVendas = useCallback(async () => {
     try {
       setLoading(true);
-      if (ENABLE_AUTH) {
-        try {
-          const data = await api.get<any[]>('/sales');
-          const mapped: Sale[] = (data || []).map((s: any, i: number) => ({
-            id: String(s.id ?? i + 1),
-            numero: s.sale_number ?? s.numero ?? `V-${new Date().getFullYear()}-${String(i + 1).padStart(3,'0')}`,
-            cliente: s.customer_name ?? s.cliente ?? 'Cliente',
-            vendedor: s.seller_name ?? s.vendedor ?? '',
-            itens: Array.isArray(s.items) ? s.items.map((it: any) => ({
-              produto: it.product?.name ?? it.produto ?? 'Item',
-              quantidade: Number(it.quantity ?? it.quantidade ?? 1),
-              preco_unitario: Number(it.unit_price ?? it.preco_unitario ?? 0),
-              subtotal: Number(it.total_price ?? it.subtotal ?? 0),
-            })) : [],
-            subtotal: Number(s.subtotal ?? 0),
-            desconto: Number(s.discount_amount ?? s.desconto ?? 0),
-            total: Number(s.total_amount ?? s.total ?? 0),
-            forma_pagamento: (s.payment_method ?? 'dinheiro') as Sale['forma_pagamento'],
-            status: (s.status ?? 'pendente') as Sale['status'],
-            data_venda: s.created_at ?? s.data_venda ?? new Date().toISOString(),
-            observacoes: s.notes ?? s.observacoes ?? '',
-          }));
-          setVendas(mapped);
-        } catch (err) {
-          console.warn('Falha ao carregar vendas da API, usando mock:', err);
-          setVendas(mockVendas);
-        }
-      } else {
-        setVendas(mockVendas);
-      }
+      if (!tenant?.id) { setVendas([]); return; }
+
+      const res = await fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}`);
+      if (!res.ok) throw new Error('Erro ao carregar vendas');
+      const json = await res.json();
+      const data = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
+      const mapped: Sale[] = (data || []).map((s: any, i: number) => ({
+        id: String(s.id ?? i + 1),
+        numero: s.sale_number ?? s.numero ?? `V-${new Date().getFullYear()}-${String(i + 1).padStart(3,'0')}`,
+        cliente: s.customer?.name ?? s.customer_name ?? s.cliente ?? 'Cliente',
+        vendedor: s.seller_name ?? s.vendedor ?? '',
+        itens: Array.isArray(s.items) ? s.items.map((it: any) => ({
+          produto: it.product?.name ?? it.produto ?? 'Item',
+          quantidade: Number(it.quantity ?? it.quantidade ?? 1),
+          preco_unitario: Number(it.unit_price ?? it.preco_unitario ?? 0),
+          subtotal: Number(it.total_price ?? it.subtotal ?? 0),
+        })) : [],
+        subtotal: Number(s.subtotal ?? 0),
+        desconto: Number(s.discount_amount ?? s.desconto ?? 0),
+        total: Number(s.total_amount ?? s.total ?? 0),
+        forma_pagamento: (s.payment_method ?? 'dinheiro') as Sale['forma_pagamento'],
+        status: (s.status ?? 'pendente') as Sale['status'],
+        data_venda: s.created_at ?? s.data_venda ?? new Date().toISOString(),
+        observacoes: s.notes ?? s.observacoes ?? '',
+      }));
+      setVendas(mapped);
     } catch (error) {
       console.error('Erro ao carregar vendas:', error);
       toast.error('Erro ao carregar vendas');
     } finally {
       setLoading(false);
     }
-  }, [mockVendas]);
+  }, [tenant?.id]);
 
   useEffect(() => {
     loadVendas();
@@ -232,19 +179,7 @@ export default function VendasPage() {
   // Adicionar venda
   const handleAddVenda = async () => {
     try {
-      const novaVenda: Sale = {
-        id: Date.now().toString(),
-        numero: `V-${new Date().getFullYear()}-${(vendas.length + 1).toString().padStart(3, '0')}`,
-        ...newVenda,
-        itens: [], // Seria preenchido em um fluxo completo de PDV
-        subtotal: 0,
-        desconto: 0,
-        total: 0,
-        status: 'pendente',
-        data_venda: new Date().toISOString()
-      };
-
-      setVendas(prev => [...prev, novaVenda]);
+      // Criação de venda completa ocorre no PDV. Aqui apenas informamos.
       setShowAddDialog(false);
       setNewVenda({
         cliente: '',
@@ -252,7 +187,7 @@ export default function VendasPage() {
         forma_pagamento: 'dinheiro',
         observacoes: ''
       });
-      toast.success('Venda criada com sucesso!');
+      toast.info('Criação de venda disponível no PDV. Lista carregada da API.');
     } catch (error) {
       console.error('Erro ao criar venda:', error);
       toast.error('Erro ao criar venda');
