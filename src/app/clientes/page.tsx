@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { JugaKPICard, JugaProgressCard } from '@/components/dashboard/JugaComponents';
 import { 
   Dialog, 
@@ -89,6 +91,7 @@ export default function ClientesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showDetailsDialog, setShowDetailsDialog] = useState<null | Customer>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showImportPreview, setShowImportPreview] = useState(false);
   const [importFileName, setImportFileName] = useState('');
@@ -135,27 +138,101 @@ export default function ClientesPage() {
     type: 'PF' as 'PF' | 'PJ',
   });
 
-  // Carregar clientes quando houver tenant
-  useEffect(() => {
-    if (!tenant?.id) {
-      setLoading(false);
-      setCustomers([]);
-      return;
+  // Estados para validação
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Funções de máscara
+  const formatPhone = (value: string) => {
+    if (!value || typeof value !== 'string') return '';
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+  };
+
+  const formatCPF = (value: string) => {
+    if (!value || typeof value !== 'string') return '';
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+    if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+    return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
+  };
+
+  const formatCNPJ = (value: string) => {
+    if (!value || typeof value !== 'string') return '';
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 5) return `${numbers.slice(0, 2)}.${numbers.slice(2)}`;
+    if (numbers.length <= 8) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5)}`;
+    if (numbers.length <= 12) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8)}`;
+    return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8, 12)}-${numbers.slice(12, 14)}`;
+  };
+
+  const formatDocument = (value: string, type: 'PF' | 'PJ') => {
+    if (!value || typeof value !== 'string') return '';
+    return type === 'PF' ? formatCPF(value) : formatCNPJ(value);
+  };
+
+  // Função de validação
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+
+    if (!newCustomer.name.trim()) {
+      errors.name = 'Nome é obrigatório';
     }
-    loadCustomers();
+
+    if (newCustomer.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newCustomer.email)) {
+      errors.email = 'E-mail inválido';
+    }
+
+    if (newCustomer.phone && !/^\(\d{2}\)\s\d{4,5}-\d{4}$/.test(newCustomer.phone)) {
+      errors.phone = 'Telefone deve estar no formato (11) 99999-9999';
+    }
+
+    if (newCustomer.document) {
+      if (newCustomer.type === 'PF' && !/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(newCustomer.document)) {
+        errors.document = 'CPF deve estar no formato 000.000.000-00';
+      } else if (newCustomer.type === 'PJ' && !/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(newCustomer.document)) {
+        errors.document = 'CNPJ deve estar no formato 00.000.000/0000-00';
+      }
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Limpar documento quando tipo mudar
+  useEffect(() => {
+    setNewCustomer(prev => ({ ...prev, document: '' }));
+  }, [newCustomer.type]);
+
+  // Carregar clientes quando houver tenant (fallback para ID neutro)
+  useEffect(() => {
+    const fetchNow = async () => {
+      await loadCustomers();
+    };
+    fetchNow();
   }, [tenant?.id]);
 
   const loadCustomers = async () => {
     try {
       setLoading(true);
-      const url = tenant?.id
-        ? `/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}`
-        : '/next_api/customers';
+      const tenantId = tenant?.id || '00000000-0000-0000-0000-000000000000';
+      const url = `/next_api/customers?tenant_id=${encodeURIComponent(tenantId)}`;
+      console.log('🔍 Debug - Carregando clientes para tenant:', tenantId);
+      
       const response = await fetch(url);
-      if (!response.ok) throw new Error('Erro ao carregar clientes');
+      if (!response.ok) {
+        const txt = await response.text();
+        throw new Error('Erro ao carregar clientes: ' + txt);
+      }
       
       const data = await response.json();
       const rows = Array.isArray(data?.data) ? data.data : (data?.rows || data || []);
+      console.log('🔍 Debug - Clientes carregados:', rows.length, 'clientes');
       setCustomers(rows);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
@@ -188,14 +265,49 @@ export default function ClientesPage() {
     return matchesSearch && matchesAdvanced;
   }) : [];
 
+  // Excluir cliente
+  const handleDeleteCustomer = async (id: string, name?: string) => {
+    const confirmed = window.confirm(`Tem certeza que deseja excluir ${name ? name : 'este cliente'}?`);
+    if (!confirmed) return;
+    try {
+      const res = await fetch(`/next_api/customers?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const txt = await res.text();
+        console.error('DELETE /next_api/customers falhou', res.status, txt);
+        throw new Error(txt || 'Falha ao excluir');
+      }
+      // Remoção otimista da UI
+      setCustomers(prev => prev.filter(c => c.id !== id));
+      toast.success('Cliente excluído com sucesso');
+      // Revalida em background
+      loadCustomers();
+    } catch (err: any) {
+      console.error('Erro ao excluir cliente:', err);
+      toast.error('Erro ao excluir cliente: ' + (err?.message || ''));
+    }
+  };
+
   // Adicionar cliente
   const handleAddCustomer = async () => {
+    // Limpar erros anteriores
+    setValidationErrors({});
+    
+    // Validar formulário
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    
     try {
+      const tenantId = tenant?.id || '00000000-0000-0000-0000-000000000000';
+      console.log('🔍 Debug - Tenant ID:', tenantId, 'Tenant object:', tenant);
+      
       const response = await fetch('/next_api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tenant_id: tenant?.id,
+          tenant_id: tenantId,
           ...newCustomer,
         })
       });
@@ -205,10 +317,54 @@ export default function ClientesPage() {
       await loadCustomers();
       setShowAddDialog(false);
       setNewCustomer({ name: '', email: '', phone: '', document: '', city: '', type: 'PF' });
+      setValidationErrors({});
       toast.success('Cliente adicionado com sucesso!');
     } catch (error) {
       console.error('Erro ao adicionar cliente:', error);
       toast.error('Erro ao adicionar cliente');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Abrir modal para edição
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
+  const openEdit = (customer: Customer) => {
+    setNewCustomer({
+      name: customer.name || '',
+      email: customer.email || '',
+      phone: formatPhone(customer.phone || ''),
+      document: customer.document || '',
+      city: customer.city || '',
+      type: (customer.type || 'PF') as 'PF' | 'PJ',
+    });
+    setValidationErrors({});
+    setEditingCustomerId(customer.id);
+    setShowAddDialog(true);
+  };
+
+  // Salvar edição
+  const handleSaveEdit = async () => {
+    if (!editingCustomerId) return;
+    if (!validateForm()) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/next_api/customers?id=${encodeURIComponent(editingCustomerId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCustomer),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast.success('Cliente atualizado com sucesso');
+      setShowAddDialog(false);
+      setEditingCustomerId(null);
+      setNewCustomer({ name: '', email: '', phone: '', document: '', city: '', type: 'PF' });
+      await loadCustomers();
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao atualizar cliente');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -273,17 +429,7 @@ export default function ClientesPage() {
     }
   };
 
-  const formatDocument = (doc: string, type: 'PF' | 'PJ') => {
-    if (type === 'PF') {
-      return doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-    } else {
-      return doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-    }
-  };
 
-  const formatPhone = (phone: string) => {
-    return phone.replace(/(\d{2})(\d{4,5})(\d{4})/, '($1) $2-$3');
-  };
 
   // Botão de diagnóstico: cria um cliente simples para validar a rota
   const testCreateCustomer = async () => {
@@ -292,7 +438,7 @@ export default function ClientesPage() {
       const res = await fetch('/next_api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenant_id: tenant?.id, name: 'Cliente Teste API', email: 'teste@example.com' })
+        body: JSON.stringify({ tenant_id: tenant?.id || '00000000-0000-0000-0000-000000000000', name: 'Cliente Teste API', email: 'teste@example.com' })
       });
       const text = await res.text();
       console.log('🧪 Teste API status:', res.status, 'body:', text);
@@ -670,13 +816,13 @@ export default function ClientesPage() {
                       </TableCell>
                     )}
                     {columnVisibility.document && (
-                      <TableCell>{formatDocument(customer.document, customer.type)}</TableCell>
+                      <TableCell>{formatDocument(customer.document || '', customer.type || 'PF')}</TableCell>
                     )}
                     {columnVisibility.phone && (
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Phone className="h-3 w-3 text-gray-400" />
-                          {formatPhone(customer.phone)}
+                          {formatPhone(customer.phone || '')}
                         </div>
                       </TableCell>
                     )}
@@ -697,36 +843,29 @@ export default function ClientesPage() {
                       </TableCell>
                     )}
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            className="h-8 w-8 p-0 hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44 z-50 bg-white border border-gray-200 shadow-xl rounded-lg">
-                          <div className="py-1">
-                            <DropdownMenuItem className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center">
-                              <Eye className="h-4 w-4 mr-3 text-gray-400" />
-                              Ver Detalhes
-                            </DropdownMenuItem>
-                            
-                            <DropdownMenuItem className="px-3 py-2 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700 flex items-center">
-                              <Edit className="h-4 w-4 mr-3 text-gray-400" />
-                              Editar
-                            </DropdownMenuItem>
-                          </div>
-                          
-                          <div className="border-t border-gray-100 pt-1">
-                            <DropdownMenuItem className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center">
-                              <Trash2 className="h-4 w-4 mr-3 text-red-400" />
-                              Excluir
-                            </DropdownMenuItem>
-                          </div>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex items-center justify-start gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setShowDetailsDialog(customer)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => openEdit(customer)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          onClick={() => handleDeleteCustomer(customer.id, customer.name)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -742,92 +881,165 @@ export default function ClientesPage() {
         </CardContent>
       </Card>
 
-      {/* Dialog Adicionar Cliente */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Adicionar Novo Cliente</DialogTitle>
-            <DialogDescription>
-              Preencha as informações do cliente abaixo
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <label htmlFor="name">Nome *</label>
-              <Input
-                id="name"
-                value={newCustomer.name}
-                onChange={(e) => setNewCustomer(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Nome do cliente"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <label htmlFor="type">Tipo</label>
-                <select 
-                  className="px-3 py-2 border rounded-md"
-                  value={newCustomer.type}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, type: e.target.value as 'PF' | 'PJ' }))}
-                >
-                  <option value="PF">Pessoa Física</option>
-                  <option value="PJ">Pessoa Jurídica</option>
-                </select>
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="document">CPF/CNPJ</label>
-                <Input
-                  id="document"
-                  value={newCustomer.document}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, document: e.target.value }))}
-                  placeholder="000.000.000-00"
-                />
+      {/* Dialog Adicionar/Editar Cliente */}
+      <Dialog open={showAddDialog} onOpenChange={(open) => { if (!open) { setShowAddDialog(false); setEditingCustomerId(null); setValidationErrors({}); } else { setShowAddDialog(true); } }}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+          <div className="relative">
+            {/* Header com gradiente */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-t-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
+                  <UserPlus className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-bold text-white">{editingCustomerId ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</DialogTitle>
+                  <DialogDescription className="text-blue-100 mt-1">
+                    {editingCustomerId ? 'Atualize as informações do cliente.' : 'Preencha as informações do cliente abaixo. Os campos marcados com * são obrigatórios.'}
+                  </DialogDescription>
+                </div>
               </div>
             </div>
-            <div className="grid gap-2">
-              <label htmlFor="email">E-mail</label>
-              <Input
-                id="email"
-                type="email"
-                value={newCustomer.email}
-                onChange={(e) => setNewCustomer(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="email@exemplo.com"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <label htmlFor="phone">Telefone</label>
-                <Input
-                  id="phone"
-                  value={newCustomer.phone}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="(11) 99999-9999"
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="city">Cidade</label>
-                <Input
-                  id="city"
-                  value={newCustomer.city}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, city: e.target.value }))}
-                  placeholder="São Paulo"
-                />
+            
+            {/* Conteúdo principal */}
+            <div className="p-6 bg-slate-800/50 backdrop-blur-sm">
+              <div className="grid gap-6">
+                <div className="grid gap-3">
+                  <Label htmlFor="name" className="text-sm font-medium text-slate-200">Nome Completo *</Label>
+                  <Input
+                    id="name"
+                    value={newCustomer.name}
+                    onChange={(e) => setNewCustomer(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Digite o nome completo do cliente"
+                    className={`h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 ${validationErrors.name ? 'border-red-400 focus:border-red-400' : ''}`}
+                  />
+                  {validationErrors.name && (
+                    <p className="text-sm text-red-400">{validationErrors.name}</p>
+                  )}
+                </div>
+            
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid gap-3">
+                    <Label htmlFor="type" className="text-sm font-medium text-slate-200">Tipo de Cliente</Label>
+                    <Select 
+                      value={newCustomer.type}
+                      onValueChange={(value) => setNewCustomer(prev => ({ ...prev, type: value as 'PF' | 'PJ' }))}
+                    >
+                      <SelectTrigger className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white">
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-700 border-slate-600 shadow-xl">
+                        <SelectItem value="PF" className="hover:bg-slate-600 text-white">Pessoa Física</SelectItem>
+                        <SelectItem value="PJ" className="hover:bg-slate-600 text-white">Pessoa Jurídica</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-3">
+                    <Label htmlFor="document" className="text-sm font-medium text-slate-200">CPF/CNPJ</Label>
+                    <Input
+                      id="document"
+                      value={newCustomer.document}
+                      onChange={(e) => {
+                        const formatted = formatDocument(e.target.value, newCustomer.type);
+                        setNewCustomer(prev => ({ ...prev, document: formatted }));
+                      }}
+                      placeholder={newCustomer.type === 'PF' ? '000.000.000-00' : '00.000.000/0000-00'}
+                      className={`h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 ${validationErrors.document ? 'border-red-400 focus:border-red-400' : ''}`}
+                    />
+                    {validationErrors.document && (
+                      <p className="text-sm text-red-400">{validationErrors.document}</p>
+                    )}
+                  </div>
+                </div>
+            
+                <div className="grid gap-3">
+                  <Label htmlFor="email" className="text-sm font-medium text-slate-200">E-mail</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={newCustomer.email}
+                    onChange={(e) => setNewCustomer(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="email@exemplo.com"
+                    className={`h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 ${validationErrors.email ? 'border-red-400 focus:border-red-400' : ''}`}
+                  />
+                  {validationErrors.email && (
+                    <p className="text-sm text-red-400">{validationErrors.email}</p>
+                  )}
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid gap-3">
+                    <Label htmlFor="phone" className="text-sm font-medium text-slate-200">Telefone</Label>
+                    <Input
+                      id="phone"
+                      value={newCustomer.phone}
+                      onChange={(e) => {
+                        const formatted = formatPhone(e.target.value);
+                        setNewCustomer(prev => ({ ...prev, phone: formatted }));
+                      }}
+                      placeholder="(11) 99999-9999"
+                      className={`h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 ${validationErrors.phone ? 'border-red-400 focus:border-red-400' : ''}`}
+                    />
+                    {validationErrors.phone && (
+                      <p className="text-sm text-red-400">{validationErrors.phone}</p>
+                    )}
+                  </div>
+                  <div className="grid gap-3">
+                    <Label htmlFor="city" className="text-sm font-medium text-slate-200">Cidade</Label>
+                    <Input
+                      id="city"
+                      value={newCustomer.city}
+                      onChange={(e) => setNewCustomer(prev => ({ ...prev, city: e.target.value }))}
+                      placeholder="São Paulo"
+                      className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+            {/* Rodapé com gradiente */}
+            <div className="bg-gradient-to-r from-slate-800 to-slate-700 p-6 rounded-b-lg border-t border-slate-600/50">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => { setShowAddDialog(false); setEditingCustomerId(null); }}
+                  className="w-full sm:w-auto border-slate-500 bg-slate-700/50 hover:bg-slate-600 text-slate-200 hover:text-white h-11 font-medium transition-all duration-200 hover:shadow-md"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={editingCustomerId ? handleSaveEdit : handleAddCustomer} 
+                  disabled={isSubmitting}
+                  className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white h-11 font-medium disabled:opacity-50 transition-all duration-200 hover:shadow-lg"
+                >
+                  {isSubmitting ? (editingCustomerId ? 'Salvando...' : 'Adicionando...') : (editingCustomerId ? 'Salvar Alterações' : 'Adicionar Cliente')}
+                </Button>
+              </div>
+            </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Detalhes do Cliente */}
+      <Dialog open={!!showDetailsDialog} onOpenChange={(open) => !open && setShowDetailsDialog(null)}>
+        <DialogContent className="text-slate-900">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900">Detalhes do Cliente</DialogTitle>
+            <DialogDescription className="text-slate-600">Informações básicas do cliente selecionado</DialogDescription>
+          </DialogHeader>
+          {showDetailsDialog && (
+            <div className="space-y-2">
+              <div><span className="font-medium">Nome:</span> {showDetailsDialog.name}</div>
+              <div><span className="font-medium">Tipo:</span> {showDetailsDialog.type}</div>
+              <div><span className="font-medium">Documento:</span> {showDetailsDialog.document}</div>
+              <div><span className="font-medium">Telefone:</span> {formatPhone(showDetailsDialog.phone || '')}</div>
+              <div><span className="font-medium">E-mail:</span> {showDetailsDialog.email}</div>
+              <div><span className="font-medium">Cidade:</span> {showDetailsDialog.city}</div>
+              <div><span className="font-medium">Status:</span> {showDetailsDialog.status}</div>
+              <div className="text-xs text-slate-500"><span className="font-medium">Criado em:</span> {new Date(showDetailsDialog.created_at).toLocaleString('pt-BR')}</div>
+            </div>
+          )}
           <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setShowAddDialog(false)}
-              className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
-            >
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleAddCustomer} 
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              Adicionar Cliente
-            </Button>
+            <Button variant="outline" onClick={() => setShowDetailsDialog(null)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -887,7 +1099,36 @@ export default function ClientesPage() {
         onClose={() => setShowImportPreview(false)}
         onConfirm={async () => {
           // Importação direta simples
-          await handleRegisterSelected(importRows);
+          try {
+            setIsRegistering(true);
+            let success = 0, fail = 0;
+            for (const row of importRows) {
+              try {
+                const response = await fetch('/next_api/customers', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    tenant_id: tenant?.id || '00000000-0000-0000-0000-000000000000',
+                    name: row.nome || '',
+                    email: row.email || '',
+                    phone: row.telefone || '',
+                    document: row.documento || '',
+                    city: row.cidade || '',
+                    type: row.tipo || 'PF',
+                  })
+                });
+                if (response.ok) success++;
+                else fail++;
+              } catch (err) {
+                fail++;
+              }
+            }
+            toast.success(`Importação concluída: ${success} sucessos, ${fail} falhas`);
+            setShowImportPreview(false);
+            await loadCustomers();
+          } finally {
+            setIsRegistering(false);
+          }
         }}
         onRegister={async (selected) => {
           try {

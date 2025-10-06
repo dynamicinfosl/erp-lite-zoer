@@ -33,6 +33,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import { Product, PDVItem } from '@/types';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { api } from '@/lib/api-client';
@@ -46,6 +47,7 @@ interface MenuItem {
 
 export default function PDVPage() {
   const { user, tenant, signOut } = useSimpleAuth();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<PDVItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<PDVItem | null>(null);
@@ -195,6 +197,16 @@ export default function PDVPage() {
     setCustomerName('');
   }, []);
 
+  const startNewSale = useCallback(() => {
+    clearCart();
+    setSearchTerm('');
+    setSidebarOpen(false);
+    toast.success('Nova venda iniciada');
+    setTimeout(() => {
+      document.getElementById('search-input')?.focus();
+    }, 0);
+  }, [clearCart]);
+
   const processPayment = useCallback(() => {
     if (cart.length === 0) return;
 
@@ -250,6 +262,11 @@ export default function PDVPage() {
                   key={item.label}
                   href={item.href}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setSidebarOpen(false);
+                    router.push(item.href);
+                  }}
                 >
                   <IconComponent className="h-5 w-5" />
                   <span className="font-medium text-sm">{item.label}</span>
@@ -298,7 +315,7 @@ export default function PDVPage() {
               <p className="text-sm sm:text-base text-body">F1 - Menu | Ctrl+F - Buscar | Ctrl+Enter - Adicionar | Esc - Cancelar</p>
             </div>
             <div className="flex items-center gap-2">
-              <Button className="juga-gradient text-white">Nova Venda</Button>
+              <Button className="juga-gradient text-white" onClick={startNewSale}>Nova Venda</Button>
             </div>
           </div>
 

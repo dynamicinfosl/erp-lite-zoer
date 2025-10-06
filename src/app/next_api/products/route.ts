@@ -11,24 +11,57 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 async function createProductHandler(request: NextRequest) {
   try {
     const body = await request.json();
-    const { tenant_id, name, description, price, stock, category } = body;
+    let { tenant_id, user_id, name, description, price, stock } = body;
 
-    if (!tenant_id || !name || !price) {
+    if (!name || price === undefined || price === null) {
       return NextResponse.json(
-        { error: 'Tenant ID, nome e preço são obrigatórios' },
+        { error: 'Nome e preço são obrigatórios' },
         { status: 400 }
       );
+    }
+
+    // Resolver tenant_id quando ausente ou inválido
+    const ZERO_UUID = '00000000-0000-0000-0000-000000000000';
+    if (!tenant_id || tenant_id === ZERO_UUID) {
+      if (user_id) {
+        // tentar obter membership ativa
+        const { data: membership } = await supabaseAdmin
+          .from('user_memberships')
+          .select('tenant_id')
+          .eq('user_id', user_id)
+          .eq('is_active', true)
+          .maybeSingle();
+        if (membership?.tenant_id) {
+          tenant_id = membership.tenant_id as string;
+        } else {
+          // criar tenant trial simples e membership
+          const { data: newTenant, error: tenantErr } = await supabaseAdmin
+            .from('tenants')
+            .insert({ name: 'Meu Negócio', slug: `trial-${Date.now()}`, status: 'trial' })
+            .select('id')
+            .single();
+          if (tenantErr) {
+            return NextResponse.json({ error: 'Falha ao resolver tenant' }, { status: 400 });
+          }
+          tenant_id = newTenant.id;
+          await supabaseAdmin
+            .from('user_memberships')
+            .insert({ user_id, tenant_id, role: 'owner', is_active: true });
+        }
+      } else {
+        return NextResponse.json({ error: 'Tenant inválido' }, { status: 400 });
+      }
     }
 
     const { data, error } = await supabaseAdmin
       .from('products')
       .insert({
         tenant_id,
+        user_id: user_id || null,
         name,
         description,
-        price: parseFloat(price),
-        stock: parseInt(stock) || 0,
-        category,
+        sale_price: parseFloat(price),
+        stock_quantity: parseInt(stock) || 0,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -60,10 +93,9 @@ async function listProductsHandler(request: NextRequest) {
     const tenant_id = searchParams.get('tenant_id');
 
     if (!tenant_id) {
-      return NextResponse.json(
-        { error: 'Tenant ID é obrigatório' },
-        { status: 400 }
-      );
+      // Em desenvolvimento, quando tenant ainda não está resolvido no cliente,
+      // devolvemos lista vazia para não quebrar a UI.
+      return NextResponse.json({ success: true, data: [] });
     }
 
     const { data, error } = await supabaseAdmin
@@ -94,3 +126,47 @@ async function listProductsHandler(request: NextRequest) {
 // Exportar handlers com validação de plano
 export const POST = withPlanValidation(createProductHandler, 'create_product');
 export const GET = listProductsHandler;
+
+// PUT - atualizar produto
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, name, description, price, stock } = body;
+    if (!id) return NextResponse.json({ error: 'ID é obrigatório' }, { status: 400 });
+
+    const { data, error } = await supabaseAdmin
+      .from('products')
+      .update({
+        name,
+        description,
+        sale_price: price !== undefined ? parseFloat(price) : undefined,
+        stock_quantity: stock !== undefined ? parseInt(stock) : undefined,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    return NextResponse.json({ success: true, data });
+  } catch (e) {
+    return NextResponse.json({ error: 'Erro ao atualizar produto' }, { status: 500 });
+  }
+}
+
+// DELETE - excluir produto
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'ID é obrigatório' }, { status: 400 });
+
+    const { error } = await supabaseAdmin.from('products').delete().eq('id', id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    return NextResponse.json({ error: 'Erro ao excluir produto' }, { status: 500 });
+  }
+}

@@ -45,6 +45,7 @@ import {
   Edit,
   Eye,
   DollarSign,
+  Trash2 as Trash,
   BarChart3,
   PackagePlus,
   TrendingUp,
@@ -68,6 +69,7 @@ import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
+import { Label } from '@/components/ui/label';
 
 interface Product {
   id: string;
@@ -101,7 +103,7 @@ interface ColumnVisibility {
 }
 
 export default function ProdutosPage() {
-  const { tenant } = useSimpleAuth();
+  const { tenant, user, refreshTenant } = useSimpleAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -156,20 +158,29 @@ export default function ProdutosPage() {
 
   // Carregar produtos quando houver tenant
   useEffect(() => {
+    // Tentar usar tenant do contexto; se não houver, usar o persistido
+    const storedTenantId = typeof window !== 'undefined' ? localStorage.getItem('lastProductsTenantId') : null;
+    if (!tenant?.id && storedTenantId) {
+      loadProducts(storedTenantId);
+      return;
+    }
     if (!tenant?.id) {
       setLoading(false);
       setProducts([]);
       return;
     }
+    // Salvar para futuros loads
+    try { localStorage.setItem('lastProductsTenantId', tenant.id); } catch {}
     loadProducts();
   }, [tenant?.id]);
 
-  const loadProducts = async () => {
+  const loadProducts = async (overrideTenantId?: string) => {
     try {
       setLoading(true);
-      const url = tenant?.id
-        ? `/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`
-        : '/next_api/products';
+      const currentTenantId = overrideTenantId || tenant?.id;
+      const url = currentTenantId
+        ? `/next_api/products?tenant_id=${encodeURIComponent(currentTenantId)}`
+        : `/next_api/products`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Erro ao carregar produtos');
       
@@ -201,23 +212,75 @@ export default function ProdutosPage() {
 
   // Adicionar produto
   const handleAddProduct = async () => {
+    console.log('[Produtos] handleAddProduct: start', { tenantId: tenant?.id, newProduct });
     try {
+      let tenantId = tenant?.id || (typeof window !== 'undefined' ? localStorage.getItem('lastProductsTenantId') || undefined : undefined);
+      if (!tenantId) {
+        // tentar recuperar
+        await refreshTenant();
+        tenantId = tenant?.id || (typeof window !== 'undefined' ? localStorage.getItem('lastProductsTenantId') || undefined : undefined);
+      }
+      if (!tenantId) {
+        tenantId = '00000000-0000-0000-0000-000000000000';
+        toast.message('Prosseguindo com tenant de teste (trial).');
+      }
+      if (!newProduct.name || !newProduct.sale_price) {
+        toast.error('Informe ao menos Nome e Preço de Venda.');
+        return;
+      }
+      toast.info('Enviando cadastro do produto...');
       const productData = {
-        ...newProduct,
-        cost_price: parseFloat(newProduct.cost_price) || 0,
-        sale_price: parseFloat(newProduct.sale_price) || 0,
-        stock_quantity: parseInt(newProduct.stock_quantity) || 0,
-      };
+        tenant_id: tenantId,
+        user_id: user?.id || '00000000-0000-0000-0000-000000000000',
+        name: newProduct.name,
+        description: newProduct.description || null,
+        price: parseFloat(newProduct.sale_price) || 0,
+        stock: parseInt(newProduct.stock_quantity) || 0,
+      } as any;
 
       const response = await fetch('/next_api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenant_id: tenant?.id, ...productData })
+        body: JSON.stringify(productData)
       });
+      console.log('[Produtos] handleAddProduct: response status', response.status);
 
-      if (!response.ok) throw new Error('Erro ao adicionar produto');
+      if (!response.ok) {
+        let message = 'Erro ao adicionar produto';
+        try {
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const j = await response.json();
+            message = j?.error || message;
+          } else {
+            const text = await response.text();
+            try { message = JSON.parse(text).error || message; } catch { message = text || message; }
+          }
+        } catch {}
+        throw new Error(message);
+      }
 
-      await loadProducts();
+      const json = await response.json().catch(() => ({}));
+      console.log('[Produtos] handleAddProduct: success payload', json);
+      const created = (json && (json.data || json)) as any;
+      if (created && created.id) {
+        // Atualiza lista de imediato
+        setProducts((prev) => [created, ...prev]);
+        // Se o tenant foi resolvido/gerado no backend, tentar sincronizar e recarregar
+        if (created.tenant_id && !tenant?.id) {
+          try { localStorage.setItem('lastProductsTenantId', created.tenant_id); } catch {}
+          try { localStorage.setItem('lastProductsTenantId', created.tenant_id); } catch {}
+          await refreshTenant();
+          await loadProducts(created.tenant_id);
+        } else {
+          const tid = created.tenant_id || tenant?.id;
+          if (tid) { try { localStorage.setItem('lastProductsTenantId', tid); } catch {} }
+          await loadProducts(tid);
+        }
+      } else {
+        await refreshTenant();
+        await loadProducts();
+      }
       setShowAddDialog(false);
       setNewProduct({
         sku: '',
@@ -233,9 +296,9 @@ export default function ProdutosPage() {
         unit: 'UN',
       });
       toast.success('Produto adicionado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao adicionar produto:', error);
-      toast.error('Erro ao adicionar produto');
+    } catch (error: any) {
+      console.error('[Produtos] handleAddProduct: error', error);
+      toast.error(`Erro ao adicionar produto: ${error?.message || 'erro desconhecido'}`);
     }
   };
 
@@ -424,6 +487,70 @@ export default function ProdutosPage() {
     if (quantity === 0) return { label: 'Sem estoque', variant: 'destructive' as const };
     if (quantity <= 10) return { label: 'Estoque baixo', variant: 'outline' as const };
     return { label: 'Em estoque', variant: 'default' as const };
+  };
+
+  // Ações CRUD
+  const [showProductDetails, setShowProductDetails] = useState<Product | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const openEditProduct = (p: Product) => {
+    setEditingProduct(p);
+    setShowAddDialog(true);
+    setNewProduct({
+      sku: p.sku || '',
+      name: p.name || '',
+      description: p.description || '',
+      category: p.category || '',
+      brand: p.brand || '',
+      cost_price: String(p.cost_price ?? ''),
+      sale_price: String(p.sale_price ?? ''),
+      stock_quantity: String(p.stock_quantity ?? '0'),
+      barcode: p.barcode || '',
+      ncm: p.ncm || '',
+      unit: p.unit || 'UN',
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingProduct) return;
+    try {
+      setIsSubmitting(true);
+      const res = await fetch('/next_api/products', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingProduct.id,
+          name: newProduct.name,
+          description: newProduct.description,
+          price: parseFloat(newProduct.sale_price) || 0,
+          stock: parseInt(newProduct.stock_quantity) || 0,
+        })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const json = await res.json();
+      const updated = json?.data || {};
+      setProducts((prev) => prev.map((p) => (p.id === editingProduct.id ? { ...p, ...updated } : p)));
+      setShowAddDialog(false);
+      setEditingProduct(null);
+      toast.success('Produto atualizado');
+    } catch (e: any) {
+      toast.error(`Erro ao salvar: ${e?.message || 'erro'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string, name: string) => {
+    if (!confirm(`Excluir o produto "${name}"?`)) return;
+    try {
+      const res = await fetch(`/next_api/products?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await res.text());
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      toast.success('Produto excluído');
+    } catch (e: any) {
+      toast.error(`Erro ao excluir: ${e?.message || 'erro'}`);
+    }
   };
 
   // Função para obter ícone específico de cada coluna
@@ -946,36 +1073,29 @@ export default function ProdutosPage() {
                         </TableCell>
                       )}
                       <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              className="h-8 w-8 p-0 hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-44 z-50 bg-white border border-gray-200 shadow-xl rounded-lg">
-                            <div className="py-1">
-                              <DropdownMenuItem className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center">
-                                <Eye className="h-4 w-4 mr-3 text-gray-400" />
-                                Ver Detalhes
-                              </DropdownMenuItem>
-                              
-                              <DropdownMenuItem className="px-3 py-2 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700 flex items-center">
-                                <Edit className="h-4 w-4 mr-3 text-gray-400" />
-                                Editar
-                              </DropdownMenuItem>
-                            </div>
-                            
-                            <div className="border-t border-gray-100 pt-1">
-                              <DropdownMenuItem className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center">
-                                <Trash2 className="h-4 w-4 mr-3 text-red-400" />
-                                Excluir
-                              </DropdownMenuItem>
-                            </div>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center justify-start gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setShowProductDetails(product)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => openEditProduct(product)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            onClick={() => handleDeleteProduct(product.id, product.name)}
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -999,142 +1119,207 @@ export default function ProdutosPage() {
         </CardContent>
       </Card>
 
-      {/* Dialog Adicionar Produto */}
+      {/* Dialog Adicionar/Editar Produto - layout alinhado ao de clientes */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Adicionar Novo Produto</DialogTitle>
-            <DialogDescription>
-              Preencha as informações do produto abaixo
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <label htmlFor="sku">SKU *</label>
-                <Input
-                  id="sku"
-                  value={newProduct.sku}
-                  onChange={(e) => setNewProduct(prev => ({ ...prev, sku: e.target.value }))}
-                  placeholder="Código do produto"
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="name">Nome *</label>
-                <Input
-                  id="name"
-                  value={newProduct.name}
-                  onChange={(e) => setNewProduct(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Nome do produto"
-                />
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+          <div className="relative">
+            {/* Header com gradiente */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-t-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
+                  <PackagePlus className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-bold text-white">{editingProduct ? 'Editar Produto' : 'Adicionar Novo Produto'}</DialogTitle>
+                  <DialogDescription className="text-blue-100 mt-1">
+                    {editingProduct ? 'Atualize as informações do produto.' : 'Preencha as informações do produto abaixo. Os campos marcados com * são obrigatórios.'}
+                  </DialogDescription>
+                </div>
               </div>
             </div>
-            <div className="grid gap-2">
-              <label htmlFor="description">Descrição</label>
-              <Input
-                id="description"
-                value={newProduct.description}
-                onChange={(e) => setNewProduct(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Descrição do produto"
-              />
+
+            {/* Conteúdo principal */}
+            <div className="p-6 bg-slate-800/50 backdrop-blur-sm">
+              <div className="grid gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="sku" className="text-sm font-medium text-slate-200">SKU *</Label>
+                    <Input
+                      id="sku"
+                      value={newProduct.sku}
+                      onChange={(e) => setNewProduct(prev => ({ ...prev, sku: e.target.value }))}
+                      placeholder="Código do produto"
+                      className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-sm font-medium text-slate-200">Nome *</Label>
+                    <Input
+                      id="name"
+                      value={newProduct.name}
+                      onChange={(e) => setNewProduct(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Nome do produto"
+                      className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description" className="text-sm font-medium text-slate-200">Descrição</Label>
+                  <Input
+                    id="description"
+                    value={newProduct.description}
+                    onChange={(e) => setNewProduct(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Descrição do produto"
+                    className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="category" className="text-sm font-medium text-slate-200">Categoria</Label>
+                    <Input
+                      id="category"
+                      value={newProduct.category}
+                      onChange={(e) => setNewProduct(prev => ({ ...prev, category: e.target.value }))}
+                      placeholder="Categoria"
+                      className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="brand" className="text-sm font-medium text-slate-200">Marca</Label>
+                    <Input
+                      id="brand"
+                      value={newProduct.brand}
+                      onChange={(e) => setNewProduct(prev => ({ ...prev, brand: e.target.value }))}
+                      placeholder="Marca"
+                      className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="cost_price" className="text-sm font-medium text-slate-200">Preço de Custo</Label>
+                    <Input
+                      id="cost_price"
+                      type="number"
+                      step="0.01"
+                      value={newProduct.cost_price}
+                      onChange={(e) => setNewProduct(prev => ({ ...prev, cost_price: e.target.value }))}
+                      placeholder="0.00"
+                      className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sale_price" className="text-sm font-medium text-slate-200">Preço de Venda</Label>
+                    <Input
+                      id="sale_price"
+                      type="number"
+                      step="0.01"
+                      value={newProduct.sale_price}
+                      onChange={(e) => setNewProduct(prev => ({ ...prev, sale_price: e.target.value }))}
+                      placeholder="0.00"
+                      className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="stock_quantity" className="text-sm font-medium text-slate-200">Estoque</Label>
+                    <Input
+                      id="stock_quantity"
+                      type="number"
+                      value={newProduct.stock_quantity}
+                      onChange={(e) => setNewProduct(prev => ({ ...prev, stock_quantity: e.target.value }))}
+                      placeholder="0"
+                      className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="unit" className="text-sm font-medium text-slate-200">Unidade</Label>
+                    <select 
+                      id="unit"
+                      className="h-11 bg-slate-700/50 border border-slate-600 rounded-md text-white px-3 focus:border-blue-400 focus:ring-blue-400/20"
+                      value={newProduct.unit}
+                      onChange={(e) => setNewProduct(prev => ({ ...prev, unit: e.target.value }))}
+                    >
+                      <option value="UN">UN - Unidade</option>
+                      <option value="CX">CX - Caixa</option>
+                      <option value="KG">KG - Quilograma</option>
+                      <option value="L">L - Litro</option>
+                      <option value="M">M - Metro</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="barcode" className="text-sm font-medium text-slate-200">Código de Barras</Label>
+                    <Input
+                      id="barcode"
+                      value={newProduct.barcode}
+                      onChange={(e) => setNewProduct(prev => ({ ...prev, barcode: e.target.value }))}
+                      placeholder="7891234567890"
+                      className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ncm" className="text-sm font-medium text-slate-200">NCM</Label>
+                    <Input
+                      id="ncm"
+                      value={newProduct.ncm}
+                      onChange={(e) => setNewProduct(prev => ({ ...prev, ncm: e.target.value }))}
+                      placeholder="12345678"
+                      className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <label htmlFor="category">Categoria</label>
-                <Input
-                  id="category"
-                  value={newProduct.category}
-                  onChange={(e) => setNewProduct(prev => ({ ...prev, category: e.target.value }))}
-                  placeholder="Categoria"
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="brand">Marca</label>
-                <Input
-                  id="brand"
-                  value={newProduct.brand}
-                  onChange={(e) => setNewProduct(prev => ({ ...prev, brand: e.target.value }))}
-                  placeholder="Marca"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="grid gap-2">
-                <label htmlFor="cost_price">Preço de Custo</label>
-                <Input
-                  id="cost_price"
-                  type="number"
-                  step="0.01"
-                  value={newProduct.cost_price}
-                  onChange={(e) => setNewProduct(prev => ({ ...prev, cost_price: e.target.value }))}
-                  placeholder="0.00"
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="sale_price">Preço de Venda</label>
-                <Input
-                  id="sale_price"
-                  type="number"
-                  step="0.01"
-                  value={newProduct.sale_price}
-                  onChange={(e) => setNewProduct(prev => ({ ...prev, sale_price: e.target.value }))}
-                  placeholder="0.00"
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="stock_quantity">Estoque</label>
-                <Input
-                  id="stock_quantity"
-                  type="number"
-                  value={newProduct.stock_quantity}
-                  onChange={(e) => setNewProduct(prev => ({ ...prev, stock_quantity: e.target.value }))}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="grid gap-2">
-                <label htmlFor="unit">Unidade</label>
-                <select 
-                  id="unit"
-                  className="px-3 py-2 border rounded-md"
-                  value={newProduct.unit}
-                  onChange={(e) => setNewProduct(prev => ({ ...prev, unit: e.target.value }))}
+
+            {/* Rodapé com gradiente */}
+            <div className="bg-gradient-to-r from-slate-800 to-slate-700 p-6 rounded-b-lg border-t border-slate-600/50">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => { setShowAddDialog(false); setEditingProduct(null); }}
+                  className="w-full sm:w-auto border-slate-500 bg-slate-700/50 hover:bg-slate-600 text-slate-200 hover:text-white h-11 font-medium transition-all duration-200 hover:shadow-md"
                 >
-                  <option value="UN">UN - Unidade</option>
-                  <option value="CX">CX - Caixa</option>
-                  <option value="KG">KG - Quilograma</option>
-                  <option value="L">L - Litro</option>
-                  <option value="M">M - Metro</option>
-                </select>
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="barcode">Código de Barras</label>
-                <Input
-                  id="barcode"
-                  value={newProduct.barcode}
-                  onChange={(e) => setNewProduct(prev => ({ ...prev, barcode: e.target.value }))}
-                  placeholder="7891234567890"
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="ncm">NCM</label>
-                <Input
-                  id="ncm"
-                  value={newProduct.ncm}
-                  onChange={(e) => setNewProduct(prev => ({ ...prev, ncm: e.target.value }))}
-                  placeholder="12345678"
-                />
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={editingProduct ? handleSaveEdit : handleAddProduct}
+                  disabled={isSubmitting}
+                  className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white h-11 font-medium transition-all duration-200 hover:shadow-lg"
+                >
+                  {isSubmitting ? (editingProduct ? 'Salvando...' : 'Adicionando...') : (editingProduct ? 'Salvar Alterações' : 'Adicionar Produto')}
+                </Button>
               </div>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Detalhes do Produto */}
+      <Dialog open={!!showProductDetails} onOpenChange={(open) => !open && setShowProductDetails(null)}>
+        <DialogContent className="text-slate-900">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900">Detalhes do Produto</DialogTitle>
+            <DialogDescription className="text-slate-600">Informações básicas do produto selecionado</DialogDescription>
+          </DialogHeader>
+          {showProductDetails && (
+            <div className="space-y-2">
+              <div><span className="font-medium">Nome:</span> {showProductDetails.name}</div>
+              <div><span className="font-medium">SKU:</span> {showProductDetails.sku}</div>
+              <div><span className="font-medium">Preço:</span> {formatCurrency(showProductDetails.sale_price)}</div>
+              <div><span className="font-medium">Estoque:</span> {showProductDetails.stock_quantity} {showProductDetails.unit}</div>
+              {showProductDetails.description && (
+                <div><span className="font-medium">Descrição:</span> {showProductDetails.description}</div>
+              )}
+              <div className="text-xs text-slate-500"><span className="font-medium">Criado em:</span> {new Date(showProductDetails.created_at).toLocaleString('pt-BR')}</div>
+            </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleAddProduct} className="bg-emerald-600 hover:bg-emerald-700">
-              Adicionar Produto
-            </Button>
+            <Button variant="outline" onClick={() => setShowProductDetails(null)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

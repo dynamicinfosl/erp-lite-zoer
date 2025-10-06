@@ -23,7 +23,7 @@ export async function validatePlanLimits(
       .from('subscriptions')
       .select(`
         status,
-        trial_ends_at,
+        trial_end,
         plan:plans(limits)
       `)
       .eq('tenant_id', tenantId)
@@ -39,8 +39,8 @@ export async function validatePlanLimits(
     }
 
     // Verificar se trial expirou
-    if (subscription.status === 'trial' && subscription.trial_ends_at) {
-      const trialEnd = new Date(subscription.trial_ends_at);
+    if (subscription.status === 'trial' && subscription.trial_end) {
+      const trialEnd = new Date(subscription.trial_end);
       if (trialEnd < new Date()) {
         return { 
           canProceed: false, 
