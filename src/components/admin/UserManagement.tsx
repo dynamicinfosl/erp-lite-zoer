@@ -265,7 +265,7 @@ export function UserManagement() {
         <CardContent className="flex items-center justify-center py-12">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
-            <p className="text-gray-600">Carregando usuários...</p>
+            <p className="text-gray-300">Carregando usuários...</p>
           </div>
         </CardContent>
       </Card>
@@ -280,7 +280,7 @@ export function UserManagement() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total de Clientes</p>
+                <p className="text-sm text-gray-300">Total de Clientes</p>
                 <p className="text-2xl font-bold">{users.length}</p>
               </div>
               <Users className="h-8 w-8 text-blue-600" />
@@ -292,7 +292,7 @@ export function UserManagement() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Ativos</p>
+                <p className="text-sm text-gray-300">Ativos</p>
                 <p className="text-2xl font-bold text-green-600">
                   {users.filter(u => u.tenant_status === 'active').length}
                 </p>
@@ -306,7 +306,7 @@ export function UserManagement() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Trial</p>
+                <p className="text-sm text-gray-300">Trial</p>
                 <p className="text-2xl font-bold text-blue-600">
                   {users.filter(u => u.tenant_status === 'trial').length}
                 </p>
@@ -320,12 +320,12 @@ export function UserManagement() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Pendentes</p>
+                <p className="text-sm text-gray-300">Pendentes</p>
                 <p className="text-2xl font-bold text-yellow-600">
                   {users.filter(u => u.tenant_status === 'pending_approval').length}
                 </p>
               </div>
-              <Clock className="h-8 w-8 text-yellow-600" />
+              <Calendar className="h-8 w-8 text-yellow-600" />
             </div>
           </CardContent>
         </Card>
@@ -334,7 +334,7 @@ export function UserManagement() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Suspensos</p>
+                <p className="text-sm text-gray-300">Suspensos</p>
                 <p className="text-2xl font-bold text-red-600">
                   {users.filter(u => u.tenant_status === 'suspended').length}
                 </p>
@@ -411,7 +411,7 @@ export function UserManagement() {
                       <TableCell>{getRoleBadge(user.role)}</TableCell>
                       <TableCell>{getStatusBadge(user.tenant_status)}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-sm text-gray-300">
                           <Calendar className="h-4 w-4" />
                           {formatDate(user.user_created_at)}
                         </div>
@@ -439,7 +439,7 @@ export function UserManagement() {
 
       {/* Dialog de Detalhes */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl bg-gray-900 text-white border-gray-700">
           <DialogHeader>
             <DialogTitle>Gerenciar Cliente</DialogTitle>
             <DialogDescription>
@@ -451,54 +451,54 @@ export function UserManagement() {
             <div className="space-y-6">
               {/* Informações do Usuário */}
               <div className="space-y-4">
-                <h3 className="font-semibold">Informações do Usuário</h3>
+                <h3 className="font-semibold text-white">Informações do Usuário</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-sm text-gray-600">Email</Label>
+                    <Label className="text-sm text-gray-300">Email</Label>
                     <p className="font-medium">{selectedUser.user_email}</p>
                   </div>
                   <div>
-                    <Label className="text-sm text-gray-600">Papel</Label>
+                    <Label className="text-sm text-gray-300">Papel</Label>
                     <div>{getRoleBadge(selectedUser.role)}</div>
                   </div>
                   <div>
-                    <Label className="text-sm text-gray-600">Cadastrado em</Label>
+                    <Label className="text-sm text-gray-300">Cadastrado em</Label>
                     <p>{formatDate(selectedUser.user_created_at)}</p>
                   </div>
                   <div>
-                    <Label className="text-sm text-gray-600">Último login</Label>
+                    <Label className="text-sm text-gray-300">Último login</Label>
                     <p>{formatDate(selectedUser.user_last_login)}</p>
                   </div>
                 </div>
               </div>
 
               {/* Informações da Empresa */}
-              <div className="space-y-4 border-t pt-4">
-                <h3 className="font-semibold">Informações da Empresa</h3>
+              <div className="space-y-4 border-t border-gray-700 pt-4">
+                <h3 className="font-semibold text-white">Informações da Empresa</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-sm text-gray-600">Nome</Label>
+                    <Label className="text-sm text-gray-300">Nome</Label>
                     <p className="font-medium">{selectedUser.tenant_name}</p>
                   </div>
                   <div>
-                    <Label className="text-sm text-gray-600">Status</Label>
+                    <Label className="text-sm text-gray-300">Status</Label>
                     <div>{getStatusBadge(selectedUser.tenant_status)}</div>
                   </div>
                   {selectedUser.tenant_email && (
                     <div>
-                      <Label className="text-sm text-gray-600">Email</Label>
+                      <Label className="text-sm text-gray-300">Email</Label>
                       <p>{selectedUser.tenant_email}</p>
                     </div>
                   )}
                   {selectedUser.tenant_phone && (
                     <div>
-                      <Label className="text-sm text-gray-600">Telefone</Label>
+                      <Label className="text-sm text-gray-300">Telefone</Label>
                       <p>{selectedUser.tenant_phone}</p>
                     </div>
                   )}
                   {selectedUser.tenant_document && (
                     <div>
-                      <Label className="text-sm text-gray-600">CPF/CNPJ</Label>
+                      <Label className="text-sm text-gray-300">CPF/CNPJ</Label>
                       <p>{selectedUser.tenant_document}</p>
                     </div>
                   )}
@@ -507,7 +507,7 @@ export function UserManagement() {
 
               {/* Ações */}
               <div className="border-t pt-4">
-                <h3 className="font-semibold mb-4">Ações</h3>
+                <h3 className="font-semibold mb-4 text-white">Ações</h3>
                 <div className="flex gap-2 flex-wrap">
                   {selectedUser.tenant_status === 'pending_approval' && (
                     <>
@@ -570,7 +570,7 @@ export function UserManagement() {
 
       {/* Dialog de Aprovação/Rejeição */}
       <Dialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
-        <DialogContent>
+        <DialogContent className="bg-gray-900 text-white border-gray-700">
           <DialogHeader>
             <DialogTitle>Gerenciar Aprovação</DialogTitle>
             <DialogDescription>
@@ -585,7 +585,7 @@ export function UserManagement() {
             <div className="space-y-4">
               <div className="p-4 bg-gray-50 rounded-lg">
                 <h4 className="font-medium mb-2">Cliente: {selectedUser.tenant_name}</h4>
-                <p className="text-sm text-gray-600">Email: {selectedUser.user_email}</p>
+                <p className="text-sm text-gray-300">Email: {selectedUser.user_email}</p>
               </div>
 
               <div className="space-y-4">

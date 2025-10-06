@@ -82,7 +82,7 @@ export default function AdminPage() {
       
       // Buscar dados reais das APIs
       const [usersRes, salesRes, productsRes] = await Promise.allSettled([
-        fetch('/next_api/users'),
+        fetch('/next_api/user-profiles'),
         fetch('/next_api/sales'),
         fetch('/next_api/products')
       ]);

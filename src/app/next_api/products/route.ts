@@ -2,14 +2,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { withPlanValidation } from '@/lib/plan-middleware';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+// Verificar se as variáveis estão definidas
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Variáveis do Supabase não configuradas em products route:', {
+    url: !!supabaseUrl,
+    serviceKey: !!supabaseServiceKey
+  });
+}
+
+const supabaseAdmin = supabaseUrl && supabaseServiceKey 
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
 
 // Handler original para criar produto
 async function createProductHandler(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Cliente Supabase não configurado' },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
     let { tenant_id, user_id, sku, name, description, category, brand, price, cost_price, stock, barcode, ncm, unit } = body;
 
@@ -109,6 +126,13 @@ async function createProductHandler(request: NextRequest) {
 // Handler original para listar produtos
 async function listProductsHandler(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Cliente Supabase não configurado' },
+        { status: 500 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const tenant_id = searchParams.get('tenant_id');
 
