@@ -1,5 +1,20 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 import { PlanLimits, PlanUsage } from '@/hooks/usePlanLimits';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+// Verificar se as variáveis estão definidas
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Variáveis do Supabase não configuradas em plan-utils:', {
+    url: !!supabaseUrl,
+    key: !!supabaseKey
+  });
+}
+
+const supabase = supabaseUrl && supabaseKey 
+  ? createClient(supabaseUrl, supabaseKey)
+  : null;
 
 export interface PlanValidationResult {
   canProceed: boolean;
@@ -15,9 +30,13 @@ export async function validatePlanLimits(
   tenantId: string,
   operation: 'create_customer' | 'create_product' | 'create_user' | 'create_sale'
 ): Promise<PlanValidationResult> {
-  const supabase = createClientComponentClient();
 
   try {
+    if (!supabase) {
+      console.error('Cliente Supabase não configurado em validatePlanLimits');
+      return { canProceed: false, reason: 'Cliente Supabase não configurado' };
+    }
+
     // Buscar subscription atual
     const { data: subscription, error: subError } = await supabase
       .from('subscriptions')
@@ -122,9 +141,18 @@ export async function validatePlanLimits(
  * Busca o uso atual do tenant
  */
 export async function getCurrentUsage(tenantId: string): Promise<PlanUsage> {
-  const supabase = createClientComponentClient();
 
   try {
+    if (!supabase) {
+      console.error('Cliente Supabase não configurado em getCurrentUsage');
+      return {
+        users: 0,
+        customers: 0,
+        products: 0,
+        sales_this_month: 0,
+      };
+    }
+
     const [usersResult, customersResult, productsResult, salesResult] = await Promise.all([
       // Contar usuários ativos
       supabase
@@ -179,7 +207,6 @@ export async function createSubscription(
   planId: string,
   status: 'trial' | 'active' = 'trial'
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = createClientComponentClient();
 
   try {
     const trialEndsAt = status === 'trial' 
@@ -222,7 +249,6 @@ export async function updateTenantPlan(
   tenantId: string,
   newPlanId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = createClientComponentClient();
 
   try {
     const { error } = await supabase

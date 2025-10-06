@@ -2,11 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { validatePlanLimits } from './plan-utils';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Cliente com service role para operações administrativas
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+// Verificar se as variáveis estão definidas
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Variáveis do Supabase não configuradas:', {
+    url: !!supabaseUrl,
+    serviceKey: !!supabaseServiceKey
+  });
+}
+
+// Cliente com service role para operações administrativas (fallback para anon key)
+const supabaseAdmin = supabaseUrl && supabaseServiceKey 
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
 
 export interface PlanMiddlewareOptions {
   operation: 'create_customer' | 'create_product' | 'create_user' | 'create_sale';
@@ -145,6 +155,10 @@ export async function checkFeatureAccess(
   feature: string
 ): Promise<{ hasAccess: boolean; reason?: string }> {
   try {
+    if (!supabaseAdmin) {
+      return { hasAccess: false, reason: 'Cliente Supabase não configurado' };
+    }
+
     // Buscar subscription e plano
     const { data: subscription, error } = await supabaseAdmin
       .from('subscriptions')
