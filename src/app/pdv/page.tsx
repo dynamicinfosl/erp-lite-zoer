@@ -12,6 +12,14 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Menu,
   ShoppingCart,
   Plus,
@@ -31,6 +39,12 @@ import {
   DollarSign,
   Settings,
   LogOut,
+  ArrowLeft,
+  MoreVertical,
+  MinusCircle,
+  RefreshCw,
+  RotateCcw,
+  Lock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -214,6 +228,31 @@ export default function PDVPage() {
     clearCart();
   }, [cart.length, total, customerName, clearCart]);
 
+  // Funções para operações do PDV
+  const handleSangria = useCallback(() => {
+    const valor = prompt('Digite o valor da sangria:');
+    if (valor && !isNaN(parseFloat(valor))) {
+      toast.success(`Sangria de R$ ${parseFloat(valor).toFixed(2)} realizada`);
+    }
+  }, []);
+
+  const handleTrocaDevolucao = useCallback(() => {
+    toast.info('Funcionalidade de Troca/Devolução em desenvolvimento');
+  }, []);
+
+  const handleReforco = useCallback(() => {
+    const valor = prompt('Digite o valor do reforço:');
+    if (valor && !isNaN(parseFloat(valor))) {
+      toast.success(`Reforço de R$ ${parseFloat(valor).toFixed(2)} realizado`);
+    }
+  }, []);
+
+  const handleFechamento = useCallback(() => {
+    if (confirm('Deseja realizar o fechamento do caixa?')) {
+      toast.success('Fechamento do caixa realizado com sucesso');
+    }
+  }, []);
+
   const menuItems: MenuItem[] = [
     { icon: Home, label: 'Dashboard', href: '/dashboard' },
     { icon: Users, label: 'Clientes', href: '/clientes' },
@@ -315,6 +354,43 @@ export default function PDVPage() {
               <p className="text-sm sm:text-base text-body">F1 - Menu | Ctrl+F - Buscar | Ctrl+Enter - Adicionar | Esc - Cancelar</p>
             </div>
             <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 w-9 p-0">
+                    <MoreVertical className="h-4 w-4" />
+                    <span className="sr-only">Configurações do PDV</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+                  <DropdownMenuLabel className="text-gray-900 dark:text-gray-100 font-semibold">Operações do PDV</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+                  <DropdownMenuItem onClick={handleSangria} className="cursor-pointer text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800">
+                    <MinusCircle className="mr-2 h-4 w-4 text-red-500" />
+                    <span>Sangria</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleTrocaDevolucao} className="cursor-pointer text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800">
+                    <RotateCcw className="mr-2 h-4 w-4 text-orange-500" />
+                    <span>Troca/Devolução</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleReforco} className="cursor-pointer text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800">
+                    <RefreshCw className="mr-2 h-4 w-4 text-green-500" />
+                    <span>Reforço</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+                  <DropdownMenuItem onClick={handleFechamento} className="cursor-pointer text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 focus:bg-red-50 dark:focus:bg-red-900/20">
+                    <Lock className="mr-2 h-4 w-4 text-red-500" />
+                    <span>Fechamento</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button 
+                variant="outline" 
+                onClick={() => router.push('/dashboard')}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Sair do PDV
+              </Button>
               <Button className="juga-gradient text-white" onClick={startNewSale}>Nova Venda</Button>
             </div>
           </div>

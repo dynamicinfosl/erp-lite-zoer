@@ -11,7 +11,7 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 async function createProductHandler(request: NextRequest) {
   try {
     const body = await request.json();
-    let { tenant_id, user_id, name, description, price, stock } = body;
+    let { tenant_id, user_id, sku, name, description, category, brand, price, cost_price, stock, barcode, ncm, unit } = body;
 
     if (!name || price === undefined || price === null) {
       return NextResponse.json(
@@ -53,15 +53,24 @@ async function createProductHandler(request: NextRequest) {
       }
     }
 
+    const stockQty = parseInt(stock) || 0;
+
     const { data, error } = await supabaseAdmin
       .from('products')
       .insert({
         tenant_id,
         user_id: user_id || null,
+        sku: sku || `PROD-${Date.now()}`,
         name,
-        description,
+        description: description || null,
+        category: category || null,
+        brand: brand || null,
+        cost_price: parseFloat(cost_price) || 0,
         sale_price: parseFloat(price),
-        stock_quantity: parseInt(stock) || 0,
+        stock_quantity: stockQty,
+        barcode: barcode || null,
+        ncm: ncm || null,
+        unit: unit || 'UN',
         created_at: new Date().toISOString(),
       })
       .select()
@@ -73,6 +82,17 @@ async function createProductHandler(request: NextRequest) {
         { error: 'Erro ao criar produto: ' + error.message },
         { status: 400 }
       );
+    }
+
+    // Registrar movimentação de entrada inicial se houver estoque
+    if (stockQty > 0) {
+      await supabaseAdmin.from('stock_movements').insert({
+        product_id: data.id,
+        movement_type: 'entrada',
+        quantity: stockQty,
+        reason: 'Cadastro inicial do produto',
+        created_at: new Date().toISOString(),
+      });
     }
 
     return NextResponse.json({ success: true, data });

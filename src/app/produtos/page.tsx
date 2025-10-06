@@ -232,10 +232,17 @@ export default function ProdutosPage() {
       const productData = {
         tenant_id: tenantId,
         user_id: user?.id || '00000000-0000-0000-0000-000000000000',
+        sku: newProduct.sku || '',
         name: newProduct.name,
         description: newProduct.description || null,
+        category: newProduct.category || null,
+        brand: newProduct.brand || null,
         price: parseFloat(newProduct.sale_price) || 0,
+        cost_price: parseFloat(newProduct.cost_price) || 0,
         stock: parseInt(newProduct.stock_quantity) || 0,
+        barcode: newProduct.barcode || null,
+        ncm: newProduct.ncm || null,
+        unit: newProduct.unit || 'UN',
       } as any;
 
       const response = await fetch('/next_api/products', {
