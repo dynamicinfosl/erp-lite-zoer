@@ -46,7 +46,7 @@ export default function AdminAnalyticsPage() {
       <div className="space-y-6 p-4 sm:p-6 w-full min-w-0">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-heading">Analytics e Relatórios</h1>
-          <p className="text-sm sm:text-base text-body mt-2">Análises e relatórios detalhados do sistema</p>
+          <p className="text-sm sm:text-base text-body mt-1">Análises e relatórios detalhados do sistema</p>
         </div>
 
         {/* Métricas - carrossel no mobile, grid em telas maiores */}
@@ -116,11 +116,11 @@ export default function AdminAnalyticsPage() {
         </div>
 
         {/* Gráfico: Vendas por mês */}
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle>Vendas por mês</CardTitle>
           </CardHeader>
-          <CardContent className="h-64 sm:h-72 lg:h-80 min-w-0">
+          <CardContent className="h-56 sm:h-72 lg:h-80 min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={salesSeries} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />

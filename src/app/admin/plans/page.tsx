@@ -9,8 +9,8 @@ export default function AdminPlansPage() {
     <AdminProtection>
       <div className="space-y-6 p-4 sm:p-6 w-full min-w-0">
         <div>
-          <h1 className="text-3xl font-bold text-heading">Gerenciar Planos</h1>
-          <p className="text-body mt-2">Gerenciar planos e assinaturas do sistema</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-heading">Gerenciar Planos</h1>
+          <p className="text-sm sm:text-base text-body mt-1">Gerenciar planos e assinaturas do sistema</p>
         </div>
         <PlanManagement />
       </div>

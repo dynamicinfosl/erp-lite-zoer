@@ -33,8 +33,8 @@ export default function AdminInventoryPage() {
     <AdminProtection>
       <div className="space-y-6 p-4 sm:p-6 w-full min-w-0">
         <div>
-          <h1 className="text-3xl font-bold text-heading">Controle de Inventário</h1>
-          <p className="text-body mt-2">Controle de estoque e produtos</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-heading">Controle de Inventário</h1>
+          <p className="text-sm sm:text-base text-body mt-1">Controle de estoque e produtos</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
