@@ -347,7 +347,7 @@ export function UserManagement() {
 
       {/* Tabela de Usuários */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
@@ -372,7 +372,7 @@ export function UserManagement() {
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="pt-3">
           {filteredUsers.length === 0 ? (
             <Alert>
               <AlertTriangle className="h-4 w-4" />
@@ -381,42 +381,42 @@ export function UserManagement() {
               </AlertDescription>
             </Alert>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
+            <div className="overflow-x-auto max-h-[62vh] overflow-y-auto rounded-md">
+              <Table className="text-sm w-full table-fixed">
+                <TableHeader className="sticky top-0 z-10 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                   <TableRow>
                     <TableHead>Email</TableHead>
                     <TableHead>Empresa</TableHead>
                     <TableHead>Papel</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Cadastro</TableHead>
+                    <TableHead className="hidden md:table-cell">Cadastro</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.map((user) => (
-                    <TableRow key={user.user_id}>
-                      <TableCell>
+                    <TableRow key={user.user_id} className="h-12">
+                      <TableCell className="py-2">
                         <div className="flex items-center gap-2">
                           <Mail className="h-4 w-4 text-gray-400" />
-                          <span className="font-medium">{user.user_email}</span>
+                          <span className="font-medium truncate max-w-[160px] sm:max-w-[220px]">{user.user_email}</span>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-2">
                         <div className="flex items-center gap-2">
                           <Building2 className="h-4 w-4 text-gray-400" />
-                          <span>{user.tenant_name}</span>
+                          <span className="truncate max-w-[140px] sm:max-w-[220px]">{user.tenant_name}</span>
                         </div>
                       </TableCell>
-                      <TableCell>{getRoleBadge(user.role)}</TableCell>
-                      <TableCell>{getStatusBadge(user.tenant_status)}</TableCell>
-                      <TableCell>
+                      <TableCell className="py-2">{getRoleBadge(user.role)}</TableCell>
+                      <TableCell className="py-2">{getStatusBadge(user.tenant_status)}</TableCell>
+                      <TableCell className="py-2 hidden md:table-cell">
                         <div className="flex items-center gap-2 text-sm text-gray-300">
                           <Calendar className="h-4 w-4" />
                           {formatDate(user.user_created_at)}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-2 w-[1%] whitespace-nowrap">
                         <Button
                           onClick={() => {
                             setSelectedUser(user);

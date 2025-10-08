@@ -35,6 +35,9 @@ const publicRoutes = [
   '/reset-password',
   '/admin/login',
   '/admin', // Admin faz verificação client-side com sessionStorage
+  '/admin-test', // Página de teste do admin
+  '/admin/simple', // Página simplificada do admin
+  '/admin/login/test-page', // Página de teste do login
   '/trial-expirado', // Página de trial expirado
   '/assinatura' // Página de assinatura (pode ser acessada mesmo com trial expirado)
 ];
@@ -121,9 +124,13 @@ export async function middleware(request: NextRequest) {
   );
 
   // Verificar se é uma rota pública
-  const isPublicRoute = publicRoutes.some(route => 
-    pathname === route || pathname.startsWith(route + '/')
-  );
+  const isPublicRoute = publicRoutes.some(route => {
+    if (route === '/admin' || route === '/admin-test') {
+      // Para admin, verificar se é exatamente a rota ou uma subrota
+      return pathname === route || pathname.startsWith(route + '/');
+    }
+    return pathname === route || pathname.startsWith(route + '/');
+  });
 
   // Verificar se é uma rota que precisa verificar trial
   const isTrialProtectedRoute = trialProtectedRoutes.some(route => 

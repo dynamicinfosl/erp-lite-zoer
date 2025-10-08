@@ -29,16 +29,29 @@ export function AppLayout({ children }: AppLayoutProps) {
       '/register', 
       '/forgot-password', 
       '/reset-password',
-      '/admin',  // Excluir painel admin do sidebar
+      '/admin/login',  // Página de login do admin sem sidebar
+      '/admin-test',   // Página de teste do admin sem sidebar
       '/trial-expirado'  // Página de trial expirado sem sidebar
     ];
+    
+    
     // Landing page SEMPRE sem sidebar
-    if (pathname === '/') return true;
+    if (pathname === '/') {
+      return true;
+    }
 
     // Landing page sem auth habilitada também sem sidebar
-    if (pathname === '/' && ENABLE_AUTH && !user) return true;
+    if (pathname === '/' && ENABLE_AUTH && !user) {
+      return true;
+    }
 
-    return noSidebarPages.some((page) => pathname?.startsWith(page));
+    // Páginas admin específicas sem sidebar (apenas login e teste)
+    if (pathname === '/admin/login' || pathname === '/admin-test') {
+      return true;
+    }
+    
+    // A página /admin deve ter sidebar (removida da lista de páginas sem sidebar)
+    return noSidebarPages.some((page) => pathname === page || pathname?.startsWith(page + '/'));
   }, [pathname, user]);
 
   // Páginas que precisam de proteção de trial
@@ -111,6 +124,11 @@ export function AppLayout({ children }: AppLayoutProps) {
   }
 
   if (!user) {
+    // Se está tentando acessar páginas do admin, não redirecionar (admin tem autenticação própria)
+    if (pathname === '/admin/login' || pathname === '/admin' || pathname?.startsWith('/admin/') || pathname === '/admin-test') {
+      return <main className="min-h-screen w-full">{children}</main>;
+    }
+    
     return (
       <AuthFallback>
         <main className="min-h-screen w-full">{children}</main>
