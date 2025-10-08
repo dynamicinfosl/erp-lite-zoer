@@ -28,24 +28,37 @@ async function createSaleHandler(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { tenant_id, customer_id, products, total, payment_method } = body;
+    const { customer_id, products, total, payment_method } = body;
 
-    if (!tenant_id || !products || !total) {
+    if (!products || !total) {
       return NextResponse.json(
-        { error: 'Tenant ID, produtos e total são obrigatórios' },
+        { error: 'Produtos e total são obrigatórios' },
         { status: 400 }
       );
     }
 
-    // Criar a venda
+    // Gerar número da venda (versão simplificada)
+    const { data: saleNumber, error: numberError } = await supabaseAdmin
+      .rpc('generate_sale_number');
+
+    if (numberError) {
+      console.error('Erro ao gerar número da venda:', numberError);
+      return NextResponse.json(
+        { error: 'Erro ao gerar número da venda' },
+        { status: 400 }
+      );
+    }
+
+    // Criar a venda (versão simplificada)
     const { data: sale, error: saleError } = await supabaseAdmin
       .from('sales')
       .insert({
-        tenant_id,
-        customer_id,
-        total: parseFloat(total),
+        sale_number: saleNumber,
+        customer_name: body.customer_name || 'Cliente Avulso',
+        total_amount: parseFloat(total),
         payment_method,
         status: 'completed',
+        notes: body.notes || null,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -60,13 +73,21 @@ async function createSaleHandler(request: NextRequest) {
     }
 
     // Criar itens da venda
-    const saleItems = products.map((product: any) => ({
-      sale_id: sale.id,
-      product_id: product.id,
-      quantity: product.quantity,
-      price: product.price,
-      subtotal: product.quantity * product.price,
-    }));
+    const saleItems = products.map((product: any) => {
+      const discountAmount = (product.price * product.quantity * (product.discount || 0)) / 100;
+      const subtotal = (product.price * product.quantity) - discountAmount;
+      
+      return {
+        sale_id: sale.id,
+        product_id: product.id,
+        product_name: product.name,
+        product_code: product.code,
+        unit_price: product.price,
+        quantity: product.quantity,
+        discount_percentage: product.discount || 0,
+        subtotal: subtotal,
+      };
+    });
 
     const { error: itemsError } = await supabaseAdmin
       .from('sale_items')
@@ -104,27 +125,31 @@ async function listSalesHandler(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const tenant_id = searchParams.get('tenant_id');
+    const today = searchParams.get('today');
 
-    if (!tenant_id) {
-      return NextResponse.json(
-        { error: 'Tenant ID é obrigatório' },
-        { status: 400 }
-      );
-    }
-
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('sales')
       .select(`
         *,
-        customer:customers(name, email),
         items:sale_items(
           *,
           product:products(name, price)
         )
-      `)
-      .eq('tenant_id', tenant_id)
-      .order('created_at', { ascending: false });
+      `);
+
+    // Se solicitado apenas vendas de hoje
+    if (today === 'true') {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+      
+      query = query
+        .gte('created_at', todayStart.toISOString())
+        .lte('created_at', todayEnd.toISOString());
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       console.error('Erro ao listar vendas:', error);

@@ -158,3 +158,6 @@ NEXT_PUBLIC_ENABLE_AUTH=true
 O sistema de restrição de trial está completamente implementado e testado. Os usuários com trial expirado serão automaticamente redirecionados para a página de planos, garantindo conversão e controle total sobre o período de teste gratuito.
 
 
+
+
+

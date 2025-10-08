@@ -6,6 +6,14 @@ const POSTGREST_API_KEY = process.env.POSTGREST_API_KEY || ""; // anon key (publ
 const POSTGREST_SERVICE_ROLE = process.env.POSTGREST_SERVICE_ROLE || ""; // service role key (bypasses RLS)
 
 export function createPostgrestClient(userToken?: string) {
+  console.log('🔧 PostgREST Config:', {
+    url: POSTGREST_URL,
+    schema: POSTGREST_SCHEMA,
+    hasApiKey: !!POSTGREST_API_KEY,
+    hasServiceRole: !!POSTGREST_SERVICE_ROLE,
+    userToken: userToken ? 'TEM' : 'SEM'
+  });
+  
   const client = new PostgrestClient(POSTGREST_URL, {
     schema: POSTGREST_SCHEMA,
     fetch: (...args) => {

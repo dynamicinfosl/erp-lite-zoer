@@ -1,18 +1,19 @@
-
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Search, Package } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Search, Package, Barcode, TrendingUp } from 'lucide-react';
 import { Product } from '@/types';
 
 interface ProductSearchProps {
   onProductSelect: (product: Product) => void;
   products: Product[];
+  loading?: boolean;
 }
 
-export function ProductSearch({ onProductSelect, products }: ProductSearchProps) {
+export function ProductSearch({ onProductSelect, products, loading = false }: ProductSearchProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [showResults, setShowResults] = useState(false);
@@ -76,52 +77,67 @@ export function ProductSearch({ onProductSelect, products }: ProductSearchProps)
   };
 
   return (
-    <div className="relative">
+    <div className="relative w-full">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
         <Input
           ref={inputRef}
           type="text"
-          placeholder="Digite o código ou nome do produto (F2)"
+          placeholder={loading ? "Carregando produtos..." : "Digite o código ou nome do produto (F2)"}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="pl-10 text-lg h-12"
+          className="pl-11 pr-11 text-base h-12 border-2 focus:border-primary transition-all"
           autoFocus
+          disabled={loading}
         />
+        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+          <Barcode className="h-5 w-5 text-muted-foreground" />
+        </div>
       </div>
 
       {showResults && filteredProducts.length > 0 && (
-        <Card className="absolute top-full left-0 right-0 z-50 mt-1 max-h-80 overflow-y-auto">
+        <Card className="absolute top-full left-0 right-0 z-50 mt-2 max-h-96 overflow-y-auto shadow-lg border-2 border-primary/20">
           <CardContent className="p-0">
             {filteredProducts.map((product, index) => (
               <div
                 key={product.id}
-                className={`p-3 cursor-pointer border-b last:border-b-0 hover:bg-muted ${
-                  index === selectedIndex ? 'bg-muted' : ''
+                className={`p-4 cursor-pointer border-b last:border-b-0 transition-all ${
+                  index === selectedIndex 
+                    ? 'bg-primary/10 border-l-4 border-l-primary' 
+                    : 'hover:bg-muted/50'
                 }`}
                 onClick={() => handleProductSelect(product)}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <Package className="h-4 w-4 text-primary" />
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="p-2.5 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 rounded-lg flex-shrink-0">
+                      <Package className="h-5 w-5 text-primary" />
                     </div>
-                    <div>
-                      <div className="font-medium">{product.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {product.sku && `SKU: ${product.sku}`}
-                        {product.sku && product.barcode && ' • '}
-                        {product.barcode && `Código: ${product.barcode}`}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-base truncate">{product.name}</div>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {product.sku && (
+                          <Badge variant="outline" className="text-xs">
+                            SKU: {product.sku}
+                          </Badge>
+                        )}
+                        {product.barcode && (
+                          <Badge variant="outline" className="text-xs">
+                            <Barcode className="h-3 w-3 mr-1" />
+                            {product.barcode}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-lg">
+                  <div className="text-right flex-shrink-0">
+                    <div className="font-bold text-xl text-primary">
                       {formatCurrency(product.sale_price)}
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      Estoque: {product.stock_quantity}
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                      <TrendingUp className="h-3 w-3" />
+                      Estoque: {product.stock_quantity || 0}
                     </div>
                   </div>
                 </div>
@@ -131,8 +147,25 @@ export function ProductSearch({ onProductSelect, products }: ProductSearchProps)
         </Card>
       )}
 
-      <div className="mt-2 text-xs text-muted-foreground">
-        F2 = Buscar produto • Enter = Confirmar • Esc = Cancelar
+      {showResults && searchTerm && filteredProducts.length === 0 && !loading && (
+        <Card className="absolute top-full left-0 right-0 z-50 mt-2 shadow-lg border-2 border-orange-200">
+          <CardContent className="p-6 text-center">
+            <Package className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+            <p className="text-muted-foreground font-medium">Nenhum produto encontrado</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Tente buscar por outro termo
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+        <span>F2 = Buscar • Enter = Confirmar • ↑↓ = Navegar • Esc = Cancelar</span>
+        {searchTerm && (
+          <Badge variant="secondary" className="text-xs">
+            {filteredProducts.length} resultado(s)
+          </Badge>
+        )}
       </div>
     </div>
   );

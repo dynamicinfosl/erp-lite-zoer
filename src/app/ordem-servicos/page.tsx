@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 import { 
   Dialog, 
@@ -49,9 +51,11 @@ import {
   AlertCircle,
   User,
   Calendar,
-  Wrench
+  Wrench,
+  UserPlus
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 
 interface OrdemServico {
   id: string;
@@ -82,22 +86,86 @@ interface ColumnVisibility {
 }
 
 export default function OrdemServicosPage() {
+  const { user, tenant } = useSimpleAuth();
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Armazenar ordens temporariamente no localStorage
+  const getStoredOrders = (): OrdemServico[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem(`ordens_${tenant?.id}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const setStoredOrders = (orders: OrdemServico[]) => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(`ordens_${tenant?.id}`, JSON.stringify(orders));
+    } catch {
+      // Ignorar erros de localStorage
+    }
+  };
+
+  // Funções para gerenciar preferências de colunas no localStorage
+  const getStoredColumnVisibility = (): ColumnVisibility => {
+    if (typeof window === 'undefined') return {
+      numero: true,
+      cliente: true,
+      tipo: true,
+      status: true,
+      prioridade: true,
+      tecnico: true,
+      valor_estimado: true,
+      data_abertura: true,
+      data_prazo: true,
+    };
+    try {
+      const stored = localStorage.getItem(`ordem_servico_columns_${tenant?.id}`);
+      return stored ? JSON.parse(stored) : {
+        numero: true,
+        cliente: true,
+        tipo: true,
+        status: true,
+        prioridade: true,
+        tecnico: true,
+        valor_estimado: true,
+        data_abertura: true,
+        data_prazo: true,
+      };
+    } catch {
+      return {
+        numero: true,
+        cliente: true,
+        tipo: true,
+        status: true,
+        prioridade: true,
+        tecnico: true,
+        valor_estimado: true,
+        data_abertura: true,
+        data_prazo: true,
+      };
+    }
+  };
+
+  const setStoredColumnVisibility = (columns: ColumnVisibility) => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(`ordem_servico_columns_${tenant?.id}`, JSON.stringify(columns));
+    } catch {
+      // Ignorar erros de localStorage
+    }
+  };
+
   const [searchTerm, setSearchTerm] = useState('');
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
-    numero: true,
-    cliente: true,
-    tipo: true,
-    status: true,
-    prioridade: true,
-    tecnico: true,
-    valor_estimado: true,
-    data_abertura: true,
-    data_prazo: true,
-  });
+  const [showDetailsDialog, setShowDetailsDialog] = useState<OrdemServico | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState<OrdemServico | null>(null);
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => getStoredColumnVisibility());
 
   // Filtros avançados
   const [advancedFilters, setAdvancedFilters] = useState({
@@ -110,6 +178,17 @@ export default function OrdemServicosPage() {
 
   // Estados para formulário
   const [newOrdem, setNewOrdem] = useState({
+    cliente: '',
+    tipo: '',
+    descricao: '',
+    prioridade: 'media' as 'baixa' | 'media' | 'alta',
+    valor_estimado: '',
+    data_prazo: '',
+    tecnico: ''
+  });
+
+  // Estados para edição
+  const [editOrdem, setEditOrdem] = useState({
     cliente: '',
     tipo: '',
     descricao: '',
@@ -149,18 +228,36 @@ export default function OrdemServicosPage() {
   ], []);
 
   const loadOrdens = useCallback(async () => {
+    // Usar tenant padrão se não estiver disponível
+    const tenantId = tenant?.id || '00000000-0000-0000-0000-000000000000';
+    
     try {
       setLoading(true);
-      setTimeout(() => {
-        setOrdens(mockOrdens);
-        setLoading(false);
-      }, 500);
+      const res = await fetch(`/next_api/orders?tenant_id=${tenantId}`);
+      if (!res.ok) {
+        console.error('Falha na API /next_api/orders:', res.status);
+        // Se a API falhar, usar dados do localStorage
+        const storedOrders = getStoredOrders();
+        setOrdens(storedOrders);
+      } else {
+        const data = await res.json();
+        const rows = Array.isArray(data?.data) ? data.data : (data?.rows || data || []);
+        const orders = Array.isArray(rows) ? rows : [];
+        setOrdens(orders);
+        setStoredOrders(orders);
+      }
     } catch (error) {
-      console.error('Erro ao carregar ordens de serviço:', error);
+      console.error('Erro ao carregar ordens:', error);
+      // Se der erro, usar dados do localStorage
+      const storedOrders = getStoredOrders();
+      setOrdens(storedOrders);
+      if (storedOrders.length === 0) {
       toast.error('Erro ao carregar ordens de serviço');
+      }
+    } finally {
       setLoading(false);
     }
-  }, [mockOrdens]);
+  }, [tenant?.id]);
 
   useEffect(() => {
     loadOrdens();
@@ -181,17 +278,70 @@ export default function OrdemServicosPage() {
 
   // Adicionar ordem de serviço
   const handleAddOrdem = async () => {
-    try {
-      const novaOrdem: OrdemServico = {
-        id: Date.now().toString(),
-        numero: `OS-${new Date().getFullYear()}-${(ordens.length + 1).toString().padStart(3, '0')}`,
-        ...newOrdem,
-        valor_estimado: parseFloat(newOrdem.valor_estimado) || 0,
-        status: 'aberta',
-        data_abertura: new Date().toISOString()
-      };
+    console.log('🔍 handleAddOrdem - INÍCIO');
+    console.log('📊 tenant:', tenant);
+    console.log('📝 newOrdem:', newOrdem);
+    
+    // Se tenant não estiver disponível, usar tenant padrão temporariamente
+    const tenantId = tenant?.id || '00000000-0000-0000-0000-000000000000';
+    
+    if (!tenantId) {
+      console.log('❌ Tenant não encontrado');
+      toast.error('Tenant não encontrado');
+      return;
+    }
 
-      setOrdens(prev => [...prev, novaOrdem]);
+    if (!newOrdem.cliente || !newOrdem.tipo || !newOrdem.descricao) {
+      console.log('❌ Campos obrigatórios não preenchidos');
+      toast.error('Preencha todos os campos obrigatórios');
+      return;
+    }
+
+    console.log('✅ Validações passaram, fazendo POST...');
+    try {
+      const requestBody = {
+        tenant_id: tenantId,
+        cliente: newOrdem.cliente,
+        tipo: newOrdem.tipo,
+        descricao: newOrdem.descricao,
+        prioridade: newOrdem.prioridade,
+        valor_estimado: parseFloat(newOrdem.valor_estimado) || 0,
+        data_prazo: newOrdem.data_prazo || null,
+        tecnico: newOrdem.tecnico || null,
+      };
+      
+      console.log('📤 Enviando request:', JSON.stringify(requestBody, null, 2));
+      
+      const res = await fetch('/next_api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+      
+      console.log('📥 Response status:', res.status);
+      console.log('📥 Response ok:', res.ok);
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.log('❌ Erro na resposta:', res.status, errorText);
+        throw new Error(`Erro ao criar ordem de serviço: ${res.status}`);
+      }
+
+      const responseData = await res.json();
+      console.log('📦 Response data:', JSON.stringify(responseData, null, 2));
+      
+      const newOrder = responseData.data || responseData;
+      console.log('🆕 Nova ordem:', newOrder);
+      
+      // Adicionar à lista local e salvar no localStorage
+      const updatedOrders = [newOrder, ...ordens];
+      console.log('📋 Lista atualizada:', updatedOrders.length, 'ordens');
+      
+      setOrdens(updatedOrders);
+      setStoredOrders(updatedOrders);
+
       setShowAddDialog(false);
       setNewOrdem({
         cliente: '',
@@ -202,10 +352,98 @@ export default function OrdemServicosPage() {
         data_prazo: '',
         tecnico: ''
       });
+      console.log('✅ Ordem criada com sucesso!');
       toast.success('Ordem de serviço criada com sucesso!');
     } catch (error) {
       console.error('Erro ao criar ordem de serviço:', error);
       toast.error('Erro ao criar ordem de serviço');
+    }
+  };
+
+  const handleViewDetails = (ordem: OrdemServico) => {
+    setShowDetailsDialog(ordem);
+  };
+
+  const handleEdit = (ordem: OrdemServico) => {
+    setEditOrdem({
+      cliente: ordem.cliente,
+      tipo: ordem.tipo,
+      descricao: ordem.descricao,
+      prioridade: ordem.prioridade,
+      valor_estimado: ordem.valor_estimado.toString(),
+      data_prazo: ordem.data_prazo || '',
+      tecnico: ordem.tecnico || ''
+    });
+    setShowEditDialog(ordem);
+  };
+
+  const handleUpdateOrdem = async () => {
+    const tenantId = tenant?.id || '00000000-0000-0000-0000-000000000000';
+    if (!showEditDialog || !tenantId) return;
+
+    try {
+      const res = await fetch(`/next_api/orders?id=${showEditDialog.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          cliente: editOrdem.cliente,
+          tipo: editOrdem.tipo,
+          descricao: editOrdem.descricao,
+          prioridade: editOrdem.prioridade,
+          valor_estimado: parseFloat(editOrdem.valor_estimado) || 0,
+          data_prazo: editOrdem.data_prazo || null,
+          tecnico: editOrdem.tecnico || null,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Erro ao atualizar ordem de serviço');
+      }
+
+      const responseData = await res.json();
+      const updatedOrder = responseData.data || responseData;
+      
+      // Atualizar lista local e salvar no localStorage
+      const updatedOrders = ordens.map(ordem => 
+        ordem.id === showEditDialog.id ? updatedOrder : ordem
+      );
+      setOrdens(updatedOrders);
+      setStoredOrders(updatedOrders);
+
+      setShowEditDialog(null);
+      toast.success('Ordem de serviço atualizada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao atualizar ordem de serviço:', error);
+      toast.error('Erro ao atualizar ordem de serviço');
+    }
+  };
+
+  const handleDelete = async (ordem: OrdemServico) => {
+    if (!confirm(`Tem certeza que deseja excluir a ordem de serviço ${ordem.numero}?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/next_api/orders?id=${ordem.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        throw new Error('Erro ao excluir ordem de serviço');
+      }
+
+      // Remover da lista local e salvar no localStorage
+      const updatedOrders = ordens.filter(o => o.id !== ordem.id);
+      setOrdens(updatedOrders);
+      setStoredOrders(updatedOrders);
+
+      toast.success(`Ordem de serviço ${ordem.numero} excluída com sucesso!`);
+    } catch (error) {
+      console.error('Erro ao excluir ordem de serviço:', error);
+      toast.error('Erro ao excluir ordem de serviço');
     }
   };
 
@@ -361,9 +599,11 @@ export default function OrdemServicosPage() {
                     <DropdownMenuCheckboxItem
                       key={key}
                       checked={value}
-                      onCheckedChange={(checked) => 
-                        setColumnVisibility(prev => ({ ...prev, [key]: checked || false }))
-                      }
+                      onCheckedChange={(checked) => {
+                        const newVisibility = { ...columnVisibility, [key]: checked || false };
+                        setColumnVisibility(newVisibility);
+                        setStoredColumnVisibility(newVisibility);
+                      }}
                       className="hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-800 focus:text-gray-900 dark:focus:text-gray-100"
                     >
                       {key === 'numero' ? 'Número' :
@@ -530,19 +770,28 @@ export default function OrdemServicosPage() {
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                          <DropdownMenuContent align="end" className="w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+                            <DropdownMenuItem 
+                              onClick={() => handleViewDetails(ordem)}
+                              className="cursor-pointer text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800"
+                            >
                               <Eye className="h-4 w-4 mr-2" />
                               Ver Detalhes
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleEdit(ordem)}
+                              className="cursor-pointer text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800"
+                            >
                               <Edit className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600">
+                            <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+                            <DropdownMenuItem 
+                              className="cursor-pointer text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 focus:bg-red-50 dark:focus:bg-red-950/30"
+                              onClick={() => handleDelete(ordem)}
+                            >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Cancelar OS
+                              Excluir OS
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -565,97 +814,402 @@ export default function OrdemServicosPage() {
 
       {/* Dialog Adicionar OS */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Nova Ordem de Serviço</DialogTitle>
-            <DialogDescription>
-              Preencha as informações da ordem de serviço
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+          <div className="relative">
+            {/* Header com gradiente */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-t-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
+                  <UserPlus className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-bold text-white">Nova Ordem de Serviço</DialogTitle>
+                  <DialogDescription className="text-blue-100 mt-1">
+                    Preencha as informações da ordem de serviço. Os campos marcados com * são obrigatórios.
             </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <label htmlFor="cliente">Cliente *</label>
+                </div>
+              </div>
+            </div>
+
+            {/* Conteúdo principal */}
+            <div className="p-6 bg-slate-800/50 backdrop-blur-sm">
+              <div className="grid gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="cliente" className="text-sm font-medium text-white">Cliente *</Label>
               <Input
                 id="cliente"
                 value={newOrdem.cliente}
                 onChange={(e) => setNewOrdem(prev => ({ ...prev, cliente: e.target.value }))}
                 placeholder="Nome do cliente"
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-300 focus:border-blue-400 focus:ring-blue-400"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <label htmlFor="tipo">Tipo de Serviço *</label>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="tipo" className="text-sm font-medium text-white">Tipo de Serviço *</Label>
                 <Input
                   id="tipo"
                   value={newOrdem.tipo}
                   onChange={(e) => setNewOrdem(prev => ({ ...prev, tipo: e.target.value }))}
                   placeholder="Ex: Reparo, Manutenção..."
+                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-300 focus:border-blue-400 focus:ring-blue-400"
                 />
               </div>
-              <div className="grid gap-2">
-                <label htmlFor="prioridade">Prioridade</label>
-                <select 
-                  id="prioridade"
-                  className="px-3 py-2 border rounded-md"
+                  <div className="space-y-2">
+                    <Label htmlFor="prioridade" className="text-sm font-medium text-white">Prioridade</Label>
+                    <Select 
                   value={newOrdem.prioridade}
-                  onChange={(e) => setNewOrdem(prev => ({ ...prev, prioridade: e.target.value as 'baixa' | 'media' | 'alta' }))}
-                >
-                  <option value="baixa">Baixa</option>
-                  <option value="media">Média</option>
-                  <option value="alta">Alta</option>
-                </select>
+                      onValueChange={(value: 'baixa' | 'media' | 'alta') => setNewOrdem(prev => ({ ...prev, prioridade: value }))}
+                    >
+                      <SelectTrigger className="bg-white/10 border-white/20 text-white focus:border-blue-400 focus:ring-blue-400">
+                        <SelectValue placeholder="Selecione a prioridade" className="text-white" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-800 border-slate-700">
+                        <SelectItem value="baixa" className="text-white hover:bg-slate-700">Baixa</SelectItem>
+                        <SelectItem value="media" className="text-white hover:bg-slate-700">Média</SelectItem>
+                        <SelectItem value="alta" className="text-white hover:bg-slate-700">Alta</SelectItem>
+                      </SelectContent>
+                    </Select>
               </div>
             </div>
-            <div className="grid gap-2">
-              <label htmlFor="descricao">Descrição do Serviço *</label>
+
+                <div className="space-y-2">
+                  <Label htmlFor="descricao" className="text-sm font-medium text-white">Descrição do Serviço *</Label>
               <textarea
                 id="descricao"
-                className="px-3 py-2 border rounded-md min-h-[100px]"
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white placeholder:text-gray-300 rounded-md min-h-[100px] focus:border-blue-400 focus:ring-blue-400 resize-none"
                 value={newOrdem.descricao}
                 onChange={(e) => setNewOrdem(prev => ({ ...prev, descricao: e.target.value }))}
                 placeholder="Descreva o serviço a ser realizado..."
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <label htmlFor="valor_estimado">Valor Estimado</label>
-                <Input
-                  id="valor_estimado"
-                  type="number"
-                  step="0.01"
-                  value={newOrdem.valor_estimado}
-                  onChange={(e) => setNewOrdem(prev => ({ ...prev, valor_estimado: e.target.value }))}
-                  placeholder="0.00"
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="data_prazo">Data Prazo</label>
-                <Input
-                  id="data_prazo"
-                  type="date"
-                  value={newOrdem.data_prazo}
-                  onChange={(e) => setNewOrdem(prev => ({ ...prev, data_prazo: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <label htmlFor="tecnico">Técnico Responsável</label>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="valor_estimado" className="text-sm font-medium text-white">Valor Estimado</Label>
+                    <Input
+                      id="valor_estimado"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={newOrdem.valor_estimado}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Permitir apenas números positivos e ponto decimal
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          setNewOrdem(prev => ({ ...prev, valor_estimado: value }));
+                        }
+                      }}
+                      placeholder="0.00"
+                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-300 focus:border-blue-400 focus:ring-blue-400"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="data_prazo" className="text-sm font-medium text-white">Data Prazo</Label>
+                    <Input
+                      id="data_prazo"
+                      type="date"
+                      value={newOrdem.data_prazo}
+                      onChange={(e) => setNewOrdem(prev => ({ ...prev, data_prazo: e.target.value }))}
+                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-300 focus:border-blue-400 focus:ring-blue-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="tecnico" className="text-sm font-medium text-white">Técnico Responsável</Label>
               <Input
                 id="tecnico"
                 value={newOrdem.tecnico}
                 onChange={(e) => setNewOrdem(prev => ({ ...prev, tecnico: e.target.value }))}
                 placeholder="Nome do técnico"
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-300 focus:border-blue-400 focus:ring-blue-400"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+
+              {/* Footer com botões */}
+              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-white/10">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowAddDialog(false)}
+                  className="w-full sm:w-auto border-white/20 bg-transparent hover:bg-white/10 text-white hover:text-white"
+                >
               Cancelar
             </Button>
-            <Button onClick={handleAddOrdem} className="bg-emerald-600 hover:bg-emerald-700">
+                <Button 
+                  onClick={handleAddOrdem} 
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white"
+                  type="button"
+                >
               Criar Ordem de Serviço
             </Button>
-          </DialogFooter>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Detalhes */}
+      <Dialog open={!!showDetailsDialog} onOpenChange={(open) => !open && setShowDetailsDialog(null)}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+          <div className="relative">
+            {/* Header com gradiente */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-t-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
+                  <Eye className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-bold text-white">
+                    Detalhes da Ordem de Serviço
+                  </DialogTitle>
+                  <DialogDescription className="text-blue-100 mt-1">
+                    {showDetailsDialog?.numero}
+                  </DialogDescription>
+                </div>
+              </div>
+            </div>
+
+            {/* Conteúdo principal */}
+            <div className="p-6 bg-slate-800/50 backdrop-blur-sm">
+              {showDetailsDialog && (
+                <div className="grid gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-white">Cliente</Label>
+                      <div className="text-white bg-white/10 p-3 rounded-md">
+                        {showDetailsDialog.cliente}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-white">Tipo de Serviço</Label>
+                      <div className="text-white bg-white/10 p-3 rounded-md">
+                        {showDetailsDialog.tipo}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-white">Descrição</Label>
+                    <div className="text-white bg-white/10 p-3 rounded-md min-h-[100px]">
+                      {showDetailsDialog.descricao}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-white">Status</Label>
+                      <div className="text-white bg-white/10 p-3 rounded-md">
+                        <Badge variant={showDetailsDialog.status === 'concluida' ? 'default' : 'secondary'}>
+                          {showDetailsDialog.status}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-white">Prioridade</Label>
+                      <div className="text-white bg-white/10 p-3 rounded-md">
+                        <Badge variant={showDetailsDialog.prioridade === 'alta' ? 'destructive' : 'outline'}>
+                          {showDetailsDialog.prioridade}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-white">Valor Estimado</Label>
+                      <div className="text-white bg-white/10 p-3 rounded-md">
+                        {formatCurrency(showDetailsDialog.valor_estimado)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-white">Técnico Responsável</Label>
+                      <div className="text-white bg-white/10 p-3 rounded-md">
+                        {showDetailsDialog.tecnico || 'Não atribuído'}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-white">Data Prazo</Label>
+                      <div className="text-white bg-white/10 p-3 rounded-md">
+                        {showDetailsDialog.data_prazo ? formatDate(showDetailsDialog.data_prazo) : 'Não definido'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-white">Data de Abertura</Label>
+                      <div className="text-white bg-white/10 p-3 rounded-md">
+                        {formatDate(showDetailsDialog.data_abertura)}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-white">Data de Conclusão</Label>
+                      <div className="text-white bg-white/10 p-3 rounded-md">
+                        {showDetailsDialog.data_conclusao ? formatDate(showDetailsDialog.data_conclusao) : 'Não concluída'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Footer com botões */}
+              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-white/10">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowDetailsDialog(null)}
+                  className="w-full sm:w-auto border-white/20 bg-transparent hover:bg-white/10 text-white hover:text-white"
+                >
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Edição */}
+      <Dialog open={!!showEditDialog} onOpenChange={(open) => !open && setShowEditDialog(null)}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+          <div className="relative">
+            {/* Header com gradiente */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-t-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
+                  <Edit className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-bold text-white">
+                    Editar Ordem de Serviço
+                  </DialogTitle>
+                  <DialogDescription className="text-blue-100 mt-1">
+                    {showEditDialog?.numero} - Atualize as informações
+                  </DialogDescription>
+                </div>
+              </div>
+            </div>
+
+            {/* Formulário com fundo escuro */}
+            <div className="p-6 bg-slate-800/50 backdrop-blur-sm">
+              <div className="grid gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-cliente" className="text-sm font-medium text-white">Cliente *</Label>
+                  <Input
+                    id="edit-cliente"
+                    value={editOrdem.cliente}
+                    onChange={(e) => setEditOrdem(prev => ({ ...prev, cliente: e.target.value }))}
+                    placeholder="Nome do cliente"
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-300 focus:border-blue-400 focus:ring-blue-400"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-tipo" className="text-sm font-medium text-white">Tipo de Serviço *</Label>
+                    <Input
+                      id="edit-tipo"
+                      value={editOrdem.tipo}
+                      onChange={(e) => setEditOrdem(prev => ({ ...prev, tipo: e.target.value }))}
+                      placeholder="Ex: Reparo, Manutenção..."
+                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-300 focus:border-blue-400 focus:ring-blue-400"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-prioridade" className="text-sm font-medium text-white">Prioridade</Label>
+                    <Select 
+                      value={editOrdem.prioridade} 
+                      onValueChange={(value: 'baixa' | 'media' | 'alta') => setEditOrdem(prev => ({ ...prev, prioridade: value }))}
+                    >
+                      <SelectTrigger className="bg-white/10 border-white/20 text-white focus:border-blue-400 focus:ring-blue-400">
+                        <SelectValue placeholder="Selecione a prioridade" className="text-white" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-800 border-slate-700">
+                        <SelectItem value="baixa" className="text-white hover:bg-slate-700">Baixa</SelectItem>
+                        <SelectItem value="media" className="text-white hover:bg-slate-700">Média</SelectItem>
+                        <SelectItem value="alta" className="text-white hover:bg-slate-700">Alta</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-descricao" className="text-sm font-medium text-white">Descrição do Serviço *</Label>
+                  <textarea
+                    id="edit-descricao"
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white placeholder:text-gray-300 rounded-md min-h-[100px] focus:border-blue-400 focus:ring-blue-400 resize-none"
+                    value={editOrdem.descricao}
+                    onChange={(e) => setEditOrdem(prev => ({ ...prev, descricao: e.target.value }))}
+                    placeholder="Descreva o serviço a ser realizado..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-valor" className="text-sm font-medium text-white">Valor Estimado</Label>
+                    <Input
+                      id="edit-valor"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editOrdem.valor_estimado}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Permitir apenas números positivos e ponto decimal
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          setEditOrdem(prev => ({ ...prev, valor_estimado: value }));
+                        }
+                      }}
+                      placeholder="0.00"
+                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-300 focus:border-blue-400 focus:ring-blue-400"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-prazo" className="text-sm font-medium text-white">Data Prazo</Label>
+                    <Input
+                      id="edit-prazo"
+                      type="date"
+                      value={editOrdem.data_prazo}
+                      onChange={(e) => setEditOrdem(prev => ({ ...prev, data_prazo: e.target.value }))}
+                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-300 focus:border-blue-400 focus:ring-blue-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-tecnico" className="text-sm font-medium text-white">Técnico Responsável</Label>
+                  <Input
+                    id="edit-tecnico"
+                    value={editOrdem.tecnico}
+                    onChange={(e) => setEditOrdem(prev => ({ ...prev, tecnico: e.target.value }))}
+                    placeholder="Nome do técnico"
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-300 focus:border-blue-400 focus:ring-blue-400"
+                  />
+                </div>
+              </div>
+
+              {/* Footer com botões */}
+              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-white/10">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowEditDialog(null)}
+                  className="w-full sm:w-auto border-white/20 bg-transparent hover:bg-white/10 text-white hover:text-white"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleUpdateOrdem} 
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  Atualizar Ordem de Serviço
+                </Button>
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

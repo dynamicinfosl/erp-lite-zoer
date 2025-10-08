@@ -15,50 +15,60 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
+import type { Delivery } from '@/types';
 
 export default function EntregasPage() {
-  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const { user, tenant } = useSimpleAuth();
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch('/next_api/deliveries');
-        if (!res.ok) {
-          console.error('Falha na API /next_api/deliveries:', res.status);
-          setDeliveries([]);
-        } else {
-          const data = await res.json();
-          const rows = Array.isArray(data?.data) ? data.data : (data?.rows || data || []);
-          setDeliveries(Array.isArray(rows) ? rows : []);
-        }
-      } catch (e) {
-        console.error('Falha ao carregar entregas', e);
-      } finally {
-        setLoading(false);
+  const loadDeliveries = async () => {
+    if (!tenant?.id) {
+      setDeliveries([]);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await fetch(`/next_api/deliveries?tenant_id=${tenant.id}`);
+      if (!res.ok) {
+        console.error('Falha na API /next_api/deliveries:', res.status);
+        setDeliveries([]);
+      } else {
+        const data = await res.json();
+        const rows = Array.isArray(data?.data) ? data.data : (data?.rows || data || []);
+        setDeliveries(Array.isArray(rows) ? rows : []);
       }
-    };
-    load();
-  }, []);
+    } catch (e) {
+      console.error('Falha ao carregar entregas', e);
+      setDeliveries([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDeliveries();
+  }, [tenant?.id]);
 
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'todos' | 'pendente' | 'em_rota' | 'entregue'>('todos');
+  const [statusFilter, setStatusFilter] = useState<'todos' | 'aguardando' | 'em_rota' | 'entregue' | 'cancelada'>('todos');
 
   const safeDeliveries = Array.isArray(deliveries) ? deliveries : [];
   const filtered = safeDeliveries.filter((d) => {
-    const matchesSearch = `${d.id} ${d.customer} ${d.address}`.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = `${d.id} ${d.customer_name} ${d.delivery_address}`.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'todos' ? true : d.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
   const stats = useMemo(() => {
-    const emRota = safeDeliveries.filter(d => d.status?.includes('rota')).length;
-    const pendentes = safeDeliveries.filter(d => d.status?.includes('pend')).length;
-    const entregues = safeDeliveries.filter(d => d.status?.includes('entreg')).length;
+    const emRota = safeDeliveries.filter(d => d.status === 'em_rota').length;
+    const aguardando = safeDeliveries.filter(d => d.status === 'aguardando').length;
+    const entregues = safeDeliveries.filter(d => d.status === 'entregue').length;
     const total = safeDeliveries.length;
     
-    return { emRota, pendentes, entregues, total };
+    return { emRota, aguardando, entregues, total };
   }, [deliveries]);
 
   return (
@@ -84,13 +94,18 @@ export default function EntregasPage() {
             </SelectTrigger>
             <SelectContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-lg">
               <SelectItem value="todos">Todos status</SelectItem>
-              <SelectItem value="pendente">Pendentes</SelectItem>
+              <SelectItem value="aguardando">Aguardando</SelectItem>
               <SelectItem value="em_rota">Em rota</SelectItem>
               <SelectItem value="entregue">Entregues</SelectItem>
+              <SelectItem value="cancelada">Canceladas</SelectItem>
             </SelectContent>
           </Select>
-          <Button className="juga-gradient text-white w-full sm:w-auto gap-2">
-            <RefreshCw className="h-4 w-4" />
+          <Button 
+            onClick={loadDeliveries} 
+            disabled={loading}
+            className="juga-gradient text-white w-full sm:w-auto gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">Atualizar</span>
             <span className="sm:hidden">Atualizar</span>
           </Button>
@@ -120,8 +135,8 @@ export default function EntregasPage() {
           className="min-h-[120px] sm:min-h-[140px]"
         />
         <JugaKPICard
-          title="Pendentes"
-          value={`${stats.pendentes}`}
+          title="Aguardando"
+          value={`${stats.aguardando}`}
           description="Aguardando saída"
           trend="down"
           trendValue="Requer atenção"
@@ -163,24 +178,31 @@ export default function EntregasPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(!loading ? filtered : []).map((d: any) => (
+                {(!loading ? filtered : []).map((d) => (
                   <TableRow key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                     <TableCell className="font-mono text-sm text-body">{d.id}</TableCell>
                     <TableCell className="font-medium text-heading">
-                      {d.customer_name || d.customer || d.receiver_name}
+                      {d.customer_name}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {d.address || d.delivery_address}
+                      {d.delivery_address}
                     </TableCell>
                     <TableCell>
-                      {(d.status || '').includes('pend') && <Badge variant="outline">Pendente</Badge>}
-                      {(d.status || '').includes('rota') && <Badge variant="default">Em rota</Badge>}
-                      {(d.status || '').includes('entreg') && (
+                      {d.status === 'aguardando' && <Badge variant="outline">Aguardando</Badge>}
+                      {d.status === 'em_rota' && <Badge variant="default">Em rota</Badge>}
+                      {d.status === 'entregue' && (
                         <Badge className="bg-green-600 hover:bg-green-700">Entregue</Badge>
                       )}
+                      {d.status === 'cancelada' && (
+                        <Badge variant="destructive">Cancelada</Badge>
+                      )}
                     </TableCell>
-                    <TableCell className="text-sm text-body">{d.created_at}</TableCell>
-                    <TableCell className="text-sm text-body">{d.eta || d.expected_at || '—'}</TableCell>
+                    <TableCell className="text-sm text-body">
+                      {new Date(d.created_at).toLocaleDateString('pt-BR')}
+                    </TableCell>
+                    <TableCell className="text-sm text-body">
+                      {d.delivered_at ? new Date(d.delivered_at).toLocaleDateString('pt-BR') : '—'}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

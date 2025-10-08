@@ -107,7 +107,8 @@ CREATE TABLE sale_items (
 CREATE TABLE deliveries (
     id BIGSERIAL PRIMARY KEY,
     user_id UUID NOT NULL,
-    sale_id BIGINT NOT NULL,
+    tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+    sale_id BIGINT,
     driver_id BIGINT,
     customer_name VARCHAR(200) NOT NULL,
     delivery_address TEXT NOT NULL,
@@ -120,6 +121,12 @@ CREATE TABLE deliveries (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Índices para melhor performance em entregas
+CREATE INDEX idx_deliveries_tenant_id ON deliveries(tenant_id);
+CREATE INDEX idx_deliveries_user_id ON deliveries(user_id);
+CREATE INDEX idx_deliveries_status ON deliveries(status);
+CREATE INDEX idx_deliveries_created_at ON deliveries(created_at DESC);
 
 -- Movimentações de estoque
 CREATE TABLE stock_movements (
