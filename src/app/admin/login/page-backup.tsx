@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-// Credenciais de superadmin
 const ADMIN_CREDENTIALS = {
   username: 'superadmin',
   password: 'admin2024',
 };
 
-export default function AdminLoginPage() {
+export default function AdminLoginPageBackup() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,14 +17,6 @@ export default function AdminLoginPage() {
     username: '',
     password: ''
   });
-
-  // Verificar se já está autenticado
-  useEffect(() => {
-    const adminAuth = sessionStorage.getItem('adminAuthenticated');
-    if (adminAuth === 'true') {
-      router.push('/admin');
-    }
-  }, [router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -144,12 +135,8 @@ export default function AdminLoginPage() {
             ← Voltar ao sistema
           </button>
         </div>
-
-        <div className="mt-6 text-center text-xs text-gray-500">
-          <p>Status: ✅ Página funcionando</p>
-          <p>Rota: /admin/login</p>
-        </div>
       </div>
     </div>
   );
 }
+

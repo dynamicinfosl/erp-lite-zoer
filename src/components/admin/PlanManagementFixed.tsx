@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -44,7 +45,7 @@ interface Plan {
   updated_at: string;
 }
 
-export function PlanManagement() {
+export function PlanManagementFixed() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -126,7 +127,7 @@ export function PlanManagement() {
       toast.success('Planos carregados com sucesso!');
       
     } catch (error) {
-      console.log('⚠️ Erro ao carregar planos (tratado):', error);
+      console.error('❌ Erro ao carregar planos:', error);
       setPlans([]);
       toast.info('Nenhum plano encontrado. Clique em "Novo Plano" para criar o primeiro.');
     } finally {
@@ -200,7 +201,7 @@ export function PlanManagement() {
       
       setDialogOpen(false);
     } catch (error) {
-      console.log('⚠️ Erro ao salvar plano (tratado):', error);
+      console.error('Erro ao salvar plano:', error);
       toast.error('Erro ao salvar plano');
     } finally {
       setIsSaving(false);
@@ -214,7 +215,7 @@ export function PlanManagement() {
       setPlans(prev => prev.filter(plan => plan.id !== planId));
       toast.success('Plano excluído com sucesso!');
     } catch (error) {
-      console.log('⚠️ Erro ao excluir plano (tratado):', error);
+      console.error('Erro ao excluir plano:', error);
       toast.error('Erro ao excluir plano');
     }
   };
@@ -228,7 +229,7 @@ export function PlanManagement() {
       ));
       toast.success(`Plano ${!plan.is_active ? 'ativado' : 'desativado'} com sucesso!`);
     } catch (error) {
-      console.log('⚠️ Erro ao alterar status (tratado):', error);
+      console.error('Erro ao alterar status:', error);
       toast.error('Erro ao alterar status do plano');
     }
   };
@@ -274,7 +275,7 @@ export function PlanManagement() {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Planos de Assinatura
+              Planos de Assinatura (Versão Corrigida)
             </CardTitle>
             <div className="flex gap-2">
               <Button onClick={loadPlans} variant="outline" size="sm">
@@ -370,7 +371,6 @@ export function PlanManagement() {
       {/* Dialog para criar/editar plano - Padrão do sistema */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="w-[98vw] h-[95vh] max-w-none max-h-[95vh] p-0 overflow-hidden flex flex-col bg-neutral-900 text-white">
-          {/* Header */}
           <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/10 bg-neutral-900/95 flex-shrink-0">
             <div className="flex items-center justify-between gap-4">
               <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl font-semibold text-white">
@@ -387,125 +387,64 @@ export function PlanManagement() {
             </div>
           </DialogHeader>
 
-          {/* Body scrollável */}
-          <div className="flex-1 overflow-auto bg-neutral-900">
+          <div className="flex-1 overflow-auto bg-white">
             <div className="px-4 sm:px-6 py-4 sm:py-6 grid gap-6">
-              <div className="text-sm text-white/80 bg-white/5 border border-white/10 px-3 py-2 rounded-md">
+              <div className="text-sm text-gray-600 bg-blue-50/60 border border-blue-100 px-3 py-2 rounded-md">
                 Preencha os campos abaixo. Os itens com valores numéricos aceitam apenas números.
               </div>
 
-              <h3 className="text-sm font-semibold text-white/90">Informações Básicas</h3>
+              <h3 className="text-sm font-semibold text-gray-700">Informações Básicas</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="name" className="text-white/90">Nome do Plano</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Ex: Básico"
-                    className="bg-white border border-gray-200 text-gray-900"
-                  />
+                  <Label htmlFor="name" className="text-gray-700">Nome do Plano</Label>
+                  <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Ex: Básico" className="bg-white border border-gray-200" />
                 </div>
                 <div>
-                  <Label htmlFor="price" className="text-white/90">Preço (R$)</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                    placeholder="29.90"
-                    className="bg-white border border-gray-200 text-gray-900"
-                  />
+                  <Label htmlFor="price" className="text-gray-700">Preço (R$)</Label>
+                  <Input id="price" type="number" step="0.01" value={formData.price} onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })} placeholder="29.90" className="bg-white border border-gray-200" />
                 </div>
               </div>
 
-              <h3 className="text-sm font-semibold text-white/90">Descrição</h3>
+              <h3 className="text-sm font-semibold text-gray-700">Descrição</h3>
               <div>
-                <Label htmlFor="description" className="text-white/90">Descrição</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Descreva o plano..."
-                  rows={3}
-                  className="bg-neutral-800 border border-white/10 text-white placeholder-white/50"
-                />
+                <Label htmlFor="description" className="text-gray-700">Descrição</Label>
+                <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Descreva o plano..." rows={3} className="bg-neutral-800 border border-white/10 text-white placeholder-white/50" />
               </div>
 
-              <h3 className="text-sm font-semibold text-white/90">Funcionalidades</h3>
+              <h3 className="text-sm font-semibold text-gray-700">Funcionalidades</h3>
               <div>
-                <Label htmlFor="features" className="text-white/90">Funcionalidades (uma por linha)</Label>
-                <Textarea
-                  id="features"
-                  value={formData.features}
-                  onChange={(e) => setFormData({ ...formData, features: e.target.value })}
-                  placeholder="Gestão de produtos&#10;Gestão de clientes&#10;Relatórios básicos"
-                  rows={6}
-                  className="bg-neutral-800 border border-white/10 text-white placeholder-white/50"
-                />
+                <Label htmlFor="features" className="text-gray-700">Funcionalidades (uma por linha)</Label>
+                <Textarea id="features" value={formData.features} onChange={(e) => setFormData({ ...formData, features: e.target.value })} placeholder="Gestão de produtos&#10;Gestão de clientes&#10;Relatórios básicos" rows={6} className="bg-neutral-800 border border-white/10 text-white placeholder-white/50" />
               </div>
 
-              <h3 className="text-sm font-semibold text-white/90">Limites</h3>
+              <h3 className="text-sm font-semibold text-gray-700">Limites</h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="max_users" className="text-white/90">Máx. Usuários</Label>
-                  <Input
-                    id="max_users"
-                    type="number"
-                    value={formData.max_users}
-                    onChange={(e) => setFormData({ ...formData, max_users: parseInt(e.target.value) || 1 })}
-                    className="bg-white border border-gray-200 text-gray-900"
-                  />
+                  <Label htmlFor="max_users" className="text-gray-700">Máx. Usuários</Label>
+                  <Input id="max_users" type="number" value={formData.max_users} onChange={(e) => setFormData({ ...formData, max_users: parseInt(e.target.value) || 1 })} className="bg-white border border-gray-200" />
                 </div>
                 <div>
-                  <Label htmlFor="max_products" className="text-white/90">Máx. Produtos</Label>
-                  <Input
-                    id="max_products"
-                    type="number"
-                    value={formData.max_products}
-                    onChange={(e) => setFormData({ ...formData, max_products: parseInt(e.target.value) || 100 })}
-                    className="bg-white border border-gray-200 text-gray-900"
-                  />
+                  <Label htmlFor="max_products" className="text-gray-700">Máx. Produtos</Label>
+                  <Input id="max_products" type="number" value={formData.max_products} onChange={(e) => setFormData({ ...formData, max_products: parseInt(e.target.value) || 100 })} className="bg-white border border-gray-200" />
                 </div>
                 <div>
-                  <Label htmlFor="max_customers" className="text-white/90">Máx. Clientes</Label>
-                  <Input
-                    id="max_customers"
-                    type="number"
-                    value={formData.max_customers}
-                    onChange={(e) => setFormData({ ...formData, max_customers: parseInt(e.target.value) || 1000 })}
-                    className="bg-white border border-gray-200 text-gray-900"
-                  />
+                  <Label htmlFor="max_customers" className="text-gray-700">Máx. Clientes</Label>
+                  <Input id="max_customers" type="number" value={formData.max_customers} onChange={(e) => setFormData({ ...formData, max_customers: parseInt(e.target.value) || 1000 })} className="bg-white border border-gray-200" />
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <Switch
-                  id="is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                />
-                <Label htmlFor="is_active" className="text-white/90">Plano ativo</Label>
+                <Switch id="is_active" checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
+                <Label htmlFor="is_active" className="text-gray-700">Plano ativo</Label>
               </div>
             </div>
           </div>
 
-          {/* Footer */}
           <div className="px-4 sm:px-6 py-3 sm:py-4 bg-neutral-900 border-t border-white/10 flex-shrink-0">
             <div className="flex flex-wrap gap-2 sm:gap-3 justify-end">
-              <Button variant="outline" onClick={() => setDialogOpen(false)} className="border-white/30 text-white hover:bg-white/10">
-                Cancelar
-              </Button>
+              <Button variant="outline" onClick={() => setDialogOpen(false)} className="border-white/30 text-white hover:bg-white/10">Cancelar</Button>
               <Button onClick={handleSavePlan} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Salvando...
-                  </>
-                ) : (
-                  editingPlan ? 'Atualizar' : 'Criar'
-                )}
+                {isSaving ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Salvando...</>) : (editingPlan ? 'Atualizar' : 'Criar')}
               </Button>
             </div>
           </div>

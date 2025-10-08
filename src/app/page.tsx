@@ -551,11 +551,28 @@ export default function HomePage() {
                   type="submit" 
                   className="w-full bg-blue-600 hover:bg-blue-700" 
                   size="lg"
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.preventDefault();
-                    if (ENABLE_AUTH) {
-                      router.push('/login?tab=register');
-                    } else {
+                    try {
+                      const form = (e.currentTarget.closest('form')) as HTMLFormElement | null;
+                      const inputs = form ? Array.from(form.querySelectorAll('input')) as HTMLInputElement[] : [];
+                      const company = inputs[0]?.value || '';
+                      const email = inputs[1]?.value || '';
+                      const phone = inputs[2]?.value || '';
+                      const password = inputs[3]?.value || '';
+
+                      if (ENABLE_AUTH) {
+                        const { supabase } = await import('@/lib/supabase');
+                        await supabase.auth.signUp({
+                          email: email.trim(), password: password.trim(),
+                          options: { data: { company, phone } }
+                        });
+                        await supabase.auth.signInWithPassword({ email: email.trim(), password: password.trim() });
+                      }
+                      router.push('/dashboard');
+                      setShowRegisterForm(false);
+                    } catch (err) {
+                      console.error('Erro ao registrar:', err);
                       router.push('/dashboard');
                     }
                   }}
