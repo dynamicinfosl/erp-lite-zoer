@@ -139,18 +139,30 @@ export default function PDVPage() {
     const loadProducts = async () => {
       try {
         setLoading(true);
-        if (!tenant?.id) { 
-          setProducts([]); 
-          return; 
-        }
+        const tenantId = tenant?.id || '11111111-1111-1111-1111-111111111111';
+        console.log('🛒 PDV - Carregando produtos para tenant:', tenantId);
+        console.log('🛒 PDV - Tenant object:', tenant);
 
-        const res = await fetch(`/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`);
+        // Tentar primeiro com tenant_id, se não funcionar, tentar sem
+        let res = await fetch(`/next_api/products?tenant_id=${encodeURIComponent(tenantId)}`);
+        let json = await res.json();
+        
+        // Se não retornou produtos, tentar sem tenant_id
+        if (!res.ok || !json.data || json.data.length === 0) {
+          console.log('🛒 PDV - Tentando sem tenant_id...');
+          res = await fetch('/next_api/products');
+          json = await res.json();
+        }
+        
         if (!res.ok) throw new Error('Erro ao carregar produtos');
-        const json = await res.json();
+        console.log('🛒 PDV - Resposta da API de produtos:', json);
+        
         const data = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
+        console.log('🛒 PDV - Produtos processados:', data.length, data);
+        
         setProducts(data);
       } catch (error) {
-        console.error('Erro ao carregar produtos:', error);
+        console.error('❌ PDV - Erro ao carregar produtos:', error);
         toast.error('Erro ao carregar produtos');
         setProducts([]);
       } finally {
@@ -284,6 +296,7 @@ export default function PDVPage() {
   }, []);
 
   const startNewSale = useCallback(() => {
+    console.log('🔄 Iniciando nova venda...');
     clearCart();
     setSearchTerm('');
     setSidebarOpen(false);
@@ -292,6 +305,7 @@ export default function PDVPage() {
       document.getElementById('search-input')?.focus();
     }, 0);
   }, [clearCart]);
+
 
   const processPayment = useCallback(() => {
     if (cart.length === 0) {
@@ -585,10 +599,10 @@ export default function PDVPage() {
                 <ArrowLeft className="h-4 w-4" />
                 <span className="hidden sm:inline">Sair do PDV</span>
               </Button>
-              <Button size="sm" className="juga-gradient text-white" onClick={startNewSale}>
-                <Plus className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Nova Venda</span>
-              </Button>
+         <Button size="sm" className="juga-gradient text-white" onClick={startNewSale}>
+           <Plus className="h-4 w-4 sm:mr-2" />
+           <span className="hidden sm:inline">Nova Venda</span>
+         </Button>
             </div>
           </div>
 

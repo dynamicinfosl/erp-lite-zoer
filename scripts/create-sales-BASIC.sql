@@ -107,3 +107,5 @@ SELECT generate_sale_number() as numero_teste;
 SELECT 'SETUP BÁSICO CONCLUÍDO! PDV FUNCIONANDO!' as resultado;
 
 
+
+

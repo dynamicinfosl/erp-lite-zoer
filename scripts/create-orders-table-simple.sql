@@ -72,3 +72,5 @@ ON CONFLICT DO NOTHING;
 SELECT 'Tabela orders criada com sucesso!' as status;
 SELECT COUNT(*) as total_ordens FROM public.orders;
 
+
+

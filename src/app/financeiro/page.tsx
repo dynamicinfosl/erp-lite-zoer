@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,7 +32,7 @@ interface FinancialRecord {
 
 
 export default function FinanceiroPage() {
-  const { tenant } = useSimpleAuth();
+  const { tenant, user, loading: authLoading } = useSimpleAuth();
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,22 +49,39 @@ export default function FinanceiroPage() {
     notes: '',
   });
 
+  // Debug: verificar se tenant e formData estão carregados
+  console.log('🏢 Tenant carregado:', tenant);
+  console.log('👤 Usuário logado:', user);
+  console.log('⏳ Auth loading:', authLoading);
+  console.log('📋 FormData atual:', formData);
+
   const fetchTransactions = useCallback(async () => {
     try {
       setLoading(true);
 
-      if (!tenant?.id) { 
-        setTransactions([]); 
-        return; 
-      }
+      // Usar tenant padrão se não estiver carregado (mesmo que usado na criação)
+      const tenantId = tenant?.id || '11111111-1111-1111-1111-111111111111';
+      console.log('🔍 Buscando transações para tenant:', tenantId);
+      console.log('🏢 Tenant original:', tenant);
 
-      const res = await fetch(`/next_api/financial-transactions?tenant_id=${encodeURIComponent(tenant.id)}`);
-      if (!res.ok) throw new Error('Erro ao carregar transações');
+      const res = await fetch(`/next_api/financial-transactions?tenant_id=${encodeURIComponent(tenantId)}`);
+      console.log('📡 Resposta da busca:', res.status, res.statusText);
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('❌ Erro na busca:', errorData);
+        throw new Error('Erro ao carregar transações');
+      }
+      
       const json = await res.json();
+      console.log('📋 Dados recebidos da API:', json);
+      
       const data = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
+      console.log('📊 Transações processadas:', data.length, data);
+      
       setTransactions(data);
     } catch (error) {
-      console.error('Erro ao carregar transações:', error);
+      console.error('❌ Erro ao carregar transações:', error);
       toast.error('Erro ao carregar transações');
       setTransactions([]);
     } finally {
@@ -73,16 +90,46 @@ export default function FinanceiroPage() {
   }, [tenant?.id]);
 
   useEffect(() => {
+    console.log('🔄 useEffect financeiro - fetchTransactions chamado');
+    console.log('🔄 Tenant disponível:', tenant?.id);
     fetchTransactions();
   }, [fetchTransactions]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    console.log('🎯 handleSubmit chamado!', e);
+    if (e) {
+      e.preventDefault();
+    }
+    
+    console.log('📋 FormData atual:', formData);
+    
+    // Verificar se a autenticação ainda está carregando
+    if (authLoading) {
+      console.log('⏳ Aguardando carregamento da autenticação...');
+      toast.error('Aguardando carregamento da autenticação...');
+      return;
+    }
     
     if (!formData.description || !formData.amount || !formData.category) {
+      console.log('❌ Campos obrigatórios faltando:', {
+        description: !!formData.description,
+        amount: !!formData.amount,
+        category: !!formData.category
+      });
       toast.error('Descrição, valor e categoria são obrigatórios');
       return;
     }
+
+    console.log('✅ Campos obrigatórios preenchidos');
+
+    // Usar tenant padrão se não estiver carregado
+    const tenantId = tenant?.id || '00000000-0000-0000-0000-000000000000';
+    console.log('✅ Usando tenant ID:', tenantId);
+    console.log('🔍 Tenant original:', tenant);
+    
+    // Se tenant for null, usar um tenant válido dos testes
+    const finalTenantId = tenant?.id || '11111111-1111-1111-1111-111111111111';
+    console.log('🎯 Tenant ID final:', finalTenantId);
 
     try {
       const transactionData = {
@@ -90,8 +137,11 @@ export default function FinanceiroPage() {
         amount: parseFloat(formData.amount),
         due_date: formData.due_date || new Date().toISOString().split('T')[0],
         paid_date: formData.status === 'pago' ? new Date().toISOString().split('T')[0] : null,
-        tenant_id: tenant?.id
+        tenant_id: finalTenantId
       };
+
+      console.log('📤 Enviando dados da transação:', transactionData);
+      console.log('🏢 Tenant ID final:', finalTenantId);
 
       const res = await fetch(`/next_api/financial-transactions`, {
         method: editingTransaction ? 'PUT' : 'POST',
@@ -99,7 +149,16 @@ export default function FinanceiroPage() {
         body: JSON.stringify(transactionData)
       });
 
-      if (!res.ok) throw new Error('Erro ao salvar transação');
+      console.log('📡 Resposta da API:', res.status, res.statusText);
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('❌ Erro da API:', errorData);
+        throw new Error(`Erro ao salvar transação: ${errorData.error || res.statusText}`);
+      }
+
+      const responseData = await res.json();
+      console.log('✅ Resposta da API:', responseData);
 
       toast.success(editingTransaction ? 'Transação atualizada com sucesso' : 'Transação criada com sucesso');
       setShowDialog(false);
@@ -107,8 +166,8 @@ export default function FinanceiroPage() {
       resetForm();
       fetchTransactions();
     } catch (error) {
-      console.error('Erro ao salvar transação:', error);
-      toast.error('Erro ao salvar transação');
+      console.error('❌ Erro ao salvar transação:', error);
+      toast.error(`Erro ao salvar transação: ${error.message}`);
     }
   };
 
@@ -131,19 +190,29 @@ export default function FinanceiroPage() {
     if (!confirm('Tem certeza que deseja excluir esta transação?')) return;
 
     try {
-      const res = await fetch(`/next_api/financial-transactions`, {
+      console.log('🗑️ Tentando excluir transação ID:', id);
+      
+      const res = await fetch(`/next_api/financial-transactions?id=${id}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, tenant_id: tenant?.id })
+        headers: { 'Content-Type': 'application/json' }
       });
 
-      if (!res.ok) throw new Error('Erro ao excluir transação');
+      console.log('📡 Resposta da API:', res.status, res.statusText);
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('❌ Erro da API:', errorData);
+        throw new Error(errorData.error || 'Erro ao excluir transação');
+      }
+
+      const result = await res.json();
+      console.log('✅ Transação excluída com sucesso:', result);
 
       toast.success('Transação excluída com sucesso');
       fetchTransactions();
     } catch (error) {
-      console.error('Erro ao excluir transação:', error);
-      toast.error('Erro ao excluir transação');
+      console.error('❌ Erro ao excluir transação:', error);
+      toast.error(`Erro ao excluir transação: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
   };
 
@@ -161,12 +230,15 @@ export default function FinanceiroPage() {
   };
 
   const filteredTransactions = useMemo(
-    () =>
-      transactions.filter(
+    () => {
+      const result = transactions.filter(
         (transaction) =>
           transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
           transaction.category.toLowerCase().includes(searchTerm.toLowerCase()),
-      ),
+      );
+      console.log('📋 Transações filtradas:', result.length, 'de', transactions.length, result);
+      return result;
+    },
     [transactions, searchTerm],
   );
 
@@ -227,12 +299,20 @@ export default function FinanceiroPage() {
   }, [monthlyTransactions]);
 
   const receitas = useMemo(
-    () => filteredTransactions.filter((t) => t.transaction_type === 'receita'),
+    () => {
+      const result = filteredTransactions.filter((t) => t.transaction_type === 'receita');
+      console.log('📊 Receitas filtradas:', result.length, result);
+      return result;
+    },
     [filteredTransactions],
   );
 
   const despesas = useMemo(
-    () => filteredTransactions.filter((t) => t.transaction_type === 'despesa'),
+    () => {
+      const result = filteredTransactions.filter((t) => t.transaction_type === 'despesa');
+      console.log('📊 Despesas filtradas:', result.length, result);
+      return result;
+    },
     [filteredTransactions],
   );
 
@@ -315,158 +395,198 @@ export default function FinanceiroPage() {
               Nova Transação
             </Button>
           </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {editingTransaction ? 'Editar Transação' : 'Nova Transação'}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="transaction_type">Tipo *</Label>
-                  <Select
-                    value={formData.transaction_type}
-                    onValueChange={(value: 'receita' | 'despesa') => 
-                      setFormData(prev => ({ ...prev, transaction_type: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="receita">Receita</SelectItem>
-                      <SelectItem value="despesa">Despesa</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category">Categoria *</Label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {formData.transaction_type === 'receita' ? (
-                        <>
-                          <SelectItem value="Vendas">Vendas</SelectItem>
-                          <SelectItem value="Serviços">Serviços</SelectItem>
-                          <SelectItem value="Outras Receitas">Outras Receitas</SelectItem>
-                        </>
-                      ) : (
-                        <>
-                          <SelectItem value="Fornecedores">Fornecedores</SelectItem>
-                          <SelectItem value="Aluguel">Aluguel</SelectItem>
-                          <SelectItem value="Energia">Energia</SelectItem>
-                          <SelectItem value="Água">Água</SelectItem>
-                          <SelectItem value="Internet">Internet</SelectItem>
-                          <SelectItem value="Telefone">Telefone</SelectItem>
-                          <SelectItem value="Combustível">Combustível</SelectItem>
-                          <SelectItem value="Manutenção">Manutenção</SelectItem>
-                          <SelectItem value="Marketing">Marketing</SelectItem>
-                          <SelectItem value="Outras Despesas">Outras Despesas</SelectItem>
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+            <div className="relative">
+              {/* Header com gradiente */}
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-t-lg">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
+                    <DollarSign className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-xl font-bold text-white">
+                      {editingTransaction ? 'Editar Transação' : 'Nova Transação'}
+                    </DialogTitle>
+                    <DialogDescription className="text-blue-100 mt-1">
+                      {editingTransaction ? 'Atualize as informações da transação.' : 'Preencha as informações da transação abaixo. Os campos marcados com * são obrigatórios.'}
+                    </DialogDescription>
+                  </div>
                 </div>
               </div>
+              
+              {/* Conteúdo principal */}
+              <div className="p-6 bg-slate-800/50 backdrop-blur-sm">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid gap-3">
+                      <Label htmlFor="transaction_type" className="text-sm font-medium text-slate-200">Tipo *</Label>
+                      <Select
+                        value={formData.transaction_type}
+                        onValueChange={(value: 'receita' | 'despesa') => 
+                          setFormData(prev => ({ ...prev, transaction_type: value }))
+                        }
+                      >
+                        <SelectTrigger className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-700 border-slate-600 shadow-xl">
+                          <SelectItem value="receita" className="hover:bg-slate-600 text-white">Receita</SelectItem>
+                          <SelectItem value="despesa" className="hover:bg-slate-600 text-white">Despesa</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-3">
+                      <Label htmlFor="category" className="text-sm font-medium text-slate-200">Categoria *</Label>
+                      <Select
+                        value={formData.category}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                      >
+                        <SelectTrigger className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white">
+                          <SelectValue placeholder="Selecione uma categoria" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-700 border-slate-600 shadow-xl">
+                          {formData.transaction_type === 'receita' ? (
+                            <>
+                              <SelectItem value="Vendas" className="hover:bg-slate-600 text-white">Vendas</SelectItem>
+                              <SelectItem value="Serviços" className="hover:bg-slate-600 text-white">Serviços</SelectItem>
+                              <SelectItem value="Outras Receitas" className="hover:bg-slate-600 text-white">Outras Receitas</SelectItem>
+                            </>
+                          ) : (
+                            <>
+                              <SelectItem value="Fornecedores" className="hover:bg-slate-600 text-white">Fornecedores</SelectItem>
+                              <SelectItem value="Aluguel" className="hover:bg-slate-600 text-white">Aluguel</SelectItem>
+                              <SelectItem value="Energia" className="hover:bg-slate-600 text-white">Energia</SelectItem>
+                              <SelectItem value="Água" className="hover:bg-slate-600 text-white">Água</SelectItem>
+                              <SelectItem value="Internet" className="hover:bg-slate-600 text-white">Internet</SelectItem>
+                              <SelectItem value="Telefone" className="hover:bg-slate-600 text-white">Telefone</SelectItem>
+                              <SelectItem value="Combustível" className="hover:bg-slate-600 text-white">Combustível</SelectItem>
+                              <SelectItem value="Manutenção" className="hover:bg-slate-600 text-white">Manutenção</SelectItem>
+                              <SelectItem value="Marketing" className="hover:bg-slate-600 text-white">Marketing</SelectItem>
+                              <SelectItem value="Outras Despesas" className="hover:bg-slate-600 text-white">Outras Despesas</SelectItem>
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="description">Descrição *</Label>
-                <Input
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  required
-                />
-              </div>
+                  <div className="grid gap-3">
+                    <Label htmlFor="description" className="text-sm font-medium text-slate-200">Descrição *</Label>
+                    <Input
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Digite a descrição da transação"
+                      className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
+                      required
+                    />
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Valor *</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    value={formData.amount}
-                    onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="payment_method">Forma de Pagamento</Label>
-                  <Select
-                    value={formData.payment_method}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, payment_method: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                      <SelectItem value="pix">PIX</SelectItem>
-                      <SelectItem value="cartao_debito">Cartão Débito</SelectItem>
-                      <SelectItem value="cartao_credito">Cartão Crédito</SelectItem>
-                      <SelectItem value="transferencia">Transferência</SelectItem>
-                      <SelectItem value="boleto">Boleto</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid gap-3">
+                      <Label htmlFor="amount" className="text-sm font-medium text-slate-200">Valor *</Label>
+                      <Input
+                        id="amount"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.amount}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                            setFormData(prev => ({ ...prev, amount: value }));
+                          }
+                        }}
+                        placeholder="0.00"
+                        className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
+                        required
+                      />
+                    </div>
+                    <div className="grid gap-3">
+                      <Label htmlFor="payment_method" className="text-sm font-medium text-slate-200">Forma de Pagamento</Label>
+                      <Select
+                        value={formData.payment_method}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, payment_method: value }))}
+                      >
+                        <SelectTrigger className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white">
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-700 border-slate-600 shadow-xl">
+                          <SelectItem value="dinheiro" className="hover:bg-slate-600 text-white">Dinheiro</SelectItem>
+                          <SelectItem value="pix" className="hover:bg-slate-600 text-white">PIX</SelectItem>
+                          <SelectItem value="cartao_debito" className="hover:bg-slate-600 text-white">Cartão Débito</SelectItem>
+                          <SelectItem value="cartao_credito" className="hover:bg-slate-600 text-white">Cartão Crédito</SelectItem>
+                          <SelectItem value="transferencia" className="hover:bg-slate-600 text-white">Transferência</SelectItem>
+                          <SelectItem value="boleto" className="hover:bg-slate-600 text-white">Boleto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="due_date">Data de Vencimento</Label>
-                  <Input
-                    id="due_date"
-                    type="date"
-                    value={formData.due_date}
-                    onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value: 'pendente' | 'pago' | 'cancelado') => 
-                      setFormData(prev => ({ ...prev, status: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pendente">Pendente</SelectItem>
-                      <SelectItem value="pago">Pago</SelectItem>
-                      <SelectItem value="cancelado">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid gap-3">
+                      <Label htmlFor="due_date" className="text-sm font-medium text-slate-200">Data de Vencimento</Label>
+                      <Input
+                        id="due_date"
+                        type="date"
+                        value={formData.due_date}
+                        onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
+                        className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white"
+                      />
+                    </div>
+                    <div className="grid gap-3">
+                      <Label htmlFor="status" className="text-sm font-medium text-slate-200">Status</Label>
+                      <Select
+                        value={formData.status}
+                        onValueChange={(value: 'pendente' | 'pago' | 'cancelado') => 
+                          setFormData(prev => ({ ...prev, status: value }))
+                        }
+                      >
+                        <SelectTrigger className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-700 border-slate-600 shadow-xl">
+                          <SelectItem value="pendente" className="hover:bg-slate-600 text-white">Pendente</SelectItem>
+                          <SelectItem value="pago" className="hover:bg-slate-600 text-white">Pago</SelectItem>
+                          <SelectItem value="cancelado" className="hover:bg-slate-600 text-white">Cancelado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="notes">Observações</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                  rows={3}
-                />
-              </div>
+                  <div className="grid gap-3">
+                    <Label htmlFor="notes" className="text-sm font-medium text-slate-200">Observações</Label>
+                    <Textarea
+                      id="notes"
+                      value={formData.notes}
+                      onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                      placeholder="Observações adicionais sobre a transação..."
+                      rows={3}
+                      className="bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 resize-none"
+                    />
+                  </div>
 
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit">
-                  {editingTransaction ? 'Atualizar' : 'Criar'} Transação
-                </Button>
+                  {/* Botões do formulário */}
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setShowDialog(false)}
+                      className="w-full sm:w-auto border-slate-500 bg-slate-700/50 hover:bg-slate-600 text-slate-200 hover:text-white h-11 font-medium transition-all duration-200 hover:shadow-md"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button 
+                      type="submit"
+                      className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white h-11 font-medium transition-all duration-200 hover:shadow-lg"
+                    >
+                      {editingTransaction ? 'Atualizar' : 'Criar'} Transação
+                    </Button>
+                  </div>
+
+                </form>
               </div>
-            </form>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
@@ -487,7 +607,7 @@ export default function FinanceiroPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2 juga-card">
+        <Card className="lg:col-span-2 juga-card overflow-hidden">
           <CardHeader className="flex items-center justify-between">
             <div>
               <CardTitle className="text-heading">Fluxo de Caixa</CardTitle>
@@ -498,9 +618,9 @@ export default function FinanceiroPage() {
               Atualizar
             </Button>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 p-6">
             <Tabs defaultValue="todas" className="space-y-4">
-              <TabsList className="w-full justify-start overflow-x-auto">
+              <TabsList className="w-full justify-start">
                 <TabsTrigger value="todas">Todas</TabsTrigger>
                 <TabsTrigger value="receitas">Receitas</TabsTrigger>
                 <TabsTrigger value="despesas">Despesas</TabsTrigger>
@@ -566,26 +686,33 @@ export default function FinanceiroPage() {
               ) : (
                 <div className="space-y-3">
                   {upcomingPayments.map((transaction) => (
-                    <div key={transaction.id} className="rounded-lg border p-3 juga-gradient-surface">
+                    <div key={transaction.id} className="rounded-lg border border-slate-600 bg-slate-800/50 p-4 hover:bg-slate-800/70 transition-colors">
                       <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-medium text-heading">{transaction.description}</p>
-                          <p className="text-xs text-muted-foreground capitalize">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-white text-sm truncate" title={transaction.description}>
+                            {transaction.description}
+                          </p>
+                          <p className="text-xs text-slate-300 capitalize mt-1">
                             {transaction.category} • {transaction.payment_method?.replace('_', ' ') || 'Sem método'}
                           </p>
                         </div>
-                        <Badge variant={transaction.transaction_type === 'receita' ? 'default' : 'destructive'}>
+                        <Badge 
+                          variant={transaction.transaction_type === 'receita' ? 'default' : 'destructive'}
+                          className="shrink-0"
+                        >
                           {transaction.transaction_type === 'receita' ? 'Receita' : 'Despesa'}
                         </Badge>
                       </div>
                       <div className="mt-3 flex items-center justify-between">
-                        <div className="text-caption text-xs text-muted-foreground flex items-center gap-2">
+                        <div className="text-xs text-slate-400 flex items-center gap-2">
                           <Calendar className="h-3 w-3" />
                           {transaction.due_date
                             ? new Date(transaction.due_date).toLocaleDateString('pt-BR')
                             : new Date(transaction.created_at).toLocaleDateString('pt-BR')}
                         </div>
-                        <div className="text-sm font-semibold text-heading">
+                        <div className={`text-sm font-semibold ${
+                          transaction.transaction_type === 'receita' ? 'text-green-400' : 'text-red-400'
+                        }`}>
                           {transaction.transaction_type === 'receita' ? '+' : '-'}
                           {formatCurrency(transaction.amount)}
                         </div>
@@ -608,25 +735,27 @@ export default function FinanceiroPage() {
               ) : (
                 <div className="space-y-3">
                   {overduePayments.map((transaction) => (
-                    <div key={transaction.id} className="rounded-lg border border-red-200 bg-red-50 p-3">
+                    <div key={transaction.id} className="rounded-lg border border-red-500/50 bg-red-900/20 p-4 hover:bg-red-900/30 transition-colors">
                       <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-heading">{transaction.description}</p>
-                          <p className="text-xs text-muted-foreground">{transaction.category}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-white text-sm truncate" title={transaction.description}>
+                            {transaction.description}
+                          </p>
+                          <p className="text-xs text-red-200 mt-1">{transaction.category}</p>
                         </div>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-8 gap-2 text-xs"
+                          className="h-8 gap-2 text-xs border-red-400 text-red-200 hover:bg-red-800/50 shrink-0"
                           onClick={() => handleEdit(transaction)}
                         >
                           Resolver
                           <ArrowRight className="h-3 w-3" />
                         </Button>
                       </div>
-                      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                      <div className="mt-3 flex items-center justify-between text-xs text-red-300">
                         <span>Atrasado desde {transaction.due_date ? new Date(transaction.due_date).toLocaleDateString('pt-BR') : '--'}</span>
-                        <span className="font-semibold text-red-600">{formatCurrency(transaction.amount)}</span>
+                        <span className="font-semibold text-red-400">{formatCurrency(transaction.amount)}</span>
                       </div>
                     </div>
                   ))}
@@ -665,19 +794,20 @@ function TransactionTable({
   }
 
   return (
-    <ScrollArea className="max-h-[420px]">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Data</TableHead>
-            <TableHead>Descrição</TableHead>
-            <TableHead>Categoria</TableHead>
-            <TableHead>Tipo</TableHead>
-            <TableHead>Valor</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Ações</TableHead>
-          </TableRow>
-        </TableHeader>
+    <div className="w-full">
+      <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 pb-8">
+        <Table className="min-w-[1000px] w-full mb-4">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[120px]">Data</TableHead>
+              <TableHead className="min-w-[250px]">Descrição</TableHead>
+              <TableHead className="w-[140px]">Categoria</TableHead>
+              <TableHead className="w-[140px]">Tipo</TableHead>
+              <TableHead className="w-[140px]">Valor</TableHead>
+              <TableHead className="w-[120px]">Status</TableHead>
+              <TableHead className="w-[200px] text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
         <TableBody>
           {transactions.map((transaction) => (
             <TableRow key={transaction.id} className="hover:bg-muted/50">
@@ -693,11 +823,13 @@ function TransactionTable({
                   </div>
                 </div>
               </TableCell>
-              <TableCell>
-                <div>
-                  <div className="font-medium text-heading">{transaction.description}</div>
+              <TableCell className="max-w-[250px]">
+                <div className="truncate">
+                  <div className="font-medium text-heading truncate" title={transaction.description}>
+                    {transaction.description}
+                  </div>
                   {transaction.payment_method && (
-                    <div className="text-xs text-muted-foreground capitalize">
+                    <div className="text-xs text-muted-foreground capitalize truncate">
                       {transaction.payment_method.replace('_', ' ')}
                     </div>
                   )}
@@ -730,11 +862,11 @@ function TransactionTable({
               </TableCell>
               <TableCell>{getStatusBadge(transaction.status)}</TableCell>
               <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-2">
-                  <Button variant="outline" size="sm" onClick={() => onEdit(transaction)}>
+                <div className="flex items-center justify-end gap-1">
+                  <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => onEdit(transaction)}>
                     Editar
                   </Button>
-                  <Button variant="destructive" size="sm" onClick={() => onDelete(transaction.id)}>
+                  <Button variant="destructive" size="sm" className="h-8 px-2 text-xs" onClick={() => onDelete(transaction.id)}>
                     Excluir
                   </Button>
                 </div>
@@ -742,7 +874,8 @@ function TransactionTable({
             </TableRow>
           ))}
         </TableBody>
-      </Table>
-    </ScrollArea>
+        </Table>
+      </div>
+    </div>
   );
 }

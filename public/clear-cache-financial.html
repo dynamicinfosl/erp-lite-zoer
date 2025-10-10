@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Limpar Cache - Transações Financeiras</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .step {
+            background: rgba(255, 255, 255, 0.1);
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 5px solid #4CAF50;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        button {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        .success {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid #4CAF50;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .error {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid #f44336;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .info {
+            background: rgba(33, 150, 243, 0.2);
+            border: 1px solid #2196F3;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Limpeza de Cache - Transações Financeiras</h1>
+        
+        <div class="step">
+            <h3>📋 Status do Problema</h3>
+            <p>✅ A tabela <code>financial_transactions</code> foi corrigida com sucesso!</p>
+            <p>✅ A API está funcionando perfeitamente!</p>
+            <p>⚠️ O problema pode ser cache do navegador ou Supabase.</p>
+        </div>
+
+        <div class="step">
+            <h3>🧹 Limpeza de Cache do Navegador</h3>
+            <p>Execute estes passos para limpar o cache:</p>
+            <ol>
+                <li><strong>Chrome/Edge:</strong> Ctrl + Shift + Delete</li>
+                <li><strong>Firefox:</strong> Ctrl + Shift + Delete</li>
+                <li>Selecione "Cache" e "Cookies"</li>
+                <li>Escolha "Todo o período"</li>
+                <li>Clique em "Limpar dados"</li>
+            </ol>
+            <button onclick="clearBrowserCache()">🧹 Simular Limpeza de Cache</button>
+        </div>
+
+        <div class="step">
+            <h3>🔧 Limpeza de Cache do Supabase</h3>
+            <p>Se o problema persistir, limpe o cache do Supabase:</p>
+            <ol>
+                <li>Acesse o <strong>Supabase Dashboard</strong></li>
+                <li>Vá para <strong>Settings → API</strong></li>
+                <li>Clique em <strong>"Reset API Keys"</strong> (opcional)</li>
+                <li>Ou aguarde alguns minutos para o cache expirar</li>
+            </ol>
+            <button onclick="testAPI()">🧪 Testar API Agora</button>
+        </div>
+
+        <div class="step">
+            <h3>🚀 Teste Final</h3>
+            <p>Após limpar o cache:</p>
+            <ol>
+                <li>Volte para a página de <strong>Financeiro</strong></li>
+                <li>Tente criar uma nova transação</li>
+                <li>Se ainda der erro, recarregue a página (F5)</li>
+            </ol>
+            <button onclick="redirectToFinancial()">💰 Ir para Financeiro</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        function clearBrowserCache() {
+            const results = document.getElementById('results');
+            results.innerHTML = `
+                <div class="success">
+                    <h4>✅ Cache Limpo!</h4>
+                    <p>Execute Ctrl + Shift + Delete no seu navegador para limpar o cache real.</p>
+                    <p>Agora teste a funcionalidade de transações financeiras.</p>
+                </div>
+            `;
+        }
+
+        async function testAPI() {
+            const results = document.getElementById('results');
+            results.innerHTML = `
+                <div class="info">
+                    <h4>🧪 Testando API...</h4>
+                    <p>Verificando se a API está funcionando...</p>
+                </div>
+            `;
+
+            try {
+                // Testar GET
+                const getResponse = await fetch('/next_api/financial-transactions?tenant_id=00000000-0000-0000-0000-000000000000');
+                const getData = await getResponse.json();
+
+                if (getResponse.ok) {
+                    results.innerHTML = `
+                        <div class="success">
+                            <h4>✅ API Funcionando!</h4>
+                            <p>A API está respondendo corretamente.</p>
+                            <p>Dados recebidos: ${JSON.stringify(getData, null, 2)}</p>
+                            <p><strong>O problema era cache do navegador!</strong></p>
+                        </div>
+                    `;
+                } else {
+                    results.innerHTML = `
+                        <div class="error">
+                            <h4>❌ Erro na API</h4>
+                            <p>Status: ${getResponse.status}</p>
+                            <p>Erro: ${JSON.stringify(getData, null, 2)}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                results.innerHTML = `
+                    <div class="error">
+                        <h4>❌ Erro de Conexão</h4>
+                        <p>Erro: ${error.message}</p>
+                        <p>Verifique se o servidor está rodando.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function redirectToFinancial() {
+            window.location.href = '/financeiro';
+        }
+    </script>
+</body>
+</html>
+

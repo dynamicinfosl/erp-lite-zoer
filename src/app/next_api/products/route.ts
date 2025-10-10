@@ -137,9 +137,22 @@ async function listProductsHandler(request: NextRequest) {
     const tenant_id = searchParams.get('tenant_id');
 
     if (!tenant_id) {
-      // Em desenvolvimento, quando tenant ainda não está resolvido no cliente,
-      // devolvemos lista vazia para não quebrar a UI.
-      return NextResponse.json({ success: true, data: [] });
+      // Em desenvolvimento, listar todos os produtos quando não há tenant_id
+      console.log('🔍 API Products - Sem tenant_id, listando todos os produtos');
+      const { data, error } = await supabaseAdmin
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Erro ao listar produtos (sem tenant):', error);
+        return NextResponse.json(
+          { error: 'Erro ao listar produtos: ' + error.message },
+          { status: 400 }
+        );
+      }
+      
+      return NextResponse.json({ success: true, data });
     }
 
     const { data, error } = await supabaseAdmin

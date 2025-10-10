@@ -103,7 +103,7 @@ export default function AdminPage() {
 
   return (
     <AdminProtection>
-      <div className="space-y-6 p-4 sm:p-6 w-full min-w-0">
+      <div className="space-y-8 w-full min-w-0">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
@@ -118,7 +118,7 @@ export default function AdminPage() {
           </div>
         </div>
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 2xl:grid-cols-8 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8">
                   <AdminStatCard
                     title="Total de Usuários"
                     value={stats?.totalUsers || 0}
@@ -170,7 +170,7 @@ export default function AdminPage() {
         </div>
 
         {/* Alertas Específicos */}
-        <div className="grid gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -238,7 +238,7 @@ export default function AdminPage() {
         </div>
 
         {/* Cards de Informações do Sistema */}
-        <div className="grid gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
           <StorageCard
             title="Armazenamento"
             used={75}

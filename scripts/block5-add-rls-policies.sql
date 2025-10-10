@@ -96,3 +96,5 @@ AND tablename IN ('sales', 'sale_items', 'cash_operations')
 ORDER BY tablename, policyname;
 
 
+
+

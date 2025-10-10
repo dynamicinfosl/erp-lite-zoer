@@ -27,16 +27,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   return (
-    <SidebarProvider>
+    <div className="flex h-screen bg-background overflow-hidden">
       <AdminSidebar />
-      <SidebarInset className="w-full">
-        <main className="flex-1 overflow-auto min-h-screen w-full">
-          <div className="w-full h-full p-4 sm:p-6">
-            {children}
-          </div>
-        </main>
-      </SidebarInset>
+      <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:ml-60 scrollbar-hide">
+        {children}
+      </main>
       <Toaster />
-    </SidebarProvider>
+    </div>
   );
 }

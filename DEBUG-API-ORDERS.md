@@ -143,3 +143,5 @@ fetch('/next_api/orders', {
 
 Data: 7 de outubro de 2025
 
+
+

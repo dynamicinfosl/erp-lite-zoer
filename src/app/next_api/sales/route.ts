@@ -126,6 +126,9 @@ async function listSalesHandler(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const today = searchParams.get('today');
+    const tenant_id = searchParams.get('tenant_id');
+
+    console.log('📊 Buscando vendas para tenant:', tenant_id);
 
     let query = supabaseAdmin
       .from('sales')
@@ -136,6 +139,15 @@ async function listSalesHandler(request: NextRequest) {
           product:products(name, price)
         )
       `);
+
+    // Filtrar por tenant_id se fornecido
+    if (tenant_id) {
+      query = query.eq('tenant_id', tenant_id);
+    } else {
+      // Se não há tenant_id, retornar lista vazia para evitar erro
+      console.log('⚠️ Tenant ID não fornecido, retornando lista vazia');
+      return NextResponse.json({ success: true, data: [] });
+    }
 
     // Se solicitado apenas vendas de hoje
     if (today === 'true') {
@@ -159,6 +171,7 @@ async function listSalesHandler(request: NextRequest) {
       );
     }
 
+    console.log('✅ Vendas encontradas:', data?.length || 0);
     return NextResponse.json({ success: true, data });
 
   } catch (error) {
@@ -172,4 +185,51 @@ async function listSalesHandler(request: NextRequest) {
 
 // Exportar handlers com validação de plano
 export const POST = withPlanValidation(createSaleHandler, 'create_sale');
-export const GET = listSalesHandler;
+export const GET = async (request: NextRequest) => {
+  try {
+    console.log('📊 GET /sales - Iniciando...');
+    
+    if (!supabaseAdmin) {
+      console.log('❌ Supabase não configurado');
+      return NextResponse.json(
+        { success: false, error: 'Cliente Supabase não configurado' },
+        { status: 500 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const tenant_id = searchParams.get('tenant_id');
+    
+    console.log('📊 Tenant ID recebido:', tenant_id);
+
+    if (!tenant_id) {
+      console.log('⚠️ Tenant ID não fornecido, retornando lista vazia');
+      return NextResponse.json({ success: true, data: [] });
+    }
+
+    // Buscar vendas simples sem joins complexos
+    const { data, error } = await supabaseAdmin
+      .from('sales')
+      .select('*')
+      .eq('tenant_id', tenant_id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('❌ Erro ao buscar vendas:', error);
+      return NextResponse.json(
+        { success: false, error: 'Erro ao buscar vendas: ' + error.message },
+        { status: 400 }
+      );
+    }
+
+    console.log('✅ Vendas encontradas:', data?.length || 0);
+    return NextResponse.json({ success: true, data: data || [] });
+
+  } catch (error) {
+    console.error('❌ Erro no GET sales:', error);
+    return NextResponse.json(
+      { success: false, error: 'Erro interno do servidor' },
+      { status: 500 }
+    );
+  }
+};
