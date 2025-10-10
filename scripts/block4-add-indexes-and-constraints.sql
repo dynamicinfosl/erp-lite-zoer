@@ -56,3 +56,5 @@ AND tablename IN ('products', 'customers', 'sales', 'sale_items', 'cash_operatio
 ORDER BY tablename, indexname;
 
 
+
+

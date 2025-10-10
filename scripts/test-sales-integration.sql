@@ -59,3 +59,5 @@ DELETE FROM public.sales WHERE sale_number = 'TESTE-001';
 SELECT 'TESTE CONCLUÍDO - INTEGRAÇÃO FUNCIONANDO!' as resultado;
 
 
+
+

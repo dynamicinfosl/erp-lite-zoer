@@ -149,3 +149,5 @@ SELECT generate_sale_number() as numero_teste;
 SELECT 'TODAS AS CONSTRAINTS CORRIGIDAS COM SUCESSO!' as resultado;
 
 
+
+

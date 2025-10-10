@@ -49,6 +49,7 @@ export default function AdminPage() {
         </div>
         
         {/* Stats Cards */}
+<<<<<<< HEAD
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -381,6 +382,67 @@ export default function AdminPage() {
                     backgroundColor: '#2563eb',
                     borderRadius: '3px'
                   }}></div>
+=======
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8">
+                  <AdminStatCard
+                    title="Total de Usuários"
+                    value={stats?.totalUsers || 0}
+                    icon={<Users className="h-5 w-5" />}
+                    color="blue"
+                    change="+12%"
+                    changeType="positive"
+                  />
+                  <AdminStatCard
+                    title="Usuários Ativos"
+                    value={stats?.activeUsers || 0}
+                    icon={<Activity className="h-5 w-5" />}
+                    color="green"
+                    change="+8%"
+                    changeType="positive"
+                  />
+                  <AdminStatCard
+                    title="Vendas Totais"
+                    value={stats?.totalSales || 0}
+                    icon={<BarChart3 className="h-5 w-5" />}
+                    color="purple"
+                    change="+15%"
+                    changeType="positive"
+                  />
+                  <AdminStatCard
+                    title="Produtos"
+                    value={stats?.totalProducts || 0}
+                    icon={<Package className="h-5 w-5" />}
+                    color="orange"
+                    change="+5%"
+                    changeType="positive"
+                  />
+                  <AdminStatCard
+                    title="Bebidas"
+                    value={stats?.totalBeverages || 0}
+                    icon={<Database className="h-5 w-5" />}
+                    color="cyan"
+                    change="+3%"
+                    changeType="positive"
+                  />
+          <AdminStatCard
+            title="Valor do Estoque"
+            value={`R$ ${stats?.totalInventoryValue?.toLocaleString('pt-BR') || 0}`}
+            icon={<CreditCard className="h-5 w-5" />}
+            color="emerald"
+            change="+7%"
+            changeType="positive"
+          />
+        </div>
+
+        {/* Alertas Específicos */}
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-juga-text-secondary">Estoque Baixo</CardTitle>
+                <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
+                  <AlertTriangle className="h-4 w-4" />
+>>>>>>> origin/main
                 </div>
               </div>
               
@@ -431,6 +493,7 @@ export default function AdminPage() {
                     color: textColor
                   }}>45%</span>
                 </div>
+<<<<<<< HEAD
                 <div style={{
                   height: '6px',
                   backgroundColor: isDark ? '#4b5563' : '#e5e7eb',
@@ -443,6 +506,106 @@ export default function AdminPage() {
                     backgroundColor: '#9333ea',
                     borderRadius: '3px'
                   }}></div>
+=======
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="space-y-2">
+                <div className="text-2xl font-bold text-juga-primary">{stats?.complianceRate}%</div>
+                <p className="text-sm text-caption">Taxa de conformidade</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-juga-text-secondary">Alertas de Temperatura</CardTitle>
+                <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
+                  <Activity className="h-4 w-4" />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="space-y-2">
+                <div className="text-2xl font-bold text-juga-primary">{stats?.temperatureAlerts}</div>
+                <p className="text-sm text-caption">Alertas ativos</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Cards de Informações do Sistema */}
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          <StorageCard
+            title="Armazenamento"
+            used={75}
+            total={100}
+            unit="GB"
+            description="Espaço utilizado no servidor"
+          />
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-juga-text-secondary">Último Backup</CardTitle>
+                <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
+                  <Database className="h-4 w-4" />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="space-y-2">
+                <div className="text-2xl font-bold text-juga-primary">
+                  {stats?.lastBackup ? new Date(stats.lastBackup).toLocaleDateString('pt-BR') : 'N/A'}
+                </div>
+                <p className="text-sm text-caption">Backup automático</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-juga-text-secondary">Status do Sistema</CardTitle>
+                <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
+                  <CheckCircle className="h-4 w-4" />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="space-y-2">
+                <div className="text-2xl font-bold text-green-600 capitalize">{stats?.systemHealth || 'unknown'}</div>
+                <p className="text-sm text-caption">Sistema operacional</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Atividades Recentes */}
+        <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-juga-text-primary">
+              <Activity className="h-5 w-5 text-juga-primary" />
+              Atividades Recentes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-juga-primary/10 rounded-lg">
+                  <Users className="h-4 w-4 text-juga-primary" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-heading">Novo usuário cadastrado</div>
+                  <div className="text-xs text-caption">Há 4 horas</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-juga-primary/10 rounded-lg">
+                  <Database className="h-4 w-4 text-juga-primary" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-heading">Backup automático realizado</div>
+                  <div className="text-xs text-caption">Há 6 horas</div>
+>>>>>>> origin/main
                 </div>
               </div>
             </div>

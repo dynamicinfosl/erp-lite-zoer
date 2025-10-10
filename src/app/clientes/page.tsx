@@ -85,9 +85,10 @@ interface ColumnVisibility {
 }
 
 export default function ClientesPage() {
-  const { tenant } = useSimpleAuth();
+  const { tenant, user } = useSimpleAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -209,36 +210,103 @@ export default function ClientesPage() {
     setNewCustomer(prev => ({ ...prev, document: '' }));
   }, [newCustomer.type]);
 
-  // Carregar clientes quando houver tenant (fallback para ID neutro)
+  // Carregar clientes (sempre, com fallback para ID neutro)
   useEffect(() => {
+    console.log('🔍 useEffect clientes - tenant:', tenant);
+    console.log('🔍 useEffect clientes - tenant?.id:', tenant?.id);
+    console.log('🔍 useEffect clientes - user:', user || 'não definido');
+    
     const fetchNow = async () => {
+      console.log('🔍 Iniciando carregamento de clientes...');
       await loadCustomers();
     };
+    
+    // Sempre tentar carregar, mesmo sem tenant
     fetchNow();
   }, [tenant?.id]);
 
   const loadCustomers = async () => {
+    // Evitar múltiplas chamadas simultâneas
+    if (isLoadingCustomers) {
+      console.log('⚠️ Carregamento já em andamento, ignorando...');
+      return;
+    }
+    
     try {
+      setIsLoadingCustomers(true);
       setLoading(true);
       const tenantId = tenant?.id || '00000000-0000-0000-0000-000000000000';
       const url = `/next_api/customers?tenant_id=${encodeURIComponent(tenantId)}`;
       console.log('🔍 Debug - Carregando clientes para tenant:', tenantId);
+      console.log('🔍 Debug - URL:', url);
       
-      const response = await fetch(url);
+      // Criar AbortController para timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      console.log('🔍 Debug - Response status:', response.status);
+      console.log('🔍 Debug - Response ok:', response.ok);
+      
       if (!response.ok) {
         const txt = await response.text();
-        throw new Error('Erro ao carregar clientes: ' + txt);
+        console.error('🔍 Debug - Response text:', txt);
+        throw new Error(`Erro ${response.status}: ${txt}`);
       }
       
       const data = await response.json();
+      console.log('🔍 Debug - Response data:', data);
+      
       const rows = Array.isArray(data?.data) ? data.data : (data?.rows || data || []);
-      console.log('🔍 Debug - Clientes carregados:', rows.length, 'clientes');
+      console.log('🔍 Debug - Processed rows:', rows.length);
       setCustomers(rows);
     } catch (error) {
-      console.error('Erro ao carregar clientes:', error);
-      toast.error('Erro ao carregar clientes');
+      console.error('❌ Erro ao carregar clientes:', error);
+      
+      // Tratamento específico para diferentes tipos de erro
+      if (error.name === 'AbortError') {
+        toast.error('Timeout: Servidor demorou muito para responder');
+      } else if (error.message?.includes('fetch failed')) {
+        toast.error('Erro de conexão: Verifique se o servidor está rodando');
+      } else if (error.message?.includes('Failed to fetch')) {
+        toast.error('Erro de rede: Não foi possível conectar ao servidor');
+      } else {
+        toast.error('Erro ao carregar clientes: ' + (error?.message || 'Erro desconhecido'));
+      }
     } finally {
       setLoading(false);
+      setIsLoadingCustomers(false);
+    }
+  };
+
+  // Teste direto da API GET
+  const testGetCustomers = async () => {
+    try {
+      console.log('🧪 Teste GET: testando API diretamente...');
+      const url = '/next_api/customers?tenant_id=00000000-0000-0000-0000-000000000000';
+      const res = await fetch(url);
+      const data = await res.json();
+      console.log('🧪 Teste GET resultado:', data);
+      
+      if (res.ok && data.success) {
+        toast.success(`API GET OK: ${data.data?.length || 0} clientes encontrados`);
+        setCustomers(data.data || []);
+        setLoading(false);
+      } else {
+        toast.error('API GET com erro: ' + JSON.stringify(data));
+      }
+    } catch (err) {
+      console.error('🧪 Teste GET erro:', err);
+      toast.error('API GET não responde: ' + err.message);
     }
   };
 
@@ -585,6 +653,24 @@ export default function ClientesPage() {
                 className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
               >
                 Teste API
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={loadCustomers} 
+                title="Forçar recarregamento dos clientes"
+                className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+              >
+                Recarregar
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={testGetCustomers} 
+                title="Teste direto da API GET"
+                className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+              >
+                Teste GET
               </Button>
 
               <DropdownMenu>

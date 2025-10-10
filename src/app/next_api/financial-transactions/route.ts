@@ -1,54 +1,105 @@
 
-import CrudOperations from '@/lib/crud-operations';
-import { createSuccessResponse, createErrorResponse } from '@/lib/create-response';
-import { requestMiddleware, parseQueryParams, validateRequestBody } from "@/lib/api-utils";
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // GET - buscar transações financeiras
-export const GET = requestMiddleware(async (request, context) => {
+export async function GET(request: NextRequest) {
   try {
-    const { limit, offset } = parseQueryParams(request);
-    const transactionsCrud = new CrudOperations("financial_transactions", context.token);
+    console.log('🔍 Buscando transações financeiras...');
     
-    const filters = {
-      user_id: context.payload?.sub,
-    };
-
-    const transactions = await transactionsCrud.findMany(filters, { 
-      limit: limit || 100, 
-      offset,
-      orderBy: { column: 'created_at', direction: 'desc' }
-    });
-
-    return createSuccessResponse(transactions || []);
-  } catch (error) {
-    console.error('Erro ao buscar transações:', error);
-    return createErrorResponse({
-      errorMessage: "Erro ao buscar transações",
-      status: 500,
-    });
-  }
-}, true);
-
-// POST - criar transação financeira
-export const POST = requestMiddleware(async (request, context) => {
-  try {
-    const body = await validateRequestBody(request);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    if (!body.description || !body.amount || !body.category || !body.transaction_type) {
-      return createErrorResponse({
-        errorMessage: "Descrição, valor, categoria e tipo são obrigatórios",
-        status: 400,
-      });
+    const { searchParams } = new URL(request.url);
+    const tenantId = searchParams.get('tenant_id');
+    
+    if (!tenantId) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'tenant_id é obrigatório' 
+      }, { status: 400 });
     }
 
-    const transactionsCrud = new CrudOperations("financial_transactions", context.token);
+    console.log('🔍 Buscando transações para tenant:', tenantId);
+
+    const { data: transactions, error } = await supabase
+      .from('financial_transactions')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('❌ Erro ao buscar transações:', error);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Erro ao buscar transações' 
+      }, { status: 500 });
+    }
+
+    console.log('✅ Transações encontradas:', transactions?.length || 0);
+    return NextResponse.json({ 
+      success: true, 
+      data: transactions || [] 
+    });
+  } catch (error) {
+    console.error('❌ Erro ao buscar transações:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Erro interno do servidor' 
+    }, { status: 500 });
+  }
+}
+
+// POST - criar transação financeira
+export async function POST(request: NextRequest) {
+  try {
+    console.log('🚀 Criando transação financeira...');
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    const body = await request.json();
+    console.log('📝 Dados recebidos:', body);
+    
+    // Debug: verificar se tenant_id está presente
+    if (!body.tenant_id) {
+      console.error('❌ tenant_id não encontrado nos dados:', body);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'tenant_id é obrigatório' 
+      }, { status: 400 });
+    }
+    
+    if (!body.description || !body.amount || !body.category || !body.transaction_type) {
+      console.error('❌ Campos obrigatórios faltando:', {
+        description: !!body.description,
+        amount: !!body.amount,
+        category: !!body.category,
+        transaction_type: !!body.transaction_type
+      });
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Descrição, valor, categoria e tipo são obrigatórios' 
+      }, { status: 400 });
+    }
+
+    // Validar valor (não pode ser negativo)
+    const amount = parseFloat(body.amount) || 0;
+    if (amount < 0) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Valor não pode ser negativo' 
+      }, { status: 400 });
+    }
     
     const transactionData = {
-      user_id: context.payload?.sub,
+      user_id: '00000000-0000-0000-0000-000000000000', // Usuário padrão
+      tenant_id: body.tenant_id,
       transaction_type: body.transaction_type,
       category: body.category,
       description: body.description,
-      amount: parseFloat(body.amount),
+      amount: amount,
       payment_method: body.payment_method || null,
       reference_type: body.reference_type || null,
       reference_id: body.reference_id || null,
@@ -56,98 +107,166 @@ export const POST = requestMiddleware(async (request, context) => {
       paid_date: body.status === 'pago' ? (body.paid_date || new Date().toISOString().split('T')[0]) : null,
       status: body.status || 'pendente',
       notes: body.notes || null,
-    };
-
-    const transaction = await transactionsCrud.create(transactionData);
-    return createSuccessResponse(transaction, 201);
-  } catch (error) {
-    console.error('Erro ao criar transação:', error);
-    return createErrorResponse({
-      errorMessage: "Erro ao criar transação",
-      status: 500,
-    });
-  }
-}, true);
-
-// PUT - atualizar transação financeira
-export const PUT = requestMiddleware(async (request, context) => {
-  try {
-    const { id } = parseQueryParams(request);
-    
-    if (!id) {
-      return createErrorResponse({
-        errorMessage: "ID da transação é obrigatório",
-        status: 400,
-      });
-    }
-
-    const body = await validateRequestBody(request);
-    const transactionsCrud = new CrudOperations("financial_transactions", context.token);
-    
-    // Verificar se a transação existe e pertence ao usuário
-    const existing = await transactionsCrud.findById(id);
-    if (!existing || existing.user_id !== parseInt(context.payload?.sub || '0')) {
-      return createErrorResponse({
-        errorMessage: "Transação não encontrada",
-        status: 404,
-      });
-    }
-
-    const updateData = {
-      transaction_type: body.transaction_type,
-      category: body.category,
-      description: body.description,
-      amount: parseFloat(body.amount),
-      payment_method: body.payment_method || null,
-      due_date: body.due_date || existing.due_date,
-      paid_date: body.status === 'pago' ? (body.paid_date || new Date().toISOString().split('T')[0]) : null,
-      status: body.status || 'pendente',
-      notes: body.notes || null,
+      created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
-    const transaction = await transactionsCrud.update(id, updateData);
-    return createSuccessResponse(transaction);
-  } catch (error) {
-    console.error('Erro ao atualizar transação:', error);
-    return createErrorResponse({
-      errorMessage: "Erro ao atualizar transação",
-      status: 500,
-    });
-  }
-}, true);
+    console.log('💾 Salvando no banco:', transactionData);
 
-// DELETE - excluir transação financeira
-export const DELETE = requestMiddleware(async (request, context) => {
+    const { data: transaction, error } = await supabase
+      .from('financial_transactions')
+      .insert([transactionData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Erro ao salvar transação:', error);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Erro ao salvar transação' 
+      }, { status: 500 });
+    }
+
+    console.log('✅ Transação salva com sucesso:', transaction);
+    return NextResponse.json({ 
+      success: true, 
+      data: transaction 
+    }, { status: 201 });
+  } catch (error) {
+    console.error('❌ Erro ao criar transação:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Erro interno do servidor' 
+    }, { status: 500 });
+  }
+}
+
+// PUT - atualizar transação financeira
+export async function PUT(request: NextRequest) {
   try {
-    const { id } = parseQueryParams(request);
+    console.log('✏️ Atualizando transação financeira...');
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
     
     if (!id) {
-      return createErrorResponse({
-        errorMessage: "ID da transação é obrigatório",
-        status: 400,
-      });
+      return NextResponse.json({ 
+        success: false, 
+        error: 'ID da transação é obrigatório' 
+      }, { status: 400 });
     }
 
-    const transactionsCrud = new CrudOperations("financial_transactions", context.token);
+    const body = await request.json();
+    console.log('📝 Dados de atualização:', body);
     
-    // Verificar se a transação existe e pertence ao usuário
-    const existing = await transactionsCrud.findById(id);
-    if (!existing || existing.user_id !== parseInt(context.payload?.sub || '0')) {
-      return createErrorResponse({
-        errorMessage: "Transação não encontrada",
-        status: 404,
-      });
+    // Validar valor se fornecido (não pode ser negativo)
+    if (body.amount !== undefined) {
+      const amount = parseFloat(body.amount);
+      if (isNaN(amount) || amount < 0) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Valor deve ser um número positivo' 
+        }, { status: 400 });
+      }
     }
 
-    await transactionsCrud.delete(id);
-    
-    return createSuccessResponse({ id });
-  } catch (error) {
-    console.error('Erro ao excluir transação:', error);
-    return createErrorResponse({
-      errorMessage: "Erro ao excluir transação",
-      status: 500,
+    const updateData = {
+      ...(body.transaction_type && { transaction_type: body.transaction_type }),
+      ...(body.category && { category: body.category }),
+      ...(body.description && { description: body.description }),
+      ...(body.amount !== undefined && { amount: parseFloat(body.amount) }),
+      ...(body.payment_method !== undefined && { payment_method: body.payment_method }),
+      ...(body.due_date !== undefined && { due_date: body.due_date }),
+      ...(body.status !== undefined && { 
+        status: body.status,
+        paid_date: body.status === 'pago' ? (body.paid_date || new Date().toISOString().split('T')[0]) : null
+      }),
+      ...(body.notes !== undefined && { notes: body.notes }),
+      updated_at: new Date().toISOString(),
+    };
+
+    console.log('💾 Atualizando transação:', updateData);
+
+    const { data: transaction, error } = await supabase
+      .from('financial_transactions')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Erro ao atualizar transação:', error);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Erro ao atualizar transação' 
+      }, { status: 500 });
+    }
+
+    if (!transaction) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Transação não encontrada' 
+      }, { status: 404 });
+    }
+
+    console.log('✅ Transação atualizada com sucesso:', transaction);
+    return NextResponse.json({ 
+      success: true, 
+      data: transaction 
     });
+  } catch (error) {
+    console.error('❌ Erro ao atualizar transação:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Erro interno do servidor' 
+    }, { status: 500 });
   }
-}, true);
+}
+
+// DELETE - excluir transação financeira
+export async function DELETE(request: NextRequest) {
+  try {
+    console.log('🗑️ Deletando transação financeira...');
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    
+    if (!id) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'ID da transação é obrigatório' 
+      }, { status: 400 });
+    }
+
+    console.log('🗑️ Deletando transação ID:', id);
+
+    const { error } = await supabase
+      .from('financial_transactions')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('❌ Erro ao deletar transação:', error);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Erro ao deletar transação' 
+      }, { status: 500 });
+    }
+
+    console.log('✅ Transação deletada com sucesso');
+    return NextResponse.json({ 
+      success: true, 
+      data: { id } 
+    });
+  } catch (error) {
+    console.error('❌ Erro ao deletar transação:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Erro interno do servidor' 
+    }, { status: 500 });
+  }
+}
