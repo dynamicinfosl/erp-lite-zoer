@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -65,6 +65,10 @@ const menuGroups = [
 export function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  useEffect(() => {
+    // Sempre aplicar tema escuro
+    document.documentElement.classList.add('dark');
+  }, []);
 
   const handleLogout = () => {
     toast.info('Saindo do painel administrativo...');
@@ -115,6 +119,7 @@ export function AdminSidebar() {
 
       <SidebarFooter className="px-4 py-5 border-t border-white/10">
         <div className="flex flex-col gap-4">
+          {/* Informações do Usuário */}
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-white">
               <Database className="h-4 w-4" />
@@ -128,6 +133,8 @@ export function AdminSidebar() {
               </span>
             </div>
           </div>
+
+          {/* Botão de Logout */}
           <Button
             variant="outline"
             size="sm"

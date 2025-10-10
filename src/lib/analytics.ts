@@ -124,13 +124,27 @@ export async function getTopProducts(limit = 10): Promise<TopProductRow[]> {
       .from('sale_items')
       .select('quantity, product:products(sku, name)')
     if (error) throw error
-    const map = new Map<string, { sku: string; name: string; sold: number }>()
+    const map = new Map<string, { sku: string; name: string; sold: number }>();
     for (const r of data || []) {
-      const sku = r.product?.sku || 'N/A'
-      const name = r.product?.name || 'Produto'
-      map.set(sku, { sku, name, sold: (map.get(sku)?.sold || 0) + Number(r.quantity || 0) })
+      // Defensive check for product being an object (Supabase may return product as array)
+      let sku: string = 'N/A';
+      let name: string = 'Produto';
+      const prod = Array.isArray(r.product) ? r.product[0] : r.product;
+
+      if (prod && typeof prod === 'object') {
+        sku = prod.sku ?? 'N/A';
+        name = prod.name ?? 'Produto';
+      }
+      map.set(
+        sku,
+        {
+          sku,
+          name,
+          sold: (map.get(sku)?.sold || 0) + Number(r.quantity || 0)
+        }
+      );
     }
-    const arr = Array.from(map.values()).sort((a, b) => b.sold - a.sold).slice(0, limit)
+    const arr = Array.from(map.values()).sort((a, b) => b.sold - a.sold).slice(0, limit);
     return arr
   } catch (e) {
     return [
