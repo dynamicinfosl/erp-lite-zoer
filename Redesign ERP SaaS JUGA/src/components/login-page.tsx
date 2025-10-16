@@ -229,7 +229,7 @@ export function LoginPage() {
                         <Checkbox 
                           id="remember"
                           checked={loginForm.rememberMe}
-                          onCheckedChange={(checked) => setLoginForm({...loginForm, rememberMe: !!checked})}
+                          onCheckedChange={(checked: boolean) => setLoginForm({...loginForm, rememberMe: !!checked})}
                         />
                         <Label htmlFor="remember" className="text-sm text-body">
                           Lembrar de mim
@@ -351,7 +351,7 @@ export function LoginPage() {
                       <Checkbox 
                         id="terms"
                         checked={registerForm.acceptTerms}
-                        onCheckedChange={(checked) => setRegisterForm({...registerForm, acceptTerms: !!checked})}
+                        onCheckedChange={(checked: boolean) => setRegisterForm({...registerForm, acceptTerms: !!checked})}
                       />
                       <Label htmlFor="terms" className="text-sm text-body leading-relaxed">
                         Aceito os{' '}
