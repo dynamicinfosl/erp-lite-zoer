@@ -20,7 +20,7 @@ export const GET = requestMiddleware(async (request, context) => {
     const tenantContext = await getTenantContext(context.token);
     const cashSessionsCrud = new CrudOperations("cash_sessions", context.token);
     const filters = ensureTenantId({ ...query }, tenantContext.tenantId);
-    const { rows } = await cashSessionsCrud.findMany(filters, { limit: 100 });
+    const rows = await cashSessionsCrud.findMany(filters, { limit: 100 });
 
     return createSuccessResponse({ data: rows });
   } catch (error) {
