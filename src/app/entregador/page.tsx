@@ -189,14 +189,14 @@ export default function EntregadorPage() {
                       <div className="flex items-start justify-between">
                         <div className="space-y-3 flex-1">
                           <div>
-                            <h3 className="font-semibold text-lg">{delivery.customerName || delivery.customer?.name || 'Cliente'}</h3>
+                            <h3 className="font-semibold text-lg">{delivery.customerName || 'Cliente'}</h3>
                             {getStatusBadge(delivery.status)}
                           </div>
                           
                           <div className="flex items-start gap-2">
                             <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
                             <div>
-                              <div className="font-medium">{delivery.address || delivery.delivery_address || 'Endereço não informado'}</div>
+                              <div className="font-medium">{delivery.address || 'Endereço não informado'}</div>
                               {/* Assuming neighborhood is not directly available in the new mock data */}
                               {/* {delivery.neighborhood && (
                                 <div className="text-sm text-muted-foreground">{delivery.neighborhood}</div>
@@ -221,7 +221,7 @@ export default function EntregadorPage() {
 
                         <div className="flex flex-col gap-2 ml-4">
                           <Button
-                            onClick={() => openMaps(delivery.address || delivery.delivery_address || '')}
+                            onClick={() => openMaps(delivery.address || '')}
                             variant="outline"
                             size="sm"
                           >
@@ -255,14 +255,14 @@ export default function EntregadorPage() {
                       <div className="flex items-start justify-between">
                         <div className="space-y-3 flex-1">
                           <div>
-                            <h3 className="font-semibold text-lg">{delivery.customerName || delivery.customer?.name || 'Cliente'}</h3>
+                            <h3 className="font-semibold text-lg">{delivery.customerName || 'Cliente'}</h3>
                             {getStatusBadge(delivery.status)}
                           </div>
                           
                           <div className="flex items-start gap-2">
                             <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
                             <div>
-                              <div className="font-medium">{delivery.address || delivery.delivery_address || 'Endereço não informado'}</div>
+                              <div className="font-medium">{delivery.address || 'Endereço não informado'}</div>
                               {/* Assuming neighborhood is not directly available in the new mock data */}
                               {/* {delivery.neighborhood && (
                                 <div className="text-sm text-muted-foreground">{delivery.neighborhood}</div>
@@ -292,7 +292,7 @@ export default function EntregadorPage() {
 
                         <div className="flex flex-col gap-2 ml-4">
                           <Button
-                            onClick={() => openMaps(delivery.address || delivery.delivery_address || '')}
+                            onClick={() => openMaps(delivery.address || '')}
                             variant="outline"
                             size="sm"
                           >
