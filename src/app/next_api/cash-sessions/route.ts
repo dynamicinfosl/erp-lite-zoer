@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
-import { CrudOperations } from "@/lib/crud-operations";
+import CrudOperations from "@/lib/crud-operations";
 import { createSuccessResponse, createErrorResponse } from "@/lib/create-response";
 import { getTenantContext, ensureTenantId } from "@/lib/tenant-utils";
+import { requestMiddleware } from "@/lib/api-utils";
 
 interface CashSessionQuery {
   register_id?: string;
