@@ -488,8 +488,8 @@ export default function ClientesPage() {
   // Calcular estatísticas dos clientes
   const customerStats = {
     total: Array.isArray(customers) ? customers.length : 0,
-    active: Array.isArray(customers) ? customers.filter(c => c.status === 'active' || c.is_active === true).length : 0,
-    inactive: Array.isArray(customers) ? customers.filter(c => c.status === 'inactive' || c.is_active === false).length : 0,
+    active: Array.isArray(customers) ? customers.filter(c => c.status === 'active').length : 0,
+    inactive: Array.isArray(customers) ? customers.filter(c => c.status === 'inactive').length : 0,
     pf: Array.isArray(customers) ? customers.filter(c => c.type === 'PF').length : 0,
     pj: Array.isArray(customers) ? customers.filter(c => c.type === 'PJ').length : 0,
     newThisMonth: Array.isArray(customers) ? customers.filter(c => {
@@ -869,8 +869,8 @@ export default function ClientesPage() {
                     {columnVisibility.city && <TableCell>{customer.city}</TableCell>}
                     {columnVisibility.status && (
                       <TableCell>
-                        <Badge variant={(customer.status === 'active' || customer.is_active === true) ? 'default' : 'secondary'}>
-                          {(customer.status === 'active' || customer.is_active === true) ? 'Ativo' : 'Inativo'}
+                        <Badge variant={customer.status === 'active' ? 'default' : 'secondary'}>
+                          {customer.status === 'active' ? 'Ativo' : 'Inativo'}
                         </Badge>
                       </TableCell>
                     )}
