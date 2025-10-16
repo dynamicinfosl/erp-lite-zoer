@@ -260,7 +260,7 @@ export default function ClientesPage() {
       console.error('Erro ao carregar clientes:', error);
       
       // ✅ CORREÇÃO: Se for timeout ou erro de rede, mostrar lista vazia em vez de erro
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.log('⏰ Timeout ao carregar clientes, mostrando lista vazia');
         setCustomers([]);
       } else {

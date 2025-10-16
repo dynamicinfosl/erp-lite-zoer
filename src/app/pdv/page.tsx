@@ -529,7 +529,7 @@ export default function PDVPage() {
       
     } catch (error) {
       console.error('Erro ao finalizar venda:', error);
-      toast.error(`Erro ao salvar venda: ${error.message}`);
+      toast.error(`Erro ao salvar venda: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
   }, [total, customerName, paymentMethod, clearCart, cart, calculateItemTotal]);
 
