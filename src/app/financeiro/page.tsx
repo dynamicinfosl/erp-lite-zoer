@@ -260,7 +260,7 @@ export default function FinanceiroPage() {
         value: formatCurrency(monthlyStats.totalReceitas),
         description: `${formatCurrency(monthlyStats.receitasPendentes)} pendentes`,
         color: 'success' as const,
-        trend: monthlyStats.receitasPendentes > 0 ? 'neutral' : 'up',
+        trend: (monthlyStats.receitasPendentes > 0 ? 'neutral' : 'up') as const,
         trendValue:
           monthlyStats.receitasPendentes > 0
             ? `${formatCurrency(monthlyStats.receitasPendentes)}`
@@ -281,7 +281,7 @@ export default function FinanceiroPage() {
         value: formatCurrency(monthlyStats.saldoMensal),
         description: monthlyStats.saldoMensal >= 0 ? 'Situação saudável' : 'Despesas acima das receitas',
         color: monthlyStats.saldoMensal >= 0 ? 'accent' : 'error',
-        trend: monthlyStats.saldoMensal >= 0 ? 'up' : 'down',
+        trend: (monthlyStats.saldoMensal >= 0 ? 'up' : 'down') as const,
         trendValue: monthlyStats.saldoMensal >= 0 ? '+8.4%' : '-4.2%',
         icon: <DollarSign className="h-5 w-5" />,
       },
