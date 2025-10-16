@@ -1092,7 +1092,7 @@ export default function ClientesPage() {
               <div><span className="font-medium">Telefone:</span> {formatPhone(showDetailsDialog.phone || '')}</div>
               <div><span className="font-medium">E-mail:</span> {showDetailsDialog.email}</div>
               <div><span className="font-medium">Cidade:</span> {showDetailsDialog.city}</div>
-              <div><span className="font-medium">Status:</span> {(showDetailsDialog.status === 'active' || showDetailsDialog.is_active === true) ? 'Ativo' : 'Inativo'}</div>
+              <div><span className="font-medium">Status:</span> {showDetailsDialog.status === 'active' ? 'Ativo' : 'Inativo'}</div>
               <div className="text-xs text-slate-500"><span className="font-medium">Criado em:</span> {new Date(showDetailsDialog.created_at).toLocaleString('pt-BR')}</div>
             </div>
           )}
@@ -1229,7 +1229,7 @@ export default function ClientesPage() {
                 state: (pick(['estado', 'uf']).slice(0,2).toUpperCase() || null) as any,
                 zipcode: pick(['cep', 'zip']).replace(/\D/g, ''),
                 notes: pick(['observacoes', 'observacoes adicionais', 'notes']),
-                is_active: true,
+                status: 'active',
               } as any;
 
               if (!customerData.name) { fail++; errors.push('Nome ausente'); continue; }
