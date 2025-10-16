@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 
 interface SaleData {
   id: string;
@@ -11,10 +10,12 @@ interface SaleData {
   total_amount: number;
   payment_method: string;
   created_at: string;
+  delivery_date?: string;
   items: Array<{
     product_name: string;
     quantity: number;
     unit_price: number;
+    discount?: number;
     subtotal: number;
   }>;
 }
@@ -27,12 +28,12 @@ interface CompanyData {
   city: string;
   state: string;
   zipcode: string;
+  seller_name?: string;
 }
 
 export default function ReceiptPage() {
   const params = useParams();
   const saleId = params.saleId as string;
-  const { tenant } = useSimpleAuth();
   
   const [saleData, setSaleData] = useState<SaleData | null>(null);
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
@@ -41,27 +42,72 @@ export default function ReceiptPage() {
   useEffect(() => {
     const fetchSaleData = async () => {
       try {
+        console.log('🔍 Buscando venda com ID:', saleId);
+        
         // Buscar dados da venda
         const saleResponse = await fetch(`/next_api/sales/${saleId}`);
-        if (saleResponse.ok) {
-          const saleResult = await saleResponse.json();
-          setSaleData(saleResult.data);
+        console.log('📡 Resposta da API:', saleResponse.status);
+        
+        if (!saleResponse.ok) {
+          const errorText = await saleResponse.text();
+          console.error('❌ Erro na API:', errorText);
+          throw new Error(`Erro ${saleResponse.status}: ${errorText}`);
         }
+        
+        const saleResult = await saleResponse.json();
+        console.log('✅ Dados da venda:', saleResult);
+        const sale = saleResult.data;
+        setSaleData(sale);
 
-        // Buscar dados da empresa (tenant)
-        if (tenant) {
+        // Buscar dados da empresa (tenant) da venda
+        if (sale.tenant_id) {
+          console.log('🏢 Buscando dados do tenant:', sale.tenant_id);
+          const tenantResponse = await fetch(`/next_api/tenants/${sale.tenant_id}`);
+          
+          if (tenantResponse.ok) {
+            const tenantResult = await tenantResponse.json();
+            console.log('✅ Dados do tenant:', tenantResult);
+            const tenantData = tenantResult.data || tenantResult;
+            
+            setCompanyData({
+              name: tenantData.name || 'Sua Empresa',
+              document: tenantData.document || '',
+              address: tenantData.address || '',
+              phone: tenantData.phone || tenantData.corporate_phone || '',
+              city: tenantData.city || '',
+              state: tenantData.state || '',
+              zipcode: tenantData.zip_code || '',
+              seller_name: sale.seller_name || ''
+            });
+          } else {
+            // Fallback: dados padrão
+            console.warn('⚠️ Não foi possível carregar dados do tenant');
+            setCompanyData({
+              name: 'Sua Empresa',
+              document: '',
+              address: '',
+              phone: '',
+              city: '',
+              state: '',
+              zipcode: '',
+              seller_name: ''
+            });
+          }
+        } else {
+          // Fallback: dados padrão
           setCompanyData({
-            name: tenant.name || 'Minha Empresa',
-            document: tenant.document || '00.000.000/0001-00',
-            address: tenant.address || 'Endereço não informado',
-            phone: tenant.phone || '(00) 0000-0000',
-            city: tenant.city || 'Cidade',
-            state: tenant.state || 'UF',
-            zipcode: tenant.zipcode || '00000-000'
+            name: 'Sua Empresa',
+            document: '',
+            address: '',
+            phone: '',
+            city: '',
+            state: '',
+            zipcode: '',
+            seller_name: ''
           });
         }
       } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+        console.error('❌ Erro ao carregar dados:', error);
       } finally {
         setLoading(false);
       }
@@ -70,7 +116,7 @@ export default function ReceiptPage() {
     if (saleId) {
       fetchSaleData();
     }
-  }, [saleId, tenant]);
+  }, [saleId]);
 
   useEffect(() => {
     // Abrir janela de impressão automaticamente quando a página carregar
@@ -109,11 +155,27 @@ export default function ReceiptPage() {
     );
   }
 
-  if (!saleData || !companyData) {
+  if (!saleData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600">Erro ao carregar dados da venda</p>
+          <p className="text-red-600 mb-4">Erro ao carregar dados da venda</p>
+          <button
+            onClick={() => window.close()}
+            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!companyData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Carregando dados da empresa...</p>
         </div>
       </div>
     );
@@ -127,18 +189,18 @@ export default function ReceiptPage() {
           body {
             margin: 0;
             padding: 0;
-            font-size: 10px;
-            line-height: 1.3;
+            font-size: 9px;
+            line-height: 1.2;
           }
           
           .receipt-container {
-            width: 210mm !important;
-            max-width: 210mm !important;
+            width: 80mm !important;
+            max-width: 80mm !important;
             margin: 0 auto !important;
-            padding: 10mm !important;
-            font-family: 'Arial', sans-serif !important;
-            font-size: 10px !important;
-            line-height: 1.3 !important;
+            padding: 3mm !important;
+            font-family: 'Courier New', monospace !important;
+            font-size: 9px !important;
+            line-height: 1.2 !important;
           }
           
           .no-print {
@@ -148,133 +210,137 @@ export default function ReceiptPage() {
           table {
             width: 100%;
             border-collapse: collapse;
+            font-size: 8px;
           }
           
           th, td {
-            padding: 4px 6px;
+            padding: 2px 3px;
             text-align: left;
-            border: 1px solid #333;
+            border: none;
+            border-bottom: 1px dashed #666;
           }
           
           th {
-            background-color: #f0f0f0;
             font-weight: bold;
+            border-bottom: 1px solid #333;
           }
           
           .company-header {
             text-align: center;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #333;
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+            border-bottom: 1px dashed #333;
           }
           
           .section-title {
             font-weight: bold;
-            margin-top: 15px;
-            margin-bottom: 8px;
-            padding: 4px 8px;
-            background-color: #f0f0f0;
-            border: 1px solid #333;
-          }
-          
-          .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 15px;
+            margin-top: 8px;
+            margin-bottom: 4px;
+            padding: 2px 0;
+            text-align: center;
+            border-top: 1px dashed #333;
+            border-bottom: 1px dashed #333;
           }
           
           .info-item {
-            padding: 3px 0;
+            padding: 1px 0;
+            font-size: 8px;
           }
           
           .signature-line {
-            margin-top: 40px;
+            margin-top: 15px;
             padding-top: 2px;
-            border-top: 1px solid #333;
+            border-top: 1px dashed #333;
             text-align: center;
           }
           
           .footer-note {
             text-align: center;
-            font-size: 9px;
-            margin-top: 20px;
-            padding-top: 10px;
+            font-size: 7px;
+            margin-top: 10px;
+            padding-top: 5px;
             border-top: 1px dashed #333;
+          }
+          
+          .dashed-line {
+            border-top: 1px dashed #666;
+            margin: 5px 0;
           }
         }
         
         @media screen {
           .receipt-container {
-            width: 210mm;
-            max-width: 210mm;
+            width: 80mm;
+            max-width: 80mm;
             margin: 20px auto;
-            padding: 20mm;
+            padding: 10px;
             border: 1px solid #ddd;
             box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-            font-family: 'Arial', sans-serif;
-            font-size: 11px;
-            line-height: 1.4;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            line-height: 1.3;
             background: white;
           }
           
           table {
             width: 100%;
             border-collapse: collapse;
-            margin: 10px 0;
+            margin: 5px 0;
+            font-size: 9px;
           }
           
           th, td {
-            padding: 6px 8px;
+            padding: 3px 4px;
             text-align: left;
-            border: 1px solid #333;
+            border: none;
+            border-bottom: 1px dashed #999;
           }
           
           th {
-            background-color: #f0f0f0;
             font-weight: bold;
+            border-bottom: 1px solid #333;
           }
           
           .company-header {
             text-align: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #333;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed #333;
           }
           
           .section-title {
             font-weight: bold;
-            margin-top: 20px;
-            margin-bottom: 10px;
-            padding: 6px 10px;
-            background-color: #f0f0f0;
-            border: 1px solid #333;
-          }
-          
-          .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 20px;
+            margin-top: 10px;
+            margin-bottom: 5px;
+            padding: 3px 0;
+            text-align: center;
+            border-top: 1px dashed #333;
+            border-bottom: 1px dashed #333;
           }
           
           .info-item {
-            padding: 4px 0;
+            padding: 2px 0;
+            font-size: 9px;
           }
           
           .signature-line {
-            margin-top: 60px;
+            margin-top: 20px;
             padding-top: 3px;
-            border-top: 1px solid #333;
+            border-top: 1px dashed #333;
             text-align: center;
           }
           
           .footer-note {
             text-align: center;
-            font-size: 10px;
-            margin-top: 30px;
-            padding-top: 15px;
+            font-size: 8px;
+            margin-top: 15px;
+            padding-top: 8px;
             border-top: 1px dashed #333;
+          }
+          
+          .dashed-line {
+            border-top: 1px dashed #999;
+            margin: 5px 0;
           }
         }
       `}</style>
@@ -293,37 +359,49 @@ export default function ReceiptPage() {
       <div className="receipt-container">
         {/* Cabeçalho da Empresa */}
         <div className="company-header">
-          <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '3px' }}>
             {companyData.name.toUpperCase()}
           </div>
-          <div style={{ fontSize: '10px' }}>
-            CNPJ: {companyData.document}
-          </div>
-          <div style={{ fontSize: '10px' }}>
-            {companyData.address}, {companyData.city} - {companyData.state}
-          </div>
-          <div style={{ fontSize: '10px' }}>
-            CEP: {companyData.zipcode}
-          </div>
-          <div style={{ fontSize: '10px' }}>
-            Tel: {companyData.phone}
-          </div>
+          {companyData.document && (
+            <div style={{ fontSize: '8px' }}>
+              CNPJ/CPF: {companyData.document}
+            </div>
+          )}
+          {companyData.address && (
+            <div style={{ fontSize: '8px' }}>
+              {companyData.address}
+            </div>
+          )}
+          {(companyData.zipcode || companyData.city || companyData.state) && (
+            <div style={{ fontSize: '8px' }}>
+              {companyData.zipcode && `${companyData.zipcode} - `}
+              {companyData.city && companyData.city}
+              {companyData.state && ` - ${companyData.state}`}
+            </div>
+          )}
+          {companyData.phone && (
+            <div style={{ fontSize: '8px' }}>
+              Tel: {companyData.phone}
+            </div>
+          )}
+          {companyData.seller_name && (
+            <div style={{ fontSize: '8px', marginTop: '3px' }}>
+              <strong>Vendedor:</strong> {companyData.seller_name}
+            </div>
+          )}
         </div>
 
         {/* Número do Pedido */}
-        <div style={{ textAlign: 'center', fontSize: '12px', fontWeight: 'bold', margin: '15px 0', padding: '8px', border: '2px solid #333' }}>
+        <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '8px 0', padding: '4px', borderTop: '1px dashed #333', borderBottom: '1px dashed #333' }}>
           PEDIDO Nº {saleData.sale_number}
         </div>
 
         {/* Informações do Pedido */}
-        <div className="info-grid">
+        <div style={{ fontSize: '8px', marginBottom: '8px' }}>
           <div className="info-item">
-            <strong>Data:</strong> {formatDate(saleData.created_at).split(',')[0]}
+            <strong>Data:</strong> {formatDate(saleData.created_at)}
           </div>
           <div className="info-item">
-            <strong>Entrega:</strong> {formatDate(saleData.created_at).split(',')[0]}
-          </div>
-          <div className="info-item" style={{ gridColumn: 'span 2' }}>
             <strong>Cliente:</strong> {saleData.customer_name}
           </div>
         </div>
@@ -334,10 +412,9 @@ export default function ReceiptPage() {
         <table>
           <thead>
             <tr>
-              <th style={{ width: '45%' }}>NOME</th>
-              <th style={{ width: '10%', textAlign: 'center' }}>QTD</th>
-              <th style={{ width: '15%', textAlign: 'right' }}>VL.UNT</th>
-              <th style={{ width: '10%', textAlign: 'center' }}>DESC</th>
+              <th style={{ width: '50%' }}>NOME</th>
+              <th style={{ width: '15%', textAlign: 'center' }}>QTD</th>
+              <th style={{ width: '15%', textAlign: 'right' }}>UNIT</th>
               <th style={{ width: '20%', textAlign: 'right' }}>TOTAL</th>
             </tr>
           </thead>
@@ -347,59 +424,58 @@ export default function ReceiptPage() {
                 <td>{item.product_name}</td>
                 <td style={{ textAlign: 'center' }}>{item.quantity.toFixed(2)}</td>
                 <td style={{ textAlign: 'right' }}>
-                  {item.unit_price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {item.unit_price.toFixed(2)}
                 </td>
-                <td style={{ textAlign: 'center' }}>-</td>
                 <td style={{ textAlign: 'right' }}>
-                  {item.subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {item.subtotal.toFixed(2)}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
 
+        <div className="dashed-line"></div>
+
         {/* Total do Pedido */}
-        <div style={{ textAlign: 'right', fontWeight: 'bold', marginTop: '10px', fontSize: '11px', padding: '8px', backgroundColor: '#f0f0f0', border: '1px solid #333' }}>
-          Total do pedido: {formatCurrency(saleData.total_amount)}
+        <div style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '10px', padding: '5px 0' }}>
+          Total do pedido: R$ {saleData.total_amount.toFixed(2)}
         </div>
+
+        <div className="dashed-line"></div>
 
         {/* Pagamento */}
         <div className="section-title">PAGAMENTO</div>
         
         <table>
-          <thead>
-            <tr>
-              <th style={{ width: '20%' }}>Vencimento</th>
-              <th style={{ width: '20%', textAlign: 'right' }}>Valor</th>
-              <th style={{ width: '35%' }}>Forma de pag.</th>
-              <th style={{ width: '25%' }}>Obs.</th>
-            </tr>
-          </thead>
           <tbody>
             <tr>
-              <td>{formatDate(saleData.created_at).split(',')[0]}</td>
-              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
-                {saleData.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <td style={{ width: '50%' }}>
+                <strong>Forma:</strong> {saleData.payment_method.toUpperCase()}
               </td>
-              <td>{saleData.payment_method.toUpperCase()}</td>
-              <td>-</td>
+              <td style={{ width: '50%', textAlign: 'right' }}>
+                <strong>R$ {saleData.total_amount.toFixed(2)}</strong>
+              </td>
             </tr>
           </tbody>
         </table>
 
+        <div className="dashed-line"></div>
+
         {/* Aviso Fiscal */}
-        <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '20px 0', padding: '10px', border: '1px solid #333', backgroundColor: '#fff3cd' }}>
+        <div style={{ textAlign: 'center', fontSize: '8px', fontWeight: 'bold', margin: '8px 0' }}>
           *** Este cupom não é documento fiscal ***
         </div>
 
+        <div className="dashed-line"></div>
+
         {/* Assinatura */}
-        <div className="signature-line" style={{ width: '50%', margin: '40px auto 0' }}>
+        <div className="signature-line">
           Assinatura do cliente
         </div>
 
         {/* Rodapé */}
         <div className="footer-note">
-          <div style={{ fontStyle: 'italic' }}>Software ERP Lite ZOER</div>
+          <div>Software ERP Lite ZOER</div>
         </div>
       </div>
     </div>

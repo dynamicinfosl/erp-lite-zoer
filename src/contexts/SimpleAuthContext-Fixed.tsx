@@ -12,6 +12,11 @@ interface Tenant {
   status: string;
   email?: string;
   phone?: string;
+  document?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
 }
 
 interface AuthContextType {
@@ -58,7 +63,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       try {
         const { data: tenant, error } = await supabase
           .from('tenants')
-          .select('id, name, email')
+          .select('*')
           .eq('id', userId)
           .maybeSingle();
 
@@ -67,12 +72,18 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (tenant?.id) {
-          console.log('✅ Tenant encontrado na tabela tenants:', tenant.name, tenant.email);
+          console.log('✅ Tenant encontrado na tabela tenants:', tenant.name);
           return {
             id: tenant.id,
             name: tenant.name || 'Meu Negócio',
-            status: 'trial',
+            status: tenant.status || 'trial',
             email: tenant.email,
+            phone: tenant.phone,
+            document: tenant.document,
+            address: tenant.address,
+            city: tenant.city,
+            state: tenant.state,
+            zip_code: tenant.zip_code,
           };
         }
       } catch (error) {
@@ -98,12 +109,12 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Carregar sessão inicial - VERSÃO INSTANTÂNEA
+  // Carregar sessão inicial - VERSÃO COM DADOS COMPLETOS
   useEffect(() => {
-    console.log('🔄 Iniciando autenticação INSTANTÂNEA...');
+    console.log('🔄 Iniciando autenticação...');
     
-    // Verificar sessão de forma síncrona
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
+    // Verificar sessão e carregar tenant completo
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (error) {
         console.log('⚠️ Erro na sessão, usando fallback');
       }
@@ -113,25 +124,23 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       
       if (session?.user) {
         console.log('👤 Usuário encontrado:', session.user.email);
-        setTenant({
-          id: session.user.id,
-          name: 'Meu Negócio',
-          status: 'trial',
-        });
+        // Buscar dados completos do tenant
+        const tenantData = await loadRealTenant(session.user.id);
+        setTenant(tenantData);
       } else {
         console.log('👤 Nenhum usuário logado');
         setTenant(null);
       }
       
       setLoading(false);
-      console.log('✅ Autenticação inicializada (instantânea)');
+      console.log('✅ Autenticação inicializada');
     }).catch((error) => {
       console.error('❌ Erro na autenticação:', error);
       setLoading(false);
     });
   }, []);
 
-  // Escutar mudanças de autenticação - VERSÃO SIMPLIFICADA
+  // Escutar mudanças de autenticação - VERSÃO COMPLETA
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -140,12 +149,9 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         if (event === 'SIGNED_IN' && session?.user) {
           setSession(session);
           setUser(session.user);
-          // Usar tenant simples sem buscar no banco
-          setTenant({
-            id: session.user.id,
-            name: 'Meu Negócio',
-            status: 'trial',
-          });
+          // Buscar dados completos do tenant
+          const tenantData = await loadRealTenant(session.user.id);
+          setTenant(tenantData);
         } else if (event === 'SIGNED_OUT') {
           setSession(null);
           setUser(null);

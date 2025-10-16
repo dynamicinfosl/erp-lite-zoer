@@ -33,7 +33,8 @@ export function AppLayout({ children }: AppLayoutProps) {
       '/reset-password',
       '/admin/login',  // Página de login do admin sem sidebar
       '/admin-test',   // Página de teste do admin sem sidebar
-      '/trial-expirado'  // Página de trial expirado sem sidebar
+      '/trial-expirado',  // Página de trial expirado sem sidebar
+      '/cupom'  // Página de cupom sem sidebar (página pública de impressão)
     ];
     
     
