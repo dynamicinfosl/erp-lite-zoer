@@ -193,7 +193,6 @@ export default function FornecedoresPage() {
 
   const exportXLSX = async () => {
     try {
-      // @ts-expect-error dependência opcional carregada dinamicamente
       const XLSX = await import('xlsx');
       const rows = [
         ['Nome', 'Doc', 'Telefone', 'Situação'],
