@@ -61,7 +61,8 @@ import {
 import { toast } from 'sonner';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
 import * as XLSX from 'xlsx';
-import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
+import { TenantPageWrapper } from '@/components/layout/PageWrapper';
 
 interface Customer {
   id: string;
@@ -136,6 +137,7 @@ export default function ClientesPage() {
     document: '',
     city: '',
     type: 'PF' as 'PF' | 'PJ',
+    status: 'active' as 'active' | 'inactive',
   });
 
   // Estados para validação
@@ -220,11 +222,31 @@ export default function ClientesPage() {
   const loadCustomers = async () => {
     try {
       setLoading(true);
-      const tenantId = tenant?.id || '00000000-0000-0000-0000-000000000000';
-      const url = `/next_api/customers?tenant_id=${encodeURIComponent(tenantId)}`;
-      console.log('🔍 Debug - Carregando clientes para tenant:', tenantId);
       
-      const response = await fetch(url);
+      // Sempre usar tenant do contexto, nunca fallback
+      if (!tenant?.id) {
+        console.log('⚠️ Nenhum tenant disponível, limpando clientes');
+        setCustomers([]);
+        setLoading(false);
+        return;
+      }
+      
+      const url = `/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}`;
+      console.log('🔍 Debug - Carregando clientes para tenant:', tenant.id);
+      
+      // ✅ CORREÇÃO: Adicionar timeout para evitar loading infinito
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos timeout
+      
+      const response = await fetch(url, { 
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
       if (!response.ok) {
         const txt = await response.text();
         throw new Error('Erro ao carregar clientes: ' + txt);
@@ -236,7 +258,15 @@ export default function ClientesPage() {
       setCustomers(rows);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
-      toast.error('Erro ao carregar clientes');
+      
+      // ✅ CORREÇÃO: Se for timeout ou erro de rede, mostrar lista vazia em vez de erro
+      if (error.name === 'AbortError') {
+        console.log('⏰ Timeout ao carregar clientes, mostrando lista vazia');
+        setCustomers([]);
+      } else {
+        toast.error('Erro ao carregar clientes');
+        setCustomers([]); // Garantir que sempre para o loading
+      }
     } finally {
       setLoading(false);
     }
@@ -316,7 +346,7 @@ export default function ClientesPage() {
 
       await loadCustomers();
       setShowAddDialog(false);
-      setNewCustomer({ name: '', email: '', phone: '', document: '', city: '', type: 'PF' });
+      setNewCustomer({ name: '', email: '', phone: '', document: '', city: '', type: 'PF', status: 'active' });
       setValidationErrors({});
       toast.success('Cliente adicionado com sucesso!');
     } catch (error) {
@@ -337,6 +367,7 @@ export default function ClientesPage() {
       document: customer.document || '',
       city: customer.city || '',
       type: (customer.type || 'PF') as 'PF' | 'PJ',
+      status: (customer.status || 'active') as 'active' | 'inactive',
     });
     setValidationErrors({});
     setEditingCustomerId(customer.id);
@@ -358,7 +389,7 @@ export default function ClientesPage() {
       toast.success('Cliente atualizado com sucesso');
       setShowAddDialog(false);
       setEditingCustomerId(null);
-      setNewCustomer({ name: '', email: '', phone: '', document: '', city: '', type: 'PF' });
+      setNewCustomer({ name: '', email: '', phone: '', document: '', city: '', type: 'PF', status: 'active' });
       await loadCustomers();
     } catch (err) {
       console.error(err);
@@ -457,8 +488,8 @@ export default function ClientesPage() {
   // Calcular estatísticas dos clientes
   const customerStats = {
     total: Array.isArray(customers) ? customers.length : 0,
-    active: Array.isArray(customers) ? customers.filter(c => c.status === 'active').length : 0,
-    inactive: Array.isArray(customers) ? customers.filter(c => c.status === 'inactive').length : 0,
+    active: Array.isArray(customers) ? customers.filter(c => c.status === 'active' || c.is_active === true).length : 0,
+    inactive: Array.isArray(customers) ? customers.filter(c => c.status === 'inactive' || c.is_active === false).length : 0,
     pf: Array.isArray(customers) ? customers.filter(c => c.type === 'PF').length : 0,
     pj: Array.isArray(customers) ? customers.filter(c => c.type === 'PJ').length : 0,
     newThisMonth: Array.isArray(customers) ? customers.filter(c => {
@@ -469,7 +500,8 @@ export default function ClientesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <TenantPageWrapper>
+      <div className="space-y-6">
       {/* Header com Título */}
       <div className="flex items-center justify-between">
         <div>
@@ -837,8 +869,8 @@ export default function ClientesPage() {
                     {columnVisibility.city && <TableCell>{customer.city}</TableCell>}
                     {columnVisibility.status && (
                       <TableCell>
-                        <Badge variant={customer.status === 'active' ? 'default' : 'secondary'}>
-                          {customer.status === 'active' ? 'Ativo' : 'Inativo'}
+                        <Badge variant={(customer.status === 'active' || customer.is_active === true) ? 'default' : 'secondary'}>
+                          {(customer.status === 'active' || customer.is_active === true) ? 'Ativo' : 'Inativo'}
                         </Badge>
                       </TableCell>
                     )}
@@ -882,7 +914,16 @@ export default function ClientesPage() {
       </Card>
 
       {/* Dialog Adicionar/Editar Cliente */}
-      <Dialog open={showAddDialog} onOpenChange={(open) => { if (!open) { setShowAddDialog(false); setEditingCustomerId(null); setValidationErrors({}); } else { setShowAddDialog(true); } }}>
+      <Dialog open={showAddDialog} onOpenChange={(open) => { 
+        if (!open) { 
+          setShowAddDialog(false); 
+          setEditingCustomerId(null); 
+          setValidationErrors({}); 
+          setNewCustomer({ name: '', email: '', phone: '', document: '', city: '', type: 'PF', status: 'active' });
+        } else { 
+          setShowAddDialog(true); 
+        } 
+      }}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
           <div className="relative">
             {/* Header com gradiente */}
@@ -949,6 +990,23 @@ export default function ClientesPage() {
                       <p className="text-sm text-red-400">{validationErrors.document}</p>
                     )}
                   </div>
+                </div>
+
+                {/* Campo de Status */}
+                <div className="grid gap-3">
+                  <Label htmlFor="status" className="text-sm font-medium text-slate-200">Status do Cliente</Label>
+                  <Select 
+                    value={newCustomer.status}
+                    onValueChange={(value) => setNewCustomer(prev => ({ ...prev, status: value as 'active' | 'inactive' }))}
+                  >
+                    <SelectTrigger className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white">
+                      <SelectValue placeholder="Selecione o status" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-700 border-slate-600 shadow-xl">
+                      <SelectItem value="active" className="hover:bg-slate-600 text-white">Ativo</SelectItem>
+                      <SelectItem value="inactive" className="hover:bg-slate-600 text-white">Inativo</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
             
                 <div className="grid gap-3">
@@ -1034,7 +1092,7 @@ export default function ClientesPage() {
               <div><span className="font-medium">Telefone:</span> {formatPhone(showDetailsDialog.phone || '')}</div>
               <div><span className="font-medium">E-mail:</span> {showDetailsDialog.email}</div>
               <div><span className="font-medium">Cidade:</span> {showDetailsDialog.city}</div>
-              <div><span className="font-medium">Status:</span> {showDetailsDialog.status}</div>
+              <div><span className="font-medium">Status:</span> {(showDetailsDialog.status === 'active' || showDetailsDialog.is_active === true) ? 'Ativo' : 'Inativo'}</div>
               <div className="text-xs text-slate-500"><span className="font-medium">Criado em:</span> {new Date(showDetailsDialog.created_at).toLocaleString('pt-BR')}</div>
             </div>
           )}
@@ -1208,6 +1266,7 @@ export default function ClientesPage() {
         errors={importErrors}
         isRegistering={isRegistering}
       />
-    </div>
+      </div>
+    </TenantPageWrapper>
   );
 }

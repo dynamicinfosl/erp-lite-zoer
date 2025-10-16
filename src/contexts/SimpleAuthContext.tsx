@@ -39,56 +39,112 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const supabase = createClientComponentClient();
 
-  // Função SIMPLES - Usa nome do email do usuário
-  const loadTenant = async (userId: string) => {
-    try {
-      // 1. Buscar tenant_id do usuário
-      const { data: membership } = await supabase
-        .from('user_memberships')
-        .select('tenant_id')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .single();
+  // Função SUPER SIMPLES - Cria tenant local sem depender do banco
+  const createDefaultTenant = (userEmail: string) => {
+    const userName = userEmail.split('@')[0].replace(/[^a-zA-Z0-9\s]/g, ' ').trim() || 'Meu Negócio';
+    return {
+      id: '00000000-0000-0000-0000-000000000000',
+      name: userName,
+      status: 'trial',
+    };
+  };
 
-      // Criar nome a partir do email do usuário
-      const userName = user?.email 
-        ? user.email.split('@')[0].replace(/[^a-zA-Z0-9\s]/g, ' ').trim()
-        : 'Meu Negócio';
-
-      if (membership?.tenant_id) {
-        // Usar tenant_id real + nome do usuário
-        setTenant({
-          id: membership.tenant_id,
-          name: userName,
-          status: 'trial',
-        });
-        console.log('✅ Tenant configurado:', userName);
-      } else {
-        // Fallback com UUID padrão válido
-        setTenant({
-          id: '00000000-0000-0000-0000-000000000000',
-          name: userName,
-          status: 'trial',
-        });
-        console.log('⚠️ Usando tenant padrão:', userName);
+  // Função SUPER SIMPLES - Cria subscription padrão
+  const createDefaultSubscription = () => {
+    return {
+      id: 'trial-default',
+      status: 'trial',
+      trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      plan: {
+        id: 'trial-plan',
+        name: 'Trial Gratuito',
+        slug: 'trial',
+        price_monthly: 0,
+        price_yearly: 0,
+        features: {},
+        limits: {
+          max_users: 1,
+          max_customers: 50,
+          max_products: 100,
+          max_sales_per_month: 100
+        }
       }
-    } catch (error) {
-      console.error('❌ Erro ao carregar tenant:', error);
-      const userName = user?.email?.split('@')[0] || 'Meu Negócio';
-      setTenant({
-        id: '00000000-0000-0000-0000-000000000000',
-        name: userName,
+    } as any;
+  };
+
+  // Função para buscar tenant real da conta logada
+  const loadRealTenant = async (userId: string) => {
+    try {
+      console.log('🔍 Buscando tenant real para usuário:', userId);
+      
+      // ✅ NOVA SOLUÇÃO: Buscar tenant na tabela tenants baseado no user_id
+      try {
+        const { data: tenant, error } = await supabase
+          .from('tenants')
+          .select('id, name, email')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (error) {
+          console.log('⚠️ Erro ao buscar tenant:', error);
+        }
+
+        if (tenant?.id) {
+          console.log('✅ Tenant encontrado na tabela tenants:', tenant.name, tenant.email);
+          return {
+            id: tenant.id,
+            name: tenant.name || 'Meu Negócio',
+            status: 'trial',
+            email: tenant.email,
+          };
+        }
+      } catch (error) {
+        console.log('⚠️ Erro ao verificar tenant na tabela tenants:', error);
+      }
+
+      // Fallback: usar user_id como tenant_id (compatibilidade)
+      console.log('👤 Usando user_id como tenant_id (fallback):', userId);
+      return {
+        id: userId,
+        name: 'Meu Negócio',
         status: 'trial',
-      });
+      };
+
+    } catch (error) {
+      console.error('❌ Erro ao buscar tenant real:', error);
+      // Em caso de erro, usar user_id mesmo assim
+      return {
+        id: userId,
+        name: 'Meu Negócio',
+        status: 'trial',
+      };
     }
   };
 
-  // Carregar sessão inicial - SUPER SIMPLES
+  // Carregar sessão inicial - BUSCAR TENANT REAL
   useEffect(() => {
     let mounted = true;
 
+    // Timeout de segurança para evitar loading infinito
+    const loadingTimeout = setTimeout(() => {
+      if (mounted) {
+        console.warn('⚠️ Timeout de loading atingido, forçando loading = false');
+        setLoading(false);
+      }
+    }, 1000); // 1 segundo para dar tempo de buscar tenant
+
+    // Timeout de emergência - sempre para o loading
+    const emergencyTimeout = setTimeout(() => {
+      if (mounted) {
+        console.warn('🚨 EMERGENCY: Loading forçado a parar');
+        setLoading(false);
+      }
+    }, 3000); // 3 segundos máximo absoluto
+
     const initAuth = async () => {
       try {
+        console.log('🔄 Iniciando autenticação...');
+        
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -99,20 +155,38 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        console.log('📋 Sessão encontrada:', !!session);
+
         if (mounted) {
           setSession(session);
           setUser(session?.user ?? null);
         }
         
-        // Só carregar tenant se houver usuário logado
+        // Se há usuário logado, buscar tenant real
         if (session?.user && mounted) {
-          await loadTenant(session.user.id);
-          await refreshSubscription();
+          console.log('👤 Usuário logado, buscando tenant real...');
+          const realTenant = await loadRealTenant(session.user.id);
+          const defaultSubscription = createDefaultSubscription();
+          
+          setTenant(realTenant);
+          setSubscription(defaultSubscription);
+          
+          // Limpar localStorage de tenants antigos
+          try {
+            localStorage.removeItem('lastProductsTenantId');
+            localStorage.removeItem('lastCustomersTenantId');
+            console.log('🧹 localStorage de tenants limpo');
+          } catch (error) {
+            console.log('⚠️ Erro ao limpar localStorage:', error);
+          }
+          
+          console.log('✅ Tenant real configurado:', realTenant.name, realTenant.id);
         }
         
-        // Definir loading como false APÓS carregar tudo
+        // Definir loading como false
         if (mounted) {
           setLoading(false);
+          console.log('✅ Autenticação inicializada com sucesso');
         }
       } catch (error) {
         console.error('❌ Erro ao inicializar auth:', error);
@@ -125,35 +199,60 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     // Executar inicialização
     initAuth();
 
-    // Listener de mudanças
+    // Listener de mudanças - BUSCAR TENANT REAL
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔄 Mudança de auth:', event, !!session);
+      
       if (mounted) {
         setSession(session);
         setUser(session?.user ?? null);
       }
       
       if (session?.user && mounted) {
-        // Carregar tenant e subscription
+        console.log('👤 Auth state change - buscando tenant real...');
+        const realTenant = await loadRealTenant(session.user.id);
+        const defaultSubscription = createDefaultSubscription();
+        
+        setTenant(realTenant);
+        setSubscription(defaultSubscription);
+        
+        // Limpar localStorage de tenants antigos
         try {
-          await loadTenant(session.user.id);
-          await refreshSubscription();
-        } catch (err) {
-          console.error('❌ Erro ao carregar tenant:', err);
+          localStorage.removeItem('lastProductsTenantId');
+          localStorage.removeItem('lastCustomersTenantId');
+          console.log('🧹 localStorage de tenants limpo (auth state change)');
+        } catch (error) {
+          console.log('⚠️ Erro ao limpar localStorage:', error);
         }
+        
+        console.log('✅ Auth state change - tenant real configurado:', realTenant.name, realTenant.id);
       } else if (mounted) {
         setTenant(null);
         setSubscription(null);
+        
+        // Limpar localStorage quando usuário faz logout
+        try {
+          localStorage.removeItem('lastProductsTenantId');
+          localStorage.removeItem('lastCustomersTenantId');
+          console.log('🧹 localStorage de tenants limpo (logout)');
+        } catch (error) {
+          console.log('⚠️ Erro ao limpar localStorage:', error);
+        }
       }
     });
 
     return () => {
       mounted = false;
+      clearTimeout(loadingTimeout);
+      clearTimeout(emergencyTimeout);
       subscription.unsubscribe();
     };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('🔐 Tentando login:', email);
+      
       const normalizedEmail = email.trim().toLowerCase();
       const normalizedPassword = password.trim();
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -161,147 +260,116 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         password: normalizedPassword,
       });
 
-      if (error) return { error };
-
-      if (data.user) {
-        await loadTenant(data.user.id);
+      if (error) {
+        console.error('❌ Erro no login:', error.message);
+        return { error };
       }
 
+      console.log('✅ Login bem-sucedido:', !!data.user);
       return { error: null };
     } catch (error: any) {
+      console.error('❌ Erro no login:', error);
       return { error };
     }
   };
 
   const signUp = async (email: string, password: string, companyName: string) => {
     try {
+      console.log('📝 Tentando registro:', email);
+      
       // 1. Criar usuário
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
       });
 
-      if (authError) return { error: authError };
-
-      const userId = authData.user?.id;
-      if (!userId) return { error: new Error('Usuário não criado') };
-
-      // 2. Criar tenant
-      const { data: tenantData, error: tenantError } = await supabase
-        .from('tenants')
-        .insert({
-          name: companyName,
-          slug: companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-          status: 'trial',
-        })
-        .select()
-        .single();
-
-      if (tenantError) {
-        console.error('Erro ao criar tenant:', tenantError);
-        return { error: tenantError };
+      if (authError) {
+        console.error('❌ Erro no registro:', authError.message);
+        return { error: authError };
       }
 
-      // 3. Criar membership
-      const { error: memberError } = await supabase
-        .from('user_memberships')
-        .insert({
-          user_id: userId,
-          tenant_id: tenantData.id,
-          role: 'owner',
-          is_active: true,
-        });
-
-      if (memberError) {
-        console.error('Erro ao criar membership:', memberError);
-        return { error: memberError };
-      }
-
-      // Carregar tenant
-      await loadTenant(userId);
-
+      console.log('✅ Registro bem-sucedido:', !!authData.user);
       return { error: null };
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ Erro no registro:', error);
       return { error };
     }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    setTenant(null);
-    setSubscription(null);
-    router.push('/login');
+    try {
+      console.log('🚪 Fazendo logout...');
+      
+      // 1. Fazer signOut do Supabase
+      await supabase.auth.signOut();
+      
+      // 2. Limpar estado local
+      setUser(null);
+      setSession(null);
+      setTenant(null);
+      setSubscription(null);
+      
+      // 3. Limpar dados do localStorage
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('supabase') || key.includes('sb-') || key.includes('auth'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      
+      // 4. Limpar dados do sessionStorage
+      const sessionKeysToRemove = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (key.includes('supabase') || key.includes('sb-') || key.includes('auth'))) {
+          sessionKeysToRemove.push(key);
+        }
+      }
+      sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
+      
+      // 5. Limpar cookies do Supabase
+      const cookies = document.cookie.split(';');
+      cookies.forEach(cookie => {
+        const [key] = cookie.trim().split('=');
+        if (key && (key.includes('supabase') || key.includes('sb-') || key.includes('auth'))) {
+          document.cookie = `${key}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+          document.cookie = `${key}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=localhost;`;
+        }
+      });
+      
+      console.log('✅ Logout completo realizado');
+      
+      // 6. Redirecionar para login
+      router.push('/login');
+    } catch (error) {
+      console.error('❌ Erro durante logout:', error);
+      // Mesmo com erro, limpar estado e redirecionar
+      setUser(null);
+      setSession(null);
+      setTenant(null);
+      setSubscription(null);
+      router.push('/login');
+    }
   };
 
   const refreshTenant = async () => {
-    if (user) {
-      await loadTenant(user.id);
+    if (user?.id) {
+      const realTenant = await loadRealTenant(user.id);
+      setTenant(realTenant);
+      console.log('✅ Tenant atualizado:', realTenant.name, realTenant.id);
+    } else if (user?.email) {
+      const defaultTenant = createDefaultTenant(user.email);
+      setTenant(defaultTenant);
+      console.log('✅ Tenant padrão atualizado:', defaultTenant.name);
     }
   };
 
   const refreshSubscription = async () => {
-    if (tenant?.id) {
-      try {
-        const { data: subscriptionData, error } = await supabase
-          .from('subscriptions')
-          .select(`
-            id,
-            status,
-            trial_end,
-            current_period_end,
-            plan:plans(
-              id,
-              name,
-              slug,
-              price_monthly,
-              price_yearly,
-              features,
-              limits
-            )
-          `)
-          .eq('tenant_id', tenant.id)
-          .single();
-
-        if (error) {
-          // Se não encontrou subscription, criar uma trial padrão
-          if (error.code === 'PGRST116') {
-            console.log('Nenhuma subscription encontrada, criando trial padrão');
-            const defaultSubscription = {
-              id: 'trial-default',
-              status: 'trial',
-              trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-              plan: {
-                id: 'trial-plan',
-                name: 'Trial Gratuito',
-                slug: 'trial',
-                price_monthly: 0,
-                price_yearly: 0,
-                features: {},
-                limits: {
-                  max_users: 1,
-                  max_customers: 50,
-                  max_products: 100,
-                  max_sales_per_month: 100
-                }
-              }
-            };
-            setSubscription(defaultSubscription as any);
-          } else {
-            console.error('Erro ao carregar subscription:', error.message || error);
-          }
-        } else if (subscriptionData) {
-          const normalized = {
-            ...subscriptionData,
-            trial_ends_at: (subscriptionData as any)?.trial_end || null,
-          } as typeof subscriptionData;
-          setSubscription(normalized as any);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar subscription:', error instanceof Error ? error.message : error);
-      }
-    }
+    const defaultSubscription = createDefaultSubscription();
+    setSubscription(defaultSubscription);
+    console.log('✅ Subscription atualizada');
   };
 
   return (
@@ -329,4 +397,3 @@ export const useSimpleAuth = () => {
   }
   return context;
 };
-

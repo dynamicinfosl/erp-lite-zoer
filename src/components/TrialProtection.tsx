@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { usePlanLimits } from '@/hooks/usePlanLimits';
 
 interface TrialProtectionProps {

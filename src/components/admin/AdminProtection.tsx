@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { usePathname } from 'next/navigation';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';

@@ -18,7 +18,7 @@ import {
   Home,
   CreditCard
 } from 'lucide-react';
-import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { toast } from 'sonner';
 
 interface AdminNavigationProps {

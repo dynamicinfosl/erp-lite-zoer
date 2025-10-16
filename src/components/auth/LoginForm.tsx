@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useSimpleAuth } from "@/contexts/SimpleAuthContext";
+import { useSimpleAuth } from "@/contexts/SimpleAuthContext-Fixed";
 import { Loader2, Mail, Lock, AlertTriangle } from "lucide-react";
 
 interface LoginFormProps {

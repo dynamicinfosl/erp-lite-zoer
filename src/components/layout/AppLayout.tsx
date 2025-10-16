@@ -4,11 +4,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
-import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { usePathname } from 'next/navigation';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { TrialProtection } from '@/components/TrialProtection';
 import { AuthFallback } from '@/components/AuthFallback';
+// Removidos componentes que podem causar problemas
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -17,6 +18,7 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const [isClient, setIsClient] = useState(false);
+  const [forceStopLoading, setForceStopLoading] = useState(false);
   const { user, loading } = useSimpleAuth();
 
   useEffect(() => {
@@ -130,7 +132,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     }
     
     return (
-      <AuthFallback>
+      <AuthFallback forceStopLoading={forceStopLoading}>
         <main className="min-h-screen w-full">{children}</main>
       </AuthFallback>
     );

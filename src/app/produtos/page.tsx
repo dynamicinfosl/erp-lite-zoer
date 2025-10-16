@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { JugaKPICard, JugaProgressCard } from '@/components/dashboard/JugaComponents';
 import { 
   Dialog, 
@@ -63,12 +64,14 @@ import {
   Barcode,
   FileText,
   Ruler,
-  Activity
+  Activity,
+  Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
-import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
+import { TenantPageWrapper } from '@/components/layout/PageWrapper';
 import { Label } from '@/components/ui/label';
 
 interface Product {
@@ -155,23 +158,94 @@ export default function ProdutosPage() {
   const [importRows, setImportRows] = useState<any[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [isCheckingSku, setIsCheckingSku] = useState(false);
+  const [skuValidationTimeout, setSkuValidationTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Função para limpar erro de um campo específico
+  const clearFieldError = (fieldName: string) => {
+    if (formErrors[fieldName]) {
+      setFormErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName];
+        return newErrors;
+      });
+    }
+  };
+
+  // Função para validar SKU em tempo real com debounce
+  const validateSkuRealTime = (sku: string) => {
+    // Limpar timeout anterior se existir
+    if (skuValidationTimeout) {
+      clearTimeout(skuValidationTimeout);
+    }
+
+    // Limpar erro atual do SKU
+    clearFieldError('sku');
+
+    // Se SKU está vazio, não validar
+    if (!sku.trim()) {
+      return;
+    }
+
+    // Se não há tenant válido, não validar
+    if (!tenant?.id || tenant.id === '00000000-0000-0000-0000-000000000000') {
+      console.log('⚠️ Tenant não configurado, não validando SKU em tempo real');
+      return;
+    }
+
+    // Criar novo timeout para validar após 500ms de inatividade
+    const timeout = setTimeout(async () => {
+      console.log(`🔍 Validação em tempo real do SKU "${sku.trim()}"`);
+      const skuExists = await checkSkuExists(sku.trim(), false); // Não mostrar loading
+      
+      if (skuExists) {
+        setFormErrors(prev => ({
+          ...prev,
+          sku: 'Este código SKU já está cadastrado nesta conta. Escolha outro código.'
+        }));
+        console.log(`❌ SKU "${sku.trim()}" já existe - aviso mostrado`);
+      } else {
+        console.log(`✅ SKU "${sku.trim()}" disponível`);
+      }
+    }, 500); // 500ms de delay
+
+    setSkuValidationTimeout(timeout);
+  };
+
+  // Cleanup do timeout quando componente desmonta
+  useEffect(() => {
+    return () => {
+      if (skuValidationTimeout) {
+        clearTimeout(skuValidationTimeout);
+      }
+    };
+  }, [skuValidationTimeout]);
 
   // Carregar produtos quando houver tenant
   useEffect(() => {
-    // Tentar usar tenant do contexto; se não houver, usar o persistido
-    const storedTenantId = typeof window !== 'undefined' ? localStorage.getItem('lastProductsTenantId') : null;
-    if (!tenant?.id && storedTenantId) {
-      loadProducts(storedTenantId);
-      return;
-    }
-    if (!tenant?.id) {
-      setLoading(false);
-      setProducts([]);
-      return;
-    }
-    // Salvar para futuros loads
-    try { localStorage.setItem('lastProductsTenantId', tenant.id); } catch {}
-    loadProducts();
+    console.log(`🔄 useEffect carregar produtos - tenant atual:`, tenant?.id);
+    
+    const loadWithRetry = async () => {
+      // Aguardar tenant estar disponível (máximo 2 segundos)
+      let attempts = 0;
+      while (!tenant?.id && attempts < 20) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+      
+      if (!tenant?.id) {
+        console.log(`⚠️ Nenhum tenant disponível após 2 segundos, limpando produtos`);
+        setLoading(false);
+        setProducts([]);
+        return;
+      }
+      
+      console.log(`📦 Carregando produtos para tenant: ${tenant.id}`);
+      loadProducts();
+    };
+    
+    loadWithRetry();
   }, [tenant?.id]);
 
   const loadProducts = async (overrideTenantId?: string) => {
@@ -181,14 +255,25 @@ export default function ProdutosPage() {
       const url = currentTenantId
         ? `/next_api/products?tenant_id=${encodeURIComponent(currentTenantId)}`
         : `/next_api/products`;
+      
+      console.log(`🔄 Carregando produtos para tenant: ${currentTenantId}`);
+      console.log(`📡 URL da requisição: ${url}`);
+      
       const response = await fetch(url);
-      if (!response.ok) throw new Error('Erro ao carregar produtos');
+      if (!response.ok) {
+        console.error(`❌ Erro na resposta: ${response.status} ${response.statusText}`);
+        throw new Error('Erro ao carregar produtos');
+      }
       
       const data = await response.json();
+      console.log(`📊 Dados recebidos:`, data);
+      
       const rows = Array.isArray(data?.data) ? data.data : (data?.rows || data || []);
+      console.log(`📦 Produtos encontrados: ${rows.length}`);
+      
       setProducts(rows);
     } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
+      console.error('❌ Erro ao carregar produtos:', error);
       toast.error('Erro ao carregar produtos');
     } finally {
       setLoading(false);
@@ -211,8 +296,96 @@ export default function ProdutosPage() {
   });
 
   // Adicionar produto
+  // Função para verificar se SKU já existe APENAS no tenant atual
+  const checkSkuExists = async (sku: string, showLoading = false) => {
+    const trimmedSku = sku.trim();
+    if (!trimmedSku) {
+      console.log('⚠️ SKU vazio, não verificando duplicação');
+      return false;
+    }
+    
+    if (showLoading) {
+      setIsCheckingSku(true);
+    }
+    
+    try {
+      const tenantId = tenant?.id || '00000000-0000-0000-0000-000000000000';
+      
+      // Verificar se o tenant é válido
+      if (!tenantId || tenantId === '00000000-0000-0000-0000-000000000000') {
+        console.log('⚠️ Tenant não configurado, não verificando SKU duplicado');
+        return false;
+      }
+      
+      console.log(`🔍 Verificando SKU "${trimmedSku}" no tenant ${tenantId}`);
+      
+      const response = await fetch(`/next_api/products?tenant_id=${tenantId}&sku=${encodeURIComponent(trimmedSku)}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        const exists = data.data && data.data.length > 0;
+        console.log(`📊 Resultado: SKU "${trimmedSku}" no tenant ${tenantId}: ${exists ? 'EXISTE' : 'NÃO EXISTE'}`);
+        if (exists) {
+          console.log('📋 Produtos encontrados:', data.data);
+        }
+        return exists;
+      } else {
+        console.error('❌ Erro na resposta da API:', response.status, response.statusText);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Erro ao verificar SKU:', error);
+      return false;
+    } finally {
+      if (showLoading) {
+        setIsCheckingSku(false);
+      }
+    }
+  };
+
+  // Função para validar formulário
+  const validateForm = async () => {
+    const errors: Record<string, string> = {};
+
+    // Validar campos obrigatórios
+    if (!newProduct.name.trim()) {
+      errors.name = 'Nome do produto é obrigatório';
+    }
+
+    if (!newProduct.sale_price || parseFloat(newProduct.sale_price) <= 0) {
+      errors.sale_price = 'Preço de venda é obrigatório e deve ser maior que zero';
+    }
+
+    // Validar SKU se preenchido E se há tenant válido
+    if (newProduct.sku.trim() && tenant?.id && tenant.id !== '00000000-0000-0000-0000-000000000000') {
+      console.log(`🔍 Validando SKU "${newProduct.sku.trim()}" para tenant ${tenant.id}`);
+      const skuExists = await checkSkuExists(newProduct.sku.trim(), true); // Mostrar loading na validação final
+      if (skuExists) {
+        errors.sku = 'Este código SKU já está cadastrado nesta conta. Escolha outro código.';
+        console.log(`❌ SKU "${newProduct.sku.trim()}" já existe no tenant ${tenant.id}`);
+      } else {
+        console.log(`✅ SKU "${newProduct.sku.trim()}" disponível no tenant ${tenant.id}`);
+      }
+    } else if (newProduct.sku.trim()) {
+      console.log(`⚠️ SKU "${newProduct.sku.trim()}" fornecido mas tenant inválido, pulando validação`);
+    } else {
+      console.log(`ℹ️ SKU vazio, pulando validação de duplicação`);
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleAddProduct = async () => {
     console.log('[Produtos] handleAddProduct: start', { tenantId: tenant?.id, newProduct });
+    
+    // Validar formulário antes de prosseguir
+    const isValid = await validateForm();
+    if (!isValid) {
+      toast.error('Por favor, corrija os erros no formulário antes de continuar.');
+      return;
+    }
+
     try {
       let tenantId = tenant?.id || (typeof window !== 'undefined' ? localStorage.getItem('lastProductsTenantId') || undefined : undefined);
       if (!tenantId) {
@@ -223,10 +396,6 @@ export default function ProdutosPage() {
       if (!tenantId) {
         tenantId = '00000000-0000-0000-0000-000000000000';
         toast.message('Prosseguindo com tenant de teste (trial).');
-      }
-      if (!newProduct.name || !newProduct.sale_price) {
-        toast.error('Informe ao menos Nome e Preço de Venda.');
-        return;
       }
       toast.info('Enviando cadastro do produto...');
       const productData = {
@@ -302,6 +471,7 @@ export default function ProdutosPage() {
         ncm: '',
         unit: 'UN',
       });
+      setFormErrors({}); // Limpar erros
       toast.success('Produto adicionado com sucesso!');
     } catch (error: any) {
       console.error('[Produtos] handleAddProduct: error', error);
@@ -594,7 +764,8 @@ export default function ProdutosPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <TenantPageWrapper>
+      <div className="space-y-6">
       {/* Header com Título */}
       <div className="flex items-center justify-between">
         <div>
@@ -1150,24 +1321,70 @@ export default function ProdutosPage() {
               <div className="grid gap-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="sku" className="text-sm font-medium text-slate-200">SKU *</Label>
-                    <Input
-                      id="sku"
-                      value={newProduct.sku}
-                      onChange={(e) => setNewProduct(prev => ({ ...prev, sku: e.target.value }))}
-                      placeholder="Código do produto"
-                      className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
-                    />
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="sku" className="text-sm font-medium text-slate-200">SKU</Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-4 w-4 text-slate-400 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Código interno único do produto.<br/>Deve ser único apenas nesta conta.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <div className="space-y-1">
+                      <Input
+                        id="sku"
+                        value={newProduct.sku}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setNewProduct(prev => ({ ...prev, sku: value }));
+                          // Validar SKU em tempo real
+                          validateSkuRealTime(value);
+                        }}
+                        placeholder="Código interno do produto (opcional)"
+                        className={`h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 ${
+                          formErrors.sku ? 'border-red-500 focus:border-red-400' : ''
+                        }`}
+                      />
+                      {formErrors.sku && (
+                        <div className="flex items-center gap-2 p-2 bg-red-500/10 border border-red-500/20 rounded-md">
+                          <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0" />
+                          <p className="text-xs text-red-400">{formErrors.sku}</p>
+                        </div>
+                      )}
+                      {isCheckingSku && (
+                        <div className="flex items-center gap-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded-md">
+                          <div className="h-4 w-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                          <p className="text-xs text-blue-400">Verificando código SKU...</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="name" className="text-sm font-medium text-slate-200">Nome *</Label>
-                    <Input
-                      id="name"
-                      value={newProduct.name}
-                      onChange={(e) => setNewProduct(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="Nome do produto"
-                      className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
-                    />
+                    <div className="space-y-1">
+                      <Input
+                        id="name"
+                        value={newProduct.name}
+                        onChange={(e) => {
+                          setNewProduct(prev => ({ ...prev, name: e.target.value }));
+                          clearFieldError('name');
+                        }}
+                        placeholder="Nome do produto"
+                        className={`h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 ${
+                          formErrors.name ? 'border-red-500 focus:border-red-400' : ''
+                        }`}
+                      />
+                      {formErrors.name && (
+                        <p className="text-xs text-red-400 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          {formErrors.name}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1219,16 +1436,30 @@ export default function ProdutosPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="sale_price" className="text-sm font-medium text-slate-200">Preço de Venda</Label>
-                    <Input
-                      id="sale_price"
-                      type="number"
-                      step="0.01"
-                      value={newProduct.sale_price}
-                      onChange={(e) => setNewProduct(prev => ({ ...prev, sale_price: e.target.value }))}
-                      placeholder="0.00"
-                      className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
-                    />
+                    <Label htmlFor="sale_price" className="text-sm font-medium text-slate-200">Preço de Venda *</Label>
+                    <div className="space-y-1">
+                      <Input
+                        id="sale_price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={newProduct.sale_price}
+                        onChange={(e) => {
+                          setNewProduct(prev => ({ ...prev, sale_price: e.target.value }));
+                          clearFieldError('sale_price');
+                        }}
+                        placeholder="0.00"
+                        className={`h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 ${
+                          formErrors.sale_price ? 'border-red-500 focus:border-red-400' : ''
+                        }`}
+                      />
+                      {formErrors.sale_price && (
+                        <p className="text-xs text-red-400 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          {formErrors.sale_price}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="stock_quantity" className="text-sm font-medium text-slate-200">Estoque</Label>
@@ -1288,7 +1519,24 @@ export default function ProdutosPage() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button 
                   variant="outline" 
-                  onClick={() => { setShowAddDialog(false); setEditingProduct(null); }}
+                  onClick={() => { 
+                    setShowAddDialog(false); 
+                    setEditingProduct(null); 
+                    setFormErrors({});
+                    setNewProduct({
+                      sku: '',
+                      name: '',
+                      description: '',
+                      category: '',
+                      brand: '',
+                      cost_price: '',
+                      sale_price: '',
+                      stock_quantity: '0',
+                      barcode: '',
+                      ncm: '',
+                      unit: 'UN',
+                    });
+                  }}
                   className="w-full sm:w-auto border-slate-500 bg-slate-700/50 hover:bg-slate-600 text-slate-200 hover:text-white h-11 font-medium transition-all duration-200 hover:shadow-md"
                 >
                   Cancelar
@@ -1409,6 +1657,7 @@ export default function ProdutosPage() {
         errors={importErrors}
         isRegistering={isRegistering}
       />
-    </div>
+      </div>
+    </TenantPageWrapper>
   );
 }

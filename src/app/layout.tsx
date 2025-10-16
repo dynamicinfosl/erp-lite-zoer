@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { SimpleAuthProvider } from "@/contexts/SimpleAuthContext";
+import { SimpleAuthProvider } from "@/contexts/SimpleAuthContext-Fixed";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Toaster } from "@/components/ui/toaster";
 import ZoerCopilot from "@/components/ZoerCopilot";

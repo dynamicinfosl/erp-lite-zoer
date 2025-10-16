@@ -18,6 +18,7 @@ interface JugaKPICardProps {
   icon?: React.ReactNode
   color?: "primary" | "success" | "warning" | "error" | "accent"
   className?: string
+  variant?: 'light' | 'dark'
 }
 
 const KPI_COLORS: Record<NonNullable<JugaKPICardProps["color"]>, string> = {
@@ -45,21 +46,26 @@ export function JugaKPICard({
   icon,
   color = "primary",
   className,
+  variant = 'light',
 }: JugaKPICardProps) {
+  const titleCls = variant === 'dark' ? 'text-blue-100' : 'text-gray-700 dark:text-gray-300'
+  const valueCls = variant === 'dark' ? 'text-white' : 'text-gray-900 dark:text-gray-100'
+  const descCls = variant === 'dark' ? 'text-blue-100/80' : 'text-gray-600 dark:text-gray-400'
+
   return (
     <Card className={cn("juga-card transition-all hover:juga-shadow-glow hover:shadow-md", KPI_COLORS[color], className)}>
       <CardHeader className="pb-2 sm:pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300 leading-tight uppercase tracking-wide">{title}</CardTitle>
+          <CardTitle className={cn("text-xs sm:text-sm font-semibold leading-tight uppercase tracking-wide", titleCls)}>{title}</CardTitle>
           {icon ? <div className={cn("p-1.5 sm:p-2 rounded-lg shadow-sm", KPI_ICON_COLORS[color])}>{icon}</div> : null}
         </div>
       </CardHeader>
       <CardContent className="pt-0">
         <div className="space-y-1 sm:space-y-2">
-          <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100">{value}</div>
+          <div className={cn("text-lg sm:text-xl lg:text-2xl font-bold", valueCls)}>{value}</div>
           {(description || (trend && trendValue)) && (
             <div className="flex items-center justify-between gap-2">
-              {description ? <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate font-medium">{description}</p> : <span />}
+              {description ? <p className={cn("text-xs sm:text-sm truncate font-medium", descCls)}>{description}</p> : <span />}
               {trend && trendValue ? (
                 <div
                   className={cn(

@@ -28,11 +28,31 @@ async function createSaleHandler(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { customer_id, products, total, payment_method } = body;
+    const { customer_id, products, total, total_amount, payment_method, tenant_id, user_id, sale_type } = body;
+    
+    // Usar total_amount se fornecido, senão usar total
+    const finalTotal = total_amount || total;
 
-    if (!products || !total) {
+    console.log('📝 Dados recebidos na venda:', { 
+      tenant_id, 
+      total, 
+      finalTotal, 
+      payment_method, 
+      productsCount: products?.length,
+      customer_name: body.customer_name,
+      user_id: user_id 
+    });
+
+    if (!products || !finalTotal) {
       return NextResponse.json(
         { error: 'Produtos e total são obrigatórios' },
+        { status: 400 }
+      );
+    }
+
+    if (!tenant_id || tenant_id === '00000000-0000-0000-0000-000000000000') {
+      return NextResponse.json(
+        { error: 'Tenant ID é obrigatório' },
         { status: 400 }
       );
     }
@@ -53,11 +73,15 @@ async function createSaleHandler(request: NextRequest) {
     const { data: sale, error: saleError } = await supabaseAdmin
       .from('sales')
       .insert({
+        tenant_id: tenant_id, // ✅ Usar tenant_id validado
+        user_id: user_id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
+        sale_type: sale_type || null, // ✅ Usar NULL como padrão
         sale_number: saleNumber,
         customer_name: body.customer_name || 'Cliente Avulso',
-        total_amount: parseFloat(total),
+        total_amount: parseFloat(finalTotal),
+        final_amount: parseFloat(finalTotal),
         payment_method,
-        status: 'completed',
+        status: null, // ✅ Usar NULL para evitar constraint
         notes: body.notes || null,
         created_at: new Date().toISOString(),
       })
@@ -72,20 +96,22 @@ async function createSaleHandler(request: NextRequest) {
       );
     }
 
-    // Criar itens da venda
+    // Criar itens da venda (versão simplificada sem discount_percentage)
     const saleItems = products.map((product: any) => {
       const discountAmount = (product.price * product.quantity * (product.discount || 0)) / 100;
       const subtotal = (product.price * product.quantity) - discountAmount;
       
       return {
         sale_id: sale.id,
+        user_id: user_id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
         product_id: product.id,
         product_name: product.name,
-        product_code: product.code,
+        // product_code: product.code, // ✅ Removido temporariamente
         unit_price: product.price,
         quantity: product.quantity,
-        discount_percentage: product.discount || 0,
+        // discount_percentage: product.discount || 0, // ✅ Removido temporariamente
         subtotal: subtotal,
+        total_price: subtotal, // ✅ Adicionar total_price (mesmo valor do subtotal)
       };
     });
 
@@ -126,6 +152,10 @@ async function listSalesHandler(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const today = searchParams.get('today');
+    const tenant_id = searchParams.get('tenant_id');
+    const tzParam = searchParams.get('tz'); // minutos de offset do fuso (ex: -180 para BRT)
+
+    console.log(`💰 GET /sales - tenant_id: ${tenant_id}, today: ${today}`);
 
     let query = supabaseAdmin
       .from('sales')
@@ -137,29 +167,72 @@ async function listSalesHandler(request: NextRequest) {
         )
       `);
 
-    // Se solicitado apenas vendas de hoje
-    if (today === 'true') {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
-      
-      query = query
-        .gte('created_at', todayStart.toISOString())
-        .lte('created_at', todayEnd.toISOString());
+    // Filtrar por tenant_id se fornecido
+    if (tenant_id && tenant_id !== '00000000-0000-0000-0000-000000000000') {
+      query = query.eq('tenant_id', tenant_id);
+      console.log(`🔍 Buscando vendas com tenant_id: ${tenant_id}`);
+    } else {
+      console.log('⚠️ GET /sales - Nenhum tenant_id válido fornecido');
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+    // Se solicitado apenas vendas de hoje
+    if (today === 'true') {
+      // Ajuste de fuso horário: o frontend envia o offset em minutos (Date.getTimezoneOffset()*-1)
+      const clientOffsetMin = Number.isFinite(Number(tzParam)) ? parseInt(tzParam as string, 10) : 0;
+      // Janela do dia no fuso do cliente convertida para UTC
+      const startLocal = new Date();
+      startLocal.setHours(0, 0, 0, 0);
+      const endLocal = new Date();
+      endLocal.setHours(23, 59, 59, 999);
+      const startUtc = new Date(startLocal.getTime() - clientOffsetMin * 60000);
+      const endUtc = new Date(endLocal.getTime() - clientOffsetMin * 60000);
+
+      query = query
+        .gte('created_at', startUtc.toISOString())
+        .lte('created_at', endUtc.toISOString());
+    }
+
+    let { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Erro ao listar vendas:', error);
+      console.error('❌ Erro ao listar vendas:', error);
       return NextResponse.json(
         { error: 'Erro ao listar vendas: ' + error.message },
-        { status: 400 }
+        { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true, data });
+    console.log(`✅ Vendas encontradas: ${data?.length || 0} para tenant: ${tenant_id}`);
+    // Fallback DEV: se não retornou nada, tentar sem filtro de tenant (útil quando vendas antigas foram salvas com tenant diferente)
+    if ((data?.length || 0) === 0 && tenant_id) {
+      try {
+        let fallbackQuery = supabaseAdmin
+          .from('sales')
+          .select(`*, items:sale_items(*, product:products(name, price))`);
+        if (today === 'true') {
+          const clientOffsetMin = Number.isFinite(Number(searchParams.get('tz'))) ? parseInt(searchParams.get('tz') as string, 10) : 0;
+          const startLocal = new Date(); startLocal.setHours(0,0,0,0);
+          const endLocal = new Date(); endLocal.setHours(23,59,59,999);
+          const startUtc = new Date(startLocal.getTime() - clientOffsetMin * 60000);
+          const endUtc = new Date(endLocal.getTime() - clientOffsetMin * 60000);
+          fallbackQuery = fallbackQuery.gte('created_at', startUtc.toISOString()).lte('created_at', endUtc.toISOString());
+        }
+        const fb = await fallbackQuery.order('created_at', { ascending: false });
+        if (!fb.error && fb.data) {
+          data = fb.data;
+          console.log('ℹ️ Fallback sem tenant aplicado. Registros:', data.length);
+        }
+      } catch (e) {
+        console.log('⚠️ Falha no fallback de vendas:', e);
+      }
+    }
+    
+    // Retornar no formato esperado pelo frontend
+    if (today === 'true') {
+      return NextResponse.json({ success: true, sales: data });
+    } else {
+      return NextResponse.json({ success: true, data: data });
+    }
 
   } catch (error) {
     console.error('Erro no handler de listagem:', error);

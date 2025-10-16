@@ -21,6 +21,7 @@ async function createCustomerHandler(request: NextRequest) {
       document, 
       city, 
       type,
+      status,
       address,
       neighborhood,
       state,
@@ -36,8 +37,9 @@ async function createCustomerHandler(request: NextRequest) {
       );
     }
 
-    // Preparar dados para inserção (usando schema original da tabela)
+    // Preparar dados para inserção (incluindo tenant_id)
     const customerData: any = {
+      tenant_id: tenant_id, // ✅ Agora incluímos o tenant_id
       user_id: '00000000-0000-0000-0000-000000000000', // UUID padrão temporário
       name,
       email: email || null,
@@ -49,13 +51,10 @@ async function createCustomerHandler(request: NextRequest) {
       state: state || null,
       zipcode: zipcode || null,
       notes: notes || null,
-      is_active: true,
+      is_active: status === 'active',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
-
-    // Campos tenant_id e type não existem na tabela customers atual
-    // Removidos para evitar erros de schema
 
     console.log('💾 Inserindo dados:', customerData);
     
@@ -91,25 +90,33 @@ async function listCustomersHandler(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const tenant_id = searchParams.get('tenant_id');
 
-    console.log('🔍 Debug - Listando clientes para tenant:', tenant_id);
+    console.log(`👥 GET /customers - tenant_id: ${tenant_id}`);
 
-    // Como a tabela customers não tem tenant_id configurado corretamente,
-    // vamos listar todos os clientes por enquanto
-    const { data, error } = await supabaseAdmin
+    // Filtrar clientes por tenant_id se fornecido
+    let query = supabaseAdmin
       .from('customers')
-      .select('*')
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
+      .select('*');
+    
+    // Se tenant_id foi fornecido, filtrar por ele (incluindo o zero UUID)
+    if (tenant_id) {
+      query = query.eq('tenant_id', tenant_id);
+      console.log(`🔍 Buscando clientes com tenant_id: ${tenant_id}`);
+    } else {
+      console.log('⚠️ GET /customers - Nenhum tenant_id fornecido, retornando lista vazia');
+      return NextResponse.json({ success: true, data: [] });
+    }
+    
+    const { data, error } = await query.order('is_active', { ascending: false }).order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Erro ao listar clientes:', error);
+      console.error('❌ Erro ao listar clientes:', error);
       return NextResponse.json(
         { error: 'Erro ao listar clientes: ' + error.message },
         { status: 400 }
       );
     }
 
-    console.log('🔍 Debug - Clientes encontrados:', data?.length || 0);
+    console.log(`✅ GET /customers - ${data?.length || 0} clientes encontrados para tenant ${tenant_id}`);
     return NextResponse.json({ success: true, data });
 
   } catch (error) {
@@ -138,6 +145,12 @@ async function updateCustomerHandler(request: NextRequest) {
     // Campos compatíveis com o schema atual da tabela `customers`
     const fields = ['name','email','phone','document','city','address','neighborhood','state','zipcode','notes','is_active'];
     for (const key of fields) if (key in body) allowed[key] = body[key];
+    
+    // Mapear status para is_active se fornecido
+    if ('status' in body) {
+      allowed.is_active = body.status === 'active';
+    }
+    
     allowed.updated_at = new Date().toISOString();
 
     const { error } = await supabaseAdmin

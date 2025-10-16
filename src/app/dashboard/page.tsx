@@ -2,8 +2,13 @@
 'use client';
 
 import React from 'react';
-import MainDashboard from '@/components/dashboard/MainDashboard';
+import JugaDashboard from '@/components/dashboard/JugaDashboard';
+import { TenantPageWrapper } from '@/components/layout/PageWrapper';
 
 export default function DashboardPage() {
-  return <MainDashboard />;
+  return (
+    <TenantPageWrapper>
+      <JugaDashboard />
+    </TenantPageWrapper>
+  );
 }

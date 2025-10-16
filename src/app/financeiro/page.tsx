@@ -16,7 +16,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Search, DollarSign, TrendingUp, TrendingDown, Calendar, CreditCard, Receipt, ArrowRight } from 'lucide-react';
 import { FinancialTransaction } from '@/types';
 import { toast } from 'sonner';
-import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 
 interface FinancialRecord {

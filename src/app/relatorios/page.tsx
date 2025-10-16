@@ -24,7 +24,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { Label } from '@/components/ui/label';
 
 const COLORS = ['#2563eb', '#22c55e', '#f97316', '#a855f7', '#0ea5e9'];
@@ -57,8 +57,9 @@ export default function RelatoriosPage() {
         return;
       }
 
+      const tz = -new Date().getTimezoneOffset();
       const [salesRes, productsRes, transactionsRes, deliveriesRes] = await Promise.allSettled([
-        fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}`),
+        fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}&tz=${tz}`),
         fetch(`/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`),
         fetch(`/next_api/financial-transactions?tenant_id=${encodeURIComponent(tenant.id)}`),
         fetch(`/next_api/deliveries?tenant_id=${encodeURIComponent(tenant.id)}`),

@@ -55,7 +55,7 @@ import {
   UserPlus
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 
 interface OrdemServico {
   id: string;

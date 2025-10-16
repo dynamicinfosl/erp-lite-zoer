@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { OverlaySelect } from '@/components/ui/overlay-select';
 import {
   Dialog,
   DialogContent,
@@ -64,7 +66,10 @@ import { useRouter } from 'next/navigation';
 import { Product, PDVItem } from '@/types';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { api } from '@/lib/api-client';
-import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
+import { TenantPageWrapper } from '@/components/layout/PageWrapper';
+import { PaymentSection } from '@/components/pdv/PaymentSection';
+import { SaleConfirmationModal } from '@/components/pdv/SaleConfirmationModal';
 
 interface MenuItem {
   icon: React.ElementType;
@@ -108,9 +113,54 @@ export default function PDVPage() {
   const [showCaixaDialog, setShowCaixaDialog] = useState(false);
   const [caixaOperationType, setCaixaOperationType] = useState<'sangria' | 'reforco' | 'fechamento'>('sangria');
   const [todaySales, setTodaySales] = useState<Sale[]>([]);
+  // Persistência local do histórico do dia
+  const getLocalSalesKey = useCallback(() => {
+    const tenantId = tenant?.id || 'no-tenant';
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    return `pdv.todaySales.${tenantId}.${y}-${m}-${d}`;
+  }, [tenant?.id]);
+
+  const saveTodaySalesLocal = useCallback((sales: Sale[]) => {
+    try {
+      const key = getLocalSalesKey();
+      localStorage.setItem(key, JSON.stringify(sales));
+      // fallback global (independente do tenant) para garantir visibilidade
+      const today = new Date();
+      const y = today.getFullYear();
+      const m = String(today.getMonth() + 1).padStart(2, '0');
+      const d = String(today.getDate()).padStart(2, '0');
+      localStorage.setItem(`pdv.todaySales.global.${y}-${m}-${d}`, JSON.stringify(sales));
+    } catch {}
+  }, [getLocalSalesKey]);
+
+  const loadTodaySalesLocal = useCallback(() => {
+    try {
+      let raw = localStorage.getItem(getLocalSalesKey());
+      if (!raw) {
+        // tentar global fallback
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        raw = localStorage.getItem(`pdv.todaySales.global.${y}-${m}-${d}`) || '';
+      }
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setTodaySales(parsed);
+      }
+    } catch {}
+  }, [getLocalSalesKey]);
+
   const [caixaOperations, setCaixaOperations] = useState<CaixaOperation[]>([]);
   const [caixaInicial, setCaixaInicial] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<'dinheiro' | 'pix' | 'cartao_debito' | 'cartao_credito' | 'boleto'>('dinheiro');
+  const [currentSection, setCurrentSection] = useState<'pdv' | 'payment'>('pdv');
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [lastSaleData, setLastSaleData] = useState<any>(null);
 
 
   const addSelectedToCart = useCallback(() => {
@@ -139,18 +189,29 @@ export default function PDVPage() {
     const loadProducts = async () => {
       try {
         setLoading(true);
+        
+        // Aguardar tenant estar disponível (máximo 2 segundos)
+        let attempts = 0;
+        while (!tenant?.id && attempts < 20) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+        
         if (!tenant?.id) { 
+          console.warn('⚠️ Tenant não disponível após 2 segundos');
           setProducts([]); 
           return; 
         }
 
+        console.log('🔄 Carregando produtos para tenant:', tenant.id);
         const res = await fetch(`/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`);
         if (!res.ok) throw new Error('Erro ao carregar produtos');
         const json = await res.json();
         const data = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
         setProducts(data);
+        console.log('✅ Produtos carregados:', data.length);
       } catch (error) {
-        console.error('Erro ao carregar produtos:', error);
+        console.error('❌ Erro ao carregar produtos:', error);
         toast.error('Erro ao carregar produtos');
         setProducts([]);
       } finally {
@@ -165,31 +226,68 @@ export default function PDVPage() {
   useEffect(() => {
     const loadTodaySales = async () => {
       try {
-        const response = await fetch(`/next_api/sales?today=true`);
-        if (response.ok) {
-          const data = await response.json();
-          const sales = data.sales || [];
+        if (!tenant?.id) {
+          console.warn('⚠️ Tenant não disponível para carregar vendas');
+          setTodaySales([]);
+          return;
+        }
+        
+        console.log('🔄 Carregando vendas do dia para tenant:', tenant.id);
+        
+        // Primeiro tenta carregar do localStorage para feedback imediato
+        loadTodaySalesLocal();
+
+        // Timeout de 3 segundos para a requisição
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        
+        try {
+          const tz = -new Date().getTimezoneOffset();
+          const response = await fetch(`/next_api/sales?today=true&tenant_id=${encodeURIComponent(tenant.id)}&tz=${tz}`, {
+            signal: controller.signal
+          });
           
-          // Converter para formato local
-          const localSales: Sale[] = sales.map((sale: any) => ({
-            id: sale.id,
-            numero: sale.sale_number,
-            cliente: sale.customer_name,
-            total: parseFloat(sale.total_amount),
-            forma_pagamento: sale.payment_method,
-            data_venda: sale.created_at,
-            status: sale.status === 'completed' ? 'paga' : sale.status,
-          }));
+          clearTimeout(timeoutId);
           
-          setTodaySales(localSales);
+          if (response.ok) {
+            const data = await response.json();
+            const sales = data.sales || data.data || [];
+            
+            console.log('✅ Vendas carregadas:', sales.length);
+            
+            // Converter para formato local
+            const localSales: Sale[] = sales.map((sale: any) => ({
+              id: sale.id,
+              numero: sale.sale_number || sale.numero || `#${sale.id}`,
+              cliente: sale.customer_name || sale.cliente || 'Cliente não informado',
+              total: parseFloat(sale.total_amount || sale.final_amount || sale.total || 0),
+              forma_pagamento: sale.payment_method || sale.forma_pagamento || 'dinheiro',
+              data_venda: sale.created_at || sale.sold_at || sale.data_venda,
+              status: sale.status === 'completed' ? 'paga' : (sale.status || 'paga'),
+            }));
+            
+            setTodaySales(localSales);
+            saveTodaySalesLocal(localSales);
+          } else {
+            console.log('⚠️ Erro ao carregar vendas:', response.status, '- usando array vazio');
+            // Mantém dados locais, mas não elimina
+          }
+        } catch (fetchError: any) {
+          if (fetchError.name === 'AbortError') {
+            console.log('⏰ Timeout ao carregar vendas, usando array vazio');
+          } else {
+            console.log('⚠️ Erro na requisição de vendas:', fetchError.message);
+          }
+          // Mantém dados locais
         }
       } catch (error) {
-        console.error('Erro ao carregar vendas do dia:', error);
+        console.log('⚠️ Erro ao carregar vendas do dia:', error);
+        // Mantém dados locais
       }
     };
 
     loadTodaySales();
-  }, []); // Array vazio fixo - executa apenas uma vez
+  }, [tenant?.id]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -298,25 +396,35 @@ export default function PDVPage() {
       toast.error('Adicione produtos ao carrinho');
       return;
     }
-    setShowPaymentDialog(true);
+    setCurrentSection('payment');
   }, [cart.length]);
   
-  const finalizeSale = useCallback(async () => {
+  const finalizeSale = useCallback(async (paymentData?: any) => {
     try {
       // Preparar dados da venda para o Supabase (versão simplificada)
       const saleData = {
+        tenant_id: tenant?.id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar tenant_id
+        user_id: user?.id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
+        sale_type: null, // ✅ Usar NULL para evitar constraint
         customer_name: customerName || 'Cliente Avulso',
-        total_amount: total,
-        payment_method: paymentMethod,
-        status: 'completed',
+        total_amount: total, // ✅ Corrigir: usar 'total_amount' para compatibilidade com API
+        total: total, // ✅ Manter 'total' também para compatibilidade
+        payment_method: paymentData?.paymentMethod || paymentMethod,
+        status: null, // ✅ Usar NULL para evitar constraint
         notes: cart.length > 0 ? `Venda com ${cart.length} itens` : '',
+        // Dados de pagamento (se fornecidos)
+        amount_paid: paymentData?.amountPaid || total,
+        change_amount: paymentData?.change || 0,
+        remaining_amount: paymentData?.remaining || 0,
+        payment_status: paymentData?.paymentStatus || 'paid',
+        payment_notes: paymentData?.notes,
         products: cart.map(item => ({
           id: item.id,
           name: item.name,
-          code: item.code,
+          code: item.code || item.sku || 'N/A', // ✅ Garantir que code existe
           price: item.price,
           quantity: item.quantity,
-          discount: item.discount,
+          discount: item.discount || 0, // ✅ Garantir que discount existe
           subtotal: calculateItemTotal(item)
         }))
       };
@@ -349,17 +457,74 @@ export default function PDVPage() {
       };
       
       // Adicionar venda ao histórico local
-      setTodaySales(prev => [localSaleData, ...prev]);
-      
-      toast.success(`Venda #${localSaleData.numero} finalizada com sucesso!`, {
-        description: `Total: R$ ${total.toFixed(2)} • ${paymentMethod.toUpperCase()}`,
-        duration: 5000,
+      setTodaySales(prev => {
+        const updated = [localSaleData, ...prev];
+        saveTodaySalesLocal(updated);
+        return updated;
       });
       
-      // Limpar carrinho e fechar diálogo
-    clearCart();
-      setShowPaymentDialog(false);
-      setPaymentMethod('dinheiro');
+      // Recarregar vendas do dia para garantir sincronização
+      setTimeout(async () => {
+        try {
+          const tz = -new Date().getTimezoneOffset();
+          const response = await fetch(`/next_api/sales?today=true&tenant_id=${encodeURIComponent(tenant?.id || '')}&tz=${tz}`);
+          if (response.ok) {
+            const data = await response.json();
+            const sales = data.data || [];
+            const localSales: Sale[] = sales.map((sale: any) => ({
+              id: sale.id,
+              numero: sale.sale_number,
+              cliente: sale.customer_name,
+              total: parseFloat(sale.total_amount || sale.final_amount || 0),
+              forma_pagamento: sale.payment_method,
+              data_venda: sale.created_at,
+              status: sale.status === 'completed' ? 'paga' : (sale.status || 'paga'),
+            }));
+            setTodaySales(localSales);
+            console.log('🔄 Histórico de vendas atualizado:', localSales.length);
+          }
+        } catch (error) {
+          console.error('❌ Erro ao recarregar vendas:', error);
+        }
+      }, 1000);
+      
+      // Mostrar mensagem de sucesso com detalhes do pagamento
+      if (paymentData?.paymentMethod === 'dinheiro' && paymentData?.change > 0) {
+        toast.success(`Venda #${localSaleData.numero} finalizada!`, {
+          description: `Total: R$ ${total.toFixed(2)} • Troco: R$ ${paymentData.change.toFixed(2)}`,
+          duration: 5000,
+        });
+      } else if (paymentData?.paymentMethod && paymentData?.paymentMethod !== 'dinheiro') {
+        toast.success(`Venda #${localSaleData.numero} finalizada!`, {
+          description: `Total: R$ ${total.toFixed(2)} • ${paymentData.paymentMethod.toUpperCase()}`,
+          duration: 5000,
+        });
+      } else {
+        toast.success(`Venda #${localSaleData.numero} finalizada!`, {
+          description: `Total: R$ ${total.toFixed(2)} • ${(paymentData?.paymentMethod || paymentMethod).toUpperCase()}`,
+          duration: 5000,
+        });
+      }
+      
+      // Preparar dados para o modal de confirmação
+      const confirmationData = {
+        numero: localSaleData.numero,
+        cliente: localSaleData.cliente,
+        total: localSaleData.total,
+        forma_pagamento: localSaleData.forma_pagamento,
+        data_venda: localSaleData.data_venda,
+        itens: cart.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          subtotal: calculateItemTotal(item)
+        }))
+      };
+
+      // Mostrar modal de confirmação
+      setLastSaleData(confirmationData);
+      setShowConfirmationModal(true);
+      setCurrentSection('pdv');
       
     } catch (error) {
       console.error('Erro ao finalizar venda:', error);
@@ -452,8 +617,57 @@ export default function PDVPage() {
     saldoCaixa,
   };
 
+  // Função para voltar ao PDV
+  const backToPDV = () => {
+    setCurrentSection('pdv');
+  };
+
+  // Funções para o modal de confirmação
+  const handlePrintReceipt = () => {
+    if (lastSaleData) {
+      // Abrir cupom em nova aba
+      const cupomUrl = `/cupom/${lastSaleData.numero}`;
+      window.open(cupomUrl, '_blank');
+    }
+    setShowConfirmationModal(false);
+  };
+
+  const handleNewSale = () => {
+    // Limpar carrinho e fechar modal
+    clearCart();
+    setShowConfirmationModal(false);
+    setPaymentMethod('dinheiro');
+  };
+
+  const handleCloseConfirmation = () => {
+    setShowConfirmationModal(false);
+  };
+
+  // Se estiver na seção de pagamento, mostrar apenas ela
+  if (currentSection === 'payment') {
+    return (
+      <PaymentSection
+        total={total}
+        customerName={customerName}
+        cartItems={cart.map(item => ({
+          id: item.id,
+          name: item.name,
+          code: item.code || item.sku || 'N/A',
+          price: item.price,
+          quantity: item.quantity,
+          subtotal: calculateItemTotal(item)
+        }))}
+        onFinalize={(paymentData) => {
+          finalizeSale(paymentData);
+        }}
+        onCancel={backToPDV}
+      />
+    );
+  }
+
   return (
-    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+    <TenantPageWrapper>
+      <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
 
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <div className="fixed top-4 left-4 z-40">
@@ -592,77 +806,61 @@ export default function PDVPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-            <JugaKPICard 
-              title="Carrinho Atual" 
-              value={`R$ ${kpi.totalValor.toFixed(2)}`} 
-              description={`${kpi.itensCarrinho} itens`}
-              icon={<ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />} 
-              color="primary" 
-            />
-            <JugaKPICard 
-              title="Vendas Hoje" 
-              value={`${kpi.vendasDia}`} 
-              description={`R$ ${kpi.totalVendasDia.toFixed(2)}`}
-              icon={<TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />} 
-              color="success" 
-            />
-            <JugaKPICard 
-              title="Saldo em Caixa" 
-              value={`R$ ${kpi.saldoCaixa.toFixed(2)}`} 
-              description="Saldo atual"
-              icon={<Wallet className="h-4 w-4 sm:h-5 sm:w-5" />} 
-              color="accent" 
-            />
-            <JugaKPICard 
-              title="Última Venda" 
-              value={todaySales.length > 0 ? todaySales[0].numero : '--'} 
-              description={todaySales.length > 0 ? new Date(todaySales[0].data_venda).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'Nenhuma venda'}
-              icon={<Clock className="h-4 w-4 sm:h-5 sm:w-5" />} 
-              color="warning" 
-            />
-          </div>
+          {/* Cards superiores removidos conforme solicitação */}
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2 space-y-6">
-              <Card className="juga-card">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg text-heading">
+              <Card className="border border-slate-200 bg-slate-50/80 dark:bg-slate-900/60 backdrop-blur rounded-xl">
+                <CardHeader className="pb-0 bg-gradient-to-r from-[#0f1f3b] via-[#162a4d] to-[#0f1f3b] text-white rounded-t-xl">
+                  <CardTitle className="text-sm sm:text-base text-white font-semibold tracking-wide">
                     Localizar um produto/serviço abaixo
                   </CardTitle>
-            </CardHeader>
-            <CardContent>
-                  <div className="flex gap-3">
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_200px_56px] gap-3">
                     <Input
                       id="search-input"
                       placeholder="Digite o código ou o nome"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="text-lg h-12"
+                      className="text-lg h-12 rounded-xl bg-white/70 dark:bg-slate-900/50 border border-slate-300/60 dark:border-slate-700/70 focus-visible:ring-blue-500/40"
                     />
-                    <Button variant="outline" size="lg" className="px-6">
+                    <OverlaySelect
+                      value={''}
+                      onChange={() => {}}
+                      placeholder="Status do produto"
+                      options={[
+                        { value: 'all', label: 'Todos' },
+                        { value: 'active', label: 'Ativo' },
+                        { value: 'inactive', label: 'Inativo' },
+                      ]}
+                      className="w-full"
+                    />
+                    <Button variant="outline" size="lg" className="px-0 rounded-xl border-blue-400/40">
                       <Barcode className="h-5 w-5" />
                     </Button>
                   </div>
 
                   {!loading && searchTerm && (
-                    <div className="mt-4 border rounded-lg max-h-48 overflow-y-auto bg-white dark:bg-gray-900">
-                      {filteredProducts.length === 0 && (
-                        <div className="p-3 text-sm text-muted-foreground">Nenhum produto encontrado.</div>
-                      )}
-                      {filteredProducts.map((product) => (
-                        <div
-                          key={product.id}
-                          className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer border-b last:border-b-0 flex items-center justify-between"
-                          onClick={() => selectProduct(product)}
-                        >
-                          <div>
-                            <p className="font-medium text-heading">{product.name}</p>
-                            <p className="text-sm text-muted-foreground">Código: {product.code}</p>
+                    <div className="mt-3 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                          <div className="max-h-72 overflow-y-auto bg-white dark:bg-slate-900">
+                        {filteredProducts.length === 0 && (
+                          <div className="p-3 text-sm text-muted-foreground">Nenhum produto encontrado.</div>
+                        )}
+                        {filteredProducts.map((product) => (
+                          <div
+                            key={product.id}
+                            className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer border-b last:border-b-0 flex items-center justify-between"
+                            onClick={() => selectProduct(product)}
+                          >
+                            <div>
+                              <p className="font-medium text-slate-800 dark:text-slate-100">{product.name}</p>
+                              <p className="text-sm text-muted-foreground">Código: {product.code}</p>
+                            </div>
+                            <p className="font-semibold text-blue-600">R$ {product.price.toFixed(2)}</p>
                           </div>
-                          <p className="font-semibold text-primary">R$ {product.price.toFixed(2)}</p>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -874,111 +1072,6 @@ export default function PDVPage() {
         </div>
       </div>
 
-      {/* Diálogo de Pagamento */}
-      {showPaymentDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold flex items-center gap-2">
-                  <CreditCard className="h-6 w-6" />
-                  Finalizar Venda
-                </h2>
-                <button
-                  onClick={() => setShowPaymentDialog(false)}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-    </div>
-              
-              <div className="space-y-6">
-                {/* Resumo da Venda */}
-                <div className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 p-4 rounded-lg border-2 border-blue-200 dark:border-blue-800">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-muted-foreground">Cliente:</span>
-                    <span className="font-semibold">{customerName || 'Cliente Avulso'}</span>
-                  </div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-muted-foreground">Itens:</span>
-                    <span className="font-semibold">{kpi.itensCarrinho} un. ({cart.length} produtos)</span>
-                  </div>
-                  <Separator className="my-3" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-bold">TOTAL:</span>
-                    <span className="text-2xl font-extrabold text-primary">R$ {total.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                {/* Formas de Pagamento */}
-                <div className="space-y-3">
-                  <Label className="text-base font-semibold">Forma de Pagamento</Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { value: 'dinheiro', label: 'Dinheiro', icon: DollarSign, color: 'bg-green-100 dark:bg-green-900/30' },
-                      { value: 'pix', label: 'PIX', icon: Smartphone, color: 'bg-blue-100 dark:bg-blue-900/30' },
-                      { value: 'cartao_debito', label: 'Débito', icon: CreditCard, color: 'bg-purple-100 dark:bg-purple-900/30' },
-                      { value: 'cartao_credito', label: 'Crédito', icon: CreditCard, color: 'bg-orange-100 dark:bg-orange-900/30' },
-                    ].map((method) => {
-                      const Icon = method.icon;
-                      const isSelected = paymentMethod === method.value;
-                      return (
-                        <button
-                          key={method.value}
-                          onClick={() => setPaymentMethod(method.value as any)}
-                          className={`p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${
-                            isSelected
-                              ? 'border-primary bg-primary/10 shadow-md scale-105'
-                              : 'border-gray-200 dark:border-gray-700 hover:border-primary/50 hover:scale-102'
-                          }`}
-                        >
-                          <div className={`p-3 rounded-full ${method.color}`}>
-                            <Icon className="h-6 w-6" />
-                          </div>
-                          <span className="font-semibold text-sm">{method.label}</span>
-                          {isSelected && <CheckCircle2 className="h-5 w-5 text-primary" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Cliente */}
-                <div className="space-y-2">
-                  <Label htmlFor="customer-name">Nome do Cliente (Opcional)</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="customer-name"
-                      placeholder="Digite o nome do cliente"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowPaymentDialog(false)}
-                  className="flex-1"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={finalizeSale}
-                  className="flex-1 juga-gradient text-white"
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Confirmar Venda
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Diálogo de Histórico */}
       {showHistoryDialog && (
@@ -1185,7 +1278,17 @@ export default function PDVPage() {
           </div>
         </div>
       )}
-    </div>
+
+      {/* Modal de Confirmação de Venda */}
+      <SaleConfirmationModal
+        isOpen={showConfirmationModal}
+        onClose={handleCloseConfirmation}
+        onNewSale={handleNewSale}
+        onPrintReceipt={handlePrintReceipt}
+        saleData={lastSaleData}
+      />
+      </div>
+    </TenantPageWrapper>
   );
 }
 

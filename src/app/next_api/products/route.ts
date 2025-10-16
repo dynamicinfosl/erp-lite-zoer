@@ -72,12 +72,24 @@ async function createProductHandler(request: NextRequest) {
 
     const stockQty = parseInt(stock) || 0;
 
+    // Gerar SKU único se não fornecido ou vazio
+    const finalSku = (sku && sku.trim()) ? sku.trim() : `PROD-${Date.now()}`;
+    
+    // Log para debug
+    console.log(`📝 Criando produto:`, {
+      tenant_id,
+      sku_original: sku,
+      sku_final: finalSku,
+      name,
+      user_id: user_id || '00000000-0000-0000-0000-000000000000'
+    });
+
     const { data, error } = await supabaseAdmin
       .from('products')
       .insert({
-        tenant_id,
-        user_id: user_id || null,
-        sku: sku || `PROD-${Date.now()}`,
+        tenant_id: tenant_id, // ✅ Garantir que tenant_id está presente
+        user_id: user_id || '00000000-0000-0000-0000-000000000000', // UUID padrão se não fornecido
+        sku: finalSku,
         name,
         description: description || null,
         category: category || null,
@@ -135,25 +147,45 @@ async function listProductsHandler(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const tenant_id = searchParams.get('tenant_id');
+    const sku = searchParams.get('sku');
+
+    console.log(`📦 GET /products - tenant_id: ${tenant_id}, sku: ${sku}`);
 
     if (!tenant_id) {
       // Em desenvolvimento, quando tenant ainda não está resolvido no cliente,
       // devolvemos lista vazia para não quebrar a UI.
+      console.log('⚠️ GET /products - Nenhum tenant_id fornecido, retornando lista vazia');
       return NextResponse.json({ success: true, data: [] });
     }
 
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('products')
       .select('*')
-      .eq('tenant_id', tenant_id)
-      .order('created_at', { ascending: false });
+      .eq('tenant_id', tenant_id);
+    
+    console.log(`🔍 Buscando produtos com tenant_id: ${tenant_id}`);
+
+    // Se SKU foi fornecido, filtrar por SKU DENTRO DO TENANT
+    if (sku && sku.trim()) {
+      query = query.eq('sku', sku.trim());
+      console.log(`🔍 Buscando produto com SKU "${sku.trim()}" no tenant ${tenant_id}`);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Erro ao listar produtos:', error);
+      console.error('❌ Erro ao listar produtos:', error);
       return NextResponse.json(
         { error: 'Erro ao listar produtos: ' + error.message },
         { status: 400 }
       );
+    }
+
+    // Log para debug
+    if (sku) {
+      console.log(`✅ GET /products - SKU "${sku}": ${data?.length || 0} produtos encontrados no tenant ${tenant_id}`);
+    } else {
+      console.log(`✅ GET /products - ${data?.length || 0} produtos encontrados para tenant ${tenant_id}`);
     }
 
     return NextResponse.json({ success: true, data });

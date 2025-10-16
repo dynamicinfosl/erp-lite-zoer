@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useSimpleAuth } from "@/contexts/SimpleAuthContext";
+import { useSimpleAuth } from "@/contexts/SimpleAuthContext-Fixed";
 import { Loader2, User, Building2 } from "lucide-react";
 import { CompleteRegisterForm } from "./CompleteRegisterForm";
 

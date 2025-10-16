@@ -106,3 +106,7 @@ jspm_packages/
 
 # TernJS port file
 .tern-port
+
+# Windows System Files
+AppData/
+.vscode/extensions/
