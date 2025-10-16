@@ -280,7 +280,7 @@ export default function FinanceiroPage() {
         title: 'Saldo Mensal',
         value: formatCurrency(monthlyStats.saldoMensal),
         description: monthlyStats.saldoMensal >= 0 ? 'Situação saudável' : 'Despesas acima das receitas',
-        color: monthlyStats.saldoMensal >= 0 ? 'accent' : 'error',
+        color: monthlyStats.saldoMensal >= 0 ? 'accent' as const : 'error' as const,
         trend: monthlyStats.saldoMensal >= 0 ? 'up' as const : 'down' as const,
         trendValue: monthlyStats.saldoMensal >= 0 ? '+8.4%' : '-4.2%',
         icon: <DollarSign className="h-5 w-5" />,
