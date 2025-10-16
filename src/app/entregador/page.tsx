@@ -50,7 +50,7 @@ export default function EntregadorPage() {
       const today = new Date().toISOString().split('T')[0];
       const myDeliveries = data.filter((delivery: any) => 
         (delivery.created_at || '').startsWith(today) && 
-        (delivery.status === 'em_rota' || delivery.status === 'aguardando')
+        (delivery.status === 'in-progress' || delivery.status === 'pending')
       );
       
       setDeliveries(myDeliveries);
@@ -70,7 +70,7 @@ export default function EntregadorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           id: deliveryId, 
-          status: 'em_rota',
+          status: 'in-progress',
           tenant_id: tenant?.id 
         })
       });
@@ -94,7 +94,7 @@ export default function EntregadorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           id: deliveryId, 
-          status: 'entregue',
+          status: 'delivered',
           tenant_id: tenant?.id 
         })
       });
@@ -117,19 +117,19 @@ export default function EntregadorPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'aguardando':
+      case 'pending':
         return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Aguardando Saída</Badge>;
-      case 'em_rota':
+      case 'in-progress':
         return <Badge variant="default"><Truck className="h-3 w-3 mr-1" />Em Rota</Badge>;
-      case 'entregue':
+      case 'delivered':
         return <Badge variant="outline"><CheckCircle className="h-3 w-3 mr-1" />Entregue</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  const pendingDeliveries = deliveries.filter(d => d.status === 'aguardando');
-  const inRouteDeliveries = deliveries.filter(d => d.status === 'em_rota');
+  const pendingDeliveries = deliveries.filter(d => d.status === 'pending');
+  const inRouteDeliveries = deliveries.filter(d => d.status === 'in-progress');
 
   return (
     <div className="container mx-auto p-6 space-y-6">
