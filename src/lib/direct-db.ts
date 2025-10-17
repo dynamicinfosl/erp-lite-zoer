@@ -40,7 +40,7 @@ export class DirectDBClient {
     }
   }
 
-  async query<T = unknown>(text: string, params?: any[]) {
+  async query<T = Record<string, any>>(text: string, params?: any[]) {
     try {
       const result = await this.client.query<T>(text, params);
       return result;
