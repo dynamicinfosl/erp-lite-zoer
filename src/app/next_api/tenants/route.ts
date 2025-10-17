@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAdmin = supabaseUrl && supabaseServiceKey 
+  ? createClient(supabaseUrl, supabaseServiceKey) 
+  : null;
 
 export async function GET(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Cliente Supabase não configurado' },
+        { status: 500 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const tenantId = searchParams.get('tenant_id');
 
@@ -34,6 +43,13 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Cliente Supabase não configurado' },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
     const { id, ...updateData } = body;
 

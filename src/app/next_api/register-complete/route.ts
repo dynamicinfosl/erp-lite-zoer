@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Cliente com service role para operações administrativas
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseAdmin = supabaseUrl && supabaseServiceKey 
+  ? createClient(supabaseUrl, supabaseServiceKey) 
+  : null;
 
 interface CompleteRegistrationData {
   // Dados do responsável
@@ -45,6 +47,13 @@ interface CompleteRegistrationData {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Cliente Supabase não configurado' },
+        { status: 500 }
+      );
+    }
+
     console.log('🚀 Iniciando cadastro completo...');
     const data: CompleteRegistrationData = await request.json();
     console.log('📋 Dados recebidos:', {
