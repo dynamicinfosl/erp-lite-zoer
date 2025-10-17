@@ -40,18 +40,17 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
-  const [loading, setLoading] = useState(false); // ✅ INICIAR SEM LOADING
+  const [loading, setLoading] = useState(true); // ✅ INICIAR COM LOADING
   
   const router = useRouter();
   // Usar o cliente Supabase configurado de forma segura
   const supabase = createSupabaseClient();
 
   // Função SUPER SIMPLES - Cria tenant local
-  const createDefaultTenant = (userEmail: string) => {
-    const userName = userEmail.split('@')[0].replace(/[^a-zA-Z0-9\s]/g, ' ').trim() || 'Meu Negócio';
+  const createDefaultTenant = (userId: string) => {
     return {
-      id: '00000000-0000-0000-0000-000000000000',
-      name: userName,
+      id: userId, // Usar user ID como ID único
+      name: 'Meu Negócio',
       status: 'trial',
     };
   };
@@ -115,30 +114,43 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     console.log('🔄 Iniciando autenticação...');
     
-    // Verificar sessão e carregar tenant completo
-    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-      if (error) {
-        console.log('⚠️ Erro na sessão, usando fallback');
-      }
+    // Verificar sessão e carregar tenant completo com timeout
+    const initAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.log('⚠️ Erro na sessão, usando fallback');
+        }
 
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        console.log('👤 Usuário encontrado:', session.user.email);
-        // Buscar dados completos do tenant
-        const tenantData = await loadRealTenant(session.user.id);
-        setTenant(tenantData);
-      } else {
-        console.log('👤 Nenhum usuário logado');
-        setTenant(null);
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          console.log('👤 Usuário encontrado:', session.user.email);
+          // Buscar dados completos do tenant
+          const tenantData = await loadRealTenant(session.user.id);
+          setTenant(tenantData);
+        } else {
+          console.log('👤 Nenhum usuário logado');
+          setTenant(null);
+        }
+      } catch (error) {
+        console.error('❌ Erro na autenticação:', error);
+      } finally {
+        setLoading(false);
+        console.log('✅ Autenticação inicializada');
       }
-      
+    };
+
+    // Timeout de segurança para garantir que o loading sempre termine
+    const timeoutId = setTimeout(() => {
+      console.log('⏰ Timeout na inicialização - forçando fim do loading');
       setLoading(false);
-      console.log('✅ Autenticação inicializada');
-    }).catch((error) => {
-      console.error('❌ Erro na autenticação:', error);
-      setLoading(false);
+    }, 10000); // 10 segundos
+
+    initAuth().finally(() => {
+      clearTimeout(timeoutId);
     });
   }, []);
 
@@ -148,20 +160,24 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       async (event, session) => {
         console.log('🔄 Auth state changed:', event);
         
-        if (event === 'SIGNED_IN' && session?.user) {
-          setSession(session);
-          setUser(session.user);
-          // Buscar dados completos do tenant
-          const tenantData = await loadRealTenant(session.user.id);
-          setTenant(tenantData);
-        } else if (event === 'SIGNED_OUT') {
-          setSession(null);
-          setUser(null);
-          setTenant(null);
-          setSubscription(null);
+        try {
+          if (event === 'SIGNED_IN' && session?.user) {
+            setSession(session);
+            setUser(session.user);
+            // Buscar dados completos do tenant
+            const tenantData = await loadRealTenant(session.user.id);
+            setTenant(tenantData);
+          } else if (event === 'SIGNED_OUT') {
+            setSession(null);
+            setUser(null);
+            setTenant(null);
+            setSubscription(null);
+          }
+        } catch (error) {
+          console.error('❌ Erro no auth state change:', error);
+        } finally {
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 

@@ -217,7 +217,7 @@ export default function ClientesPage() {
       
       // Sempre usar tenant do contexto, nunca fallback
       if (!tenant?.id) {
-        console.log('⚠️ Nenhum tenant disponível, limpando clientes');
+        console.log('⚠️ Nenhum tenant disponível, aguardando...');
         setCustomers([]);
         setLoading(false);
         return;
