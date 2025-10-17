@@ -206,6 +206,13 @@ export const GET = listProductsHandler;
 // PUT - atualizar produto
 export async function PUT(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Cliente Supabase não configurado' },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
     const { id, name, description, price, stock } = body;
     if (!id) return NextResponse.json({ error: 'ID é obrigatório' }, { status: 400 });
@@ -235,6 +242,13 @@ export async function PUT(request: NextRequest) {
 // DELETE - excluir produto
 export async function DELETE(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Cliente Supabase não configurado' },
+        { status: 500 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'ID é obrigatório' }, { status: 400 });
