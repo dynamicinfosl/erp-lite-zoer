@@ -46,6 +46,7 @@ interface CompleteRegistrationData {
 export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Iniciando cadastro completo...');
+    console.log('🔑 Service Key configurada:', !!supabaseServiceKey);
     const data: CompleteRegistrationData = await request.json();
     console.log('📋 Dados recebidos:', {
       responsible: { name: data.responsible?.name, email: data.responsible?.email },

@@ -1,10 +1,10 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { User, Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { SubscriptionData } from '@/hooks/usePlanLimits';
+import { supabase } from '@/lib/supabase';
 
 interface Tenant {
   id: string;
@@ -37,7 +37,6 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false); // ✅ INICIAR SEM LOADING
   
   const router = useRouter();
-  const supabase = createClientComponentClient();
 
   // Função SUPER SIMPLES - Cria tenant local
   const createDefaultTenant = (userEmail: string) => {

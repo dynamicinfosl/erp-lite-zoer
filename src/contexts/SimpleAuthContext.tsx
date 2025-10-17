@@ -262,6 +262,14 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error('❌ Erro no login:', error.message);
+        // Melhorar mensagens de erro para o usuário
+        if (error.message.includes('Invalid login credentials')) {
+          error.message = 'E-mail ou senha incorretos. Verifique suas credenciais.';
+        } else if (error.message.includes('Email not confirmed')) {
+          error.message = 'E-mail não confirmado. Verifique sua caixa de entrada.';
+        } else if (error.message.includes('Too many requests')) {
+          error.message = 'Muitas tentativas de login. Aguarde alguns minutos.';
+        }
         return { error };
       }
 

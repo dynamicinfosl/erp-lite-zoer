@@ -285,12 +285,34 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Erro ao realizar cadastro');
+        // Tratamento específico de erros
+        let errorMessage = 'Erro ao realizar cadastro';
+        
+        if (result.error) {
+          if (result.error.includes('Invalid login credentials')) {
+            errorMessage = 'Erro de configuração do servidor. Tente novamente em alguns minutos.';
+          } else if (result.error.includes('User already registered') || result.error.includes('already exists')) {
+            errorMessage = 'Este e-mail já está cadastrado. Tente fazer login ou use outro e-mail.';
+          } else if (result.error.includes('Invalid verification code')) {
+            errorMessage = 'Código de verificação inválido. Tente novamente.';
+          } else if (result.error.includes('Dados do responsável são obrigatórios')) {
+            errorMessage = 'Preencha todos os dados do responsável.';
+          } else if (result.error.includes('Dados da empresa são obrigatórios')) {
+            errorMessage = 'Preencha todos os dados da empresa.';
+          } else if (result.error.includes('Endereço completo é obrigatório')) {
+            errorMessage = 'Preencha todos os dados de endereço.';
+          } else {
+            errorMessage = result.error;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
 
       toast.success('Cadastro realizado com sucesso!');
       onSuccess?.();
     } catch (err: any) {
+      console.error('Erro no cadastro:', err);
       setError(err.message || 'Erro ao realizar cadastro');
     } finally {
       setIsLoading(false);
