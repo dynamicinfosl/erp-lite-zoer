@@ -80,7 +80,8 @@ export async function validatePlanLimits(
 
     // Buscar uso atual
     const usage = await getCurrentUsage(tenantId);
-    const limits = subscription.plan?.limits;
+    const plan = Array.isArray(subscription.plan) ? subscription.plan[0] : subscription.plan;
+    const limits = plan?.limits;
 
     if (!limits) {
       return { canProceed: false, reason: 'Limites do plano não encontrados' };
