@@ -317,7 +317,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
   };
 
   const renderStep1 = () => (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="space-y-2">
         <Label htmlFor="name">Nome Completo *</Label>
         <Input
@@ -339,7 +339,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-6">
         <div className="space-y-2">
           <Label htmlFor="phone">Telefone</Label>
           <Input
@@ -367,7 +367,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-6">
         <div className="space-y-2">
           <Label htmlFor="password">Senha *</Label>
           <Input
@@ -394,7 +394,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
   );
 
   const renderStep2 = () => (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="space-y-2">
         <Label htmlFor="companyName">Razão Social / Nome da Empresa *</Label>
         <Input
@@ -477,7 +477,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
   );
 
   const renderStep3 = () => (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="zipCode">CEP *</Label>
@@ -725,51 +725,52 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      <Card>
-        <CardHeader>
-          <div className="space-y-4">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold">Cadastro da Empresa</h1>
-              <p className="text-gray-600">Complete seu cadastro em poucos passos</p>
+    <div className="w-full">
+      <div className="space-y-8">
+        {/* Progress Section */}
+        <div className="space-y-4">
+          <div className="text-center space-y-2">
+            <h2 className="text-xl font-semibold text-gray-900">Cadastro da Empresa</h2>
+            <p className="text-sm text-gray-600">Complete seu cadastro em poucos passos</p>
+          </div>
+          
+          <div className="space-y-3">
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Etapa {currentStep} de {STEPS.length}</span>
+              <span>{Math.round(progress)}% concluído</span>
             </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>Etapa {currentStep} de {STEPS.length}</span>
-                <span>{Math.round(progress)}% concluído</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-            </div>
+            <Progress value={progress} className="h-2" />
+          </div>
 
-            <div className="flex justify-between">
-              {STEPS.map((step) => {
-                const Icon = step.icon;
-                return (
+          <div className="flex justify-between px-2">
+            {STEPS.map((step) => {
+              const Icon = step.icon;
+              return (
+                <div
+                  key={step.id}
+                  className={`flex flex-col items-center space-y-2 ${
+                    currentStep >= step.id ? 'text-blue-600' : 'text-gray-400'
+                  }`}
+                >
                   <div
-                    key={step.id}
-                    className={`flex flex-col items-center space-y-1 ${
-                      currentStep >= step.id ? 'text-blue-600' : 'text-gray-400'
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                      currentStep >= step.id
+                        ? 'bg-blue-600 text-white shadow-lg'
+                        : 'bg-gray-200 text-gray-400'
                     }`}
                   >
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        currentStep >= step.id
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 text-gray-400'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <span className="text-xs font-medium">{step.title}</span>
+                    <Icon className="h-5 w-5" />
                   </div>
-                );
-              })}
-            </div>
+                  <span className="text-xs font-medium text-center leading-tight max-w-[80px]">{step.title}</span>
+                </div>
+              );
+            })}
           </div>
-        </CardHeader>
+        </div>
 
-        <CardContent className="space-y-6">
+        {/* Form Content */}
+        <Card>
+          <CardContent className="pt-6 space-y-6">
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-md p-4">
               <p className="text-red-800 text-sm">{error}</p>
@@ -778,13 +779,13 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
 
           {renderCurrentStep()}
 
-          <div className="flex justify-between">
+          <div className="flex justify-between pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={prevStep}
               disabled={currentStep === 1}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 px-6"
             >
               <ArrowLeft className="h-4 w-4" />
               Anterior
@@ -794,7 +795,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
               <Button
                 type="button"
                 onClick={nextStep}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 px-6"
               >
                 Próximo
                 <ArrowRight className="h-4 w-4" />
@@ -804,7 +805,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
                 type="button"
                 onClick={handleSubmit}
                 disabled={isLoading}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 px-6"
               >
                 {isLoading ? (
                   <>
@@ -821,20 +822,21 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
             )}
           </div>
 
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Já tem uma conta?{' '}
-              <button
-                type="button"
-                onClick={onSwitchToLogin}
-                className="text-blue-600 hover:underline font-medium"
-              >
-                Faça login
-              </button>
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="text-center pt-4 border-t border-gray-200">
+              <p className="text-sm text-gray-600">
+                Já tem uma conta?{' '}
+                <button
+                  type="button"
+                  onClick={onSwitchToLogin}
+                  className="text-blue-600 hover:underline font-medium"
+                >
+                  Faça login
+                </button>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
