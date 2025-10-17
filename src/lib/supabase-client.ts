@@ -83,7 +83,7 @@ export function getSupabaseInstance() {
       isCreating = false
     }
   }
-  return supabaseInstance
+  return supabaseInstance!
 }
 
 // Cliente padrão exportado (sempre usa a mesma instância)
