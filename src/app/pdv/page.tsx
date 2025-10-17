@@ -421,7 +421,7 @@ export default function PDVPage() {
         products: cart.map(item => ({
           id: item.id,
           name: item.name,
-          code: item.code || item.sku || 'N/A', // ✅ Garantir que code existe
+          code: item.code || 'N/A', // ✅ Garantir que code existe
           price: item.price,
           quantity: item.quantity,
           discount: item.discount || 0, // ✅ Garantir que discount existe
