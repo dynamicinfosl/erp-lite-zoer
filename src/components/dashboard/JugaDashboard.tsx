@@ -72,6 +72,8 @@ export default function JugaDashboard() {
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
 
   // Cores para gráficos
   const COLORS = {
@@ -118,17 +120,54 @@ export default function JugaDashboard() {
 
         console.log('🔄 Carregando dashboard para tenant:', tenant.id);
 
-        // Timeout de 2 segundos para evitar loading infinito
+        // Cache de 30 segundos para evitar requisições desnecessárias
+        const now = Date.now();
+        const cacheTime = 30 * 1000; // 30 segundos
+        
+        if (now - lastFetchTime < cacheTime && !initialLoad) {
+          console.log('📦 Usando cache, dados ainda válidos');
+          setLoading(false);
+          return;
+        }
+
+        // Mostrar dados de exemplo primeiro para melhor UX
+        if (initialLoad) {
+          setStats({
+            totalSales: 0,
+            totalCustomers: 0,
+            totalProducts: 0,
+            totalOrders: 0,
+            monthlyGrowth: 0,
+            customerGrowth: 0,
+            productGrowth: 0,
+            orderGrowth: 0
+          });
+          setRecentActivity([]);
+          setMonthlyData(generateMonthlyData([]));
+          setInitialLoad(false);
+        }
+
+        // Timeout de 5 segundos para evitar loading infinito
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const timeoutId = setTimeout(() => {
+          console.log('⏰ Timeout atingido, usando dados de exemplo');
+          controller.abort();
+        }, 5000);
 
         try {
-          // Carregar dados em paralelo
+          // Carregar dados em paralelo com cache
           const tz = -new Date().getTimezoneOffset();
+          const fetchOptions = { 
+            signal: controller.signal,
+            headers: {
+              'Cache-Control': 'max-age=60', // Cache por 1 minuto
+            }
+          };
+          
           const [salesRes, productsRes, customersRes] = await Promise.allSettled([
-            fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}&tz=${tz}`, { signal: controller.signal }),
-            fetch(`/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`, { signal: controller.signal }),
-            fetch(`/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}`, { signal: controller.signal })
+            fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}&tz=${tz}`, fetchOptions),
+            fetch(`/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`, fetchOptions),
+            fetch(`/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}`, fetchOptions)
           ]);
 
           clearTimeout(timeoutId);
@@ -168,6 +207,8 @@ export default function JugaDashboard() {
           setMonthlyData(monthlyData);
 
           console.log('✅ Dashboard carregado com sucesso');
+          setLastFetchTime(Date.now());
+          setLoading(false);
 
         } catch (fetchError) {
           console.log('⚠️ Erro ao carregar dados, usando dados de exemplo');
@@ -184,6 +225,7 @@ export default function JugaDashboard() {
           });
           setRecentActivity([]);
           setMonthlyData(generateMonthlyData([]));
+          setLoading(false);
         }
 
       } catch (error) {
@@ -277,12 +319,13 @@ export default function JugaDashboard() {
     return `${diffInDays} dia${diffInDays > 1 ? 's' : ''} atrás`;
   };
 
-  if (loading) {
+  // Loading otimizado - só mostra na primeira carga
+  if (loading && initialLoad) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600 dark:text-gray-400">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="text-slate-600 text-sm">
             Carregando dashboard...
           </p>
         </div>
@@ -294,6 +337,11 @@ export default function JugaDashboard() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-xl shadow-lg">
+        {loading && !initialLoad && (
+          <div className="absolute top-4 right-4">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+          </div>
+        )}
         <div>
           <h1 className="text-3xl font-bold text-white">
             Dashboard
