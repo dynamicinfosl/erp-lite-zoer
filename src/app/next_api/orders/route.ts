@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabase = supabaseUrl && supabaseServiceKey 
+  ? createClient(supabaseUrl, supabaseServiceKey) 
+  : null;
 
 // GET - buscar ordens de serviço
 export async function GET(request: NextRequest) {
   try {
+    if (!supabase) {
+      return NextResponse.json(
+        { error: 'Cliente Supabase não configurado' },
+        { status: 500 }
+      );
+    }
+
     console.log('🔍 Buscando ordens...');
     
     const { searchParams } = new URL(request.url);
@@ -46,6 +55,13 @@ export async function GET(request: NextRequest) {
 // POST - criar nova ordem de serviço
 export async function POST(request: NextRequest) {
   try {
+    if (!supabase) {
+      return NextResponse.json(
+        { error: 'Cliente Supabase não configurado' },
+        { status: 500 }
+      );
+    }
+
     console.log('🚀 Criando ordem...');
     
     const body = await request.json();
@@ -128,6 +144,13 @@ export async function POST(request: NextRequest) {
 // PUT - atualizar ordem de serviço
 export async function PUT(request: NextRequest) {
   try {
+    if (!supabase) {
+      return NextResponse.json(
+        { error: 'Cliente Supabase não configurado' },
+        { status: 500 }
+      );
+    }
+
     console.log('🔄 Atualizando ordem...');
     
     const body = await request.json();
@@ -199,6 +222,12 @@ export async function PUT(request: NextRequest) {
 // DELETE - deletar ordem de serviço
 export async function DELETE(request: NextRequest) {
   try {
+    if (!supabase) {
+      return NextResponse.json(
+        { error: 'Cliente Supabase não configurado' },
+        { status: 500 }
+      );
+    }
     console.log('🗑️ Deletando ordem...');
     
     const { searchParams } = new URL(request.url);
