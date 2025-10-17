@@ -133,14 +133,11 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.log('⚠️ Erro na sessão, limpando e recomeçando');
-          // Limpar sessão com erro
-          await supabase.auth.signOut();
+          console.log('⚠️ Erro na sessão:', error.message);
+          // Não limpar sessão imediatamente, apenas logar o erro
           setSession(null);
           setUser(null);
           setTenant(null);
-          setLoading(false);
-          return;
         }
 
         setSession(session);
@@ -172,7 +169,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     const timeoutId = setTimeout(() => {
       console.log('⏰ Timeout na inicialização - forçando fim do loading');
       setLoading(false);
-    }, 10000); // 10 segundos
+    }, 30000); // 30 segundos - mais tempo para login
 
     initAuth().finally(() => {
       clearTimeout(timeoutId);
