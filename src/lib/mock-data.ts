@@ -15,7 +15,7 @@ export const mockProducts: Product[] = [
     unit: 'UN',
     is_active: true,
     category_id: 1,
-    user_id: '1',
+    user_id: 1,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -32,7 +32,7 @@ export const mockProducts: Product[] = [
     unit: 'UN',
     is_active: true,
     category_id: 1,
-    user_id: '1',
+    user_id: 1,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   },
@@ -49,7 +49,7 @@ export const mockProducts: Product[] = [
     unit: 'UN',
     is_active: true,
     category_id: 2,
-    user_id: '1',
+    user_id: 1,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   },
@@ -66,7 +66,7 @@ export const mockProducts: Product[] = [
     unit: 'UN',
     is_active: true,
     category_id: 3,
-    user_id: '1',
+    user_id: 1,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   },
@@ -83,7 +83,7 @@ export const mockProducts: Product[] = [
     unit: 'UN',
     is_active: true,
     category_id: 4,
-    user_id: '1',
+    user_id: 1,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   }
@@ -103,7 +103,7 @@ export const mockCustomers = [
     zipcode: '01234-567',
     notes: 'Cliente preferencial',
     is_active: true,
-    user_id: '1',
+    user_id: 1,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -120,7 +120,7 @@ export const mockCustomers = [
     zipcode: '01310-100',
     notes: 'Entrega rápida',
     is_active: true,
-    user_id: '1',
+    user_id: 1,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
@@ -129,7 +129,7 @@ export const mockCustomers = [
 export const mockSales = [
   {
     id: '1',
-    user_id: '1',
+    user_id: 1,
     customer_id: '1',
     sale_number: 'V001',
     total_amount: 45.5,
@@ -145,7 +145,7 @@ export const mockSales = [
   },
   {
     id: '2',
-    user_id: '1',
+    user_id: 1,
     customer_id: '2',
     sale_number: 'V002',
     total_amount: 89.0,
@@ -164,7 +164,7 @@ export const mockSales = [
 export const mockFinancialTransactions = [
   {
     id: '1',
-    user_id: '1',
+    user_id: 1,
     transaction_type: 'receita',
     category: 'Vendas',
     description: 'Venda de produtos',
@@ -181,7 +181,7 @@ export const mockFinancialTransactions = [
   },
   {
     id: '2',
-    user_id: '1',
+    user_id: 1,
     transaction_type: 'despesa',
     category: 'Aluguel',
     description: 'Aluguel do depósito',
@@ -201,7 +201,7 @@ export const mockFinancialTransactions = [
 export const mockDeliveries = [
   {
     id: '1',
-    user_id: '1',
+    user_id: 1,
     sale_id: '2',
     driver_id: '1',
     customer_name: 'Maria Santos',
