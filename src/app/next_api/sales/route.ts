@@ -2,30 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { withPlanValidation } from '@/lib/plan-middleware';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImV4cCI6MjA3MjU5Mzc0M30.NBHrAlv8RPxu1QhLta76Uoh6Bc_OnqhfVydy8_TX6GQ';
 
-// Verificar se as variáveis estão definidas
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Variáveis do Supabase não configuradas em sales route:', {
-    url: !!supabaseUrl,
-    serviceKey: !!supabaseServiceKey
-  });
-}
-
-const supabaseAdmin = supabaseUrl && supabaseServiceKey 
-  ? createClient(supabaseUrl, supabaseServiceKey)
-  : null;
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 // Handler original para criar venda
 async function createSaleHandler(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Cliente Supabase não configurado' },
-        { status: 500 }
-      );
-    }
 
     const body = await request.json();
     const { customer_id, products, total, total_amount, payment_method, tenant_id, user_id, sale_type } = body;
@@ -143,12 +127,6 @@ async function createSaleHandler(request: NextRequest) {
 // Handler original para listar vendas
 async function listSalesHandler(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Cliente Supabase não configurado' },
-        { status: 500 }
-      );
-    }
 
     const { searchParams } = new URL(request.url);
     const today = searchParams.get('today');

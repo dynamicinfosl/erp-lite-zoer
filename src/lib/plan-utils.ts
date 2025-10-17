@@ -4,14 +4,14 @@ import { PlanLimits, PlanUsage } from '@/hooks/usePlanLimits';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Verificar se as variáveis estão definidas (apenas log, não erro)
-if (!supabaseUrl || !supabaseKey) {
-  console.log('⚠️ Variáveis do Supabase não configuradas em plan-utils - usando fallback');
-}
+// Usar valores hardcoded como fallback se variáveis não estiverem configuradas
+const SUPABASE_URL_FALLBACK = 'https://lfxietcasaooenffdodr.supabase.co';
+const SUPABASE_KEY_FALLBACK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImV4cCI6MjA3MjU5Mzc0M30.NBHrAlv8RPxu1QhLta76Uoh6Bc_OnqhfVydy8_TX6GQ';
 
-const supabase = supabaseUrl && supabaseKey 
-  ? createClient(supabaseUrl, supabaseKey)
-  : null;
+const finalSupabaseUrl = supabaseUrl || SUPABASE_URL_FALLBACK;
+const finalSupabaseKey = supabaseKey || SUPABASE_KEY_FALLBACK;
+
+const supabase = createClient(finalSupabaseUrl, finalSupabaseKey);
 
 export interface PlanValidationResult {
   canProceed: boolean;
@@ -29,10 +29,6 @@ export async function validatePlanLimits(
 ): Promise<PlanValidationResult> {
 
   try {
-    if (!supabase) {
-      console.error('Cliente Supabase não configurado em validatePlanLimits');
-      return { canProceed: false, reason: 'Cliente Supabase não configurado' };
-    }
 
     // Buscar subscription atual
     const { data: subscription, error: subError } = await supabase
@@ -207,9 +203,6 @@ export async function createSubscription(
 ): Promise<{ success: boolean; error?: string }> {
 
   try {
-    if (!supabase) {
-      return { success: false, error: 'Cliente Supabase não configurado' };
-    }
 
     const trialEndsAt = status === 'trial' 
       ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 14 dias
@@ -253,9 +246,6 @@ export async function updateTenantPlan(
 ): Promise<{ success: boolean; error?: string }> {
 
   try {
-    if (!supabase) {
-      return { success: false, error: 'Cliente Supabase não configurado' };
-    }
 
     const { error } = await supabase
       .from('subscriptions')

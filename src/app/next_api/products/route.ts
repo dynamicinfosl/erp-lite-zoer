@@ -2,20 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { withPlanValidation } from '@/lib/plan-middleware';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImV4cCI6MjA3MjU5Mzc0M30.NBHrAlv8RPxu1QhLta76Uoh6Bc_OnqhfVydy8_TX6GQ';
 
-// Verificar se as variáveis estão definidas
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Variáveis do Supabase não configuradas em products route:', {
-    url: !!supabaseUrl,
-    serviceKey: !!supabaseServiceKey
-  });
-}
-
-const supabaseAdmin = supabaseUrl && supabaseServiceKey 
-  ? createClient(supabaseUrl, supabaseServiceKey)
-  : null;
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 // Handler original para criar produto
 async function createProductHandler(request: NextRequest) {
@@ -138,13 +128,6 @@ async function createProductHandler(request: NextRequest) {
 // Handler original para listar produtos
 async function listProductsHandler(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      console.error('❌ Cliente Supabase não configurado');
-      return NextResponse.json(
-        { error: 'Sistema não configurado - entre em contato com o suporte' },
-        { status: 503 }
-      );
-    }
 
     const { searchParams } = new URL(request.url);
     const tenant_id = searchParams.get('tenant_id');
