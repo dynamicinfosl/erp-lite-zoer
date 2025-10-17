@@ -256,6 +256,10 @@ export async function updateTenantPlan(
 ): Promise<{ success: boolean; error?: string }> {
 
   try {
+    if (!supabase) {
+      return { success: false, error: 'Cliente Supabase não configurado' };
+    }
+
     const { error } = await supabase
       .from('subscriptions')
       .update({
