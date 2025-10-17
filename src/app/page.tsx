@@ -157,10 +157,11 @@ export default function HomePage() {
 
   // Se autenticação estiver ativada e usuário logado, redirecionar
   useEffect(() => {
-    if (ENABLE_AUTH && user) {
+    if (ENABLE_AUTH && user && !loading) {
+      console.log('🔄 Usuário logado, redirecionando para dashboard...');
       router.push('/dashboard');
     }
-  }, [user, router]);
+  }, [user, loading, router]);
 
   // Landing page NUNCA mostra loading - renderiza diretamente
 
@@ -180,20 +181,12 @@ export default function HomePage() {
                 <span className="text-2xl font-bold text-white">JUGA</span>
               </div>
               <div className="flex items-center gap-4">
-                {ENABLE_AUTH ? (
-                  <>
-                    <Button asChild variant="ghost" className="text-white hover:bg-white/10">
-                      <Link href="/login">Entrar</Link>
-                    </Button>
-                    <Button asChild variant="secondary">
-                      <Link href="/login">Começar Grátis</Link>
-                    </Button>
-                  </>
-                ) : (
-                  <Button asChild variant="secondary">
-                    <Link href="/dashboard">Acessar Sistema</Link>
-                  </Button>
-                )}
+                <Button asChild variant="ghost" className="text-white hover:bg-white/10">
+                  <Link href="/login">Entrar</Link>
+                </Button>
+                <Button asChild variant="secondary">
+                  <Link href="/login">Começar Grátis</Link>
+                </Button>
               </div>
             </div>
           </nav>
@@ -563,17 +556,26 @@ export default function HomePage() {
 
                       if (ENABLE_AUTH) {
                         const { supabase } = await import('@/lib/supabase');
-                        await supabase.auth.signUp({
+                        const { error } = await supabase.auth.signUp({
                           email: email.trim(), password: password.trim(),
                           options: { data: { company, phone } }
                         });
-                        await supabase.auth.signInWithPassword({ email: email.trim(), password: password.trim() });
+                        
+                        if (error) {
+                          console.error('Erro no cadastro:', error);
+                          return; // Não continuar se houver erro
+                        }
+                        
+                        // Não fazer login imediatamente após cadastro
+                        console.log('✅ Cadastro realizado com sucesso');
                       }
-                      router.push('/dashboard');
+                      
+                      // Redirecionar para login após cadastro
+                      router.push('/login');
                       setShowRegisterForm(false);
                     } catch (err) {
                       console.error('Erro ao registrar:', err);
-                      router.push('/dashboard');
+                      // Em caso de erro, manter na landing page
                     }
                   }}
                 >

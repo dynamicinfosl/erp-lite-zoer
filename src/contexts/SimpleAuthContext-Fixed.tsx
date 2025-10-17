@@ -1,7 +1,12 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+<<<<<<< HEAD
 import { createSupabaseClient } from '@/lib/supabase-client';
+=======
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { getSupabaseInstance } from '@/lib/supabase-client';
+>>>>>>> acb3c125a528dd2061fc83803cb29943dc6e69e9
 import { User, Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { SubscriptionData } from '@/hooks/usePlanLimits';
@@ -39,18 +44,17 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
-  const [loading, setLoading] = useState(false); // ✅ INICIAR SEM LOADING
+  const [loading, setLoading] = useState(true); // ✅ INICIAR COM LOADING
   
-  const router = useRouter();
-  // Usar o cliente Supabase configurado de forma segura
-  const supabase = createSupabaseClient();
+      const router = useRouter();
+      // Usar o cliente Supabase singleton global
+      const supabase = React.useMemo(() => getSupabaseInstance(), []);
 
   // Função SUPER SIMPLES - Cria tenant local
-  const createDefaultTenant = (userEmail: string) => {
-    const userName = userEmail.split('@')[0].replace(/[^a-zA-Z0-9\s]/g, ' ').trim() || 'Meu Negócio';
+  const createDefaultTenant = (userId: string) => {
     return {
-      id: '00000000-0000-0000-0000-000000000000',
-      name: userName,
+      id: userId, // Usar user ID como ID único
+      name: 'Minha Empresa',
       status: 'trial',
     };
   };
@@ -91,38 +95,32 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         console.log('⚠️ Erro ao verificar tenant na tabela tenants:', error);
       }
 
-      // Fallback: usar user_id como tenant_id (compatibilidade)
-      console.log('👤 Usando user_id como tenant_id (fallback):', userId);
-      return {
-        id: userId,
-        name: 'Meu Negócio',
-        status: 'trial',
-      };
+      // ✅ FALLBACK GARANTIDO: Sempre retornar um tenant válido
+      console.log('👤 Usando user_id como tenant_id (fallback garantido):', userId);
+      const fallbackTenant = createDefaultTenant(userId);
+      console.log('✅ Tenant fallback criado:', fallbackTenant);
+      return fallbackTenant;
 
     } catch (error) {
       console.error('❌ Erro ao buscar tenant real:', error);
-      // Em caso de erro, usar user_id mesmo assim
-      return {
-        id: userId,
-        name: 'Meu Negócio',
-        status: 'trial',
-      };
+      // ✅ FALLBACK FINAL: Sempre retornar um tenant válido
+      const fallbackTenant = createDefaultTenant(userId);
+      console.log('✅ Tenant fallback final criado:', fallbackTenant);
+      return fallbackTenant;
     }
   };
 
-  // Carregar sessão inicial - VERSÃO COM DADOS COMPLETOS
+  // Carregar sessão inicial - VERSÃO ULTRA SIMPLIFICADA
   useEffect(() => {
     console.log('🔄 Iniciando autenticação...');
     
-    // Verificar sessão e carregar tenant completo
-    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-      if (error) {
-        console.log('⚠️ Erro na sessão, usando fallback');
-      }
-
-      setSession(session);
-      setUser(session?.user ?? null);
+    let isInitialized = false;
+    
+    const initAuth = async () => {
+      if (isInitialized) return;
+      isInitialized = true;
       
+<<<<<<< HEAD
       if (session?.user) {
         console.log('👤 Usuário encontrado:', session.user.email);
         // Buscar dados completos do tenant
@@ -141,17 +139,53 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         } else {
           setTenant(null);
         }
+=======
+      try {
+        console.log('🔍 Verificando sessão existente...');
+        
+        // Verificação simples e direta
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          console.log('👤 Usuário encontrado:', session.user.email);
+          // Buscar tenant de forma mais simples
+          const tenantData = await loadRealTenant(session.user.id);
+          console.log('🏢 Tenant carregado:', tenantData);
+          setTenant(tenantData);
+        } else {
+          console.log('👤 Nenhum usuário logado');
+          setTenant(null);
+        }
+      } catch (error) {
+        console.error('❌ Erro na autenticação:', error);
+        setSession(null);
+        setUser(null);
+        setTenant(null);
+      } finally {
+        setLoading(false);
+        console.log('✅ Autenticação inicializada');
+>>>>>>> acb3c125a528dd2061fc83803cb29943dc6e69e9
       }
-      
-      setLoading(false);
-      console.log('✅ Autenticação inicializada');
-    }).catch((error) => {
-      console.error('❌ Erro na autenticação:', error);
-      setLoading(false);
-    });
-  }, []);
+    };
 
-  // Escutar mudanças de autenticação - VERSÃO COMPLETA
+    // Timeout mais curto
+    const timeoutId = setTimeout(() => {
+      if (!isInitialized) {
+        console.log('⏰ Timeout na inicialização');
+        setLoading(false);
+        isInitialized = true;
+      }
+    }, 10000); // 10 segundos
+
+    initAuth().finally(() => {
+      clearTimeout(timeoutId);
+    });
+  }, [supabase]);
+
+  // Escutar mudanças de autenticação - VERSÃO ULTRA SIMPLIFICADA
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -160,22 +194,21 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         if (event === 'SIGNED_IN' && session?.user) {
           setSession(session);
           setUser(session.user);
-          // Buscar dados completos do tenant
-          const tenantData = await loadRealTenant(session.user.id);
-          setTenant(tenantData);
+          setLoading(false);
         } else if (event === 'SIGNED_OUT') {
           setSession(null);
           setUser(null);
           setTenant(null);
           setSubscription(null);
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -218,17 +251,49 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
+      console.log('🚪 Iniciando logout...');
+      
+      // Limpar todos os dados locais
+      setSession(null);
+      setUser(null);
+      setTenant(null);
+      setSubscription(null);
+      
+      // Limpar localStorage e sessionStorage
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        // Limpar especificamente os dados do Supabase
+        const supabaseKeys = Object.keys(localStorage).filter(key => 
+          key.includes('supabase') || key.includes('sb-')
+        );
+        supabaseKeys.forEach(key => localStorage.removeItem(key));
+        
+        const sessionKeys = Object.keys(sessionStorage).filter(key => 
+          key.includes('supabase') || key.includes('sb-')
+        );
+        sessionKeys.forEach(key => sessionStorage.removeItem(key));
+      }
+      
+      // Fazer logout no Supabase
       await supabase.auth.signOut();
+      
+      console.log('✅ Logout concluído');
       router.push('/login');
     } catch (error) {
       console.error('❌ Erro ao fazer logout:', error);
+      // Mesmo com erro, redirecionar para login
+      router.push('/login');
     }
   };
 
   const refreshTenant = async () => {
     if (user?.id) {
       try {
+        console.log('🔄 Atualizando tenant para usuário:', user.id);
         const tenantData = await loadRealTenant(user.id);
+        console.log('🏢 Tenant atualizado:', tenantData);
         setTenant(tenantData);
       } catch (error) {
         console.error('❌ Erro ao atualizar tenant:', error);

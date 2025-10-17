@@ -18,11 +18,12 @@ function getSupabaseConfig() {
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error('❌ Variáveis do Supabase não encontradas!')
-    throw new Error('Variáveis de ambiente NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY são necessárias!')
+    console.error('Usando valores hardcoded como fallback')
+    // Não lançar erro, usar valores hardcoded
   }
 
-  console.log('✅ Supabase configurado com URL:', supabaseUrl.substring(0, 30) + '...')
-  return { supabaseUrl, supabaseAnonKey }
+  console.log('✅ Supabase configurado com URL:', supabaseUrl?.substring(0, 30) + '...')
+  return { supabaseUrl: supabaseUrl || SUPABASE_URL, supabaseAnonKey: supabaseAnonKey || SUPABASE_ANON_KEY }
 }
 
 // Criar cliente Supabase de forma segura
@@ -34,9 +35,9 @@ export function createSupabaseClient() {
       auth: {
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: true,
+        detectSessionInUrl: false, // Desabilitar detecção automática
         flowType: 'pkce',
-        debug: true
+        debug: false // Desabilitar debug para reduzir logs
       },
       global: {
         headers: {
@@ -45,7 +46,7 @@ export function createSupabaseClient() {
         fetch: (url, options = {}) => {
           return fetch(url, {
             ...options,
-            signal: AbortSignal.timeout(15000)
+            signal: AbortSignal.timeout(10000) // Reduzir timeout
           })
         }
       },
@@ -54,7 +55,7 @@ export function createSupabaseClient() {
       },
       realtime: {
         params: {
-          eventsPerSecond: 10
+          eventsPerSecond: 5 // Reduzir frequência
         }
       }
     })
@@ -64,12 +65,26 @@ export function createSupabaseClient() {
   }
 }
 
-// Cliente padrão exportado (lazy initialization)
+// Singleton global para evitar múltiplas instâncias
 let supabaseInstance: ReturnType<typeof createSupabaseClient> | null = null
+let isCreating = false
 
-export const supabase = (() => {
-  if (!supabaseInstance) {
-    supabaseInstance = createSupabaseClient()
+// Função para obter instância única
+export function getSupabaseInstance() {
+  if (!supabaseInstance && !isCreating) {
+    isCreating = true
+    try {
+      supabaseInstance = createSupabaseClient()
+      console.log('✅ Nova instância Supabase criada')
+    } catch (error) {
+      console.error('❌ Erro ao criar instância Supabase:', error)
+      throw error
+    } finally {
+      isCreating = false
+    }
   }
-  return supabaseInstance
-})()
+  return supabaseInstance!
+}
+
+// Cliente padrão exportado (sempre usa a mesma instância)
+export const supabase = getSupabaseInstance()

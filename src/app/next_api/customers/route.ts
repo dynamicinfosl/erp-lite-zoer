@@ -2,22 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { withPlanValidation } from '@/lib/plan-middleware';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImV4cCI6MjA3MjU5Mzc0M30.NBHrAlv8RPxu1QhLta76Uoh6Bc_OnqhfVydy8_TX6GQ';
 
-const supabaseAdmin = supabaseUrl && supabaseServiceKey 
-  ? createClient(supabaseUrl, supabaseServiceKey) 
-  : null;
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 // Handler original para criar cliente
 async function createCustomerHandler(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Cliente Supabase não configurado' },
-        { status: 500 }
-      );
-    }
 
     const body = await request.json();
     console.log('📝 Dados recebidos:', body);
@@ -97,9 +89,10 @@ async function createCustomerHandler(request: NextRequest) {
 async function listCustomersHandler(request: NextRequest) {
   try {
     if (!supabaseAdmin) {
+      console.error('❌ Cliente Supabase não configurado');
       return NextResponse.json(
-        { error: 'Cliente Supabase não configurado' },
-        { status: 500 }
+        { error: 'Sistema não configurado - entre em contato com o suporte' },
+        { status: 503 }
       );
     }
 
@@ -147,12 +140,6 @@ async function listCustomersHandler(request: NextRequest) {
 // Handler para atualizar cliente
 async function updateCustomerHandler(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Cliente Supabase não configurado' },
-        { status: 500 }
-      );
-    }
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -201,12 +188,6 @@ async function updateCustomerHandler(request: NextRequest) {
 // Handler para excluir cliente (soft delete se coluna existir, senão delete físico)
 async function deleteCustomerHandler(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Cliente Supabase não configurado' },
-        { status: 500 }
-      );
-    }
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
