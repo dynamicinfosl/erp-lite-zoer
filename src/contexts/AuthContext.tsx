@@ -149,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       // Promise.race para forçar timeout de 10 segundos na RPC
+      const rpcStartTime = Date.now();
       const rpcPromise = supabase.rpc('get_user_tenant', { p_user_id: user.id });
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('RPC_TIMEOUT')), 10000)
