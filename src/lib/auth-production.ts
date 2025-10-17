@@ -61,7 +61,7 @@ export class ProductionAuth {
 
       // Usar service role se disponível, senão usar client normal
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10';
-      const serviceSupabase = createClient(supabaseUrl, serviceRoleKey);
+      const serviceSupabase = createClient(supabaseUrl!, serviceRoleKey);
       
       const { data: tenant, error: tenantError } = await serviceSupabase
         .from('tenants')
