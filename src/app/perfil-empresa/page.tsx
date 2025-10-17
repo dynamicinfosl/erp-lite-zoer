@@ -87,7 +87,10 @@ export default function PerfilEmpresaPage() {
       setLoading(true);
 
       // Usar o tenant do contexto de autenticação
-      const tenantData = authTenant;
+      const tenantData: TenantData = {
+        ...authTenant,
+        slug: authTenant.slug || authTenant.name.toLowerCase().replace(/\s+/g, '-')
+      };
       
       console.log('📋 Dados do tenant carregados:', {
         name: tenantData.name,
