@@ -126,8 +126,9 @@ export async function getTopProducts(limit = 10): Promise<TopProductRow[]> {
     if (error) throw error
     const map = new Map<string, { sku: string; name: string; sold: number }>()
     for (const r of data || []) {
-      const sku = r.product?.sku || 'N/A'
-      const name = r.product?.name || 'Produto'
+      const product = Array.isArray(r.product) ? r.product[0] : r.product
+      const sku = product?.sku || 'N/A'
+      const name = product?.name || 'Produto'
       map.set(sku, { sku, name, sold: (map.get(sku)?.sold || 0) + Number(r.quantity || 0) })
     }
     const arr = Array.from(map.values()).sort((a, b) => b.sold - a.sold).slice(0, limit)
