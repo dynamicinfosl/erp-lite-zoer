@@ -50,7 +50,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   const createDefaultTenant = (userId: string) => {
     return {
       id: userId, // Usar user ID como ID único
-      name: 'Meu Negócio',
+      name: 'Minha Empresa',
       status: 'trial',
     };
   };
@@ -113,10 +113,34 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     // Verificar sessão e carregar tenant completo com timeout
     const initAuth = async () => {
       try {
+        console.log('🔍 Verificando sessão existente...');
+        
+        // Limpar qualquer sessão conflitante primeiro
+        if (typeof window !== 'undefined') {
+          // Verificar se há sessão de outro usuário em cache
+          const cachedUser = localStorage.getItem('sb-lfxietcasaooenffdodr-auth-token');
+          if (cachedUser) {
+            try {
+              const parsedUser = JSON.parse(cachedUser);
+              console.log('🔍 Sessão em cache encontrada:', parsedUser?.user?.email);
+            } catch (e) {
+              console.log('🧹 Limpando cache corrompido...');
+              localStorage.removeItem('sb-lfxietcasaooenffdodr-auth-token');
+            }
+          }
+        }
+        
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.log('⚠️ Erro na sessão, usando fallback');
+          console.log('⚠️ Erro na sessão, limpando e recomeçando');
+          // Limpar sessão com erro
+          await supabase.auth.signOut();
+          setSession(null);
+          setUser(null);
+          setTenant(null);
+          setLoading(false);
+          return;
         }
 
         setSession(session);
@@ -134,6 +158,10 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.error('❌ Erro na autenticação:', error);
+        // Em caso de erro, limpar tudo
+        setSession(null);
+        setUser(null);
+        setTenant(null);
       } finally {
         setLoading(false);
         console.log('✅ Autenticação inicializada');
@@ -223,10 +251,40 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
+      console.log('🚪 Iniciando logout...');
+      
+      // Limpar todos os dados locais
+      setSession(null);
+      setUser(null);
+      setTenant(null);
+      setSubscription(null);
+      
+      // Limpar localStorage e sessionStorage
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        // Limpar especificamente os dados do Supabase
+        const supabaseKeys = Object.keys(localStorage).filter(key => 
+          key.includes('supabase') || key.includes('sb-')
+        );
+        supabaseKeys.forEach(key => localStorage.removeItem(key));
+        
+        const sessionKeys = Object.keys(sessionStorage).filter(key => 
+          key.includes('supabase') || key.includes('sb-')
+        );
+        sessionKeys.forEach(key => sessionStorage.removeItem(key));
+      }
+      
+      // Fazer logout no Supabase
       await supabase.auth.signOut();
+      
+      console.log('✅ Logout concluído');
       router.push('/login');
     } catch (error) {
       console.error('❌ Erro ao fazer logout:', error);
+      // Mesmo com erro, redirecionar para login
+      router.push('/login');
     }
   };
 

@@ -97,24 +97,11 @@ async function createCustomerHandler(request: NextRequest) {
 async function listCustomersHandler(request: NextRequest) {
   try {
     if (!supabaseAdmin) {
-      console.error('❌ Cliente Supabase não configurado - retornando dados mock');
-      // Retornar dados mock para desenvolvimento
-      return NextResponse.json({ 
-        success: true, 
-        data: [
-          {
-            id: 1,
-            name: 'Cliente Exemplo',
-            email: 'cliente@exemplo.com',
-            phone: '(11) 99999-9999',
-            document: '123.456.789-00',
-            type: 'PF',
-            status: 'active',
-            tenant_id: '00000000-0000-0000-0000-000000000000',
-            created_at: new Date().toISOString()
-          }
-        ]
-      });
+      console.error('❌ Cliente Supabase não configurado');
+      return NextResponse.json(
+        { error: 'Sistema não configurado - entre em contato com o suporte' },
+        { status: 503 }
+      );
     }
 
     const { searchParams } = new URL(request.url);
