@@ -236,7 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: '40d6bd12-b8ce-472c-a2e5-4fd448b952fb',
           user_id: user.id,
           tenant_id: '5305296a-c1a1-4b9d-8934-e7b8bfc82565',
-          role: 'owner',
+          role: 'owner' as const,
           is_active: true,
           tenant: tenant
         }];
