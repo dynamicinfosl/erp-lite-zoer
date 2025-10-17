@@ -1,7 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { createSupabaseClient } from '@/lib/supabase-client';
 import { User, Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
@@ -131,7 +130,17 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         setTenant(tenantData);
       } else {
         console.log('👤 Nenhum usuário logado');
-        setTenant(null);
+        // Se a autenticação não estiver habilitada, criar tenant padrão
+        if (process.env.NEXT_PUBLIC_ENABLE_AUTH !== 'true') {
+          console.log('🔓 Auth desabilitada, criando tenant padrão');
+          setTenant({
+            id: '00000000-0000-0000-0000-000000000000',
+            name: 'Meu Negócio',
+            status: 'trial',
+          });
+        } else {
+          setTenant(null);
+        }
       }
       
       setLoading(false);

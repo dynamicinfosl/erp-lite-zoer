@@ -4,7 +4,7 @@ import React, { Suspense } from 'react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { PageLoadingSpinner } from '@/components/ui/loading-spinner';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 interface PageWrapperProps {
   children: React.ReactNode;
@@ -60,24 +60,44 @@ export function TenantPageWrapper({
   children, 
   fallback 
 }: Omit<PageWrapperProps, 'requireAuth'>) {
-  const { tenant, loading } = useSimpleAuth();
+  const { tenant, loading, user } = useSimpleAuth();
+  const router = useRouter();
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
 
-  if (loading) {
+  // Timeout de 3 segundos para loading infinito
+  useEffect(() => {
+    if (loading) {
+      const timer = setTimeout(() => {
+        setLoadingTimeout(true);
+      }, 3000);
+      return () => clearTimeout(timer);
+    } else {
+      setLoadingTimeout(false);
+    }
+  }, [loading]);
+
+  // Se está carregando há muito tempo, redirecionar para login
+  useEffect(() => {
+    if (loadingTimeout && !user) {
+      console.log('⏱️ Timeout de loading, redirecionando para login');
+      router.replace('/login');
+    }
+  }, [loadingTimeout, user, router]);
+
+  // Se está carregando, mostrar spinner
+  if (loading && !loadingTimeout) {
     return fallback || <PageLoadingSpinner />;
   }
 
-  if (!tenant?.id) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Carregando informações da conta...
-          </p>
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-        </div>
-      </div>
-    );
+  // Se não tem tenant mas tem usuário, permitir acesso (tenant será criado sob demanda)
+  // Se não tem nem tenant nem usuário, redirecionar para login
+  if (!tenant?.id && !user) {
+    console.log('🔒 Sem tenant e sem usuário, redirecionando para login');
+    router.replace('/login');
+    return null;
   }
 
+  // Se tem usuário mas não tem tenant, permitir acesso
+  // O tenant será criado automaticamente quando necessário
   return <>{children}</>;
 }

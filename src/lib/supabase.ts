@@ -1,16 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Lê as variáveis de ambiente SEM fallback para evitar conectar no projeto errado
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined
+// Credenciais hardcoded (fallback se as variáveis de ambiente não funcionarem)
+const HARDCODED_URL = 'https://lfxietcasaooenffdodr.supabase.co'
+const HARDCODED_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImV4cCI6MjA3MjU5Mzc0M30.NBHrAlv8RPxu1QhLta76Uoh6Bc_OnqhfVydy8_TX6GQ'
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  // Não lança erro aqui para não quebrar build; o erro ficará claro nos logs
-  // e nas chamadas de autenticação. Também ajuda durante setup local.
-  // Dica: configure .env.local com NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY
-  // Exemplos de arquivos: env.example, env.supabase.config
-  console.error('[Supabase] Variáveis de ambiente ausentes: NEXT_PUBLIC_SUPABASE_URL/ANON_KEY')
-}
+// Tenta ler das variáveis de ambiente primeiro, senão usa hardcoded
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || HARDCODED_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || HARDCODED_KEY
+
+console.log('[Supabase] Usando credenciais:', supabaseUrl.includes('lfxietcasaooenffdodr') ? 'HARDCODED ✅' : 'ENV VARS ✅')
 
 // Loga a origem (mascara parte do domínio) para diagnóstico
 try {

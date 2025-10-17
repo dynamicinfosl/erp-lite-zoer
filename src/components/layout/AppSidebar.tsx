@@ -86,6 +86,7 @@ const menuGroups = [
       { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Relatórios', url: '/relatorios', icon: BarChart3, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Perfil da Empresa', url: '/perfil-empresa', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Perfil do Usuário', url: '/perfil-usuario', icon: UserCog, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Assinatura', url: '/assinatura', icon: CreditCard, roles: ['admin', 'vendedor', 'financeiro'] },
       // Botão Administração oculto - acesso restrito apenas para usuário "julga"
       // { title: 'Administração', url: '/admin', icon: Shield, roles: ['admin'] },
@@ -98,18 +99,6 @@ function SidebarContentInternal() {
   const pathname = usePathname();
   const { user, tenant, signOut } = useSimpleAuth();
   
-  // Estados do modal de perfil
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [profileData, setProfileData] = useState({
-    name: '',
-    cpf: '',
-    rg: '',
-    birthDate: '',
-    gender: '',
-    email: '',
-    password: '••••••••••••',
-  });
-  const [isSavingProfile, setIsSavingProfile] = useState(false);
   
   // Simular perfil do usuário baseado no role ou usar um perfil padrão se auth estiver desabilitado
   const userRole = ENABLE_AUTH && user ? 'admin' : mockUserProfile.role;
@@ -118,50 +107,12 @@ function SidebarContentInternal() {
   const displayName = tenant?.name || 
     (user?.email ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ') : 'Meu Negócio');
   
-  // Carregar dados do perfil quando o modal abrir
-  useEffect(() => {
-    if (isProfileModalOpen) {
-      setProfileData({
-        name: user?.user_metadata?.name || displayName,
-        cpf: user?.user_metadata?.cpf || '',
-        rg: user?.user_metadata?.rg || '',
-        birthDate: user?.user_metadata?.birthDate || '',
-        gender: user?.user_metadata?.gender || '',
-        email: user?.email || 'usuario@empresa.com',
-        password: '••••••••••••',
-      });
-    }
-  }, [isProfileModalOpen, user, displayName]);
 
   const filteredGroups = menuGroups.map(group => ({
     title: group.title,
     items: group.items.filter(item => item.roles.includes(userRole)),
   })).filter(group => group.items.length > 0);
 
-  // Função para salvar perfil do usuário
-  const handleSaveProfile = async () => {
-    try {
-      setIsSavingProfile(true);
-      
-      // TODO: Implementar chamada à API para atualizar perfil
-      // await fetch('/next_api/user-profiles', {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(profileData),
-      // });
-      
-      // Simular delay de salvamento
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      alert('Perfil atualizado com sucesso!');
-      setIsProfileModalOpen(false);
-    } catch (error) {
-      console.error('Erro ao salvar perfil:', error);
-      alert('Erro ao salvar perfil. Tente novamente.');
-    } finally {
-      setIsSavingProfile(false);
-    }
-  };
 
   return (
     <Sidebar className="hidden lg:flex w-60 flex-col juga-sidebar-gradient text-white">
@@ -216,19 +167,7 @@ function SidebarContentInternal() {
                 {displayName}
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsProfileModalOpen(true)}
-                title="Editar perfil"
-                className="hover:bg-white/10"
-              >
-                <UserCog className="h-[1.2rem] w-[1.2rem] text-white" />
-                <span className="sr-only">Perfil do usuário</span>
-              </Button>
-              <ThemeToggle />
-            </div>
+            <ThemeToggle />
           </div>
           <Button
             variant="outline"
@@ -249,198 +188,6 @@ function SidebarContentInternal() {
           </Button>
         </div>
       </SidebarFooter>
-
-      {/* Modal de Edição de Perfil */}
-      <Dialog open={isProfileModalOpen} onOpenChange={setIsProfileModalOpen}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="border-b pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gray-100 rounded-lg">
-                <User className="h-5 w-5 text-gray-600" />
-              </div>
-              <div>
-                <DialogTitle className="text-xl font-semibold">Meus dados</DialogTitle>
-              </div>
-            </div>
-          </DialogHeader>
-          
-          <Tabs defaultValue="dados-gerais" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="dados-gerais">Dados gerais</TabsTrigger>
-              <TabsTrigger value="foto">Foto</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="dados-gerais" className="space-y-6">
-              {/* Primeira linha: Nome, CPF, RG */}
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1 space-y-2">
-                  <Label htmlFor="name" className="text-sm font-medium text-gray-700">
-                    Nome<span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="name"
-                    value={profileData.name}
-                    onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                    placeholder="Cláudio Alves"
-                    className="w-full h-10 border border-gray-300 rounded-md px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                
-                <div className="w-full md:w-48 space-y-2">
-                  <Label htmlFor="cpf" className="text-sm font-medium text-gray-700">
-                    CPF
-                  </Label>
-                  <Input
-                    id="cpf"
-                    value={profileData.cpf}
-                    onChange={(e) => setProfileData({ ...profileData, cpf: e.target.value })}
-                    placeholder=""
-                    className="w-full h-10 border border-gray-300 rounded-md px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                
-                <div className="w-full md:w-48 space-y-2">
-                  <Label htmlFor="rg" className="text-sm font-medium text-gray-700">
-                    RG
-                  </Label>
-                  <Input
-                    id="rg"
-                    value={profileData.rg}
-                    onChange={(e) => setProfileData({ ...profileData, rg: e.target.value })}
-                    placeholder=""
-                    className="w-full h-10 border border-gray-300 rounded-md px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Segunda linha: Data de nascimento, Sexo */}
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="w-full md:w-56 space-y-2">
-                  <Label htmlFor="birthDate" className="text-sm font-medium text-gray-700">
-                    Data de nascimento
-                  </Label>
-                  <Input
-                    id="birthDate"
-                    type="date"
-                    value={profileData.birthDate}
-                    onChange={(e) => setProfileData({ ...profileData, birthDate: e.target.value })}
-                    className="w-full h-10 border border-gray-300 rounded-md px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                
-                <div className="flex-1 space-y-2">
-                  <Label htmlFor="gender" className="text-sm font-medium text-gray-700">
-                    Sexo
-                  </Label>
-                  <select
-                    id="gender"
-                    value={profileData.gender}
-                    onChange={(e) => setProfileData({ ...profileData, gender: e.target.value })}
-                    className="w-full h-10 px-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Selecione</option>
-                    <option value="masculino">Masculino</option>
-                    <option value="feminino">Feminino</option>
-                    <option value="outro">Outro</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Seção: Dados de acesso */}
-              <div className="pt-6 border-t">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <span className="p-1 bg-gray-100 rounded">🔒</span>
-                  Dados de acesso
-                </h3>
-                
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <Label className="text-sm font-medium text-gray-700">E-mail</Label>
-                      <p className="text-sm text-gray-600 mt-1">{profileData.email}</p>
-                    </div>
-                    <Button variant="outline" size="sm" className="ml-4">
-                      ✉️ Alterar e-mail
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <Label className="text-sm font-medium text-gray-700">Senha</Label>
-                      <p className="text-sm text-gray-600 mt-1">{profileData.password}</p>
-                    </div>
-                    <Button variant="outline" size="sm" className="ml-4">
-                      🔑 Alterar senha
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <Label className="text-sm font-medium text-gray-700">Autenticação em duas etapas</Label>
-                      <p className="text-sm text-gray-500 mt-1">Adicione mais segurança à sua conta</p>
-                    </div>
-                    <Button variant="outline" size="sm" className="ml-4">
-                      🛡️ Habilitar autenticação
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <Label className="text-sm font-medium text-gray-700">Dispositivos autorizados</Label>
-                      <p className="text-sm text-gray-500 mt-1">Gerencie os dispositivos conectados</p>
-                    </div>
-                    <Button variant="outline" size="sm" className="ml-4">
-                      💻 Gerenciar dispositivos
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="foto" className="space-y-6">
-              <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                <div className="w-32 h-32 bg-gray-200 rounded-full flex items-center justify-center">
-                  <User className="h-16 w-16 text-gray-400" />
-                </div>
-                <p className="text-sm text-gray-600">Nenhuma foto selecionada</p>
-                <Button variant="outline" className="mt-4">
-                  📷 Escolher foto
-                </Button>
-              </div>
-            </TabsContent>
-          </Tabs>
-
-          {/* Botões de Ação */}
-          <div className="flex justify-end gap-3 pt-4 border-t mt-6">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsProfileModalOpen(false)}
-              disabled={isSavingProfile}
-              className="text-red-600 border-red-300 hover:bg-red-50"
-            >
-              ✕ Cancelar
-            </Button>
-            <Button
-              type="button"
-              onClick={handleSaveProfile}
-              disabled={isSavingProfile}
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              {isSavingProfile ? (
-                <>
-                  <span className="inline-block animate-spin mr-2">⏳</span>
-                  Salvando...
-                </>
-              ) : (
-                <>
-                  ✓ Atualizar
-                </>
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </Sidebar>
   );
 }
