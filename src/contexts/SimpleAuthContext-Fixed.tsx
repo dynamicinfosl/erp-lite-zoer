@@ -42,9 +42,13 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true); // ✅ INICIAR COM LOADING
   
-  const router = useRouter();
-  // Usar o cliente Supabase configurado de forma segura (singleton)
-  const supabase = React.useMemo(() => createSupabaseClient(), []);
+      const router = useRouter();
+      // Usar o cliente Supabase singleton global
+      const supabase = React.useMemo(() => {
+        // Importar dinamicamente para garantir singleton
+        const { getSupabaseInstance } = require('@/lib/supabase-client');
+        return getSupabaseInstance();
+      }, []);
 
   // Função SUPER SIMPLES - Cria tenant local
   const createDefaultTenant = (userId: string) => {
@@ -106,7 +110,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Carregar sessão inicial - VERSÃO SIMPLIFICADA
+  // Carregar sessão inicial - VERSÃO ULTRA SIMPLIFICADA
   useEffect(() => {
     console.log('🔄 Iniciando autenticação...');
     
@@ -119,21 +123,15 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       try {
         console.log('🔍 Verificando sessão existente...');
         
-        // Aguardar um pouco para evitar conflitos de inicialização
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Verificação simples e direta
+        const { data: { session } } = await supabase.auth.getSession();
         
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.log('⚠️ Erro na sessão:', error.message);
-        }
-
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
           console.log('👤 Usuário encontrado:', session.user.email);
-          // Buscar dados completos do tenant
+          // Buscar tenant de forma mais simples
           const tenantData = await loadRealTenant(session.user.id);
           console.log('🏢 Tenant carregado:', tenantData);
           setTenant(tenantData);
@@ -152,54 +150,42 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Timeout de segurança mais curto
+    // Timeout mais curto
     const timeoutId = setTimeout(() => {
       if (!isInitialized) {
-        console.log('⏰ Timeout na inicialização - forçando fim do loading');
+        console.log('⏰ Timeout na inicialização');
         setLoading(false);
         isInitialized = true;
       }
-    }, 15000); // 15 segundos
+    }, 10000); // 10 segundos
 
     initAuth().finally(() => {
       clearTimeout(timeoutId);
     });
-  }, []);
+  }, [supabase]);
 
-  // Escutar mudanças de autenticação - VERSÃO SIMPLIFICADA
+  // Escutar mudanças de autenticação - VERSÃO ULTRA SIMPLIFICADA
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔄 Auth state changed:', event);
         
-        try {
-          if (event === 'SIGNED_IN' && session?.user) {
-            setSession(session);
-            setUser(session.user);
-            // Buscar dados completos do tenant
-            const tenantData = await loadRealTenant(session.user.id);
-            console.log('🏢 Tenant carregado via auth change:', tenantData);
-            setTenant(tenantData);
-          } else if (event === 'SIGNED_OUT') {
-            setSession(null);
-            setUser(null);
-            setTenant(null);
-            setSubscription(null);
-          }
-        } catch (error) {
-          console.error('❌ Erro no auth state change:', error);
-        } finally {
+        if (event === 'SIGNED_IN' && session?.user) {
+          setSession(session);
+          setUser(session.user);
+          setLoading(false);
+        } else if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setUser(null);
+          setTenant(null);
+          setSubscription(null);
           setLoading(false);
         }
       }
     );
 
     return () => {
-      try {
-        subscription.unsubscribe();
-      } catch (error) {
-        console.log('⚠️ Erro ao desinscrever:', error);
-      }
+      subscription.unsubscribe();
     };
   }, [supabase]);
 

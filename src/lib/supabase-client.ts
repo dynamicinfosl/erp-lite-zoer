@@ -65,18 +65,26 @@ export function createSupabaseClient() {
   }
 }
 
-// Cliente padrão exportado (lazy initialization com proteção)
+// Singleton global para evitar múltiplas instâncias
 let supabaseInstance: ReturnType<typeof createSupabaseClient> | null = null
 let isCreating = false
 
-export const supabase = (() => {
+// Função para obter instância única
+export function getSupabaseInstance() {
   if (!supabaseInstance && !isCreating) {
     isCreating = true
     try {
       supabaseInstance = createSupabaseClient()
+      console.log('✅ Nova instância Supabase criada')
+    } catch (error) {
+      console.error('❌ Erro ao criar instância Supabase:', error)
+      throw error
     } finally {
       isCreating = false
     }
   }
   return supabaseInstance
-})()
+}
+
+// Cliente padrão exportado (sempre usa a mesma instância)
+export const supabase = getSupabaseInstance()
