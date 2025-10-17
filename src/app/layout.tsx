@@ -5,7 +5,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { SimpleAuthProvider } from "@/contexts/SimpleAuthContext-Fixed";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Toaster } from "@/components/ui/toaster";
-import ZoerCopilot from "@/components/ZoerCopilot";
+import { SonnerProvider } from "@/components/SonnerProvider";
 import { ErrorHandler } from "@/components/ErrorHandler";
 
 import "./globals.css";
@@ -51,8 +51,7 @@ export default function RootLayout({
             </AppLayout>
             <ErrorHandler />
             <Toaster />
-            {/* Renderizar ZoerCopilot apenas quando habilitado por envs */}
-            {process.env.NEXT_PUBLIC_ENABLE_ZOER === 'true' && <ZoerCopilot />}
+            <SonnerProvider />
           </SimpleAuthProvider>
         </ThemeProvider>
       </body>

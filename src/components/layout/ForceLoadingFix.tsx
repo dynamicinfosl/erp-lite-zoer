@@ -14,7 +14,7 @@ export function ForceLoadingFix({ children }: ForceLoadingFixProps) {
       const loadingElements = document.querySelectorAll('[data-loading="true"]');
       loadingElements.forEach(element => {
         element.removeAttribute('data-loading');
-        element.style.display = 'none';
+        (element as HTMLElement).style.display = 'none';
       });
 
       // Log para debug

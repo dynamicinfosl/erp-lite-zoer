@@ -157,15 +157,10 @@ async function listSalesHandler(request: NextRequest) {
 
     console.log(`💰 GET /sales - tenant_id: ${tenant_id}, today: ${today}`);
 
+    // Buscar apenas as vendas (sem JOIN para evitar erro de relacionamento)
     let query = supabaseAdmin
       .from('sales')
-      .select(`
-        *,
-        items:sale_items(
-          *,
-          product:products(name, price)
-        )
-      `);
+      .select('*');
 
     // Filtrar por tenant_id se fornecido
     if (tenant_id && tenant_id !== '00000000-0000-0000-0000-000000000000') {
@@ -208,7 +203,7 @@ async function listSalesHandler(request: NextRequest) {
       try {
         let fallbackQuery = supabaseAdmin
           .from('sales')
-          .select(`*, items:sale_items(*, product:products(name, price))`);
+          .select('*');
         if (today === 'true') {
           const clientOffsetMin = Number.isFinite(Number(searchParams.get('tz'))) ? parseInt(searchParams.get('tz') as string, 10) : 0;
           const startLocal = new Date(); startLocal.setHours(0,0,0,0);

@@ -15,6 +15,11 @@ const adminRoutes = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
+  // Ignorar completamente a rota de cupom
+  if (pathname.startsWith('/cupom/')) {
+    return NextResponse.next();
+  }
+  
   // Verificar se a autenticação está habilitada
   const enableAuth = process.env.NEXT_PUBLIC_ENABLE_AUTH === 'true';
   
@@ -71,10 +76,11 @@ export const config = {
     /*
      * Match all request paths except for the ones starting with:
      * - api (API routes)
+     * - next_api (custom API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|next_api|_next/static|_next/image|favicon.ico).*)',
   ],
 };

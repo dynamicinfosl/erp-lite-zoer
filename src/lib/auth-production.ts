@@ -1,10 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { User } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = supabaseUrl && supabaseAnonKey 
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
 
 export interface Tenant {
   id: string;
@@ -31,6 +33,10 @@ export class ProductionAuth {
     phone?: string 
   }) {
     try {
+      if (!supabase) {
+        throw new Error('Cliente Supabase não configurado');
+      }
+
       // 1. Criar usuário
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -55,7 +61,7 @@ export class ProductionAuth {
 
       // Usar service role se disponível, senão usar client normal
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10';
-      const serviceSupabase = createClient(supabaseUrl, serviceRoleKey);
+      const serviceSupabase = createClient(supabaseUrl!, serviceRoleKey);
       
       const { data: tenant, error: tenantError } = await serviceSupabase
         .from('tenants')
@@ -101,6 +107,10 @@ export class ProductionAuth {
   }
 
   static async signIn(email: string, password: string) {
+    if (!supabase) {
+      throw new Error('Cliente Supabase não configurado');
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -111,12 +121,20 @@ export class ProductionAuth {
   }
 
   static async signOut() {
+    if (!supabase) {
+      throw new Error('Cliente Supabase não configurado');
+    }
+
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   }
 
   static async getCurrentUser(): Promise<AuthUser | null> {
     try {
+      if (!supabase) {
+        return null;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) return null;
@@ -177,6 +195,10 @@ export class ProductionAuth {
       console.error('💥 Erro geral no getCurrentUser:', error);
       // Em caso de erro, retornar usuário sem tenant
       try {
+        if (!supabase) {
+          return null;
+        }
+        
         const { data: { user } } = await supabase.auth.getUser();
         return user ? { ...user, currentTenant: undefined, role: undefined } as AuthUser : null;
       } catch {

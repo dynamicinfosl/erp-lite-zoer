@@ -407,7 +407,7 @@ export default function AssinaturaPage() {
                 </div>
               </div>
             </div>
-          ) : currentPlan !== 'trial' && subscription?.plan ? (
+          ) : (currentPlan as string) !== 'trial' && subscription?.plan ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
                 <div className={`p-2 rounded-lg ${currentInfo.bgColor}`}>
@@ -450,7 +450,7 @@ export default function AssinaturaPage() {
                            label === 'Produtos' ? getUsagePercentage('product') : 
                            getUsagePercentage('user')}
                   current={current}
-                  total={total}
+                  total={typeof total === 'number' ? total : undefined}
                   color="primary"
                 />
               ))}

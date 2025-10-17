@@ -1,12 +1,11 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Phone, Clock, CheckCircle, Truck, Navigation } from 'lucide-react';
-import { Delivery } from '@/types';
 import { toast } from 'sonner';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 
@@ -26,14 +25,7 @@ export default function EntregadorPage() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchMyDeliveries();
-    // Atualizar a cada 30 segundos
-    const interval = setInterval(fetchMyDeliveries, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchMyDeliveries = async () => {
+  const fetchMyDeliveries = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -51,7 +43,7 @@ export default function EntregadorPage() {
       const today = new Date().toISOString().split('T')[0];
       const myDeliveries = data.filter((delivery: any) => 
         (delivery.created_at || '').startsWith(today) && 
-        (delivery.status === 'em_rota' || delivery.status === 'aguardando')
+        (delivery.status === 'in-progress' || delivery.status === 'pending')
       );
       
       setDeliveries(myDeliveries);
@@ -62,7 +54,14 @@ export default function EntregadorPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenant?.id]);
+
+  useEffect(() => {
+    fetchMyDeliveries();
+    // Atualizar a cada 30 segundos
+    const interval = setInterval(fetchMyDeliveries, 30000);
+    return () => clearInterval(interval);
+  }, [fetchMyDeliveries]);
 
   const handleStartDelivery = async (deliveryId: number) => {
     try {
@@ -71,7 +70,7 @@ export default function EntregadorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           id: deliveryId, 
-          status: 'em_rota',
+          status: 'in-progress',
           tenant_id: tenant?.id 
         })
       });
@@ -95,7 +94,7 @@ export default function EntregadorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           id: deliveryId, 
-          status: 'entregue',
+          status: 'delivered',
           tenant_id: tenant?.id 
         })
       });
@@ -118,19 +117,19 @@ export default function EntregadorPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'aguardando':
+      case 'pending':
         return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Aguardando Saída</Badge>;
-      case 'em_rota':
+      case 'in-progress':
         return <Badge variant="default"><Truck className="h-3 w-3 mr-1" />Em Rota</Badge>;
-      case 'entregue':
+      case 'delivered':
         return <Badge variant="outline"><CheckCircle className="h-3 w-3 mr-1" />Entregue</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  const pendingDeliveries = deliveries.filter(d => d.status === 'aguardando');
-  const inRouteDeliveries = deliveries.filter(d => d.status === 'em_rota');
+  const pendingDeliveries = deliveries.filter(d => d.status === 'pending');
+  const inRouteDeliveries = deliveries.filter(d => d.status === 'in-progress');
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -190,14 +189,14 @@ export default function EntregadorPage() {
                       <div className="flex items-start justify-between">
                         <div className="space-y-3 flex-1">
                           <div>
-                            <h3 className="font-semibold text-lg">{delivery.customerName || delivery.customer?.name || 'Cliente'}</h3>
+                            <h3 className="font-semibold text-lg">{delivery.customerName || 'Cliente'}</h3>
                             {getStatusBadge(delivery.status)}
                           </div>
                           
                           <div className="flex items-start gap-2">
                             <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
                             <div>
-                              <div className="font-medium">{delivery.address || delivery.delivery_address || 'Endereço não informado'}</div>
+                              <div className="font-medium">{delivery.address || 'Endereço não informado'}</div>
                               {/* Assuming neighborhood is not directly available in the new mock data */}
                               {/* {delivery.neighborhood && (
                                 <div className="text-sm text-muted-foreground">{delivery.neighborhood}</div>
@@ -222,7 +221,7 @@ export default function EntregadorPage() {
 
                         <div className="flex flex-col gap-2 ml-4">
                           <Button
-                            onClick={() => openMaps(delivery.address || delivery.delivery_address || '')}
+                            onClick={() => openMaps(delivery.address || '')}
                             variant="outline"
                             size="sm"
                           >
@@ -256,14 +255,14 @@ export default function EntregadorPage() {
                       <div className="flex items-start justify-between">
                         <div className="space-y-3 flex-1">
                           <div>
-                            <h3 className="font-semibold text-lg">{delivery.customerName || delivery.customer?.name || 'Cliente'}</h3>
+                            <h3 className="font-semibold text-lg">{delivery.customerName || 'Cliente'}</h3>
                             {getStatusBadge(delivery.status)}
                           </div>
                           
                           <div className="flex items-start gap-2">
                             <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
                             <div>
-                              <div className="font-medium">{delivery.address || delivery.delivery_address || 'Endereço não informado'}</div>
+                              <div className="font-medium">{delivery.address || 'Endereço não informado'}</div>
                               {/* Assuming neighborhood is not directly available in the new mock data */}
                               {/* {delivery.neighborhood && (
                                 <div className="text-sm text-muted-foreground">{delivery.neighborhood}</div>
@@ -293,7 +292,7 @@ export default function EntregadorPage() {
 
                         <div className="flex flex-col gap-2 ml-4">
                           <Button
-                            onClick={() => openMaps(delivery.address || delivery.delivery_address || '')}
+                            onClick={() => openMaps(delivery.address || '')}
                             variant="outline"
                             size="sm"
                           >

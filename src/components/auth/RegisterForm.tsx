@@ -81,15 +81,7 @@ export function RegisterForm({
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="complete" className="space-y-4">
-              <div className="text-center space-y-2">
-                <h3 className="text-lg font-semibold">Cadastro Completo da Empresa</h3>
-                <p className="text-sm text-gray-600">
-                  Coleta todos os dados da empresa, responsável e endereço. 
-                  Ideal para empresas que querem configurar tudo de uma vez.
-                </p>
-              </div>
-              
+            <TabsContent value="complete" className="space-y-6">
               <CompleteRegisterForm 
                 onSuccess={handleCompleteRegistration}
                 onSwitchToLogin={onSwitchToLogin}
@@ -119,19 +111,6 @@ export function RegisterForm({
               <p className="text-red-800 text-sm">{error}</p>
             </div>
           )}
-
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              Já tem uma conta?{' '}
-              <button
-                type="button"
-                onClick={onSwitchToLogin}
-                className="text-blue-600 hover:underline font-medium"
-              >
-                Faça login
-              </button>
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>

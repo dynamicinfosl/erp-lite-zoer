@@ -40,8 +40,24 @@ export function PlanLimitGuard({ children, operation, fallback }: PlanLimitGuard
     );
   }
 
+  // Mapear operação para tipo esperado pela função canCreate
+  const getOperationType = (op: string): 'customer' | 'product' | 'user' => {
+    switch (op) {
+      case 'create_customer':
+        return 'customer';
+      case 'create_product':
+        return 'product';
+      case 'create_user':
+        return 'user';
+      case 'create_sale':
+        return 'customer'; // Vendas são limitadas por clientes
+      default:
+        return 'customer';
+    }
+  };
+
   // Se não pode criar o item, mostrar aviso
-  if (!canCreate(operation)) {
+  if (!canCreate(getOperationType(operation))) {
     const getOperationInfo = () => {
       switch (operation) {
         case 'create_customer':

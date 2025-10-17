@@ -193,7 +193,6 @@ export default function FornecedoresPage() {
 
   const exportXLSX = async () => {
     try {
-      // @ts-expect-error dependência opcional carregada dinamicamente
       const XLSX = await import('xlsx');
       const rows = [
         ['Nome', 'Doc', 'Telefone', 'Situação'],
@@ -430,7 +429,6 @@ export default function FornecedoresPage() {
       let headers: string[] = [];
 
       if (ext === 'xlsx' || ext === 'xls') {
-        // @ts-expect-error dependência opcional carregada dinamicamente
         const XLSX = await import('xlsx');
         const data = await file.arrayBuffer();
         const wb = XLSX.read(data);

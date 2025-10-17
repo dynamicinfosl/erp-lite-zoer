@@ -239,30 +239,30 @@ export default function RealDashboard() {
         <JugaKPICard
           title="Vendas Hoje"
           value={`R$ ${data.totalSales.toFixed(2)}`}
-          change="+12.5%"
-          changeType="positive"
-          icon={DollarSign}
+          trend="up"
+          trendValue="+12.5%"
+          icon={<DollarSign className="h-5 w-5" />}
         />
         <JugaKPICard
           title="Total de Clientes"
           value={data.totalCustomers.toString()}
-          change="+8.2%"
-          changeType="positive"
-          icon={Users}
+          trend="up"
+          trendValue="+8.2%"
+          icon={<Users className="h-5 w-5" />}
         />
         <JugaKPICard
           title="Produtos Ativos"
           value={data.totalProducts.toString()}
-          change="+3.1%"
-          changeType="positive"
-          icon={Package}
+          trend="up"
+          trendValue="+3.1%"
+          icon={<Package className="h-5 w-5" />}
         />
         <JugaKPICard
           title="Vendas Realizadas"
           value={data.sales.length.toString()}
-          change="+15.3%"
-          changeType="positive"
-          icon={ShoppingCart}
+          trend="up"
+          trendValue="+15.3%"
+          icon={<ShoppingCart className="h-5 w-5" />}
         />
       </div>
 

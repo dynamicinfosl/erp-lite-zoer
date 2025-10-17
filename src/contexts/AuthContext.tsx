@@ -66,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadUserData = useCallback(async (user: User) => {
     console.log('📍 Carregando tenant para:', user.email);
+    const startTime = Date.now();
     
     const timeout = setTimeout(() => {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -83,14 +84,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('🔍 Carregando dados do usuário:', user.email);
       console.log('🔍 User ID:', user.id);
-      console.log('🔍 Supabase URL:', supabase.supabaseUrl);
       
       // Tentar usar função RPC otimizada primeiro
       console.log('🚀 Tentando RPC otimizada...');
       console.log('🔑 Parâmetro user.id:', user.id);
       console.log('🔑 Tipo:', typeof user.id);
-      
-      const rpcStartTime = Date.now();
       
       // Verificar cache local primeiro (acelera logins subsequentes)
       const cacheKey = `tenant_cache_${user.id}`;
@@ -148,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       // Promise.race para forçar timeout de 10 segundos na RPC
+      const rpcStartTime = Date.now();
       const rpcPromise = supabase.rpc('get_user_tenant', { p_user_id: user.id });
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('RPC_TIMEOUT')), 10000)
@@ -155,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       let rpcData, rpcError;
       try {
-        const result = await Promise.race([rpcPromise, timeoutPromise]);
+        const result = await Promise.race([rpcPromise, timeoutPromise]) as { data: any; error: any };
         rpcData = result.data;
         rpcError = result.error;
       } catch (error: any) {
@@ -237,7 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: '40d6bd12-b8ce-472c-a2e5-4fd448b952fb',
           user_id: user.id,
           tenant_id: '5305296a-c1a1-4b9d-8934-e7b8bfc82565',
-          role: 'owner',
+          role: 'owner' as const,
           is_active: true,
           tenant: tenant
         }];

@@ -9,14 +9,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
   // e nas chamadas de autenticação. Também ajuda durante setup local.
   // Dica: configure .env.local com NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY
   // Exemplos de arquivos: env.example, env.supabase.config
-  // eslint-disable-next-line no-console
   console.error('[Supabase] Variáveis de ambiente ausentes: NEXT_PUBLIC_SUPABASE_URL/ANON_KEY')
 }
 
 // Loga a origem (mascara parte do domínio) para diagnóstico
 try {
   const maskedUrl = supabaseUrl ? supabaseUrl.replace(/(https?:\/\/)([^.]+)/, '$1***') : 'undefined'
-  // eslint-disable-next-line no-console
   console.log(`[Supabase] URL em uso: ${maskedUrl}`)
 } catch {}
 

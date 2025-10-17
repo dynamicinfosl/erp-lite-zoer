@@ -37,6 +37,13 @@ export default function RelatoriosPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [report, setReport] = useState<any | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'30days' | 'thismonth' | 'sales' | 'products'>('30days');
+  const [activeExport, setActiveExport] = useState<'all' | 'financial' | 'sales' | 'logistics'>('all');
+  
+  // Log do estado inicial
+  console.log('🎯 Estado inicial - activeFilter:', activeFilter);
+  console.log('🎯 Estado inicial - activeExport:', activeExport);
   const [dateRange, setDateRange] = useState(() => {
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -58,22 +65,25 @@ export default function RelatoriosPage() {
       }
 
       const tz = -new Date().getTimezoneOffset();
-      const [salesRes, productsRes, transactionsRes, deliveriesRes] = await Promise.allSettled([
+      const [salesRes, productsRes, transactionsRes, deliveriesRes, reportRes] = await Promise.allSettled([
         fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}&tz=${tz}`),
         fetch(`/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`),
         fetch(`/next_api/financial-transactions?tenant_id=${encodeURIComponent(tenant.id)}`),
         fetch(`/next_api/deliveries?tenant_id=${encodeURIComponent(tenant.id)}`),
+        fetch(`/next_api/reports/sales?tenant_id=${encodeURIComponent(tenant.id)}&start=${dateRange.start}&end=${dateRange.end}`),
       ]);
 
       const salesData = salesRes.status === 'fulfilled' ? await salesRes.value.json() : { data: [] };
       const productsData = productsRes.status === 'fulfilled' ? await productsRes.value.json() : { data: [] };
       const transactionsData = transactionsRes.status === 'fulfilled' ? await transactionsRes.value.json() : { data: [] };
       const deliveriesData = deliveriesRes.status === 'fulfilled' ? await deliveriesRes.value.json() : { data: [] };
+      const reportData = reportRes.status === 'fulfilled' ? await reportRes.value.json() : null;
 
       setSales(Array.isArray(salesData?.data) ? salesData.data : (salesData?.rows || []));
       setProducts(Array.isArray(productsData?.data) ? productsData.data : (productsData?.rows || []));
       setTransactions(Array.isArray(transactionsData?.data) ? transactionsData.data : (transactionsData?.rows || []));
       setDeliveries(Array.isArray(deliveriesData?.data) ? deliveriesData.data : (deliveriesData?.rows || []));
+      setReport(reportData);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
@@ -82,12 +92,14 @@ export default function RelatoriosPage() {
   };
 
   useEffect(() => {
+    console.log('🔄 useEffect disparado - tenant:', tenant?.id, 'dateRange:', dateRange);
     if (!tenant?.id) {
       setLoading(false);
       return;
     }
+    console.log('📊 Carregando dados...');
     loadData();
-  }, [tenant?.id]);
+  }, [tenant?.id, dateRange]);
 
   const formatCurrency = useCallback(
     (value: number) =>
@@ -97,6 +109,81 @@ export default function RelatoriosPage() {
       }).format(value),
     [],
   );
+
+  const exportReportCSV = useCallback(() => {
+    try {
+      const rows: string[] = [];
+      rows.push(['Data','Receita','Custo','Lucro'].join(','));
+      const items = report?.items || [];
+      for (const it of items) {
+        const date = new Date(it.date).toLocaleDateString('pt-BR');
+        rows.push([
+          date,
+          (it.revenue ?? 0).toFixed(2).replace('.', ','),
+          (it.cost ?? 0).toFixed(2).replace('.', ','),
+          (it.profit ?? 0).toFixed(2).replace('.', ',')
+        ].join(','));
+      }
+      rows.push('');
+      rows.push(['Totais',
+        (report?.totalRevenue ?? 0).toFixed(2).replace('.', ','),
+        (report?.totalCost ?? 0).toFixed(2).replace('.', ','),
+        (report?.totalProfit ?? 0).toFixed(2).replace('.', ','),
+      ].join(','));
+
+      const csv = rows.join('\n');
+      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-custo-lucro-${dateRange.start}_a_${dateRange.end}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Falha ao exportar CSV', e);
+    }
+  }, [report, dateRange]);
+
+  const handleFilterChange = useCallback((filter: '30days' | 'thismonth' | 'sales' | 'products') => {
+    console.log('🔄 Filtro clicado:', filter);
+    console.log('🔄 Estado atual activeFilter:', activeFilter);
+    setActiveFilter(filter);
+    console.log('🔄 Novo estado será:', filter);
+    
+    const now = new Date();
+    let newDateRange = { ...dateRange };
+    
+    switch (filter) {
+      case '30days':
+        const thirtyDaysAgo = new Date(now);
+        thirtyDaysAgo.setDate(now.getDate() - 30);
+        newDateRange = {
+          start: thirtyDaysAgo.toISOString().split('T')[0],
+          end: now.toISOString().split('T')[0],
+        };
+        console.log('📅 Últimos 30 dias:', newDateRange);
+        break;
+      case 'thismonth':
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        newDateRange = {
+          start: firstDay.toISOString().split('T')[0],
+          end: now.toISOString().split('T')[0],
+        };
+        console.log('📅 Este mês:', newDateRange);
+        break;
+      case 'sales':
+      case 'products':
+        console.log('📊 Filtro de categoria:', filter);
+        // Para filtros de categoria, mantém o período atual
+        break;
+    }
+    
+    console.log('✅ Atualizando dateRange para:', newDateRange);
+    setDateRange(newDateRange);
+  }, [dateRange]);
+
 
   const filteredSales = useMemo(
     () =>
@@ -124,6 +211,181 @@ export default function RelatoriosPage() {
       }),
     [deliveries, dateRange],
   );
+
+  const exportAllData = useCallback(() => {
+    try {
+      const rows: string[] = [];
+      rows.push(['Tipo','Data','Descrição','Valor','Status'].join(','));
+      
+      // Vendas
+      filteredSales.forEach(sale => {
+        const date = new Date(sale.sold_at || sale.created_at || '').toLocaleDateString('pt-BR');
+        rows.push([
+          'Venda',
+          date,
+          `Venda #${sale.id}`,
+          (sale.total_amount || 0).toFixed(2).replace('.', ','),
+          sale.status || 'Concluída'
+        ].join(','));
+      });
+      
+      // Transações
+      filteredTransactions.forEach(transaction => {
+        const date = new Date(transaction.created_at || '').toLocaleDateString('pt-BR');
+        rows.push([
+          'Transação',
+          date,
+          transaction.description || 'Transação financeira',
+          (transaction.amount || 0).toFixed(2).replace('.', ','),
+          transaction.status || 'Processada'
+        ].join(','));
+      });
+      
+      // Entregas
+      filteredDeliveries.forEach(delivery => {
+        const date = new Date(delivery.created_at || '').toLocaleDateString('pt-BR');
+        rows.push([
+          'Entrega',
+          date,
+          `Entrega #${delivery.id}`,
+          (delivery.delivery_cost || 0).toFixed(2).replace('.', ','),
+          delivery.status || 'Pendente'
+        ].join(','));
+      });
+
+      const csv = rows.join('\n');
+      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-completo-${dateRange.start}_a_${dateRange.end}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Falha ao exportar dados completos', e);
+    }
+  }, [filteredSales, filteredTransactions, filteredDeliveries, dateRange]);
+
+  const exportFinancialReport = useCallback(() => {
+    try {
+      const rows: string[] = [];
+      rows.push(['Data','Tipo','Descrição','Valor','Status'].join(','));
+      
+      filteredTransactions.forEach(transaction => {
+        const date = new Date(transaction.created_at || '').toLocaleDateString('pt-BR');
+        rows.push([
+          date,
+          transaction.type || 'Transação',
+          transaction.description || 'Transação financeira',
+          (transaction.amount || 0).toFixed(2).replace('.', ','),
+          transaction.status || 'Processada'
+        ].join(','));
+      });
+
+      const csv = rows.join('\n');
+      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-financeiro-${dateRange.start}_a_${dateRange.end}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Falha ao exportar relatório financeiro', e);
+    }
+  }, [filteredTransactions, dateRange]);
+
+  const exportSalesReport = useCallback(() => {
+    try {
+      const rows: string[] = [];
+      rows.push(['Data','ID Venda','Cliente','Produtos','Valor Total','Status'].join(','));
+      
+      filteredSales.forEach(sale => {
+        const date = new Date(sale.sold_at || sale.created_at || '').toLocaleDateString('pt-BR');
+        rows.push([
+          date,
+          sale.id || '',
+          sale.customer_name || 'Cliente não informado',
+          sale.items?.length || 0,
+          (sale.total_amount || 0).toFixed(2).replace('.', ','),
+          sale.status || 'Concluída'
+        ].join(','));
+      });
+
+      const csv = rows.join('\n');
+      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-vendas-${dateRange.start}_a_${dateRange.end}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Falha ao exportar relatório de vendas', e);
+    }
+  }, [filteredSales, dateRange]);
+
+  const exportLogisticsReport = useCallback(() => {
+    try {
+      const rows: string[] = [];
+      rows.push(['Data','ID Entrega','Cliente','Endereço','Status','Custo'].join(','));
+      
+      filteredDeliveries.forEach(delivery => {
+        const date = new Date(delivery.created_at || '').toLocaleDateString('pt-BR');
+        rows.push([
+          date,
+          delivery.id || '',
+          delivery.customer_name || 'Cliente não informado',
+          delivery.delivery_address || 'Endereço não informado',
+          delivery.status || 'Pendente',
+          (delivery.delivery_cost || 0).toFixed(2).replace('.', ',')
+        ].join(','));
+      });
+
+      const csv = rows.join('\n');
+      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-logistica-${dateRange.start}_a_${dateRange.end}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Falha ao exportar relatório de logística', e);
+    }
+  }, [filteredDeliveries, dateRange]);
+
+  const handleExportChange = useCallback((exportType: 'all' | 'financial' | 'sales' | 'logistics') => {
+    console.log('📤 Exportação clicada:', exportType);
+    setActiveExport(exportType);
+    
+    switch (exportType) {
+      case 'all':
+        console.log('📊 Exportando todos os dados...');
+        exportAllData();
+        break;
+      case 'financial':
+        console.log('💰 Exportando relatório financeiro...');
+        exportFinancialReport();
+        break;
+      case 'sales':
+        console.log('🛒 Exportando vendas detalhadas...');
+        exportSalesReport();
+        break;
+      case 'logistics':
+        console.log('🚚 Exportando dados de logística...');
+        exportLogisticsReport();
+        break;
+    }
+  }, [exportAllData, exportFinancialReport, exportSalesReport, exportLogisticsReport]);
 
   const salesStats = useMemo(() => {
     const totalAmount = filteredSales.reduce((sum, sale) => sum + (sale.final_amount || sale.total_amount || sale.total || 0), 0);
@@ -200,12 +462,21 @@ export default function RelatoriosPage() {
     () => [
       {
         title: 'Faturamento no período',
-        value: formatCurrency(salesStats.totalAmount),
+        value: formatCurrency(report?.totalRevenue ?? salesStats.totalAmount),
         description: `${salesStats.totalSales} vendas concluídas`,
         trend: 'up' as const,
         trendValue: '+8,2%',
         icon: <DollarSign className="h-5 w-5" />,
         color: 'primary' as const,
+      },
+      {
+        title: 'Lucro no período',
+        value: formatCurrency(report?.totalProfit ?? 0),
+        description: `Margem ${report ? report.profitMargin + '%' : '-'}`,
+        trend: 'neutral' as const,
+        trendValue: '—',
+        icon: <TrendingUp className="h-5 w-5" />,
+        color: 'accent' as const,
       },
       {
         title: 'Ticket médio',
@@ -338,45 +609,34 @@ export default function RelatoriosPage() {
 
                 <Card className="juga-card">
                   <CardHeader className="pb-4">
-                    <CardTitle className="text-lg sm:text-xl text-heading">Vendas por forma de pagamento</CardTitle>
+                    <CardTitle className="text-lg sm:text-xl text-heading">Custo x Receita x Lucro</CardTitle>
                   </CardHeader>
-                  <CardContent className="flex flex-col items-center gap-4">
-                    <div className="h-[260px] w-full">
+                  <CardContent>
+                    <ChartContainer
+                      config={{
+                        receita: { label: 'Receita', color: 'hsl(var(--chart-1))' },
+                        custo: { label: 'Custo', color: 'hsl(var(--chart-2))' },
+                        lucro: { label: 'Lucro', color: 'hsl(var(--chart-3))' },
+                      }}
+                      className="h-[260px]"
+                    >
                       <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={paymentMethodData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={100}
-                            paddingAngle={5}
-                            dataKey="value"
-                          >
-                            {paymentMethodData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          {paymentMethodData.length > 0 && (
-                            <ChartTooltip
-                              content={({ active, payload }) => {
-                                if (active && payload && payload.length) {
-                                  return (
-                                    <div className="rounded-lg border bg-background/95 p-2 shadow">
-                                      <p className="text-sm font-medium">{payload[0].name}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {formatCurrency(payload[0].value as number)}
-                                      </p>
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              }}
-                            />
-                          )}
-                        </PieChart>
+                        <LineChart data={[{
+                          date: 'Período',
+                          receita: report?.totalRevenue ?? 0,
+                          custo: report?.totalCost ?? 0,
+                          lucro: report?.totalProfit ?? 0,
+                        }]}
+                        >
+                          <XAxis dataKey="date" hide />
+                          <YAxis />
+                          <ChartTooltip content={<ChartTooltipContent />} />
+                          <Line type="monotone" dataKey="receita" stroke="hsl(var(--chart-1))" strokeWidth={2} />
+                          <Line type="monotone" dataKey="custo" stroke="hsl(var(--chart-2))" strokeWidth={2} />
+                          <Line type="monotone" dataKey="lucro" stroke="hsl(var(--chart-3))" strokeWidth={2} />
+                        </LineChart>
                       </ResponsiveContainer>
-                    </div>
+                    </ChartContainer>
                   </CardContent>
                 </Card>
               </div>
@@ -387,7 +647,7 @@ export default function RelatoriosPage() {
                     <CardTitle className="text-lg sm:text-xl text-heading">Detalhamento de vendas</CardTitle>
                     <p className="text-sm text-muted-foreground">Principais vendas no período filtrado</p>
                   </div>
-                  <Button variant="outline" className="gap-2">
+                  <Button variant="outline" className="gap-2" onClick={exportReportCSV} disabled={!report?.items?.length}>
                     <Download className="h-4 w-4" />
                     Exportar CSV
                   </Button>
@@ -717,22 +977,85 @@ export default function RelatoriosPage() {
               <CardTitle className="text-base sm:text-lg text-heading">Filtros Rápidos</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 sm:space-y-3">
-              <Button className="w-full justify-start juga-gradient text-white text-sm">
+              {/* Botão de teste simples */}
+              <button 
+                onClick={() => {
+                  console.log('🧪 BOTÃO TESTE CLICADO!');
+                  alert('Botão de teste funcionando!');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  backgroundColor: '#ff0000',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  marginBottom: '8px'
+                }}
+              >
+                🧪 TESTE - Clique aqui
+              </button>
+              
+              <Button 
+                className="w-full justify-start text-sm"
+                variant={activeFilter === '30days' ? 'default' : 'outline'}
+                onClick={() => {
+                  console.log('🖱️ Botão 30 dias clicado!');
+                  handleFilterChange('30days');
+                }}
+                style={{
+                  backgroundColor: activeFilter === '30days' ? '#1e40af' : 'transparent',
+                  color: activeFilter === '30days' ? 'white' : 'inherit'
+                }}
+              >
                 <Calendar className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Últimos 30 dias</span>
                 <span className="sm:hidden">30 dias</span>
               </Button>
-              <Button variant="outline" className="w-full justify-start text-sm">
+              <Button 
+                className="w-full justify-start text-sm"
+                variant={activeFilter === 'thismonth' ? 'default' : 'outline'}
+                onClick={() => {
+                  console.log('🖱️ Botão este mês clicado!');
+                  handleFilterChange('thismonth');
+                }}
+                style={{
+                  backgroundColor: activeFilter === 'thismonth' ? '#1e40af' : 'transparent',
+                  color: activeFilter === 'thismonth' ? 'white' : 'inherit'
+                }}
+              >
                 <TrendingUp className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Este mês</span>
                 <span className="sm:hidden">Mês</span>
               </Button>
-              <Button variant="outline" className="w-full justify-start text-sm">
+              <Button 
+                className="w-full justify-start text-sm"
+                variant={activeFilter === 'sales' ? 'default' : 'outline'}
+                onClick={() => {
+                  console.log('🖱️ Botão vendas clicado!');
+                  handleFilterChange('sales');
+                }}
+                style={{
+                  backgroundColor: activeFilter === 'sales' ? '#1e40af' : 'transparent',
+                  color: activeFilter === 'sales' ? 'white' : 'inherit'
+                }}
+              >
                 <DollarSign className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Vendas</span>
                 <span className="sm:hidden">Vendas</span>
               </Button>
-              <Button variant="outline" className="w-full justify-start text-sm">
+              <Button 
+                className="w-full justify-start text-sm"
+                variant={activeFilter === 'products' ? 'default' : 'outline'}
+                onClick={() => {
+                  console.log('🖱️ Botão produtos clicado!');
+                  handleFilterChange('products');
+                }}
+                style={{
+                  backgroundColor: activeFilter === 'products' ? '#1e40af' : 'transparent',
+                  color: activeFilter === 'products' ? 'white' : 'inherit'
+                }}
+              >
                 <Package className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Produtos</span>
                 <span className="sm:hidden">Produtos</span>
@@ -746,22 +1069,66 @@ export default function RelatoriosPage() {
               <CardTitle className="text-base sm:text-lg text-heading">Exportações</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 sm:space-y-3">
-              <Button className="w-full justify-start juga-gradient text-white text-sm">
+              <Button 
+                className="w-full justify-start text-sm"
+                variant={activeExport === 'all' ? 'default' : 'outline'}
+                onClick={() => {
+                  console.log('🖱️ Botão exportar todos clicado!');
+                  handleExportChange('all');
+                }}
+                style={{
+                  backgroundColor: activeExport === 'all' ? '#1e40af' : 'transparent',
+                  color: activeExport === 'all' ? 'white' : 'inherit'
+                }}
+              >
                 <Download className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Exportar Todos</span>
                 <span className="sm:hidden">Todos</span>
               </Button>
-              <Button variant="outline" className="w-full justify-start text-sm">
+              <Button 
+                className="w-full justify-start text-sm"
+                variant={activeExport === 'financial' ? 'default' : 'outline'}
+                onClick={() => {
+                  console.log('🖱️ Botão relatório financeiro clicado!');
+                  handleExportChange('financial');
+                }}
+                style={{
+                  backgroundColor: activeExport === 'financial' ? '#1e40af' : 'transparent',
+                  color: activeExport === 'financial' ? 'white' : 'inherit'
+                }}
+              >
                 <FileText className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Relatório Financeiro</span>
                 <span className="sm:hidden">Financeiro</span>
               </Button>
-              <Button variant="outline" className="w-full justify-start text-sm">
+              <Button 
+                className="w-full justify-start text-sm"
+                variant={activeExport === 'sales' ? 'default' : 'outline'}
+                onClick={() => {
+                  console.log('🖱️ Botão vendas detalhadas clicado!');
+                  handleExportChange('sales');
+                }}
+                style={{
+                  backgroundColor: activeExport === 'sales' ? '#1e40af' : 'transparent',
+                  color: activeExport === 'sales' ? 'white' : 'inherit'
+                }}
+              >
                 <LineIcon className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Vendas Detalhadas</span>
                 <span className="sm:hidden">Vendas</span>
               </Button>
-              <Button variant="outline" className="w-full justify-start text-sm">
+              <Button 
+                className="w-full justify-start text-sm"
+                variant={activeExport === 'logistics' ? 'default' : 'outline'}
+                onClick={() => {
+                  console.log('🖱️ Botão logística clicado!');
+                  handleExportChange('logistics');
+                }}
+                style={{
+                  backgroundColor: activeExport === 'logistics' ? '#1e40af' : 'transparent',
+                  color: activeExport === 'logistics' ? 'white' : 'inherit'
+                }}
+              >
                 <Truck className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Logística</span>
                 <span className="sm:hidden">Logística</span>

@@ -10,62 +10,81 @@ const supabaseAdmin = supabaseUrl && supabaseServiceKey
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { saleId: string } }
+  { params }: { params: Promise<{ saleId: string }> }
 ) {
   try {
+    const { saleId } = await params;
+    console.log('🔍 API - Buscando venda:', saleId);
+    
     if (!supabaseAdmin) {
+      console.error('❌ Supabase Admin não configurado');
       return NextResponse.json(
         { error: 'Cliente Supabase não configurado' },
         { status: 500 }
       );
     }
 
-    const saleId = params.saleId;
-
     if (!saleId) {
+      console.error('❌ ID da venda não fornecido');
       return NextResponse.json(
         { error: 'ID da venda é obrigatório' },
         { status: 400 }
       );
     }
 
-    // Buscar dados da venda (pode ser por ID ou por número da venda)
+    // Buscar dados da venda (pode ser por ID numérico, UUID ou por número da venda)
+    // Primeiro, tentar buscar direto por ID (se for número ou UUID)
+    const isNumber = /^\d+$/.test(saleId);
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(saleId);
+    
+    console.log('🔍 saleId:', saleId, '| É número?', isNumber, '| É UUID?', isUUID);
+    
     let query = supabaseAdmin
       .from('sales')
       .select('*');
     
-    // Se for um UUID, buscar por ID, senão buscar por sale_number
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(saleId);
-    
-    if (isUUID) {
+    if (isNumber) {
+      // Se for número, buscar por ID numérico
+      query = query.eq('id', parseInt(saleId));
+      console.log('🔍 Buscando por ID numérico:', parseInt(saleId));
+    } else if (isUUID) {
+      // Se for UUID, buscar por ID UUID
       query = query.eq('id', saleId);
+      console.log('🔍 Buscando por ID UUID:', saleId);
     } else {
+      // Senão, buscar por sale_number
       query = query.eq('sale_number', saleId);
+      console.log('🔍 Buscando por sale_number:', saleId);
     }
     
-    const { data: sale, error: saleError } = await query.single();
-
-    if (saleError) {
-      console.error('Erro ao buscar venda:', saleError);
+    const { data: sales, error: saleError } = await query;
+    
+    // Verificar se encontrou alguma venda
+    if (saleError || !sales || sales.length === 0) {
+      console.error('❌ Erro ao buscar venda:', saleError || 'Nenhuma venda encontrada');
       return NextResponse.json(
-        { error: 'Venda não encontrada' },
+        { error: 'Venda não encontrada', details: saleError?.message || 'Nenhum registro encontrado' },
         { status: 404 }
       );
     }
+    
+    const sale = sales[0];
+    console.log('✅ Venda encontrada:', sale?.id, sale?.sale_number);
 
     // Buscar itens da venda
+    console.log('🔍 Buscando itens para sale_id:', sale.id);
     const { data: items, error: itemsError } = await supabaseAdmin
       .from('sale_items')
       .select('*')
-      .eq('sale_id', saleId);
+      .eq('sale_id', sale.id);
 
     if (itemsError) {
-      console.error('Erro ao buscar itens da venda:', itemsError);
-      return NextResponse.json(
-        { error: 'Erro ao buscar itens da venda' },
-        { status: 400 }
-      );
+      console.error('❌ Erro ao buscar itens da venda:', itemsError);
+      // Não retornar erro, apenas usar array vazio
+      console.log('⚠️ Continuando sem itens...');
     }
+    
+    console.log('✅ Itens encontrados:', items?.length || 0, items);
 
     // Formatar dados da venda
     const saleData = {
@@ -75,14 +94,15 @@ export async function GET(
       total_amount: sale.total_amount,
       payment_method: sale.payment_method,
       created_at: sale.created_at,
-      items: items.map(item => ({
+      items: items?.map(item => ({
         product_name: item.product_name,
         quantity: item.quantity,
         unit_price: item.unit_price,
         subtotal: item.subtotal || item.total_price || (item.unit_price * item.quantity)
-      }))
+      })) || []
     };
 
+    console.log('✅ Retornando dados da venda:', saleData);
     return NextResponse.json({ success: true, data: saleData });
 
   } catch (error) {

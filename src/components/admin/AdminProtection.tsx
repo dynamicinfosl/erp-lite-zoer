@@ -15,7 +15,7 @@ function checkIsAdmin(user: unknown): boolean {
   if (!user) return false;
   if (typeof user === 'object' && user !== null) {
     const userObj = user as { 
-      user_metadata?: { role?: string }; 
+      user_metadata?: { role?: string; email?: string }; 
       isAdmin?: boolean;
       email?: string;
     };

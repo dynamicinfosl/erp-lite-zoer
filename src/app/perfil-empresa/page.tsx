@@ -87,7 +87,21 @@ export default function PerfilEmpresaPage() {
       setLoading(true);
 
       // Usar o tenant do contexto de autenticação
-      const tenantData = authTenant;
+      const tenantData: TenantData = {
+        ...authTenant,
+        slug: authTenant.name.toLowerCase().replace(/\s+/g, '-')
+      };
+      
+      console.log('📋 Dados do tenant carregados:', {
+        name: tenantData.name,
+        email: tenantData.email,
+        phone: tenantData.phone,
+        document: tenantData.document,
+        address: tenantData.address,
+        city: tenantData.city,
+        state: tenantData.state,
+        zip_code: tenantData.zip_code,
+      });
       
       setTenant(tenantData);
       setFormData({
@@ -115,6 +129,18 @@ export default function PerfilEmpresaPage() {
     try {
       setSaving(true);
 
+      console.log('📝 Enviando dados do tenant:', {
+        id: tenant.id,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        document: formData.document,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zip_code: formData.zip_code,
+      });
+
       const res = await fetch('/next_api/tenants', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -131,13 +157,48 @@ export default function PerfilEmpresaPage() {
         })
       });
 
-      if (!res.ok) throw new Error('Erro ao atualizar dados');
+      console.log('📡 Resposta do servidor:', res.status);
 
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('❌ Erro do servidor:', errorData);
+        throw new Error(errorData.details || errorData.error || 'Erro ao atualizar dados');
+      }
+
+      const result = await res.json();
+      console.log('✅ Resultado:', result);
+
+      // Atualizar os dados do formulário com o que foi salvo
+      if (result.data) {
+        console.log('🔄 Atualizando formulário com dados salvos:', result.data);
+        
+        const updatedFormData = {
+          name: result.data.name || '',
+          email: result.data.email || '',
+          phone: result.data.phone || '',
+          document: result.data.document || '',
+          address: result.data.address || '',
+          city: result.data.city || '',
+          state: result.data.state || '',
+          zip_code: result.data.zip_code || '',
+        };
+        
+        setFormData(updatedFormData);
+        setTenant(result.data);
+        
+        console.log('✅ Formulário atualizado:', updatedFormData);
+      }
+
+      console.log('🎉 Mostrando toast de sucesso');
       toast.success('Dados atualizados com sucesso!');
-      await loadTenantData();
-    } catch (error) {
-      console.error('Erro ao salvar:', error);
-      toast.error('Erro ao salvar dados');
+      
+      // Atualizar contexto global também
+      if (refreshTenant) {
+        await refreshTenant();
+      }
+    } catch (error: any) {
+      console.error('❌ Erro ao salvar:', error);
+      toast.error(error.message || 'Erro ao salvar dados');
     } finally {
       setSaving(false);
     }

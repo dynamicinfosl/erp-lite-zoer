@@ -10,17 +10,12 @@ export const GET = requestMiddleware(async (request, context) => {
     if (!context?.token || !context?.payload?.sub) {
       return createSuccessResponse([]);
     }
-    const { limit, offset, tenant_id } = parseQueryParams(request);
+    const { limit, offset } = parseQueryParams(request);
     const deliveriesCrud = new CrudOperations("deliveries", context.token);
     
     const filters: any = {
       user_id: context.payload?.sub,
     };
-
-    // Filtrar por tenant_id se fornecido
-    if (tenant_id) {
-      filters.tenant_id = tenant_id;
-    }
 
     const deliveries = await deliveriesCrud.findMany(filters, { 
       limit: limit || 50, 

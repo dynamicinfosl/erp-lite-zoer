@@ -123,49 +123,43 @@ export default function AdminPage() {
                     title="Total de Usuários"
                     value={stats?.totalUsers || 0}
                     icon={<Users className="h-5 w-5" />}
-                    color="blue"
-                    change="+12%"
-                    changeType="positive"
+                    variant="primary"
+                    trend={{ value: "+12%", direction: "up" }}
                   />
                   <AdminStatCard
                     title="Usuários Ativos"
                     value={stats?.activeUsers || 0}
                     icon={<Activity className="h-5 w-5" />}
-                    color="green"
-                    change="+8%"
-                    changeType="positive"
+                    variant="success"
+                    trend={{ value: "+8%", direction: "up" }}
                   />
                   <AdminStatCard
                     title="Vendas Totais"
                     value={stats?.totalSales || 0}
                     icon={<BarChart3 className="h-5 w-5" />}
-                    color="purple"
-                    change="+15%"
-                    changeType="positive"
+                    variant="primary"
+                    trend={{ value: "+15%", direction: "up" }}
                   />
                   <AdminStatCard
                     title="Produtos"
                     value={stats?.totalProducts || 0}
                     icon={<Package className="h-5 w-5" />}
-                    color="orange"
-                    change="+5%"
-                    changeType="positive"
+                    variant="warning"
+                    trend={{ value: "+5%", direction: "up" }}
                   />
                   <AdminStatCard
                     title="Bebidas"
                     value={stats?.totalBeverages || 0}
                     icon={<Database className="h-5 w-5" />}
-                    color="cyan"
-                    change="+3%"
-                    changeType="positive"
+                    variant="primary"
+                    trend={{ value: "+3%", direction: "up" }}
                   />
           <AdminStatCard
             title="Valor do Estoque"
             value={`R$ ${stats?.totalInventoryValue?.toLocaleString('pt-BR') || 0}`}
             icon={<CreditCard className="h-5 w-5" />}
-            color="emerald"
-            change="+7%"
-            changeType="positive"
+            variant="success"
+            trend={{ value: "+7%", direction: "up" }}
           />
         </div>
 
@@ -240,11 +234,8 @@ export default function AdminPage() {
         {/* Cards de Informações do Sistema */}
         <div className="grid gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
           <StorageCard
-            title="Armazenamento"
             used={75}
             total={100}
-            unit="GB"
-            description="Espaço utilizado no servidor"
           />
           <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
             <CardHeader className="pb-3">

@@ -50,11 +50,19 @@ export const PUBLIC_ROUTES = [
 
 // Função para verificar se uma rota é protegida
 export function isProtectedRoute(pathname: string): boolean {
+  // Rotas especiais que não devem ser consideradas protegidas
+  if (pathname.startsWith('/cupom/')) {
+    return false;
+  }
   return PROTECTED_ROUTES.some(route => pathname.startsWith(route));
 }
 
 // Função para verificar se uma rota é pública
 export function isPublicRoute(pathname: string): boolean {
+  // Adicionar rotas especiais que não precisam de autenticação
+  if (pathname.startsWith('/cupom/')) {
+    return true;
+  }
   return PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(route));
 }
 

@@ -2,10 +2,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { User } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = supabaseUrl && supabaseAnonKey 
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
 
 export interface Tenant {
   id: string;
@@ -37,6 +39,10 @@ export interface AuthUser extends User {
 // Classe para gerenciar autenticação SaaS - VERSÃO DEBUG
 export class SaasAuth {
   static async getCurrentUser(): Promise<AuthUser | null> {
+    if (!supabase) {
+      return null;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) return null;
@@ -105,6 +111,10 @@ export class SaasAuth {
   }
 
   static async signIn(email: string, password: string) {
+    if (!supabase) {
+      throw new Error('Cliente Supabase não configurado');
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -115,6 +125,10 @@ export class SaasAuth {
   }
 
   static async signOut() {
+    if (!supabase) {
+      throw new Error('Cliente Supabase não configurado');
+    }
+
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   }

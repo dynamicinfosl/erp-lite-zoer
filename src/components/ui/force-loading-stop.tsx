@@ -15,7 +15,7 @@ export function ForceLoadingStop() {
       });
 
       // Mostrar mensagem de erro se necessário
-      const loadingText = document.querySelector('text-body, [class*="text-body"]');
+      const loadingText = document.querySelector('text-body, [class*="text-body"]') as HTMLElement;
       if (loadingText) {
         loadingText.textContent = 'Sistema carregado - clique em qualquer lugar para continuar';
         loadingText.style.cursor = 'pointer';

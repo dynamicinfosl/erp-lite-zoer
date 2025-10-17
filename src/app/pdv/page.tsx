@@ -421,7 +421,7 @@ export default function PDVPage() {
         products: cart.map(item => ({
           id: item.id,
           name: item.name,
-          code: item.code || item.sku || 'N/A', // ✅ Garantir que code existe
+          code: item.code || 'N/A', // ✅ Garantir que code existe
           price: item.price,
           quantity: item.quantity,
           discount: item.discount || 0, // ✅ Garantir que discount existe
@@ -508,6 +508,7 @@ export default function PDVPage() {
       
       // Preparar dados para o modal de confirmação
       const confirmationData = {
+        id: localSaleData.id, // Adicionar ID para impressão do cupom
         numero: localSaleData.numero,
         cliente: localSaleData.cliente,
         total: localSaleData.total,
@@ -528,7 +529,7 @@ export default function PDVPage() {
       
     } catch (error) {
       console.error('Erro ao finalizar venda:', error);
-      toast.error(`Erro ao salvar venda: ${error.message}`);
+      toast.error(`Erro ao salvar venda: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
   }, [total, customerName, paymentMethod, clearCart, cart, calculateItemTotal]);
 
@@ -625,11 +626,17 @@ export default function PDVPage() {
   // Funções para o modal de confirmação
   const handlePrintReceipt = () => {
     if (lastSaleData) {
-      // Abrir cupom em nova aba
-      const cupomUrl = `/cupom/${lastSaleData.numero}`;
+      // Abrir cupom em nova aba usando o ID da venda
+      const cupomUrl = `/cupom/${lastSaleData.id}`;
       window.open(cupomUrl, '_blank');
     }
     setShowConfirmationModal(false);
+  };
+
+  // Função para imprimir cupom do histórico
+  const handlePrintHistoryReceipt = (saleId: string) => {
+    const cupomUrl = `/cupom/${saleId}`;
+    window.open(cupomUrl, '_blank');
   };
 
   const handleNewSale = () => {
@@ -650,9 +657,9 @@ export default function PDVPage() {
         total={total}
         customerName={customerName}
         cartItems={cart.map(item => ({
-          id: item.id,
+          id: item.id.toString(),
           name: item.name,
-          code: item.code || item.sku || 'N/A',
+          code: item.code || 'N/A',
           price: item.price,
           quantity: item.quantity,
           subtotal: calculateItemTotal(item)
@@ -1101,7 +1108,7 @@ export default function PDVPage() {
                   todaySales.map((sale) => (
                     <Card key={sale.id} className="juga-card hover:shadow-md transition-shadow">
                       <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
+                        <div className="flex items-start justify-between gap-4">
                           <div className="space-y-1 flex-1">
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="font-mono">
@@ -1134,10 +1141,19 @@ export default function PDVPage() {
                               <span className="capitalize">{sale.forma_pagamento.replace('_', ' ')}</span>
                             </div>
                           </div>
-                          <div className="text-right">
+                          <div className="flex flex-col items-end gap-2">
                             <div className="text-2xl font-bold text-primary">
                               R$ {sale.total.toFixed(2)}
                             </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePrintHistoryReceipt(sale.id)}
+                              className="gap-1 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+                            >
+                              <Receipt className="h-4 w-4" />
+                              Cupom
+                            </Button>
                           </div>
                         </div>
                       </CardContent>

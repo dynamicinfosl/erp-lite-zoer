@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -211,15 +211,7 @@ export default function ClientesPage() {
     setNewCustomer(prev => ({ ...prev, document: '' }));
   }, [newCustomer.type]);
 
-  // Carregar clientes quando houver tenant (fallback para ID neutro)
-  useEffect(() => {
-    const fetchNow = async () => {
-      await loadCustomers();
-    };
-    fetchNow();
-  }, [tenant?.id]);
-
-  const loadCustomers = async () => {
+  const loadCustomers = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -260,7 +252,7 @@ export default function ClientesPage() {
       console.error('Erro ao carregar clientes:', error);
       
       // ✅ CORREÇÃO: Se for timeout ou erro de rede, mostrar lista vazia em vez de erro
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.log('⏰ Timeout ao carregar clientes, mostrando lista vazia');
         setCustomers([]);
       } else {
@@ -270,7 +262,15 @@ export default function ClientesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenant?.id]);
+
+  // Carregar clientes quando houver tenant (fallback para ID neutro)
+  useEffect(() => {
+    const fetchNow = async () => {
+      await loadCustomers();
+    };
+    fetchNow();
+  }, [tenant?.id, loadCustomers]);
 
   // Filtrar clientes
   const filteredCustomers = Array.isArray(customers) ? customers.filter(customer => {
@@ -488,8 +488,8 @@ export default function ClientesPage() {
   // Calcular estatísticas dos clientes
   const customerStats = {
     total: Array.isArray(customers) ? customers.length : 0,
-    active: Array.isArray(customers) ? customers.filter(c => c.status === 'active' || c.is_active === true).length : 0,
-    inactive: Array.isArray(customers) ? customers.filter(c => c.status === 'inactive' || c.is_active === false).length : 0,
+    active: Array.isArray(customers) ? customers.filter(c => c.status === 'active').length : 0,
+    inactive: Array.isArray(customers) ? customers.filter(c => c.status === 'inactive').length : 0,
     pf: Array.isArray(customers) ? customers.filter(c => c.type === 'PF').length : 0,
     pj: Array.isArray(customers) ? customers.filter(c => c.type === 'PJ').length : 0,
     newThisMonth: Array.isArray(customers) ? customers.filter(c => {
@@ -869,8 +869,8 @@ export default function ClientesPage() {
                     {columnVisibility.city && <TableCell>{customer.city}</TableCell>}
                     {columnVisibility.status && (
                       <TableCell>
-                        <Badge variant={(customer.status === 'active' || customer.is_active === true) ? 'default' : 'secondary'}>
-                          {(customer.status === 'active' || customer.is_active === true) ? 'Ativo' : 'Inativo'}
+                        <Badge variant={customer.status === 'active' ? 'default' : 'secondary'}>
+                          {customer.status === 'active' ? 'Ativo' : 'Inativo'}
                         </Badge>
                       </TableCell>
                     )}
@@ -1092,7 +1092,7 @@ export default function ClientesPage() {
               <div><span className="font-medium">Telefone:</span> {formatPhone(showDetailsDialog.phone || '')}</div>
               <div><span className="font-medium">E-mail:</span> {showDetailsDialog.email}</div>
               <div><span className="font-medium">Cidade:</span> {showDetailsDialog.city}</div>
-              <div><span className="font-medium">Status:</span> {(showDetailsDialog.status === 'active' || showDetailsDialog.is_active === true) ? 'Ativo' : 'Inativo'}</div>
+              <div><span className="font-medium">Status:</span> {showDetailsDialog.status === 'active' ? 'Ativo' : 'Inativo'}</div>
               <div className="text-xs text-slate-500"><span className="font-medium">Criado em:</span> {new Date(showDetailsDialog.created_at).toLocaleString('pt-BR')}</div>
             </div>
           )}
@@ -1229,7 +1229,7 @@ export default function ClientesPage() {
                 state: (pick(['estado', 'uf']).slice(0,2).toUpperCase() || null) as any,
                 zipcode: pick(['cep', 'zip']).replace(/\D/g, ''),
                 notes: pick(['observacoes', 'observacoes adicionais', 'notes']),
-                is_active: true,
+                status: 'active',
               } as any;
 
               if (!customerData.name) { fail++; errors.push('Nome ausente'); continue; }

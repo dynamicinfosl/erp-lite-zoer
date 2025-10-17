@@ -80,7 +80,8 @@ export async function validatePlanLimits(
 
     // Buscar uso atual
     const usage = await getCurrentUsage(tenantId);
-    const limits = subscription.plan?.limits;
+    const plan = Array.isArray(subscription.plan) ? subscription.plan[0] : subscription.plan;
+    const limits = plan?.limits;
 
     if (!limits) {
       return { canProceed: false, reason: 'Limites do plano não encontrados' };
@@ -209,6 +210,10 @@ export async function createSubscription(
 ): Promise<{ success: boolean; error?: string }> {
 
   try {
+    if (!supabase) {
+      return { success: false, error: 'Cliente Supabase não configurado' };
+    }
+
     const trialEndsAt = status === 'trial' 
       ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 14 dias
       : null;
@@ -251,6 +256,10 @@ export async function updateTenantPlan(
 ): Promise<{ success: boolean; error?: string }> {
 
   try {
+    if (!supabase) {
+      return { success: false, error: 'Cliente Supabase não configurado' };
+    }
+
     const { error } = await supabase
       .from('subscriptions')
       .update({

@@ -188,7 +188,8 @@ export async function checkFeatureAccess(
     }
 
     // Verificar se feature está disponível no plano
-    const features = subscription.plan?.features || {};
+    const plan = Array.isArray(subscription.plan) ? subscription.plan[0] : subscription.plan;
+    const features = plan?.features || {};
     const hasFeature = features[feature] === true;
 
     if (!hasFeature) {

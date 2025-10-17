@@ -25,12 +25,12 @@ export function AppHeader({
   className = ''
 }: AppHeaderProps) {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { signOut } = useAuth();
 
   const handleLogout = async () => {
     if (confirm('Deseja sair do sistema?')) {
       if (ENABLE_AUTH) {
-        await logout();
+        await signOut();
       } else {
         router.push('/login');
       }

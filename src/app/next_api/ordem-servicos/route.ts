@@ -84,7 +84,10 @@ export async function GET(request: NextRequest) {
     return createSuccessResponse({ data: ordensFiltradas, message: 'Ordens de serviço listadas com sucesso' });
   } catch (error) {
     console.error('Erro ao listar ordens de serviço:', error);
-    return createErrorResponse('Erro interno do servidor', 500);
+    return createErrorResponse({
+      errorMessage: 'Erro interno do servidor',
+      status: 500
+    });
   }
 }
 
@@ -93,7 +96,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     if (!body.cliente?.nome || !body.equipamento?.tipo || !body.problema) {
-      return createErrorResponse('Dados obrigatórios não fornecidos', 400);
+      return createErrorResponse({
+        errorMessage: 'Dados obrigatórios não fornecidos',
+        status: 400
+      });
     }
 
     const proximoNumero = ordensServico.length + 1;
@@ -133,7 +139,10 @@ export async function POST(request: NextRequest) {
     return createSuccessResponse({ data: novaOrdem, message: 'Ordem de serviço criada com sucesso' }, 201);
   } catch (error) {
     console.error('Erro ao criar ordem de serviço:', error);
-    return createErrorResponse('Erro interno do servidor', 500);
+    return createErrorResponse({
+      errorMessage: 'Erro interno do servidor',
+      status: 500
+    });
   }
 }
 
@@ -143,13 +152,19 @@ export async function PUT(request: NextRequest) {
     const { id } = body;
 
     if (!id) {
-      return createErrorResponse('ID da ordem é obrigatório', 400);
+      return createErrorResponse({
+        errorMessage: 'ID da ordem é obrigatório',
+        status: 400
+      });
     }
 
     const index = ordensServico.findIndex((ordem) => ordem.id === id);
 
     if (index === -1) {
-      return createErrorResponse('Ordem de serviço não encontrada', 404);
+      return createErrorResponse({
+        errorMessage: 'Ordem de serviço não encontrada',
+        status: 404
+      });
     }
 
     ordensServico[index] = {
@@ -162,7 +177,10 @@ export async function PUT(request: NextRequest) {
     return createSuccessResponse({ data: ordensServico[index], message: 'Ordem de serviço atualizada com sucesso' });
   } catch (error) {
     console.error('Erro ao atualizar ordem de serviço:', error);
-    return createErrorResponse('Erro interno do servidor', 500);
+    return createErrorResponse({
+      errorMessage: 'Erro interno do servidor',
+      status: 500
+    });
   }
 }
 
@@ -172,13 +190,19 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id');
 
     if (!id) {
-      return createErrorResponse('ID da ordem é obrigatório', 400);
+      return createErrorResponse({
+        errorMessage: 'ID da ordem é obrigatório',
+        status: 400
+      });
     }
 
     const index = ordensServico.findIndex((ordem) => ordem.id === id);
 
     if (index === -1) {
-      return createErrorResponse('Ordem de serviço não encontrada', 404);
+      return createErrorResponse({
+        errorMessage: 'Ordem de serviço não encontrada',
+        status: 404
+      });
     }
 
     const ordemRemovida = ordensServico.splice(index, 1)[0];
@@ -186,6 +210,9 @@ export async function DELETE(request: NextRequest) {
     return createSuccessResponse({ data: ordemRemovida, message: 'Ordem de serviço removida com sucesso' });
   } catch (error) {
     console.error('Erro ao excluir ordem de serviço:', error);
-    return createErrorResponse('Erro interno do servidor', 500);
+    return createErrorResponse({
+      errorMessage: 'Erro interno do servidor',
+      status: 500
+    });
   }
 }
