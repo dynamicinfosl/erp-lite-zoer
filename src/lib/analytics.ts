@@ -1,5 +1,3 @@
-import { supabase } from '@/lib/supabase'
-
 export interface MonthlySalesPoint {
   month: string
   value: number
@@ -21,6 +19,13 @@ export interface TopProductRow {
 
 const hasSupabaseEnv = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
 
+// Import condicional do Supabase apenas quando necessário
+const getSupabase = async () => {
+  if (!hasSupabaseEnv) return null
+  const { supabase } = await import('@/lib/supabase')
+  return supabase
+}
+
 export async function getMonthlySales(tenantId?: string): Promise<MonthlySalesPoint[]> {
   if (!hasSupabaseEnv) {
     return [
@@ -34,6 +39,18 @@ export async function getMonthlySales(tenantId?: string): Promise<MonthlySalesPo
   }
 
   try {
+    const supabase = await getSupabase()
+    if (!supabase) {
+      return [
+        { month: 'Jan', value: 62 },
+        { month: 'Fev', value: 70 },
+        { month: 'Mar', value: 75 },
+        { month: 'Abr', value: 80 },
+        { month: 'Mai', value: 83 },
+        { month: 'Jun', value: 89.5 },
+      ]
+    }
+
     // Agrega vendas (sales.total) por mês do ano corrente
     const start = new Date(new Date().getFullYear(), 0, 1).toISOString()
     const { data, error } = await supabase
@@ -85,6 +102,16 @@ export async function getActiveUsers(limit = 10): Promise<ActiveUserRow[]> {
     ]
   }
   try {
+    const supabase = await getSupabase()
+    if (!supabase) {
+      return [
+        { id: 'u1', name: 'João Silva', email: 'joao@empresa.com', lastActive: 'há 5 min', role: 'admin' },
+        { id: 'u2', name: 'Maria Souza', email: 'maria@empresa.com', lastActive: 'há 12 min', role: 'vendedor' },
+        { id: 'u3', name: 'Paulo Lima', email: 'paulo@empresa.com', lastActive: 'há 18 min', role: 'financeiro' },
+        { id: 'u4', name: 'Ana Costa', email: 'ana@empresa.com', lastActive: 'há 25 min', role: 'vendedor' },
+      ]
+    }
+
     // Exemplo: tabela "user_activity" com last_seen; ajuste conforme seu schema
     const { data, error } = await supabase
       .from('user_activity')
@@ -119,6 +146,16 @@ export async function getTopProducts(limit = 10): Promise<TopProductRow[]> {
     ]
   }
   try {
+    const supabase = await getSupabase()
+    if (!supabase) {
+      return [
+        { sku: 'BEV-010', name: 'Água Mineral 500ml', sold: 1240 },
+        { sku: 'BEV-001', name: 'Cerveja Pilsen 350ml', sold: 980 },
+        { sku: 'BEV-042', name: 'Refrigerante Cola 2L', sold: 760 },
+        { sku: 'BEV-077', name: 'Energético 269ml', sold: 540 },
+      ]
+    }
+
     // Agrega sale_items por produto
     const { data, error } = await supabase
       .from('sale_items')
