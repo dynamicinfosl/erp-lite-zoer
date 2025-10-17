@@ -106,38 +106,26 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Carregar sessão inicial - VERSÃO COM DADOS COMPLETOS
+  // Carregar sessão inicial - VERSÃO SIMPLIFICADA
   useEffect(() => {
     console.log('🔄 Iniciando autenticação...');
     
-    // Verificar sessão e carregar tenant completo com timeout
+    let isInitialized = false;
+    
     const initAuth = async () => {
+      if (isInitialized) return;
+      isInitialized = true;
+      
       try {
         console.log('🔍 Verificando sessão existente...');
         
-        // Limpar qualquer sessão conflitante primeiro
-        if (typeof window !== 'undefined') {
-          // Verificar se há sessão de outro usuário em cache
-          const cachedUser = localStorage.getItem('sb-lfxietcasaooenffdodr-auth-token');
-          if (cachedUser) {
-            try {
-              const parsedUser = JSON.parse(cachedUser);
-              console.log('🔍 Sessão em cache encontrada:', parsedUser?.user?.email);
-            } catch (e) {
-              console.log('🧹 Limpando cache corrompido...');
-              localStorage.removeItem('sb-lfxietcasaooenffdodr-auth-token');
-            }
-          }
-        }
+        // Aguardar um pouco para evitar conflitos de inicialização
+        await new Promise(resolve => setTimeout(resolve, 100));
         
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.log('⚠️ Erro na sessão:', error.message);
-          // Não limpar sessão imediatamente, apenas logar o erro
-          setSession(null);
-          setUser(null);
-          setTenant(null);
         }
 
         setSession(session);
@@ -155,7 +143,6 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.error('❌ Erro na autenticação:', error);
-        // Em caso de erro, limpar tudo
         setSession(null);
         setUser(null);
         setTenant(null);
@@ -165,18 +152,21 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Timeout de segurança para garantir que o loading sempre termine
+    // Timeout de segurança mais curto
     const timeoutId = setTimeout(() => {
-      console.log('⏰ Timeout na inicialização - forçando fim do loading');
-      setLoading(false);
-    }, 30000); // 30 segundos - mais tempo para login
+      if (!isInitialized) {
+        console.log('⏰ Timeout na inicialização - forçando fim do loading');
+        setLoading(false);
+        isInitialized = true;
+      }
+    }, 15000); // 15 segundos
 
     initAuth().finally(() => {
       clearTimeout(timeoutId);
     });
   }, []);
 
-  // Escutar mudanças de autenticação - VERSÃO COMPLETA
+  // Escutar mudanças de autenticação - VERSÃO SIMPLIFICADA
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -204,8 +194,14 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      try {
+        subscription.unsubscribe();
+      } catch (error) {
+        console.log('⚠️ Erro ao desinscrever:', error);
+      }
+    };
+  }, [supabase]);
 
   const signIn = async (email: string, password: string) => {
     try {

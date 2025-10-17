@@ -35,9 +35,9 @@ export function createSupabaseClient() {
       auth: {
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: true,
+        detectSessionInUrl: false, // Desabilitar detecção automática
         flowType: 'pkce',
-        debug: true
+        debug: false // Desabilitar debug para reduzir logs
       },
       global: {
         headers: {
@@ -46,7 +46,7 @@ export function createSupabaseClient() {
         fetch: (url, options = {}) => {
           return fetch(url, {
             ...options,
-            signal: AbortSignal.timeout(15000)
+            signal: AbortSignal.timeout(10000) // Reduzir timeout
           })
         }
       },
@@ -55,7 +55,7 @@ export function createSupabaseClient() {
       },
       realtime: {
         params: {
-          eventsPerSecond: 10
+          eventsPerSecond: 5 // Reduzir frequência
         }
       }
     })
@@ -65,12 +65,18 @@ export function createSupabaseClient() {
   }
 }
 
-// Cliente padrão exportado (lazy initialization)
+// Cliente padrão exportado (lazy initialization com proteção)
 let supabaseInstance: ReturnType<typeof createSupabaseClient> | null = null
+let isCreating = false
 
 export const supabase = (() => {
-  if (!supabaseInstance) {
-    supabaseInstance = createSupabaseClient()
+  if (!supabaseInstance && !isCreating) {
+    isCreating = true
+    try {
+      supabaseInstance = createSupabaseClient()
+    } finally {
+      isCreating = false
+    }
   }
   return supabaseInstance
 })()
