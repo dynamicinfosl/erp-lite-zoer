@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { createSupabaseClient } from '@/lib/supabase-client';
+import { getSupabaseInstance } from '@/lib/supabase-client';
 import { User, Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { SubscriptionData } from '@/hooks/usePlanLimits';
@@ -44,11 +44,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   
       const router = useRouter();
       // Usar o cliente Supabase singleton global
-      const supabase = React.useMemo(() => {
-        // Importar dinamicamente para garantir singleton
-        const { getSupabaseInstance } = require('@/lib/supabase-client');
-        return getSupabaseInstance();
-      }, []);
+      const supabase = React.useMemo(() => getSupabaseInstance(), []);
 
   // Função SUPER SIMPLES - Cria tenant local
   const createDefaultTenant = (userId: string) => {
