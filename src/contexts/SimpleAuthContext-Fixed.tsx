@@ -228,14 +228,23 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   const refreshSubscription = async () => {
     // Implementação simplificada
     setSubscription({
-      plan: 'trial',
-      status: 'active',
-      trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      limits: {
-        products: 100,
-        customers: 100,
-        sales: 1000,
+      id: '00000000-0000-0000-0000-000000000000',
+      plan: {
+        id: 'trial',
+        name: 'Trial',
+        slug: 'trial',
+        price_monthly: 0,
+        price_yearly: 0,
+        features: {},
+        limits: {
+          max_users: 1,
+          max_customers: 100,
+          max_products: 100,
+          max_sales_per_month: 1000,
+        },
       },
+      status: 'trial',
+      trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
   };
 
