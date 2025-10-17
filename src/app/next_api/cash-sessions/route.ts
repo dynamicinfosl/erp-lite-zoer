@@ -25,7 +25,10 @@ export const GET = requestMiddleware(async (request, context) => {
     return createSuccessResponse({ data: rows });
   } catch (error) {
     console.error("Erro ao listar sessões de caixa:", error);
-    return createErrorResponse("Erro ao listar sessões de caixa", 500);
+    return createErrorResponse({
+      errorMessage: "Erro ao listar sessões de caixa",
+      status: 500
+    });
   }
 }, true);
 
@@ -49,7 +52,10 @@ export const POST = requestMiddleware(async (request, context) => {
     return createSuccessResponse({ data: created }, 201);
   } catch (error) {
     console.error("Erro ao criar sessão de caixa:", error);
-    return createErrorResponse("Erro ao criar sessão de caixa", 500);
+    return createErrorResponse({
+      errorMessage: "Erro ao criar sessão de caixa",
+      status: 500
+    });
   }
 }, true);
 
@@ -74,7 +80,10 @@ export const PATCH = requestMiddleware(async (request, context, { params }: Cash
     return createSuccessResponse({ data: updated });
   } catch (error) {
     console.error("Erro ao atualizar sessão de caixa:", error);
-    return createErrorResponse("Erro ao atualizar sessão de caixa", 500);
+    return createErrorResponse({
+      errorMessage: "Erro ao atualizar sessão de caixa",
+      status: 500
+    });
   }
 }, true);
 
@@ -87,7 +96,10 @@ export const DELETE = requestMiddleware(async (_request, context, { params }: Ca
     return createSuccessResponse({ success: true });
   } catch (error) {
     console.error("Erro ao excluir sessão de caixa:", error);
-    return createErrorResponse("Erro ao excluir sessão de caixa", 500);
+    return createErrorResponse({
+      errorMessage: "Erro ao excluir sessão de caixa",
+      status: 500
+    });
   }
 }, true);
 

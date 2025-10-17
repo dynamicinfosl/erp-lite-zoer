@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -217,9 +217,9 @@ export default function ClientesPage() {
       await loadCustomers();
     };
     fetchNow();
-  }, [tenant?.id]);
+  }, [tenant?.id, loadCustomers]);
 
-  const loadCustomers = async () => {
+  const loadCustomers = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -270,7 +270,7 @@ export default function ClientesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenant?.id]);
 
   // Filtrar clientes
   const filteredCustomers = Array.isArray(customers) ? customers.filter(customer => {

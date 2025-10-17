@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,9 +30,9 @@ export default function EntregadorPage() {
     // Atualizar a cada 30 segundos
     const interval = setInterval(fetchMyDeliveries, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchMyDeliveries]);
 
-  const fetchMyDeliveries = async () => {
+  const fetchMyDeliveries = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -61,7 +61,7 @@ export default function EntregadorPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenant?.id]);
 
   const handleStartDelivery = async (deliveryId: number) => {
     try {
