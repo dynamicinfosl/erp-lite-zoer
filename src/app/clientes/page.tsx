@@ -211,14 +211,6 @@ export default function ClientesPage() {
     setNewCustomer(prev => ({ ...prev, document: '' }));
   }, [newCustomer.type]);
 
-  // Carregar clientes quando houver tenant (fallback para ID neutro)
-  useEffect(() => {
-    const fetchNow = async () => {
-      await loadCustomers();
-    };
-    fetchNow();
-  }, [tenant?.id, loadCustomers]);
-
   const loadCustomers = useCallback(async () => {
     try {
       setLoading(true);
@@ -271,6 +263,14 @@ export default function ClientesPage() {
       setLoading(false);
     }
   }, [tenant?.id]);
+
+  // Carregar clientes quando houver tenant (fallback para ID neutro)
+  useEffect(() => {
+    const fetchNow = async () => {
+      await loadCustomers();
+    };
+    fetchNow();
+  }, [tenant?.id, loadCustomers]);
 
   // Filtrar clientes
   const filteredCustomers = Array.isArray(customers) ? customers.filter(customer => {
