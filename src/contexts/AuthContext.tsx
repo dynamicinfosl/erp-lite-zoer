@@ -90,8 +90,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('🔑 Parâmetro user.id:', user.id);
       console.log('🔑 Tipo:', typeof user.id);
       
-      const rpcStartTime = Date.now();
-      
       // Verificar cache local primeiro (acelera logins subsequentes)
       const cacheKey = `tenant_cache_${user.id}`;
       const cachedData = localStorage.getItem(cacheKey);
