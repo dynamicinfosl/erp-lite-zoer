@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
