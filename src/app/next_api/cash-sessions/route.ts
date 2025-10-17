@@ -105,10 +105,9 @@ export const DELETE = requestMiddleware(async (request, context) => {
       });
     }
 
-    const tenantContext = await getTenantContext(context.token);
     const cashSessionsCrud = new CrudOperations("cash_sessions", context.token);
 
-    await cashSessionsCrud.delete(id, tenantContext.tenantId);
+    await cashSessionsCrud.delete(id);
     return createSuccessResponse({ success: true });
   } catch (error) {
     console.error("Erro ao excluir sessão de caixa:", error);
