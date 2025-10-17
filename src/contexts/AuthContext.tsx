@@ -84,7 +84,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('🔍 Carregando dados do usuário:', user.email);
       console.log('🔍 User ID:', user.id);
-      console.log('🔍 Supabase URL:', supabase.supabaseUrl);
       
       // Tentar usar função RPC otimizada primeiro
       console.log('🚀 Tentando RPC otimizada...');
