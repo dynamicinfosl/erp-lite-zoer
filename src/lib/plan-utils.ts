@@ -210,6 +210,10 @@ export async function createSubscription(
 ): Promise<{ success: boolean; error?: string }> {
 
   try {
+    if (!supabase) {
+      return { success: false, error: 'Cliente Supabase não configurado' };
+    }
+
     const trialEndsAt = status === 'trial' 
       ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 14 dias
       : null;
