@@ -18,11 +18,12 @@ function getSupabaseConfig() {
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error('❌ Variáveis do Supabase não encontradas!')
-    throw new Error('Variáveis de ambiente NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY são necessárias!')
+    console.error('Usando valores hardcoded como fallback')
+    // Não lançar erro, usar valores hardcoded
   }
 
-  console.log('✅ Supabase configurado com URL:', supabaseUrl.substring(0, 30) + '...')
-  return { supabaseUrl, supabaseAnonKey }
+  console.log('✅ Supabase configurado com URL:', supabaseUrl?.substring(0, 30) + '...')
+  return { supabaseUrl: supabaseUrl || SUPABASE_URL, supabaseAnonKey: supabaseAnonKey || SUPABASE_ANON_KEY }
 }
 
 // Criar cliente Supabase de forma segura
