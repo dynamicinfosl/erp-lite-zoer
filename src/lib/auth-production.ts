@@ -33,6 +33,10 @@ export class ProductionAuth {
     phone?: string 
   }) {
     try {
+      if (!supabase) {
+        throw new Error('Cliente Supabase não configurado');
+      }
+
       // 1. Criar usuário
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -103,6 +107,10 @@ export class ProductionAuth {
   }
 
   static async signIn(email: string, password: string) {
+    if (!supabase) {
+      throw new Error('Cliente Supabase não configurado');
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -113,12 +121,20 @@ export class ProductionAuth {
   }
 
   static async signOut() {
+    if (!supabase) {
+      throw new Error('Cliente Supabase não configurado');
+    }
+
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   }
 
   static async getCurrentUser(): Promise<AuthUser | null> {
     try {
+      if (!supabase) {
+        return null;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) return null;
@@ -179,6 +195,10 @@ export class ProductionAuth {
       console.error('💥 Erro geral no getCurrentUser:', error);
       // Em caso de erro, retornar usuário sem tenant
       try {
+        if (!supabase) {
+          return null;
+        }
+        
         const { data: { user } } = await supabase.auth.getUser();
         return user ? { ...user, currentTenant: undefined, role: undefined } as AuthUser : null;
       } catch {
