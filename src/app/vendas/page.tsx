@@ -316,7 +316,7 @@ export default function VendasPage() {
           title="Ticket Médio"
           value={`${formatCurrency(stats.ticketMedio)}`}
           description="Por venda paga"
-          color="info"
+          color="primary"
           icon={<TrendingUp className="h-5 w-5" />}
           trend="neutral"
           trendValue="30 dias"
