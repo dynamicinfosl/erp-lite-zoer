@@ -59,12 +59,18 @@ export const POST = requestMiddleware(async (request, context) => {
   }
 }, true);
 
-interface CashSessionParams {
-  params: { id: string };
-}
-
-export const PATCH = requestMiddleware(async (request, context, { params }: CashSessionParams) => {
+export const PATCH = requestMiddleware(async (request, context) => {
   try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    
+    if (!id) {
+      return createErrorResponse({
+        errorMessage: 'ID da sessão é obrigatório',
+        status: 400
+      });
+    }
+
     const body = (await request.json()) as Partial<CashSessionBody> & {
       closed_at?: string;
       closing_amount?: number;
@@ -75,7 +81,7 @@ export const PATCH = requestMiddleware(async (request, context, { params }: Cash
     const cashSessionsCrud = new CrudOperations("cash_sessions", context.token);
 
     const data = ensureTenantId(body as unknown as Record<string, unknown>, tenantContext.tenantId);
-    const updated = await cashSessionsCrud.update(params.id, data);
+    const updated = await cashSessionsCrud.update(id, data);
 
     return createSuccessResponse({ data: updated });
   } catch (error) {
@@ -87,12 +93,22 @@ export const PATCH = requestMiddleware(async (request, context, { params }: Cash
   }
 }, true);
 
-export const DELETE = requestMiddleware(async (_request, context, { params }: CashSessionParams) => {
+export const DELETE = requestMiddleware(async (request, context) => {
   try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    
+    if (!id) {
+      return createErrorResponse({
+        errorMessage: 'ID da sessão é obrigatório',
+        status: 400
+      });
+    }
+
     const tenantContext = await getTenantContext(context.token);
     const cashSessionsCrud = new CrudOperations("cash_sessions", context.token);
 
-    await cashSessionsCrud.delete(params.id, tenantContext.tenantId);
+    await cashSessionsCrud.delete(id, tenantContext.tenantId);
     return createSuccessResponse({ success: true });
   } catch (error) {
     console.error("Erro ao excluir sessão de caixa:", error);
