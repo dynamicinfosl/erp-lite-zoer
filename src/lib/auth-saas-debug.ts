@@ -39,6 +39,10 @@ export interface AuthUser extends User {
 // Classe para gerenciar autenticação SaaS - VERSÃO DEBUG
 export class SaasAuth {
   static async getCurrentUser(): Promise<AuthUser | null> {
+    if (!supabase) {
+      return null;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) return null;
@@ -107,6 +111,10 @@ export class SaasAuth {
   }
 
   static async signIn(email: string, password: string) {
+    if (!supabase) {
+      throw new Error('Cliente Supabase não configurado');
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -117,6 +125,10 @@ export class SaasAuth {
   }
 
   static async signOut() {
+    if (!supabase) {
+      throw new Error('Cliente Supabase não configurado');
+    }
+
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   }
