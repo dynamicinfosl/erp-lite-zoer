@@ -43,8 +43,8 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true); // ✅ INICIAR COM LOADING
   
   const router = useRouter();
-  // Usar o cliente Supabase configurado de forma segura
-  const supabase = createSupabaseClient();
+  // Usar o cliente Supabase configurado de forma segura (singleton)
+  const supabase = React.useMemo(() => createSupabaseClient(), []);
 
   // Função SUPER SIMPLES - Cria tenant local
   const createDefaultTenant = (userId: string) => {
@@ -91,22 +91,18 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         console.log('⚠️ Erro ao verificar tenant na tabela tenants:', error);
       }
 
-      // Fallback: usar user_id como tenant_id (compatibilidade)
-      console.log('👤 Usando user_id como tenant_id (fallback):', userId);
-      return {
-        id: userId,
-        name: 'Meu Negócio',
-        status: 'trial',
-      };
+      // ✅ FALLBACK GARANTIDO: Sempre retornar um tenant válido
+      console.log('👤 Usando user_id como tenant_id (fallback garantido):', userId);
+      const fallbackTenant = createDefaultTenant(userId);
+      console.log('✅ Tenant fallback criado:', fallbackTenant);
+      return fallbackTenant;
 
     } catch (error) {
       console.error('❌ Erro ao buscar tenant real:', error);
-      // Em caso de erro, usar user_id mesmo assim
-      return {
-        id: userId,
-        name: 'Meu Negócio',
-        status: 'trial',
-      };
+      // ✅ FALLBACK FINAL: Sempre retornar um tenant válido
+      const fallbackTenant = createDefaultTenant(userId);
+      console.log('✅ Tenant fallback final criado:', fallbackTenant);
+      return fallbackTenant;
     }
   };
 
@@ -130,6 +126,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
           console.log('👤 Usuário encontrado:', session.user.email);
           // Buscar dados completos do tenant
           const tenantData = await loadRealTenant(session.user.id);
+          console.log('🏢 Tenant carregado:', tenantData);
           setTenant(tenantData);
         } else {
           console.log('👤 Nenhum usuário logado');
@@ -166,6 +163,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
             setUser(session.user);
             // Buscar dados completos do tenant
             const tenantData = await loadRealTenant(session.user.id);
+            console.log('🏢 Tenant carregado via auth change:', tenantData);
             setTenant(tenantData);
           } else if (event === 'SIGNED_OUT') {
             setSession(null);
@@ -235,7 +233,9 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   const refreshTenant = async () => {
     if (user?.id) {
       try {
+        console.log('🔄 Atualizando tenant para usuário:', user.id);
         const tenantData = await loadRealTenant(user.id);
+        console.log('🏢 Tenant atualizado:', tenantData);
         setTenant(tenantData);
       } catch (error) {
         console.error('❌ Erro ao atualizar tenant:', error);

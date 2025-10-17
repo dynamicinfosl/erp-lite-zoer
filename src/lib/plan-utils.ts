@@ -4,12 +4,9 @@ import { PlanLimits, PlanUsage } from '@/hooks/usePlanLimits';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Verificar se as variáveis estão definidas
+// Verificar se as variáveis estão definidas (apenas log, não erro)
 if (!supabaseUrl || !supabaseKey) {
-  console.error('Variáveis do Supabase não configuradas em plan-utils:', {
-    url: !!supabaseUrl,
-    key: !!supabaseKey
-  });
+  console.log('⚠️ Variáveis do Supabase não configuradas em plan-utils - usando fallback');
 }
 
 const supabase = supabaseUrl && supabaseKey 
