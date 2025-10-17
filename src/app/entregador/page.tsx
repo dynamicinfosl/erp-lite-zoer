@@ -25,13 +25,6 @@ export default function EntregadorPage() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchMyDeliveries();
-    // Atualizar a cada 30 segundos
-    const interval = setInterval(fetchMyDeliveries, 30000);
-    return () => clearInterval(interval);
-  }, [fetchMyDeliveries]);
-
   const fetchMyDeliveries = useCallback(async () => {
     try {
       setLoading(true);
@@ -62,6 +55,13 @@ export default function EntregadorPage() {
       setLoading(false);
     }
   }, [tenant?.id]);
+
+  useEffect(() => {
+    fetchMyDeliveries();
+    // Atualizar a cada 30 segundos
+    const interval = setInterval(fetchMyDeliveries, 30000);
+    return () => clearInterval(interval);
+  }, [fetchMyDeliveries]);
 
   const handleStartDelivery = async (deliveryId: number) => {
     try {
