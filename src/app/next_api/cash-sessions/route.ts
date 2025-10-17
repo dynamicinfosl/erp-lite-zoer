@@ -46,7 +46,7 @@ export const POST = requestMiddleware(async (request, context) => {
     const tenantContext = await getTenantContext(context.token);
 
     const cashSessionsCrud = new CrudOperations("cash_sessions", context.token);
-    const data = ensureTenantId(body as Record<string, unknown>, tenantContext.tenantId);
+    const data = ensureTenantId(body as unknown as Record<string, unknown>, tenantContext.tenantId);
 
     const created = await cashSessionsCrud.create(data);
     return createSuccessResponse({ data: created }, 201);
@@ -74,7 +74,7 @@ export const PATCH = requestMiddleware(async (request, context, { params }: Cash
     const tenantContext = await getTenantContext(context.token);
     const cashSessionsCrud = new CrudOperations("cash_sessions", context.token);
 
-    const data = ensureTenantId(body as Record<string, unknown>, tenantContext.tenantId);
+    const data = ensureTenantId(body as unknown as Record<string, unknown>, tenantContext.tenantId);
     const updated = await cashSessionsCrud.update(params.id, data);
 
     return createSuccessResponse({ data: updated });
