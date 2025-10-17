@@ -241,28 +241,28 @@ export default function RealDashboard() {
           value={`R$ ${data.totalSales.toFixed(2)}`}
           change="+12.5%"
           changeType="positive"
-          icon={DollarSign}
+          icon={<DollarSign className="h-5 w-5" />}
         />
         <JugaKPICard
           title="Total de Clientes"
           value={data.totalCustomers.toString()}
           change="+8.2%"
           changeType="positive"
-          icon={Users}
+          icon={<Users className="h-5 w-5" />}
         />
         <JugaKPICard
           title="Produtos Ativos"
           value={data.totalProducts.toString()}
           change="+3.1%"
           changeType="positive"
-          icon={Package}
+          icon={<Package className="h-5 w-5" />}
         />
         <JugaKPICard
           title="Vendas Realizadas"
           value={data.sales.length.toString()}
           change="+15.3%"
           changeType="positive"
-          icon={ShoppingCart}
+          icon={<ShoppingCart className="h-5 w-5" />}
         />
       </div>
 
