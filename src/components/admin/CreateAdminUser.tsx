@@ -76,10 +76,7 @@ export function CreateAdminUser({ onSuccess }: CreateAdminUserProps) {
       setError(null);
 
       // Criar usuário com role de admin
-      const result = await signUp(formData.email, formData.password, {
-        full_name: formData.fullName,
-        role: 'admin'
-      });
+      const result = await signUp(formData.email, formData.password, formData.fullName);
 
       if (result.error) {
         throw result.error;
