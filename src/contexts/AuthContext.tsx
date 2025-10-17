@@ -154,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       let rpcData, rpcError;
       try {
-        const result = await Promise.race([rpcPromise, timeoutPromise]);
+        const result = await Promise.race([rpcPromise, timeoutPromise]) as { data: any; error: any };
         rpcData = result.data;
         rpcError = result.error;
       } catch (error: any) {
