@@ -657,9 +657,9 @@ export default function PDVPage() {
         total={total}
         customerName={customerName}
         cartItems={cart.map(item => ({
-          id: item.id,
+          id: item.id.toString(),
           name: item.name,
-          code: item.code || item.sku || 'N/A',
+          code: item.code || 'N/A',
           price: item.price,
           quantity: item.quantity,
           subtotal: calculateItemTotal(item)
