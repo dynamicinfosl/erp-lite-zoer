@@ -66,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadUserData = useCallback(async (user: User) => {
     console.log('📍 Carregando tenant para:', user.email);
+    const startTime = Date.now();
     
     const timeout = setTimeout(() => {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
