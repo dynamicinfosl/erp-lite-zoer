@@ -65,7 +65,7 @@ export function createSupabaseClient() {
 }
 
 // Cliente padrão exportado (lazy initialization)
-let supabaseInstance: ReturnType<typeof createClient> | null = null
+let supabaseInstance: ReturnType<typeof createSupabaseClient> | null = null
 
 export const supabase = (() => {
   if (!supabaseInstance) {
