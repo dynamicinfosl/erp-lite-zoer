@@ -28,6 +28,7 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  UserCog,
   Store,
   Warehouse,
   Receipt,
@@ -44,6 +45,17 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { mockUserProfile } from '@/lib/mock-data';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { User } from 'lucide-react';
 
 const menuGroups = [
   {
@@ -74,6 +86,7 @@ const menuGroups = [
       { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Relatórios', url: '/relatorios', icon: BarChart3, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Perfil da Empresa', url: '/perfil-empresa', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Perfil do Usuário', url: '/perfil-usuario', icon: UserCog, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Assinatura', url: '/assinatura', icon: CreditCard, roles: ['admin', 'vendedor', 'financeiro'] },
       // Botão Administração oculto - acesso restrito apenas para usuário "julga"
       // { title: 'Administração', url: '/admin', icon: Shield, roles: ['admin'] },
@@ -86,17 +99,20 @@ function SidebarContentInternal() {
   const pathname = usePathname();
   const { user, tenant, signOut } = useSimpleAuth();
   
+  
   // Simular perfil do usuário baseado no role ou usar um perfil padrão se auth estiver desabilitado
   const userRole = ENABLE_AUTH && user ? 'admin' : mockUserProfile.role;
 
   // Nome para exibir (sempre tem algo)
   const displayName = tenant?.name || 
     (user?.email ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ') : 'Meu Negócio');
+  
 
   const filteredGroups = menuGroups.map(group => ({
     title: group.title,
     items: group.items.filter(item => item.roles.includes(userRole)),
   })).filter(group => group.items.length > 0);
+
 
   return (
     <Sidebar className="hidden lg:flex w-60 flex-col juga-sidebar-gradient text-white">

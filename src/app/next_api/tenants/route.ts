@@ -62,12 +62,31 @@ export async function PUT(request: NextRequest) {
     // Remover campos que podem não existir no schema
     const safeUpdateData: any = {};
     
-    // Campos que existem na tabela tenants
+    // Campos básicos
     if (updateData.name !== undefined) safeUpdateData.name = updateData.name;
     if (updateData.email !== undefined) safeUpdateData.email = updateData.email;
     if (updateData.phone !== undefined) safeUpdateData.phone = updateData.phone;
     if (updateData.document !== undefined) safeUpdateData.document = updateData.document;
+    
+    // Dados gerais da empresa
+    if (updateData.tipo !== undefined) safeUpdateData.tipo = updateData.tipo;
+    if (updateData.nome_fantasia !== undefined) safeUpdateData.nome_fantasia = updateData.nome_fantasia;
+    if (updateData.razao_social !== undefined) safeUpdateData.razao_social = updateData.razao_social;
+    if (updateData.inscricao_estadual !== undefined) safeUpdateData.inscricao_estadual = updateData.inscricao_estadual;
+    if (updateData.inscricao_municipal !== undefined) safeUpdateData.inscricao_municipal = updateData.inscricao_municipal;
+    if (updateData.cnae_principal !== undefined) safeUpdateData.cnae_principal = updateData.cnae_principal;
+    if (updateData.regime_tributario !== undefined) safeUpdateData.regime_tributario = updateData.regime_tributario;
+    if (updateData.regime_especial !== undefined) safeUpdateData.regime_especial = updateData.regime_especial;
+    
+    // Contato
+    if (updateData.celular !== undefined) safeUpdateData.celular = updateData.celular;
+    if (updateData.site !== undefined) safeUpdateData.site = updateData.site;
+    
+    // Endereço completo
     if (updateData.address !== undefined) safeUpdateData.address = updateData.address;
+    if (updateData.numero !== undefined) safeUpdateData.numero = updateData.numero;
+    if (updateData.complemento !== undefined) safeUpdateData.complemento = updateData.complemento;
+    if (updateData.bairro !== undefined) safeUpdateData.bairro = updateData.bairro;
     if (updateData.city !== undefined) safeUpdateData.city = updateData.city;
     if (updateData.state !== undefined) safeUpdateData.state = updateData.state;
     if (updateData.zip_code !== undefined) safeUpdateData.zip_code = updateData.zip_code;
@@ -125,7 +144,68 @@ export async function PUT(request: NextRequest) {
   }
 }
 
+export async function POST(request: NextRequest) {
+  try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Cliente Supabase não configurado' },
+        { status: 500 }
+      );
+    }
 
+    const body = await request.json();
+    const { id, name, slug, ...extraData } = body;
 
+    if (!id || !name) {
+      return NextResponse.json({ 
+        error: 'ID e nome do tenant são obrigatórios' 
+      }, { status: 400 });
+    }
 
+    console.log('📝 Criando novo tenant:', id, name);
+
+    // Verificar se tenant já existe
+    const { data: existingTenant } = await supabaseAdmin
+      .from('tenants')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (existingTenant) {
+      return NextResponse.json({ 
+        error: 'Tenant já existe. Use PUT para atualizar.' 
+      }, { status: 409 });
+    }
+
+    // Criar novo tenant
+    const { data: tenant, error } = await supabaseAdmin
+      .from('tenants')
+      .insert({
+        id,
+        name,
+        slug: slug || name.toLowerCase().replace(/\s+/g, '-'),
+        status: 'trial',
+        ...extraData
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Erro ao criar tenant:', error);
+      return NextResponse.json({ 
+        error: 'Erro ao criar empresa', 
+        details: error.message 
+      }, { status: 500 });
+    }
+
+    console.log('✅ Tenant criado com sucesso:', tenant);
+    return NextResponse.json({ data: tenant, success: true }, { status: 201 });
+  } catch (error: any) {
+    console.error('❌ Erro na API tenants POST:', error);
+    return NextResponse.json({ 
+      error: 'Erro interno do servidor', 
+      details: error.message 
+    }, { status: 500 });
+  }
+}
 

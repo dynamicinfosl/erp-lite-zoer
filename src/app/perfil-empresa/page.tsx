@@ -8,115 +8,245 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Mail, Phone, MapPin, FileText, Save, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { Building2, Mail, Phone, MapPin, FileText, Save, Loader2, Search, Plus } from 'lucide-react';
 
 interface TenantData {
   id: string;
   name: string;
   slug: string;
   status: string;
+  // Dados gerais
+  tipo?: string;
+  document?: string; // CNPJ
+  nome_fantasia?: string;
+  razao_social?: string;
+  inscricao_estadual?: string;
+  inscricao_municipal?: string;
+  cnae_principal?: string;
+  regime_tributario?: string;
+  regime_especial?: string;
+  // Contato
   email?: string;
   phone?: string;
-  document?: string;
+  celular?: string;
+  site?: string;
+  // Endereço
+  zip_code?: string;
   address?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
   city?: string;
   state?: string;
-  zip_code?: string;
   created_at?: string;
 }
 
 export default function PerfilEmpresaPage() {
-  const { user, tenant: authTenant, loading: authLoading, refreshTenant } = useSimpleAuth();
+  const { user, tenant: authTenant, loading: authLoading } = useSimpleAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tenant, setTenant] = useState<TenantData | null>(null);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+
+  // Funções de máscara
+  const formatCNPJ = (value: string) => {
+    const numbers = value.replace(/\D/g, '').slice(0, 14);
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 5) return `${numbers.slice(0, 2)}.${numbers.slice(2)}`;
+    if (numbers.length <= 8) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5)}`;
+    if (numbers.length <= 12) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8)}`;
+    return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8, 12)}-${numbers.slice(12)}`;
+  };
+
+  const formatCPF = (value: string) => {
+    const numbers = value.replace(/\D/g, '').slice(0, 11);
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+    if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+    return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9)}`;
+  };
+
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, '').slice(0, 10);
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+  };
+
+  const formatCelular = (value: string) => {
+    const numbers = value.replace(/\D/g, '').slice(0, 11);
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
+  };
+
+  const formatCEP = (value: string) => {
+    const numbers = value.replace(/\D/g, '').slice(0, 8);
+    if (numbers.length <= 5) return numbers;
+    return `${numbers.slice(0, 5)}-${numbers.slice(5)}`;
+  };
   
   const [formData, setFormData] = useState({
-    name: '',
+    // Dados gerais
+    tipo: 'juridica',
+    document: '',
+    nome_fantasia: '',
+    razao_social: '',
+    inscricao_estadual: '',
+    inscricao_municipal: '',
+    cnae_principal: '',
+    regime_tributario: '',
+    regime_especial: '',
+    // Contato
     email: '',
     phone: '',
-    document: '',
+    celular: '',
+    site: '',
+    // Endereço
+    zip_code: '',
     address: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
     city: '',
     state: '',
-    zip_code: '',
   });
+
+  const [originalFormData, setOriginalFormData] = useState(formData);
 
   useEffect(() => {
     if (authLoading) return;
     loadTenantData();
   }, [authTenant, authLoading]);
 
+  // Auto-esconder mensagem de sucesso após 5 segundos
+  useEffect(() => {
+    if (showSuccessMessage) {
+      const timer = setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessMessage]);
+
   const loadTenantData = async () => {
     if (!authTenant) {
-      // Se a autenticação estiver desativada, usa um tenant mock para evitar tela vazia
-      if (process.env.NEXT_PUBLIC_ENABLE_AUTH !== 'true') {
-        setTenant({
-          id: '00000000-0000-0000-0000-000000000000',
-          name: 'Minha Empresa',
-          slug: 'minha-empresa',
-          status: 'trial',
-          email: '',
-          phone: '',
-          document: '',
-          address: '',
-          city: '',
-          state: '',
-          zip_code: ''
-        } as any);
-        setFormData({
-          name: 'Minha Empresa',
-          email: '',
-          phone: '',
-          document: '',
-          address: '',
-          city: '',
-          state: '',
-          zip_code: ''
-        });
+      // Se não tem tenant, buscar ou criar um no banco
+      try {
+        setLoading(true);
+        const userId = user?.id || '00000000-0000-0000-0000-000000000000';
+        
+        // Tentar buscar tenant existente
+        const response = await fetch(`/next_api/tenants?tenant_id=${userId}`);
+        const result = await response.json();
+        
+        if (response.ok && result.data) {
+          // Tenant existe, usar ele
+          const existingTenant = result.data;
+          setTenant(existingTenant);
+          const loadedFormData = {
+            tipo: existingTenant.tipo || 'juridica',
+            document: existingTenant.document || '',
+            nome_fantasia: existingTenant.nome_fantasia || existingTenant.name || '',
+            razao_social: existingTenant.razao_social || '',
+            inscricao_estadual: existingTenant.inscricao_estadual || '',
+            inscricao_municipal: existingTenant.inscricao_municipal || '',
+            cnae_principal: existingTenant.cnae_principal || '',
+            regime_tributario: existingTenant.regime_tributario || '',
+            regime_especial: existingTenant.regime_especial || '',
+            email: existingTenant.email || '',
+            phone: existingTenant.phone || '',
+            celular: existingTenant.celular || '',
+            site: existingTenant.site || '',
+            zip_code: existingTenant.zip_code || '',
+            address: existingTenant.address || '',
+            numero: existingTenant.numero || '',
+            complemento: existingTenant.complemento || '',
+            bairro: existingTenant.bairro || '',
+            city: existingTenant.city || '',
+            state: existingTenant.state || '',
+          };
+          setFormData(loadedFormData);
+          setOriginalFormData(loadedFormData);
+        } else {
+          // Tenant não existe, mostrar formulário vazio para criar
+          const defaultTenant = {
+            id: userId,
+            name: user?.email?.split('@')[0] || 'Minha Empresa',
+            slug: 'minha-empresa',
+            status: 'trial',
+            tipo: 'juridica',
+            email: user?.email || '',
+          } as TenantData;
+          
+          setTenant(defaultTenant);
+          const defaultFormData = {
+            tipo: 'juridica',
+            document: '',
+            nome_fantasia: defaultTenant.name,
+            razao_social: '',
+            inscricao_estadual: '',
+            inscricao_municipal: '',
+            cnae_principal: '',
+            regime_tributario: '',
+            regime_especial: '',
+            email: defaultTenant.email || '',
+            phone: '',
+            celular: '',
+            site: '',
+            zip_code: '',
+            address: '',
+            numero: '',
+            complemento: '',
+            bairro: '',
+            city: '',
+            state: '',
+          };
+          setFormData(defaultFormData);
+          setOriginalFormData(defaultFormData);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar tenant:', error);
+      } finally {
         setLoading(false);
-        return;
       }
-
-      setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-
-      // Usar o tenant do contexto de autenticação
       const tenantData: TenantData = {
         ...authTenant,
         slug: authTenant.name.toLowerCase().replace(/\s+/g, '-')
       };
       
-      console.log('📋 Dados do tenant carregados:', {
-        name: tenantData.name,
-        email: tenantData.email,
-        phone: tenantData.phone,
-        document: tenantData.document,
-        address: tenantData.address,
-        city: tenantData.city,
-        state: tenantData.state,
-        zip_code: tenantData.zip_code,
-      });
-      
       setTenant(tenantData);
-      setFormData({
-        name: tenantData.name || '',
+      const loadedFormData = {
+        tipo: tenantData.tipo || 'juridica',
+        document: tenantData.document || '',
+        nome_fantasia: tenantData.nome_fantasia || tenantData.name || '',
+        razao_social: tenantData.razao_social || '',
+        inscricao_estadual: tenantData.inscricao_estadual || '',
+        inscricao_municipal: tenantData.inscricao_municipal || '',
+        cnae_principal: tenantData.cnae_principal || '',
+        regime_tributario: tenantData.regime_tributario || '',
+        regime_especial: tenantData.regime_especial || '',
         email: tenantData.email || '',
         phone: tenantData.phone || '',
-        document: tenantData.document || '',
+        celular: tenantData.celular || '',
+        site: tenantData.site || '',
+        zip_code: tenantData.zip_code || '',
         address: tenantData.address || '',
+        numero: tenantData.numero || '',
+        complemento: tenantData.complemento || '',
+        bairro: tenantData.bairro || '',
         city: tenantData.city || '',
         state: tenantData.state || '',
-        zip_code: tenantData.zip_code || '',
-      });
+      };
+      setFormData(loadedFormData);
+      setOriginalFormData(loadedFormData);
     } catch (error) {
       console.error('Erro:', error);
-      toast.error('Erro ao carregar dados');
     } finally {
       setLoading(false);
     }
@@ -129,362 +259,488 @@ export default function PerfilEmpresaPage() {
     try {
       setSaving(true);
 
-      console.log('📝 Enviando dados do tenant:', {
-        id: tenant.id,
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        document: formData.document,
-        address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        zip_code: formData.zip_code,
-      });
+      // Primeiro, verificar se o tenant existe
+      const checkResponse = await fetch(`/next_api/tenants?tenant_id=${tenant.id}`);
+      const checkResult = await checkResponse.json();
 
-      const res = await fetch('/next_api/tenants', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: tenant.id,
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          document: formData.document,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          zip_code: formData.zip_code,
-        })
-      });
-
-      console.log('📡 Resposta do servidor:', res.status);
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        console.error('❌ Erro do servidor:', errorData);
-        throw new Error(errorData.details || errorData.error || 'Erro ao atualizar dados');
-      }
-
-      const result = await res.json();
-      console.log('✅ Resultado:', result);
-
-      // Atualizar os dados do formulário com o que foi salvo
-      if (result.data) {
-        console.log('🔄 Atualizando formulário com dados salvos:', result.data);
-        
-        const updatedFormData = {
-          name: result.data.name || '',
-          email: result.data.email || '',
-          phone: result.data.phone || '',
-          document: result.data.document || '',
-          address: result.data.address || '',
-          city: result.data.city || '',
-          state: result.data.state || '',
-          zip_code: result.data.zip_code || '',
-        };
-        
-        setFormData(updatedFormData);
-        setTenant(result.data);
-        
-        console.log('✅ Formulário atualizado:', updatedFormData);
-      }
-
-      console.log('🎉 Mostrando toast de sucesso');
-      toast.success('Dados atualizados com sucesso!');
+      let response;
       
-      // Atualizar contexto global também
-      if (refreshTenant) {
-        await refreshTenant();
+      if (!checkResponse.ok || !checkResult.data) {
+        // Tenant não existe, criar primeiro
+        console.log('📝 Tenant não existe, criando...');
+        response = await fetch('/next_api/tenants', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: tenant.id,
+            name: formData.nome_fantasia || tenant.name,
+            slug: (formData.nome_fantasia || tenant.name).toLowerCase().replace(/\s+/g, '-'),
+            status: 'trial',
+            ...formData,
+          }),
+        });
+      } else {
+        // Tenant existe, atualizar
+        console.log('📝 Tenant existe, atualizando...');
+        response = await fetch('/next_api/tenants', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: tenant.id,
+            name: formData.nome_fantasia || tenant.name,
+            ...formData,
+          }),
+        });
       }
-    } catch (error: any) {
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao salvar');
+      }
+
+      console.log('✅ Dados salvos com sucesso');
+      setShowSuccessMessage(true);
+      setOriginalFormData(formData);
+      
+      // Atualizar o tenant local com os dados salvos
+      if (result.data) {
+        setTenant(result.data);
+      }
+    } catch (error) {
       console.error('❌ Erro ao salvar:', error);
-      toast.error(error.message || 'Erro ao salvar dados');
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      alert('Erro ao salvar dados: ' + errorMessage);
     } finally {
       setSaving(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-500';
-      case 'trial':
-        return 'bg-blue-500';
-      case 'suspended':
-        return 'bg-red-500';
-      default:
-        return 'bg-gray-500';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'Ativo';
-      case 'trial':
-        return 'Trial';
-      case 'suspended':
-        return 'Suspenso';
-      default:
-        return status;
-    }
-  };
-
   if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="flex h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Carregando informações da empresa...</p>
+        </div>
       </div>
     );
   }
 
   if (!tenant) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex flex-col items-center gap-3">
-              <p className="text-gray-600">Empresa não encontrada</p>
-              <Button variant="outline" onClick={refreshTenant}>Tentar novamente</Button>
-            </div>
-          </CardContent>
+      <div className="flex h-screen items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Empresa não encontrada</CardTitle>
+            <CardDescription>Não foi possível carregar os dados da empresa.</CardDescription>
+          </CardHeader>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
-      {/* Header - Responsivo */}
-      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold text-heading">Perfil da Empresa</h1>
-          <p className="text-sm sm:text-base text-body">Gerencie as informações da sua empresa</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-          <Badge className={`${getStatusColor(tenant.status)} text-white w-full sm:w-auto justify-center`}>
-            {getStatusLabel(tenant.status)}
-          </Badge>
+    <div className="container mx-auto py-8 px-4">
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Building2 className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Dados da Empresa</h1>
+            <p className="text-muted-foreground">
+              Gerencie as informações da sua empresa
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Main Content - Responsivo */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
-        <div className="xl:col-span-2 space-y-4 sm:space-y-6">
-          <Tabs defaultValue="dados" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="dados" className="text-xs sm:text-sm">Dados da Empresa</TabsTrigger>
-              <TabsTrigger value="endereco" className="text-xs sm:text-sm">Endereço</TabsTrigger>
-            </TabsList>
+      {showSuccessMessage && (
+        <div className="mb-8 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <svg className="w-6 h-6 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span className="text-green-800 font-medium">Dados da empresa atualizados com sucesso!</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowSuccessMessage(false)}
+            className="text-green-600 hover:bg-green-100"
+          >
+            ✕
+          </Button>
+        </div>
+      )}
 
-            <form onSubmit={handleSubmit}>
-              <TabsContent value="dados">
-                <Card className="juga-card">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg sm:text-xl text-heading">Informações Básicas</CardTitle>
-                    <CardDescription className="text-sm">Dados principais da empresa</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name" className="text-sm font-medium text-heading">Nome da Empresa *</Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Ex: Empresa JUGA"
-                        required
-                        className="h-11"
-                      />
-                    </div>
+      <form onSubmit={handleSubmit}>
+        <Tabs defaultValue="dados-gerais" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="dados-gerais">Dados Gerais</TabsTrigger>
+            <TabsTrigger value="contato">Contato</TabsTrigger>
+            <TabsTrigger value="endereco">Endereço</TabsTrigger>
+          </TabsList>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="email" className="text-sm font-medium text-heading flex items-center gap-2">
-                          <Mail className="h-4 w-4" />
-                          E-mail
-                        </Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                          placeholder="contato@empresa.com"
-                          className="h-11"
-                        />
-                      </div>
+          {/* ABA: DADOS GERAIS */}
+          <TabsContent value="dados-gerais" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Informações da Empresa
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Linha 1: Tipo, CNPJ, Nome Fantasia */}
+                <div className="grid md:grid-cols-[200px_1fr_1fr] gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="tipo">Tipo<span className="text-red-500">*</span></Label>
+                    <select
+                      id="tipo"
+                      value={formData.tipo}
+                      onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+                      className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      required
+                    >
+                      <option value="juridica">Pessoa jurídica</option>
+                      <option value="fisica">Pessoa física</option>
+                    </select>
+                  </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="phone" className="text-sm font-medium text-heading flex items-center gap-2">
-                          <Phone className="h-4 w-4" />
-                          Telefone
-                        </Label>
-                        <Input
-                          id="phone"
-                          value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                          placeholder="(21) 98765-4321"
-                          className="h-11"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="document" className="text-sm font-medium text-heading flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        CNPJ
-                      </Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="document">
+                      CNPJ<span className="text-red-500">*</span>
+                    </Label>
+                    <div className="flex gap-2 items-start">
                       <Input
                         id="document"
                         value={formData.document}
-                        onChange={(e) => setFormData({ ...formData, document: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, document: formatCNPJ(e.target.value) })}
                         placeholder="00.000.000/0000-00"
-                        className="h-11"
+                        required
+                        className="h-11 flex-1"
+                        maxLength={18}
                       />
+                      <Button type="button" variant="outline" size="icon" className="h-11 w-11 flex-shrink-0">
+                        <Search className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                  </div>
 
-              <TabsContent value="endereco">
-                <Card className="juga-card">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg sm:text-xl text-heading">Endereço</CardTitle>
-                    <CardDescription className="text-sm">Localização da empresa</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="address" className="text-sm font-medium text-heading">Endereço</Label>
-                      <Input
-                        id="address"
-                        value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                        placeholder="Rua, número, complemento"
-                        className="h-11"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="sm:col-span-2 space-y-2">
-                        <Label htmlFor="city" className="text-sm font-medium text-heading">Cidade</Label>
-                        <Input
-                          id="city"
-                          value={formData.city}
-                          onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                          placeholder="Rio de Janeiro"
-                          className="h-11"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="state" className="text-sm font-medium text-heading">Estado</Label>
-                        <Input
-                          id="state"
-                          value={formData.state}
-                          onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                          placeholder="RJ"
-                          maxLength={2}
-                          className="h-11"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="zip_code" className="text-sm font-medium text-heading">CEP</Label>
-                      <Input
-                        id="zip_code"
-                        value={formData.zip_code}
-                        onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
-                        placeholder="00000-000"
-                        className="h-11"
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={loadTenantData}
-                  disabled={saving}
-                  className="w-full sm:w-auto"
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={saving}
-                  className="juga-gradient text-white w-full sm:w-auto"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" />
-                      Salvar Alterações
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-          </Tabs>
-        </div>
-
-        {/* Sidebar - Responsivo */}
-        <div className="space-y-4 sm:space-y-6">
-          {/* Informações da Empresa - Responsivo */}
-          <Card className="juga-card">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base sm:text-lg text-heading">Informações da Empresa</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 sm:space-y-3">
-              <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <span className="text-body text-sm">Status</span>
-                <Badge className={`${getStatusColor(tenant.status)} text-white`}>
-                  {getStatusLabel(tenant.status)}
-                </Badge>
-              </div>
-              {tenant.created_at && (
-                <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
-                  <span className="text-body text-sm">Criada em</span>
-                  <span className="text-heading text-sm">{new Date(tenant.created_at).toLocaleDateString('pt-BR')}</span>
+                  <div className="space-y-2">
+                    <Label htmlFor="nome_fantasia">Nome fantasia<span className="text-red-500">*</span></Label>
+                    <Input
+                      id="nome_fantasia"
+                      value={formData.nome_fantasia}
+                      onChange={(e) => setFormData({ ...formData, nome_fantasia: e.target.value })}
+                      placeholder="Nome fantasia"
+                      required
+                      className="h-11"
+                    />
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
 
-          {/* Ações Rápidas - Responsivo */}
-          <Card className="juga-card">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base sm:text-lg text-heading">Ações Rápidas</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 sm:space-y-3">
-              <Button className="w-full justify-start juga-gradient text-white text-sm">
-                <Building2 className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Editar Perfil</span>
-                <span className="sm:hidden">Perfil</span>
-              </Button>
-              <Button variant="outline" className="w-full justify-start text-sm">
-                <FileText className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Documentos</span>
-                <span className="sm:hidden">Docs</span>
-              </Button>
-              <Button variant="outline" className="w-full justify-start text-sm">
-                <MapPin className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Endereços</span>
-                <span className="sm:hidden">Endereço</span>
-              </Button>
-            </CardContent>
-          </Card>
+                {/* Linha 2: Razão Social */}
+                <div className="space-y-2">
+                  <Label htmlFor="razao_social">Razão social</Label>
+                  <Input
+                    id="razao_social"
+                    value={formData.razao_social}
+                    onChange={(e) => setFormData({ ...formData, razao_social: e.target.value })}
+                    placeholder="Razão social da empresa"
+                    className="h-11"
+                  />
+                </div>
+
+                {/* Linha 3: Inscrição Estadual, Municipal */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="inscricao_estadual">Ins. estadual</Label>
+                      <label className="flex items-center gap-1 text-sm">
+                        <input type="checkbox" className="rounded" />
+                        <span className="text-muted-foreground">ISENTA</span>
+                      </label>
+                    </div>
+                    <Input
+                      id="inscricao_estadual"
+                      value={formData.inscricao_estadual}
+                      onChange={(e) => setFormData({ ...formData, inscricao_estadual: e.target.value })}
+                      placeholder="000.000.000.000"
+                      className="h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="inscricao_municipal">Ins. municipal</Label>
+                    <Input
+                      id="inscricao_municipal"
+                      value={formData.inscricao_municipal}
+                      onChange={(e) => setFormData({ ...formData, inscricao_municipal: e.target.value })}
+                      placeholder="Inscrição municipal"
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+
+                {/* Linha 4: CNAE Principal, Regime Tributário, Regime Especial */}
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="cnae_principal">CNAE Principal</Label>
+                    <Input
+                      id="cnae_principal"
+                      value={formData.cnae_principal}
+                      onChange={(e) => setFormData({ ...formData, cnae_principal: e.target.value })}
+                      placeholder="Digite para buscar"
+                      className="h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="regime_tributario">Regime tributário</Label>
+                    <select
+                      id="regime_tributario"
+                      value={formData.regime_tributario}
+                      onChange={(e) => setFormData({ ...formData, regime_tributario: e.target.value })}
+                      className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="">Selecione</option>
+                      <option value="simples">Simples Nacional</option>
+                      <option value="presumido">Lucro Presumido</option>
+                      <option value="real">Lucro Real</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="regime_especial">Regime especial de tributação</Label>
+                    <select
+                      id="regime_especial"
+                      value={formData.regime_especial}
+                      onChange={(e) => setFormData({ ...formData, regime_especial: e.target.value })}
+                      className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="">Sem regime</option>
+                      <option value="mei">MEI</option>
+                      <option value="simples">Simples Nacional</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* I.E. Substitutos Tributários */}
+                <div className="space-y-3 pt-4 border-t">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold">I.E. substitutos tributários</Label>
+                  </div>
+                  <p className="text-sm text-muted-foreground bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    Os contribuintes que praticam operações com substituição tributária, tem o recurso de registrar a inscrição estadual do substituto tributário, para que ele referencia recolha o ICMSST na UF de origem da mercadoria.
+                  </p>
+                  <Button type="button" variant="outline" size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Adicionar inscrição
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ABA: CONTATO */}
+          <TabsContent value="contato" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Phone className="h-5 w-5" />
+                  Informações de Contato
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Linha 1: E-mail, Telefone, Celular, Site */}
+                <div className="grid md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">
+                      E-mail<span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="email@empresa.com"
+                      required
+                      className="h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Telefone<span className="text-red-500">*</span></Label>
+                    <Input
+                      id="phone"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: formatPhone(e.target.value) })}
+                      placeholder="(00) 0000-0000"
+                      required
+                      className="h-11"
+                      maxLength={14}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="celular">Celular</Label>
+                    <Input
+                      id="celular"
+                      value={formData.celular}
+                      onChange={(e) => setFormData({ ...formData, celular: formatCelular(e.target.value) })}
+                      placeholder="(00) 00000-0000"
+                      className="h-11"
+                      maxLength={15}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="site">Site</Label>
+                    <Input
+                      id="site"
+                      value={formData.site}
+                      onChange={(e) => setFormData({ ...formData, site: e.target.value })}
+                      placeholder="www.empresa.com"
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ABA: ENDEREÇO */}
+          <TabsContent value="endereco" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  Endereço
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Linha 1: CEP, Logradouro, Número */}
+                <div className="grid md:grid-cols-[200px_1fr_200px] gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="zip_code">CEP<span className="text-red-500">*</span></Label>
+                    <Input
+                      id="zip_code"
+                      value={formData.zip_code}
+                      onChange={(e) => setFormData({ ...formData, zip_code: formatCEP(e.target.value) })}
+                      placeholder="00000-000"
+                      required
+                      className="h-11"
+                      maxLength={9}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Logradouro<span className="text-red-500">*</span></Label>
+                    <Input
+                      id="address"
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      placeholder="Rua, Avenida, etc"
+                      required
+                      className="h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="numero">Número<span className="text-red-500">*</span></Label>
+                    <Input
+                      id="numero"
+                      value={formData.numero}
+                      onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                      placeholder="000"
+                      required
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+
+                {/* Linha 2: Complemento, Bairro */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="complemento">Complemento</Label>
+                    <Input
+                      id="complemento"
+                      value={formData.complemento}
+                      onChange={(e) => setFormData({ ...formData, complemento: e.target.value })}
+                      placeholder="Apto, Sala, Bloco, etc"
+                      className="h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="bairro">Bairro<span className="text-red-500">*</span></Label>
+                    <Input
+                      id="bairro"
+                      value={formData.bairro}
+                      onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
+                      placeholder="Nome do bairro"
+                      required
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+
+                {/* Linha 3: Cidade */}
+                <div className="space-y-2">
+                  <Label htmlFor="city">Cidade<span className="text-red-500">*</span></Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="city"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      placeholder="Nome da cidade (Estado)"
+                      required
+                      className="h-11"
+                    />
+                    <Button type="button" variant="ghost" size="icon" className="h-11 w-11">
+                      <span className="text-sm">🗑️</span>
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Botões de ação */}
+        <div className="flex justify-end gap-3 mt-8">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setFormData(originalFormData)}
+            disabled={saving || loading}
+            className="min-w-[120px] bg-red-600 hover:bg-red-700 text-white hover:text-white"
+          >
+            <span>✕</span>
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            disabled={saving || loading}
+            className="min-w-[120px] bg-green-600 hover:bg-green-700"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              <>
+                <span>✓</span>
+                Atualizar
+              </>
+            )}
+          </Button>
         </div>
-      </div>
-
+      </form>
     </div>
   );
 }
-
-
