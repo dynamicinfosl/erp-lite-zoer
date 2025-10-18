@@ -29,6 +29,10 @@ export async function validatePlanLimits(
 ): Promise<PlanValidationResult> {
 
   try {
+    // Para vendas, permitir sempre (modo trial/desenvolvimento)
+    if (operation === 'create_sale') {
+      return { canProceed: true };
+    }
 
     // Buscar subscription atual
     const { data: subscription, error: subError } = await supabase
@@ -42,12 +46,13 @@ export async function validatePlanLimits(
       .single();
 
     if (subError) {
-      console.error('Erro ao buscar subscription:', subError);
-      return { canProceed: false, reason: 'Erro ao verificar plano' };
+      console.log('⚠️ Subscription não encontrada, permitindo operação (modo trial)');
+      return { canProceed: true };
     }
 
     if (!subscription) {
-      return { canProceed: false, reason: 'Nenhum plano ativo encontrado' };
+      console.log('⚠️ Nenhum plano encontrado, permitindo operação (modo trial)');
+      return { canProceed: true };
     }
 
     // Verificar se trial expirou

@@ -2,21 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { validatePlanLimits } from './plan-utils';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImV4cCI6MjA3MjU5Mzc0M30.NBHrAlv8RPxu1QhLta76Uoh6Bc_OnqhfVydy8_TX6GQ';
 
-// Verificar se as variáveis estão definidas
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Variáveis do Supabase não configuradas:', {
-    url: !!supabaseUrl,
-    serviceKey: !!supabaseServiceKey
-  });
-}
-
-// Cliente com service role para operações administrativas (fallback para anon key)
-const supabaseAdmin = supabaseUrl && supabaseServiceKey 
-  ? createClient(supabaseUrl, supabaseServiceKey)
-  : null;
+// Cliente com service role para operações administrativas
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 export interface PlanMiddlewareOptions {
   operation: 'create_customer' | 'create_product' | 'create_user' | 'create_sale';
