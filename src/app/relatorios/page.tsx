@@ -592,11 +592,11 @@ export default function RelatoriosPage() {
                     <CardTitle className="text-lg sm:text-xl text-heading">Volume diário de vendas</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <ChartContainer config={{ amount: { label: 'Valor', color: 'hsl(var(--chart-1))' } }} className="h-[260px]">
+                    <ChartContainer config={{ amount: { label: 'Valor', color: 'hsl(var(--chart-1))' } }} className="h-[200px]">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={dailySalesChart}>
+                        <BarChart data={dailySalesChart} margin={{ left: 5, right: 55, top: 10, bottom: 10 }}>
                           <XAxis dataKey="date" />
-                          <YAxis />
+                          <YAxis tickFormatter={(value) => formatCurrency(value)} />
                           {dailySalesChart.length > 0 && (
                             <ChartTooltip content={<ChartTooltipContent />} />
                           )}
@@ -618,7 +618,7 @@ export default function RelatoriosPage() {
                         custo: { label: 'Custo', color: 'hsl(var(--chart-2))' },
                         lucro: { label: 'Lucro', color: 'hsl(var(--chart-3))' },
                       }}
-                      className="h-[260px]"
+                      className="h-[200px]"
                     >
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={[{
@@ -627,6 +627,7 @@ export default function RelatoriosPage() {
                           custo: report?.totalCost ?? 0,
                           lucro: report?.totalProfit ?? 0,
                         }]}
+                        margin={{ left: 20, right: 20, top: 10, bottom: 10 }}
                         >
                           <XAxis dataKey="date" hide />
                           <YAxis />

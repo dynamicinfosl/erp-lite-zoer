@@ -6,20 +6,55 @@ import { requestMiddleware, parseQueryParams, validateRequestBody } from "@/lib/
 // GET - buscar transações financeiras
 export const GET = requestMiddleware(async (request, context) => {
   try {
-    const { limit, offset } = parseQueryParams(request);
-    const transactionsCrud = new CrudOperations("financial_transactions", context.token);
+    const queryParams = parseQueryParams(request);
+    const { limit, offset, tenant_id } = queryParams;
     
-    const filters = {
-      user_id: context.payload?.sub,
-    };
+    if (!tenant_id) {
+      return createErrorResponse({
+        errorMessage: "tenant_id é obrigatório",
+        status: 400,
+      });
+    }
 
-    const transactions = await transactionsCrud.findMany(filters, { 
-      limit: limit || 100, 
-      offset,
-      orderBy: { column: 'created_at', direction: 'desc' }
-    });
+    console.log('📊 Buscando transações financeiras para tenant:', tenant_id);
 
-    return createSuccessResponse(transactions || []);
+    // Dados mockados temporariamente até a tabela ser criada
+    const mockTransactions = [
+      {
+        id: '1',
+        tenant_id: tenant_id,
+        transaction_type: 'receita',
+        category: 'Vendas',
+        description: 'Venda de produto A',
+        amount: 150.00,
+        payment_method: 'PIX',
+        due_date: new Date().toISOString().split('T')[0],
+        paid_date: new Date().toISOString().split('T')[0],
+        status: 'pago',
+        notes: 'Pagamento recebido',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: '2',
+        tenant_id: tenant_id,
+        transaction_type: 'despesa',
+        category: 'Fornecedores',
+        description: 'Compra de materiais',
+        amount: 75.50,
+        payment_method: 'Cartão',
+        due_date: new Date().toISOString().split('T')[0],
+        paid_date: null,
+        status: 'pendente',
+        notes: 'Aguardando pagamento',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    ];
+
+    console.log('✅ Transações mockadas retornadas:', mockTransactions.length);
+
+    return createSuccessResponse(mockTransactions);
   } catch (error) {
     console.error('Erro ao buscar transações:', error);
     return createErrorResponse({

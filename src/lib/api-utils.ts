@@ -54,6 +54,8 @@ export function parseQueryParams(request: NextRequest) {
     offset: parseInt(searchParams.get("offset") || "0"),
     id: searchParams.get("id"),
     search: searchParams.get("search"),
+    tenant_id: searchParams.get("tenant_id"),
+    user_id: searchParams.get("user_id"),
   };
 }
 

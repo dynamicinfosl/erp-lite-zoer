@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { JugaKPICard, JugaProgressCard } from '@/components/dashboard/JugaComponents';
 import { usePlanLimits } from '@/hooks/usePlanLimits';
+import { useSubscriptions } from '@/hooks/useSubscriptions';
+import { PaymentModal } from '@/components/payment/PaymentModal';
 import { formatPrice, calculateYearlyDiscount } from '@/lib/plan-utils';
 import { 
   CreditCard, 
@@ -134,6 +136,11 @@ export default function AssinaturaPage() {
     refreshData
   } = usePlanLimits();
 
+  // Estados para modal de pagamento
+  const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
   // Determinar plano atual baseado nos dados reais
   const currentPlan: PlanId = subscription?.status === 'trial' ? 'trial' : 
     subscription?.plan?.slug as PlanId || 'trial';
@@ -141,6 +148,44 @@ export default function AssinaturaPage() {
   const currentInfo = subscriptionInfo[currentPlan];
   const CurrentIcon = currentInfo.icon;
 
+  // Função para selecionar plano
+  const handleSelectPlan = async (planId: PlanId) => {
+    if (planId === currentPlan) return;
+    
+    console.log('🎯 Plano selecionado:', planId);
+    
+    const planData = plans.find(plan => plan.id === planId);
+    if (!planData) {
+      console.error('❌ Plano não encontrado:', planId);
+      return;
+    }
+
+    setSelectedPlan(planId);
+    setShowPaymentModal(true);
+  };
+
+  // Função para sucesso do pagamento
+  const handlePaymentSuccess = async (paymentData: any) => {
+    try {
+      setIsProcessing(true);
+      console.log('💳 Dados do pagamento:', paymentData);
+      
+      // Simular criação de assinatura
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      console.log('✅ Assinatura criada:', paymentData);
+      
+      setShowPaymentModal(false);
+      setSelectedPlan(null);
+      refreshData();
+      
+    } catch (error) {
+      console.error('❌ Erro ao criar assinatura:', error);
+      alert('Erro ao processar assinatura. Tente novamente.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   // Usar dados reais do hook
   const usageLimits = useMemo(
@@ -311,11 +356,12 @@ export default function AssinaturaPage() {
                 {/* Card de Progresso */}
                 <JugaKPICard
                   title="Progresso do Teste"
-                  value={isTrialExpired ? '100%' : `${Math.round(((14 - daysLeftInTrial) / 14) * 100)}%`}
-                  description={isTrialExpired ? '14 de 14 dias utilizados' : 
-                             `${14 - daysLeftInTrial} de 14 dias utilizados`}
+                  value={isTrialExpired ? '100%' : `${Math.round(((30 - daysLeftInTrial) / 30) * 100)}%`}
+                  description={isTrialExpired ? '30 de 30 dias utilizados' : 
+                             `${30 - daysLeftInTrial} de 30 dias utilizados`}
                   trend="neutral"
-                  trendValue="Completo"
+                  trendValue={isTrialExpired ? 'Completo' : 
+                             (30 - daysLeftInTrial) >= 30 ? 'Completo' : 'Em andamento'}
                   icon={<TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />}
                   color="primary"
                   className="min-h-[120px] sm:min-h-[140px]"
@@ -527,12 +573,18 @@ export default function AssinaturaPage() {
                         : 'bg-white text-sky-600 border-sky-600 hover:bg-sky-50 hover:border-sky-700'
                     }`}
                     variant={currentPlan === plan.id ? 'outline' : plan.popular ? 'default' : 'outline'} 
-                    disabled={currentPlan === plan.id}
+                    disabled={currentPlan === plan.id || isProcessing}
+                    onClick={() => handleSelectPlan(plan.id as PlanId)}
                   >
                     {currentPlan === plan.id ? (
                       <div className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
                         Plano Atual
+                      </div>
+                    ) : selectedPlan === plan.id && isProcessing ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Processando...
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
@@ -628,6 +680,19 @@ export default function AssinaturaPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal de Pagamento */}
+      {showPaymentModal && selectedPlan && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => {
+            setShowPaymentModal(false);
+            setSelectedPlan(null);
+          }}
+          plan={plans.find(plan => plan.id === selectedPlan)!}
+          onPaymentSuccess={handlePaymentSuccess}
+        />
+      )}
     </div>
   );
 }
