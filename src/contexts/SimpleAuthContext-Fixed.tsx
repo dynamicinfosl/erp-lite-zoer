@@ -1,12 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-<<<<<<< HEAD
-import { createSupabaseClient } from '@/lib/supabase-client';
-=======
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { getSupabaseInstance } from '@/lib/supabase-client';
->>>>>>> acb3c125a528dd2061fc83803cb29943dc6e69e9
 import { User, Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { SubscriptionData } from '@/hooks/usePlanLimits';
@@ -120,26 +115,6 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       if (isInitialized) return;
       isInitialized = true;
       
-<<<<<<< HEAD
-      if (session?.user) {
-        console.log('👤 Usuário encontrado:', session.user.email);
-        // Buscar dados completos do tenant
-        const tenantData = await loadRealTenant(session.user.id);
-        setTenant(tenantData);
-      } else {
-        console.log('👤 Nenhum usuário logado');
-        // Se a autenticação não estiver habilitada, criar tenant padrão
-        if (process.env.NEXT_PUBLIC_ENABLE_AUTH !== 'true') {
-          console.log('🔓 Auth desabilitada, criando tenant padrão');
-          setTenant({
-            id: '00000000-0000-0000-0000-000000000000',
-            name: 'Meu Negócio',
-            status: 'trial',
-          });
-        } else {
-          setTenant(null);
-        }
-=======
       try {
         console.log('🔍 Verificando sessão existente...');
         
@@ -167,7 +142,6 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       } finally {
         setLoading(false);
         console.log('✅ Autenticação inicializada');
->>>>>>> acb3c125a528dd2061fc83803cb29943dc6e69e9
       }
     };
 
