@@ -117,15 +117,6 @@ export async function validatePlanLimits(
         }
         break;
 
-      case 'create_sale':
-        if (limits.max_sales_per_month !== -1 && usage.sales_this_month >= limits.max_sales_per_month) {
-          return { 
-            canProceed: false, 
-            reason: `Limite de ${limits.max_sales_per_month} vendas por mês atingido. Faça upgrade do seu plano.`,
-            limitExceeded: true 
-          };
-        }
-        break;
     }
 
     return { canProceed: true };
