@@ -823,8 +823,9 @@ export default function ClientesPage() {
           {loading ? (
             <div className="text-center py-8">Carregando clientes...</div>
           ) : (
-            <Table>
-              <TableHeader>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
                   {columnVisibility.type && <TableHead>Tipo</TableHead>}
@@ -902,7 +903,8 @@ export default function ClientesPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           )}
 
           {filteredCustomers.length === 0 && !loading && (

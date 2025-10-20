@@ -666,8 +666,9 @@ function TransactionTable({
 
   return (
     <ScrollArea className="max-h-[420px]">
-      <Table>
-        <TableHeader>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
           <TableRow>
             <TableHead>Data</TableHead>
             <TableHead>Descrição</TableHead>
@@ -742,7 +743,8 @@ function TransactionTable({
             </TableRow>
           ))}
         </TableBody>
-      </Table>
+        </Table>
+      </div>
     </ScrollArea>
   );
 }

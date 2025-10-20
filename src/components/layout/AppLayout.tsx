@@ -4,6 +4,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
+import { MobileHeader } from './MobileHeader';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { usePathname } from 'next/navigation';
 import { ENABLE_AUTH } from '@/constants/auth';
@@ -96,6 +97,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
     return (
       <SidebarProvider>
+        <MobileHeader />
         <AppSidebar />
         <SidebarInset>
           <main className="flex-1 overflow-auto min-h-screen">

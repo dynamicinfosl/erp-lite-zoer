@@ -655,8 +655,9 @@ export default function RelatoriosPage() {
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="max-h-[360px]">
-                    <Table>
-                      <TableHeader>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
                         <TableRow>
                           <TableHead>Cliente</TableHead>
                           <TableHead>Data</TableHead>
@@ -692,7 +693,8 @@ export default function RelatoriosPage() {
                           ))
                         )}
                       </TableBody>
-                    </Table>
+                      </Table>
+                    </div>
                   </ScrollArea>
                 </CardContent>
               </Card>
@@ -806,8 +808,9 @@ export default function RelatoriosPage() {
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="max-h-[360px]">
-                    <Table>
-                      <TableHeader>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
                         <TableRow>
                           <TableHead>Produto</TableHead>
                           <TableHead>Estoque</TableHead>
@@ -849,7 +852,8 @@ export default function RelatoriosPage() {
                             ))
                         )}
                       </TableBody>
-                    </Table>
+                      </Table>
+                    </div>
                   </ScrollArea>
                 </CardContent>
               </Card>
@@ -902,8 +906,9 @@ export default function RelatoriosPage() {
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="max-h-[360px]">
-                    <Table>
-                      <TableHeader>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
                         <TableRow>
                           <TableHead>Cliente</TableHead>
                           <TableHead>Endereço</TableHead>
@@ -962,7 +967,8 @@ export default function RelatoriosPage() {
                           ))
                         )}
                       </TableBody>
-                    </Table>
+                      </Table>
+                    </div>
                   </ScrollArea>
                 </CardContent>
               </Card>

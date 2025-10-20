@@ -1184,8 +1184,9 @@ export default function ProdutosPage() {
               </div>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
                   {columnVisibility.sku && <TableHead>SKU</TableHead>}
@@ -1279,7 +1280,8 @@ export default function ProdutosPage() {
                   );
                 })}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           )}
 
           {filteredProducts.length === 0 && !loading && (

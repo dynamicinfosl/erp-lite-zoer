@@ -486,8 +486,9 @@ export default function VendasPage() {
           {loading ? (
             <div className="text-center py-8">Carregando vendas...</div>
           ) : (
-            <Table>
-              <TableHeader>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                 <TableRow>
                   {columnVisibility.numero && <TableHead>Número</TableHead>}
                   {columnVisibility.cliente && <TableHead>Cliente</TableHead>}
@@ -584,7 +585,8 @@ export default function VendasPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           )}
 
           {filteredVendas.length === 0 && !loading && (
