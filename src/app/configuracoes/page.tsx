@@ -641,9 +641,6 @@ export default function ConfiguracoesPage() {
                   Fazer Backup Manual
                 </Button>
                 <Button variant="outline" className="w-full">
-                  Limpar Cache
-                </Button>
-                <Button variant="outline" className="w-full">
                   Exportar Dados
                 </Button>
                 <Button variant="destructive" className="w-full">

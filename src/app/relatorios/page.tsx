@@ -984,25 +984,6 @@ export default function RelatoriosPage() {
               <CardTitle className="text-base sm:text-lg text-heading">Filtros Rápidos</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 sm:space-y-3">
-              {/* Botão de teste simples */}
-              <button 
-                onClick={() => {
-                  console.log('🧪 BOTÃO TESTE CLICADO!');
-                  alert('Botão de teste funcionando!');
-                }}
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  backgroundColor: '#ff0000',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  marginBottom: '8px'
-                }}
-              >
-                🧪 TESTE - Clique aqui
-              </button>
-              
               <Button 
                 className="w-full justify-start text-sm"
                 variant={activeFilter === '30days' ? 'default' : 'outline'}

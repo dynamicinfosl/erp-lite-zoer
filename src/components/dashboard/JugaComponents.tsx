@@ -60,9 +60,9 @@ export function JugaKPICard({
           {icon ? <div className={cn("p-1.5 sm:p-2 rounded-lg shadow-sm", KPI_ICON_COLORS[color])}>{icon}</div> : null}
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
+      <CardContent className="pt-0 px-3 sm:px-4">
         <div className="space-y-1 sm:space-y-2">
-          <div className={cn("text-lg sm:text-xl lg:text-2xl font-bold", valueCls)}>{value}</div>
+          <div className={cn("text-lg sm:text-xl lg:text-2xl font-bold text-left leading-tight", valueCls)}>{value}</div>
           {(description || (trend && trendValue)) && (
             <div className="flex items-center justify-between gap-2">
               {description ? <p className={cn("text-xs sm:text-sm truncate font-medium", descCls)}>{description}</p> : <span />}

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 import {
   DollarSign,
   Users,
@@ -59,6 +60,29 @@ interface MonthlyData {
 
 export default function JugaDashboard() {
   const { tenant } = useSimpleAuth();
+  const router = useRouter();
+
+  // Funções de navegação
+  const handleNavigateToPDV = () => {
+    router.push('/pdv');
+  };
+
+  const handleNavigateToCustomers = () => {
+    router.push('/clientes');
+  };
+
+  const handleNavigateToReports = () => {
+    router.push('/relatorios');
+  };
+
+  const handleNavigateToProducts = () => {
+    router.push('/produtos');
+  };
+
+  const handleNavigateToSales = () => {
+    router.push('/vendas');
+  };
+
   const [stats, setStats] = useState<DashboardStats>({
     totalSales: 0,
     totalCustomers: 0,
@@ -351,11 +375,20 @@ export default function JugaDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/30">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/30"
+            onClick={handleNavigateToReports}
+          >
             <Download className="h-4 w-4 mr-2" />
             Exportar
           </Button>
-          <Button size="sm" className="bg-white text-blue-600 hover:bg-blue-50 font-semibold">
+          <Button 
+            size="sm" 
+            className="bg-white text-blue-600 hover:bg-blue-50 font-semibold"
+            onClick={handleNavigateToPDV}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Nova Venda
           </Button>
@@ -564,7 +597,10 @@ export default function JugaDashboard() {
 
       {/* Cards de Ação Rápida */}
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white to-blue-50/30 hover:from-blue-50 hover:to-blue-100">
+        <Card 
+          className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white to-blue-50/30 hover:from-blue-50 hover:to-blue-100"
+          onClick={handleNavigateToPDV}
+        >
           <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
             <CardTitle className="flex items-center gap-2 text-white">
               <Plus className="h-5 w-5" />
@@ -575,14 +611,20 @@ export default function JugaDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6">
-            <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg">
+            <Button 
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+              onClick={handleNavigateToPDV}
+            >
               <ShoppingCart className="h-4 w-4 mr-2" />
               Abrir PDV
             </Button>
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white to-slate-50/30 hover:from-slate-50 hover:to-slate-100">
+        <Card 
+          className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white to-slate-50/30 hover:from-slate-50 hover:to-slate-100"
+          onClick={handleNavigateToCustomers}
+        >
           <CardHeader className="bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-t-lg">
             <CardTitle className="flex items-center gap-2 text-white">
               <Users className="h-5 w-5" />
@@ -593,14 +635,21 @@ export default function JugaDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6">
-            <Button variant="outline" className="w-full border-slate-300 text-slate-700 hover:border-slate-400 hover:text-slate-800 hover:bg-slate-50 font-semibold py-3 rounded-lg transition-all duration-200">
+            <Button 
+              variant="outline" 
+              className="w-full border-slate-300 text-slate-700 hover:border-slate-400 hover:text-slate-800 hover:bg-slate-50 font-semibold py-3 rounded-lg transition-all duration-200"
+              onClick={handleNavigateToCustomers}
+            >
               <ArrowRight className="h-4 w-4 mr-2" />
               Ver Clientes
             </Button>
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white to-indigo-50/30 hover:from-indigo-50 hover:to-indigo-100">
+        <Card 
+          className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white to-indigo-50/30 hover:from-indigo-50 hover:to-indigo-100"
+          onClick={handleNavigateToReports}
+        >
           <CardHeader className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-t-lg">
             <CardTitle className="flex items-center gap-2 text-white">
               <FileText className="h-5 w-5" />
@@ -611,7 +660,11 @@ export default function JugaDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6">
-            <Button variant="outline" className="w-full border-indigo-300 text-indigo-700 hover:border-indigo-400 hover:text-indigo-800 hover:bg-indigo-50 font-semibold py-3 rounded-lg transition-all duration-200">
+            <Button 
+              variant="outline" 
+              className="w-full border-indigo-300 text-indigo-700 hover:border-indigo-400 hover:text-indigo-800 hover:bg-indigo-50 font-semibold py-3 rounded-lg transition-all duration-200"
+              onClick={handleNavigateToReports}
+            >
               <ArrowRight className="h-4 w-4 mr-2" />
               Ver Relatórios
             </Button>

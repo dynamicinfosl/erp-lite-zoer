@@ -7,8 +7,6 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Toaster } from "@/components/ui/toaster";
 import { SonnerProvider } from "@/components/SonnerProvider";
 import { ErrorHandler } from "@/components/ErrorHandler";
-import { AuthDebugInfo } from "@/components/debug/AuthDebugInfo";
-import { ClearAuthCache } from "@/components/debug/ClearAuthCache";
 
 import "./globals.css";
 
@@ -54,8 +52,6 @@ export default function RootLayout({
             <ErrorHandler />
             <Toaster />
             <SonnerProvider />
-            <AuthDebugInfo />
-            <ClearAuthCache />
           </SimpleAuthProvider>
         </ThemeProvider>
       </body>
