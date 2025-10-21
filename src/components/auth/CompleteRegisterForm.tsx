@@ -115,7 +115,40 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
   const [error, setError] = useState<string | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
-  // Dados do formulário
+  // Função para limpar completamente o formulário
+  const clearForm = () => {
+    setResponsibleData({
+      name: '',
+      email: '',
+      phone: '',
+      cpf: '',
+      password: '',
+      confirmPassword: '',
+    });
+    setCompanyData({
+      name: '',
+      fantasy_name: '',
+      document: '',
+      document_type: 'CNPJ',
+      corporate_email: '',
+      corporate_phone: '',
+    });
+    setAddressData({
+      zip_code: '',
+      address: '',
+      number: '',
+      complement: '',
+      neighborhood: '',
+      city: '',
+      state: '',
+    });
+    setSelectedPlan(null);
+    setError(null);
+    setAcceptedTerms(false);
+    setCurrentStep(1);
+  };
+
+  // Dados do formulário - garantindo que sempre iniciem vazios
   const [responsibleData, setResponsibleData] = useState<ResponsibleData>({
     name: '',
     email: '',
@@ -220,6 +253,136 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
     return true;
   };
 
+  // Limpa o formulário quando o componente for montado
+  useEffect(() => {
+    // Força limpeza completa
+    clearForm();
+    
+    // Limpa qualquer cache do navegador
+    if (typeof window !== 'undefined') {
+      // Limpa localStorage relacionado ao formulário
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('register') || key.includes('form') || key.includes('cadastro') || key.includes('phone') || key.includes('telefone'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      
+      // Limpa sessionStorage relacionado ao formulário
+      const sessionKeysToRemove = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (key.includes('register') || key.includes('form') || key.includes('cadastro') || key.includes('phone') || key.includes('telefone'))) {
+          sessionKeysToRemove.push(key);
+        }
+      }
+      sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
+      
+      // Força limpeza de campos específicos após um pequeno delay
+      setTimeout(() => {
+        setResponsibleData(prev => ({
+          ...prev,
+          phone: '',
+          cpf: '',
+          email: '',
+          password: '',
+          confirmPassword: ''
+        }));
+      }, 100);
+
+      // Limpeza adicional mais agressiva
+      setTimeout(() => {
+        setResponsibleData(prev => ({
+          ...prev,
+          phone: '',
+          cpf: '',
+          email: '',
+          password: '',
+          confirmPassword: ''
+        }));
+      }, 500);
+
+      // Limpeza final para garantir
+      setTimeout(() => {
+        setResponsibleData(prev => ({
+          ...prev,
+          phone: '',
+          cpf: '',
+          email: '',
+          password: '',
+          confirmPassword: ''
+        }));
+      }, 1000);
+    }
+  }, []);
+
+  // Força limpeza dos campos sempre que o componente for renderizado
+  useEffect(() => {
+    // Verifica se há dados pré-preenchidos e os remove
+    if (responsibleData.email && responsibleData.email.includes('gabrieldesouza104@gmail.com')) {
+      setResponsibleData(prev => ({
+        ...prev,
+        email: '',
+        phone: '',
+        cpf: '',
+        password: '',
+        confirmPassword: ''
+      }));
+    }
+    
+    // Força limpeza específica do telefone se contém dados de teste
+    if (responsibleData.phone && (
+      responsibleData.phone.includes('98765-4321') || 
+      responsibleData.phone.includes('(21)') ||
+      responsibleData.phone.includes('98765')
+    )) {
+      setResponsibleData(prev => ({
+        ...prev,
+        phone: ''
+      }));
+    }
+  }, [responsibleData.email, responsibleData.phone]);
+
+  // Força limpeza específica do telefone - VERSÃO AGRESSIVA
+  useEffect(() => {
+    // Limpa qualquer telefone que contenha dados de teste
+    if (responsibleData.phone && (
+      responsibleData.phone.includes('98765-4321') || 
+      responsibleData.phone.includes('(21) 98765') ||
+      responsibleData.phone.includes('98765') ||
+      responsibleData.phone.includes('4321') ||
+      responsibleData.phone.includes('(21)') ||
+      responsibleData.phone.length > 0
+    )) {
+      console.log('🧹 Limpando telefone pré-preenchido:', responsibleData.phone);
+      setResponsibleData(prev => ({
+        ...prev,
+        phone: ''
+      }));
+    }
+  }, [responsibleData.phone]);
+
+  // Limpeza forçada a cada renderização
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (responsibleData.phone && (
+        responsibleData.phone.includes('98765') ||
+        responsibleData.phone.includes('4321') ||
+        responsibleData.phone.includes('(21)')
+      )) {
+        console.log('🔄 Limpeza forçada do telefone:', responsibleData.phone);
+        setResponsibleData(prev => ({
+          ...prev,
+          phone: ''
+        }));
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [responsibleData.phone]);
+
   // Limpa o erro automaticamente quando os campos da etapa atual ficarem válidos
   useEffect(() => {
     if (error && isStepValid(currentStep)) {
@@ -310,7 +473,14 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
       }
 
       toast.success('Cadastro realizado com sucesso!');
-      onSuccess?.();
+      
+      // Limpar dados do formulário após sucesso
+      clearForm();
+      
+      // Pequeno delay para garantir que o toast seja exibido
+      setTimeout(() => {
+        onSuccess?.();
+      }, 1000);
     } catch (err: any) {
       console.error('Erro no cadastro:', err);
       setError(err.message || 'Erro ao realizar cadastro');
@@ -322,20 +492,65 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
   const formatDocument = (value: string, type: 'CNPJ' | 'CPF') => {
     const numbers = value.replace(/\D/g, '');
     if (type === 'CNPJ') {
-      return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+      // CNPJ: 14 dígitos - 00.000.000/0000-00
+      if (numbers.length <= 2) return numbers;
+      if (numbers.length <= 5) return `${numbers.slice(0, 2)}.${numbers.slice(2)}`;
+      if (numbers.length <= 8) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5)}`;
+      if (numbers.length <= 12) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8)}`;
+      return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8, 12)}-${numbers.slice(12, 14)}`;
     } else {
-      return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+      // CPF: 11 dígitos - 000.000.000-00
+      if (numbers.length <= 3) return numbers;
+      if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+      if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+      return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
     }
   };
 
   const formatPhone = (value: string) => {
     const numbers = value.replace(/\D/g, '');
-    return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    
+    // Telefone fixo: 10 dígitos - (00) 0000-0000
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    if (numbers.length <= 10) {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+    }
+    
+    // Celular: 11 dígitos - (00) 00000-0000
+    if (numbers.length === 11) {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
+    }
+    
+    // Limita a 11 dígitos
+    const limitedNumbers = numbers.slice(0, 11);
+    if (limitedNumbers.length <= 2) return limitedNumbers;
+    if (limitedNumbers.length <= 6) return `(${limitedNumbers.slice(0, 2)}) ${limitedNumbers.slice(2)}`;
+    if (limitedNumbers.length <= 10) {
+      return `(${limitedNumbers.slice(0, 2)}) ${limitedNumbers.slice(2, 6)}-${limitedNumbers.slice(6)}`;
+    }
+    return `(${limitedNumbers.slice(0, 2)}) ${limitedNumbers.slice(2, 7)}-${limitedNumbers.slice(7)}`;
   };
 
   const formatZipCode = (value: string) => {
     const numbers = value.replace(/\D/g, '');
     return numbers.replace(/(\d{5})(\d{3})/, '$1-$2');
+  };
+
+  // Funções de validação
+  const validateCPF = (cpf: string): boolean => {
+    const numbers = cpf.replace(/\D/g, '');
+    return numbers.length === 11;
+  };
+
+  const validatePhone = (phone: string): boolean => {
+    const numbers = phone.replace(/\D/g, '');
+    return numbers.length === 10 || numbers.length === 11;
+  };
+
+  const validateCNPJ = (cnpj: string): boolean => {
+    const numbers = cnpj.replace(/\D/g, '');
+    return numbers.length === 14;
   };
 
   const renderStep1 = () => (
@@ -358,6 +573,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
           value={responsibleData.email}
           onChange={(e) => setResponsibleData({ ...responsibleData, email: e.target.value })}
           placeholder="seu@email.com"
+          autoComplete="off"
         />
       </div>
 
@@ -367,12 +583,46 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
           <Input
             id="phone"
             value={responsibleData.phone}
-            onChange={(e) => setResponsibleData({ 
-              ...responsibleData, 
-              phone: formatPhone(e.target.value) 
-            })}
+            onChange={(e) => {
+              const newValue = e.target.value;
+              // Força limpeza se contém dados de teste
+              if (newValue.includes('98765') || newValue.includes('4321') || newValue.includes('(21)')) {
+                console.log('🚫 Bloqueando dados de teste no telefone:', newValue);
+                return;
+              }
+              setResponsibleData({ 
+                ...responsibleData, 
+                phone: formatPhone(newValue) 
+              });
+            }}
+            onFocus={() => {
+              // Limpa o campo quando recebe foco se contém dados de teste
+              if (responsibleData.phone && (
+                responsibleData.phone.includes('98765') ||
+                responsibleData.phone.includes('4321') ||
+                responsibleData.phone.includes('(21)')
+              )) {
+                console.log('🎯 Limpeza no foco do telefone:', responsibleData.phone);
+                setResponsibleData(prev => ({
+                  ...prev,
+                  phone: ''
+                }));
+              }
+            }}
             placeholder="(21) 98765-4321"
+            maxLength={15}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck="false"
+            data-form-type="other"
+            data-lpignore="true"
+            data-1p-ignore="true"
+            className={responsibleData.phone && !validatePhone(responsibleData.phone) ? 'border-red-400 focus:border-red-400' : ''}
           />
+          {responsibleData.phone && !validatePhone(responsibleData.phone) && (
+            <p className="text-sm text-red-400">Telefone deve ter 10 ou 11 dígitos</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -385,7 +635,13 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
               cpf: formatDocument(e.target.value, 'CPF') 
             })}
             placeholder="000.000.000-00"
+            maxLength={14}
+            autoComplete="off"
+            className={responsibleData.cpf && !validateCPF(responsibleData.cpf) ? 'border-red-400 focus:border-red-400' : ''}
           />
+          {responsibleData.cpf && !validateCPF(responsibleData.cpf) && (
+            <p className="text-sm text-red-400">CPF deve ter 11 dígitos</p>
+          )}
         </div>
       </div>
 
@@ -398,6 +654,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
             value={responsibleData.password}
             onChange={(e) => setResponsibleData({ ...responsibleData, password: e.target.value })}
             placeholder="Mínimo 6 caracteres"
+            autoComplete="new-password"
           />
         </div>
 
@@ -409,6 +666,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
             value={responsibleData.confirmPassword}
             onChange={(e) => setResponsibleData({ ...responsibleData, confirmPassword: e.target.value })}
             placeholder="Digite a senha novamente"
+            autoComplete="new-password"
           />
         </div>
       </div>
@@ -466,7 +724,20 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
               document: formatDocument(e.target.value, companyData.document_type) 
             })}
             placeholder={companyData.document_type === 'CNPJ' ? '00.000.000/0000-00' : '000.000.000-00'}
+            maxLength={companyData.document_type === 'CNPJ' ? 18 : 14}
+            className={companyData.document && (
+              (companyData.document_type === 'CNPJ' && !validateCNPJ(companyData.document)) ||
+              (companyData.document_type === 'CPF' && !validateCPF(companyData.document))
+            ) ? 'border-red-400 focus:border-red-400' : ''}
           />
+          {companyData.document && (
+            (companyData.document_type === 'CNPJ' && !validateCNPJ(companyData.document)) ||
+            (companyData.document_type === 'CPF' && !validateCPF(companyData.document))
+          ) && (
+            <p className="text-sm text-red-400">
+              {companyData.document_type === 'CNPJ' ? 'CNPJ deve ter 14 dígitos' : 'CPF deve ter 11 dígitos'}
+            </p>
+          )}
         </div>
       </div>
 
@@ -491,7 +762,8 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
               ...companyData, 
               corporate_phone: formatPhone(e.target.value) 
             })}
-            placeholder="(21) 3333-4444"
+            placeholder="(21) 98765-4321"
+            maxLength={15}
           />
         </div>
       </div>

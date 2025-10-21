@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+// Valores hardcoded como fallback (mesmo padrão usado em outros arquivos)
+const HARDCODED_URL = 'https://lfxietcasaooenffdodr.supabase.co';
+const HARDCODED_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || HARDCODED_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || HARDCODED_SERVICE_KEY;
+
+// Debug das variáveis de ambiente
+console.log('🔍 Debug das variáveis de ambiente:');
+console.log('  - NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? '✅ ENV' : '🔄 FALLBACK');
+console.log('  - SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ ENV' : '🔄 FALLBACK');
+console.log('  - NEXT_PUBLIC_SUPABASE_ANON_KEY:', supabaseAnonKey ? '✅ Configurada' : '❌ Não configurada');
 
 // Cliente com service role para operações administrativas
 const supabaseAdmin = supabaseUrl && supabaseServiceKey 
@@ -89,7 +99,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Criar usuário no Supabase Auth
+    // 1. Verificar se usuário já existe
+    console.log('🔍 Verificando se usuário já existe...');
+    const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (listError) {
+      console.error('❌ Erro ao listar usuários:', listError);
+      return NextResponse.json(
+        { error: `Erro ao verificar usuários: ${listError.message}` },
+        { status: 400 }
+      );
+    }
+
+    // Verificar se email já existe
+    const existingUser = existingUsers?.users?.find(user => user.email === data.responsible.email);
+    
+    if (existingUser) {
+      console.log('⚠️ Usuário já existe, removendo duplicado...');
+      
+      // Remover usuário duplicado
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(existingUser.id);
+      
+      if (deleteError) {
+        console.error('❌ Erro ao remover usuário duplicado:', deleteError);
+        return NextResponse.json(
+          { error: `Erro ao remover usuário duplicado: ${deleteError.message}` },
+          { status: 400 }
+        );
+      }
+      
+      console.log('✅ Usuário duplicado removido com sucesso');
+    }
+
+    // 2. Criar usuário no Supabase Auth
     console.log('👤 Criando usuário no Supabase Auth...');
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: data.responsible.email,

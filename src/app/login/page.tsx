@@ -10,10 +10,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { Loader2, ArrowLeft, Shield, Users, BarChart3, Settings } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, loading } = useSimpleAuth();
+  const { user, loading, signOut } = useSimpleAuth();
   const [activeTab, setActiveTab] = useState('login');
 
   // Redirecionar se já estiver logado (apenas quando autenticação estiver habilitada)
@@ -52,10 +53,19 @@ export default function LoginPage() {
     }
   };
 
-  const handleRegisterSuccess = () => {
+  const handleRegisterSuccess = async () => {
     if (ENABLE_AUTH) {
+      // Fazer logout da sessão atual para evitar conflito de usuários
+      try {
+        await signOut();
+        console.log('✅ Logout realizado após registro bem-sucedido');
+      } catch (error) {
+        console.error('❌ Erro ao fazer logout após registro:', error);
+      }
+      
       setActiveTab('login');
-      // Mostrar mensagem de sucesso ou redirecionar
+      // Mostrar mensagem de sucesso
+      toast.success('Cadastro realizado com sucesso! Agora você pode fazer login.');
     } else {
       // Quando autenticação está desabilitada, redirecionar para dashboard
       router.push('/dashboard');

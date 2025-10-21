@@ -225,7 +225,7 @@ export default function HomePage() {
               <div className="mt-16 flex items-center justify-center gap-8 text-white/70 text-sm">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" />
-                  <span>30 dias grátis</span>
+                  <span>14 dias grátis</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Lock className="h-4 w-4" />
@@ -491,7 +491,7 @@ export default function HomePage() {
                 </Button>
               </div>
               <CardDescription>
-                Comece seu teste grátis de 30 dias agora
+                Comece seu teste grátis de 14 dias agora
               </CardDescription>
             </CardHeader>
 

@@ -54,7 +54,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     return {
       id: 'trial-default',
       status: 'trial',
-      trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
       plan: {
         id: 'trial-plan',
         name: 'Trial Gratuito',

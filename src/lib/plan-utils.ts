@@ -213,7 +213,7 @@ export async function createSubscription(
         trial_ends_at: trialEndsAt,
         current_period_start: new Date().toISOString(),
         current_period_end: status === 'active' 
-          ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 dias
+          ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 14 dias
           : null,
       });
 

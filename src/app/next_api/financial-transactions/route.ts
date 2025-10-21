@@ -18,43 +18,36 @@ export const GET = requestMiddleware(async (request, context) => {
 
     console.log('📊 Buscando transações financeiras para tenant:', tenant_id);
 
-    // Dados mockados temporariamente até a tabela ser criada
-    const mockTransactions = [
-      {
-        id: '1',
-        tenant_id: tenant_id,
-        transaction_type: 'receita',
-        category: 'Vendas',
-        description: 'Venda de produto A',
-        amount: 150.00,
-        payment_method: 'PIX',
-        due_date: new Date().toISOString().split('T')[0],
-        paid_date: new Date().toISOString().split('T')[0],
-        status: 'pago',
-        notes: 'Pagamento recebido',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      {
-        id: '2',
-        tenant_id: tenant_id,
-        transaction_type: 'despesa',
-        category: 'Fornecedores',
-        description: 'Compra de materiais',
-        amount: 75.50,
-        payment_method: 'Cartão',
-        due_date: new Date().toISOString().split('T')[0],
-        paid_date: null,
-        status: 'pendente',
-        notes: 'Aguardando pagamento',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+    // ✅ BUSCAR DADOS REAIS DO BANCO COM ISOLAMENTO POR TENANT
+    try {
+      // Usar Supabase diretamente em vez de CrudOperations
+      const { createClient } = await import('@supabase/supabase-js');
+      
+      const SUPABASE_URL = 'https://lfxietcasaooenffdodr.supabase.co';
+      const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10';
+      
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+      
+      const { data: transactions, error: dbError } = await supabase
+        .from('financial_transactions')
+        .select('*')
+        .eq('tenant_id', tenant_id)
+        .order('created_at', { ascending: false })
+        .limit(limit || 100)
+        .range(offset || 0, (offset || 0) + (limit || 100) - 1);
+
+      if (dbError) {
+        console.log('❌ Erro ao buscar transações:', dbError.message);
+        return createSuccessResponse([]);
       }
-    ];
 
-    console.log('✅ Transações mockadas retornadas:', mockTransactions.length);
-
-    return createSuccessResponse(mockTransactions);
+      console.log('✅ Transações reais retornadas:', transactions?.length || 0);
+      return createSuccessResponse(transactions || []);
+    } catch (dbError) {
+      console.log('⚠️ Erro ao buscar do banco, retornando lista vazia:', dbError.message);
+      // Se não conseguir buscar do banco, retornar lista vazia para evitar dados cruzados
+      return createSuccessResponse([]);
+    }
   } catch (error) {
     console.error('Erro ao buscar transações:', error);
     return createErrorResponse({

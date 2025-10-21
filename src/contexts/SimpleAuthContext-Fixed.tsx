@@ -59,35 +59,52 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('🔍 Buscando tenant real para usuário:', userId);
       
-      // ✅ NOVA SOLUÇÃO: Buscar tenant na tabela tenants baseado no user_id
+      // ✅ SOLUÇÃO CORRETA: Buscar tenant através de user_memberships
       try {
-        const { data: tenant, error } = await supabase
-          .from('tenants')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle();
+        // 1. Buscar membership do usuário
+        const { data: membership, error: membershipError } = await supabase
+          .from('user_memberships')
+          .select('tenant_id, role, is_active')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .single();
 
-        if (error) {
-          console.log('⚠️ Erro ao buscar tenant:', error);
+        if (membershipError) {
+          console.log('⚠️ Erro ao buscar membership:', membershipError);
         }
 
-        if (tenant?.id) {
-          console.log('✅ Tenant encontrado na tabela tenants:', tenant.name);
-          return {
-            id: tenant.id,
-            name: tenant.name || 'Meu Negócio',
-            status: tenant.status || 'trial',
-            email: tenant.email,
-            phone: tenant.phone,
-            document: tenant.document,
-            address: tenant.address,
-            city: tenant.city,
-            state: tenant.state,
-            zip_code: tenant.zip_code,
-          };
+        if (membership?.tenant_id) {
+          console.log('✅ Membership encontrado, buscando tenant:', membership.tenant_id);
+          
+          // 2. Buscar dados do tenant
+          const { data: tenant, error: tenantError } = await supabase
+            .from('tenants')
+            .select('*')
+            .eq('id', membership.tenant_id)
+            .single();
+
+          if (tenantError) {
+            console.log('⚠️ Erro ao buscar tenant:', tenantError);
+          }
+
+          if (tenant?.id) {
+            console.log('✅ Tenant encontrado:', tenant.name);
+            return {
+              id: tenant.id,
+              name: tenant.name || 'Meu Negócio',
+              status: tenant.status || 'trial',
+              email: tenant.email,
+              phone: tenant.phone,
+              document: tenant.document,
+              address: tenant.address,
+              city: tenant.city,
+              state: tenant.state,
+              zip_code: tenant.zip_code,
+            };
+          }
         }
       } catch (error) {
-        console.log('⚠️ Erro ao verificar tenant na tabela tenants:', error);
+        console.log('⚠️ Erro ao verificar membership/tenant:', error);
       }
 
       // ✅ FALLBACK GARANTIDO: Sempre retornar um tenant válido
@@ -294,7 +311,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         },
       },
       status: 'trial',
-      trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
     });
   };
 

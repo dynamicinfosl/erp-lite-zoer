@@ -59,7 +59,7 @@ export class SaasAuth {
         name: 'Teste Gabriel',
         slug: 'teste-gabriel',
         status: 'trial',
-        trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         settings: {},
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()

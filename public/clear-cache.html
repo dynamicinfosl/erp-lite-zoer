@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Limpar Cache - ERP Lite</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .success {
+            color: green;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Limpeza de Cache</h1>
+        <p>Este utilitário ajuda a limpar o cache do navegador e dados armazenados localmente.</p>
+        
+        <button onclick="clearAll()">Limpar Tudo</button>
+        <button onclick="clearLocalStorage()">Limpar LocalStorage</button>
+        <button onclick="clearSessionStorage()">Limpar SessionStorage</button>
+        <button onclick="clearFormData()">Limpar Dados de Formulário</button>
+        <button onclick="clearPhoneData()">Limpar Dados de Telefone</button>
+        <button onclick="reloadPage()">Recarregar Página</button>
+        
+        <div id="result"></div>
+        
+        <script>
+            function clearAll() {
+                try {
+                    // Limpar localStorage
+                    localStorage.clear();
+                    
+                    // Limpar sessionStorage
+                    sessionStorage.clear();
+                    
+                    // Limpar cookies (se possível)
+                    document.cookie.split(";").forEach(function(c) { 
+                        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                    });
+                    
+                    document.getElementById('result').innerHTML = '<div class="success">✅ Cache limpo com sucesso! Redirecionando...</div>';
+                    
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 2000);
+                    
+                } catch (error) {
+                    document.getElementById('result').innerHTML = '<div style="color: red;">❌ Erro ao limpar cache: ' + error.message + '</div>';
+                }
+            }
+            
+            function clearLocalStorage() {
+                localStorage.clear();
+                document.getElementById('result').innerHTML = '<div class="success">✅ LocalStorage limpo!</div>';
+            }
+            
+            function clearSessionStorage() {
+                sessionStorage.clear();
+                document.getElementById('result').innerHTML = '<div class="success">✅ SessionStorage limpo!</div>';
+            }
+            
+            function clearFormData() {
+                try {
+                    // Limpa todos os campos de formulário na página
+                    const inputs = document.querySelectorAll('input, textarea, select');
+                    inputs.forEach(input => {
+                        if (input.type === 'checkbox' || input.type === 'radio') {
+                            input.checked = false;
+                        } else {
+                            input.value = '';
+                        }
+                    });
+                    
+                    // Limpa dados específicos do formulário de cadastro
+                    localStorage.removeItem('register-form-data');
+                    localStorage.removeItem('cadastro-form-data');
+                    localStorage.removeItem('form-data');
+                    localStorage.removeItem('phone');
+                    localStorage.removeItem('telefone');
+                    localStorage.removeItem('cpf');
+                    localStorage.removeItem('email');
+                    sessionStorage.removeItem('register-form-data');
+                    sessionStorage.removeItem('cadastro-form-data');
+                    sessionStorage.removeItem('form-data');
+                    sessionStorage.removeItem('phone');
+                    sessionStorage.removeItem('telefone');
+                    sessionStorage.removeItem('cpf');
+                    sessionStorage.removeItem('email');
+                    
+                    // Limpa dados de preenchimento automático do navegador
+                    const phoneInputs = document.querySelectorAll('input[type="tel"], input[name*="phone"], input[name*="telefone"]');
+                    phoneInputs.forEach(input => {
+                        input.value = '';
+                        input.setAttribute('autocomplete', 'off');
+                    });
+                    
+                    document.getElementById('result').innerHTML = '<div class="success">✅ Dados de formulário limpos!</div>';
+                } catch (error) {
+                    document.getElementById('result').innerHTML = '<div style="color: red;">❌ Erro ao limpar dados: ' + error.message + '</div>';
+                }
+            }
+            
+            function clearPhoneData() {
+                try {
+                    // Limpa especificamente dados de telefone
+                    const phoneInputs = document.querySelectorAll('input[type="tel"], input[name*="phone"], input[name*="telefone"], input[id*="phone"]');
+                    phoneInputs.forEach(input => {
+                        input.value = '';
+                        input.setAttribute('autocomplete', 'off');
+                        input.setAttribute('data-lpignore', 'true');
+                        input.setAttribute('data-1p-ignore', 'true');
+                    });
+                    
+                    // Limpa dados específicos de telefone
+                    localStorage.removeItem('phone');
+                    localStorage.removeItem('telefone');
+                    localStorage.removeItem('phone_number');
+                    localStorage.removeItem('user_phone');
+                    sessionStorage.removeItem('phone');
+                    sessionStorage.removeItem('telefone');
+                    sessionStorage.removeItem('phone_number');
+                    sessionStorage.removeItem('user_phone');
+                    
+                    // Limpa dados de preenchimento automático
+                    const allInputs = document.querySelectorAll('input');
+                    allInputs.forEach(input => {
+                        if (input.value.includes('98765') || input.value.includes('4321') || input.value.includes('(21)')) {
+                            input.value = '';
+                        }
+                    });
+                    
+                    document.getElementById('result').innerHTML = '<div class="success">✅ Dados de telefone limpos!</div>';
+                } catch (error) {
+                    document.getElementById('result').innerHTML = '<div style="color: red;">❌ Erro ao limpar dados: ' + error.message + '</div>';
+                }
+            }
+            
+            function reloadPage() {
+                window.location.reload(true);
+            }
+        </script>
+    </div>
+</body>
+</html>

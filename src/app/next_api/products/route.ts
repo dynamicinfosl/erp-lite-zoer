@@ -29,6 +29,31 @@ async function createProductHandler(request: NextRequest) {
 
     // Resolver tenant_id quando ausente ou inválido
     const ZERO_UUID = '00000000-0000-0000-0000-000000000000';
+    
+    // ✅ VALIDAÇÃO DE TRIAL EXPIRADO
+    if (tenant_id && tenant_id !== ZERO_UUID) {
+      const { data: tenant, error: tenantError } = await supabaseAdmin
+        .from('tenants')
+        .select('trial_ends_at, status')
+        .eq('id', tenant_id)
+        .single();
+
+      if (!tenantError && tenant) {
+        if (tenant.status === 'trial' && tenant.trial_ends_at) {
+          const trialEnd = new Date(tenant.trial_ends_at);
+          if (trialEnd < new Date()) {
+            return NextResponse.json(
+              { 
+                error: 'Período de teste expirado. Faça upgrade do seu plano para continuar.',
+                trialExpired: true 
+              },
+              { status: 403 }
+            );
+          }
+        }
+      }
+    }
+
     if (!tenant_id || tenant_id === ZERO_UUID) {
       if (user_id) {
         // tentar obter membership ativa

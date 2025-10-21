@@ -356,12 +356,12 @@ export default function AssinaturaPage() {
                 {/* Card de Progresso */}
                 <JugaKPICard
                   title="Progresso do Teste"
-                  value={isTrialExpired ? '100%' : `${Math.round(((30 - daysLeftInTrial) / 30) * 100)}%`}
-                  description={isTrialExpired ? '30 de 30 dias utilizados' : 
-                             `${30 - daysLeftInTrial} de 30 dias utilizados`}
+                  value={isTrialExpired ? '100%' : `${Math.round(((14 - daysLeftInTrial) / 14) * 100)}%`}
+                  description={isTrialExpired ? '14 de 14 dias utilizados' : 
+                             `${14 - daysLeftInTrial} de 14 dias utilizados`}
                   trend="neutral"
                   trendValue={isTrialExpired ? 'Completo' : 
-                             (30 - daysLeftInTrial) >= 30 ? 'Completo' : 'Em andamento'}
+                             (14 - daysLeftInTrial) >= 14 ? 'Completo' : 'Em andamento'}
                   icon={<TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />}
                   color="primary"
                   className="min-h-[120px] sm:min-h-[140px]"

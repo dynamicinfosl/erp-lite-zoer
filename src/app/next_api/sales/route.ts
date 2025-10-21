@@ -176,29 +176,7 @@ async function listSalesHandler(request: NextRequest) {
     }
 
     console.log(`✅ Vendas encontradas: ${data?.length || 0} para tenant: ${tenant_id}`);
-    // Fallback DEV: se não retornou nada, tentar sem filtro de tenant (útil quando vendas antigas foram salvas com tenant diferente)
-    if ((data?.length || 0) === 0 && tenant_id) {
-      try {
-        let fallbackQuery = supabaseAdmin
-          .from('sales')
-          .select('*');
-        if (today === 'true') {
-          const clientOffsetMin = Number.isFinite(Number(searchParams.get('tz'))) ? parseInt(searchParams.get('tz') as string, 10) : 0;
-          const startLocal = new Date(); startLocal.setHours(0,0,0,0);
-          const endLocal = new Date(); endLocal.setHours(23,59,59,999);
-          const startUtc = new Date(startLocal.getTime() - clientOffsetMin * 60000);
-          const endUtc = new Date(endLocal.getTime() - clientOffsetMin * 60000);
-          fallbackQuery = fallbackQuery.gte('created_at', startUtc.toISOString()).lte('created_at', endUtc.toISOString());
-        }
-        const fb = await fallbackQuery.order('created_at', { ascending: false });
-        if (!fb.error && fb.data) {
-          data = fb.data;
-          console.log('ℹ️ Fallback sem tenant aplicado. Registros:', data.length);
-        }
-      } catch (e) {
-        console.log('⚠️ Falha no fallback de vendas:', e);
-      }
-    }
+    // ✅ REMOVIDO FALLBACK: Não buscar dados de outros tenants por segurança
     
     // Retornar no formato esperado pelo frontend
     if (today === 'true') {

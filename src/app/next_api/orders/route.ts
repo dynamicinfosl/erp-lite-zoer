@@ -1,22 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Configurações hardcoded para garantir funcionamento
+const SUPABASE_URL = 'https://lfxietcasaooenffdodr.supabase.co';
+const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10';
 
-const supabase = supabaseUrl && supabaseServiceKey 
-  ? createClient(supabaseUrl, supabaseServiceKey) 
-  : null;
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 // GET - buscar ordens de serviço
 export async function GET(request: NextRequest) {
   try {
-    if (!supabase) {
-      return NextResponse.json(
-        { error: 'Cliente Supabase não configurado' },
-        { status: 500 }
-      );
-    }
 
     console.log('🔍 Buscando ordens...');
     
@@ -55,12 +48,6 @@ export async function GET(request: NextRequest) {
 // POST - criar nova ordem de serviço
 export async function POST(request: NextRequest) {
   try {
-    if (!supabase) {
-      return NextResponse.json(
-        { error: 'Cliente Supabase não configurado' },
-        { status: 500 }
-      );
-    }
 
     console.log('🚀 Criando ordem...');
     
@@ -144,12 +131,6 @@ export async function POST(request: NextRequest) {
 // PUT - atualizar ordem de serviço
 export async function PUT(request: NextRequest) {
   try {
-    if (!supabase) {
-      return NextResponse.json(
-        { error: 'Cliente Supabase não configurado' },
-        { status: 500 }
-      );
-    }
 
     console.log('🔄 Atualizando ordem...');
     
@@ -222,12 +203,6 @@ export async function PUT(request: NextRequest) {
 // DELETE - deletar ordem de serviço
 export async function DELETE(request: NextRequest) {
   try {
-    if (!supabase) {
-      return NextResponse.json(
-        { error: 'Cliente Supabase não configurado' },
-        { status: 500 }
-      );
-    }
     console.log('🗑️ Deletando ordem...');
     
     const { searchParams } = new URL(request.url);
