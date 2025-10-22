@@ -574,6 +574,32 @@ export default function ProdutosPage() {
       let fail = 0;
       const errors: string[] = [];
 
+      // ✅ DEBUG: Verificar tenant antes de processar
+      console.log('🔍 DEBUG - Tenant atual:', tenant);
+      console.log('🔍 DEBUG - Tenant ID:', tenant?.id);
+      
+      if (!tenant?.id) {
+        console.error('❌ Tenant não disponível para importação');
+        console.log('🔄 Tentando recarregar tenant...');
+        
+        // Tentar recarregar o tenant
+        try {
+          await refreshTenant();
+          console.log('🔄 Tenant após refresh:', tenant);
+          
+          if (!tenant?.id) {
+            toast.error('Erro: Tenant não disponível. Recarregue a página.');
+            setIsRegistering(false);
+            return;
+          }
+        } catch (error) {
+          console.error('❌ Erro ao recarregar tenant:', error);
+          toast.error('Erro: Tenant não disponível. Recarregue a página.');
+          setIsRegistering(false);
+          return;
+        }
+      }
+
       for (const row of selected) {
         const obj: Record<string, any> = Array.isArray(row)
           ? (() => {
@@ -613,10 +639,19 @@ export default function ProdutosPage() {
           continue;
         }
 
+        // ✅ DEBUG: Log dos dados antes do envio
+        const requestData = { tenant_id: tenant?.id, ...productData };
+        console.log('📤 Enviando dados do produto:', {
+          tenant_id: requestData.tenant_id,
+          name: requestData.name,
+          sale_price: requestData.sale_price,
+          sku: requestData.sku
+        });
+
         const response = await fetch('/next_api/products', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tenant_id: tenant?.id, ...productData }),
+          body: JSON.stringify(requestData),
         });
 
         if (response.ok) {
