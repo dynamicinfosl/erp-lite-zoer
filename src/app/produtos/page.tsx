@@ -226,27 +226,38 @@ export default function ProdutosPage() {
   useEffect(() => {
     console.log(`🔄 useEffect carregar produtos - tenant atual:`, tenant?.id);
     
-    const loadWithRetry = async () => {
-      // Aguardar tenant estar disponível (máximo 2 segundos)
+    // Se não há tenant, não fazer nada ainda
+    if (!tenant?.id) {
+      console.log(`⏳ Nenhum tenant disponível, aguardando...`);
+      return;
+    }
+    
+    // Se há tenant, carregar produtos
+    console.log(`📦 Carregando produtos para tenant: ${tenant.id}`);
+    loadProducts();
+  }, [tenant?.id]);
+
+  // ✅ Aguardar tenant estar carregado e então carregar produtos
+  useEffect(() => {
+    const waitForTenant = async () => {
+      // Aguardar até 5 segundos pelo tenant
       let attempts = 0;
-      while (!tenant?.id && attempts < 20) {
+      while (!tenant?.id && attempts < 50) {
         await new Promise(resolve => setTimeout(resolve, 100));
         attempts++;
       }
       
-      if (!tenant?.id) {
-        console.log(`⚠️ Nenhum tenant disponível após 2 segundos, limpando produtos`);
+      if (tenant?.id) {
+        console.log(`✅ Tenant carregado, carregando produtos: ${tenant.id}`);
+        loadProducts();
+      } else {
+        console.log(`⚠️ Timeout aguardando tenant`);
         setLoading(false);
-        setProducts([]);
-        return;
       }
-      
-      console.log(`📦 Carregando produtos para tenant: ${tenant.id}`);
-      loadProducts();
     };
     
-    loadWithRetry();
-  }, [tenant?.id]);
+    waitForTenant();
+  }, []); // Executar apenas uma vez na montagem
 
   const loadProducts = async (overrideTenantId?: string) => {
     try {
