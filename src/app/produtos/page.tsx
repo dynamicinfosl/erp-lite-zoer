@@ -567,6 +567,34 @@ export default function ProdutosPage() {
       .trim();
   };
 
+  // ✅ Função para converter preços do formato brasileiro
+  const parseBrazilianPrice = (value: string | number): number => {
+    if (!value) return 0;
+    
+    const str = value.toString().trim();
+    if (!str || str === '0') return 0;
+    
+    // Remover caracteres não numéricos exceto vírgula e ponto
+    const clean = str.replace(/[^\d.,]/g, '');
+    
+    // Se tem vírgula, tratar como separador decimal brasileiro
+    if (clean.includes(',')) {
+      // Se tem ponto também, ponto é milhares e vírgula é decimal
+      if (clean.includes('.')) {
+        const parts = clean.split(',');
+        const integerPart = parts[0].replace(/\./g, '');
+        const decimalPart = parts[1] || '00';
+        return parseFloat(`${integerPart}.${decimalPart}`);
+      } else {
+        // Só vírgula, tratar como decimal
+        return parseFloat(clean.replace(',', '.'));
+      }
+    } else {
+      // Só números, tratar como inteiro
+      return parseFloat(clean);
+    }
+  };
+
   const handleRegisterSelected = async (selected: any[]) => {
     try {
       setIsRegistering(true);
@@ -624,8 +652,8 @@ export default function ProdutosPage() {
           description: (obj['descricao'] || obj['descrição'] || '').toString().trim() || null,
           category: (obj['categoria'] || '').toString().trim() || null,
           brand: (obj['marca'] || '').toString().trim() || null,
-          cost_price: parseFloat((obj['valor de custo'] || obj['custo'] || obj['preco de custo'] || '0').toString().replace(/[^\d.,]/g, '').replace(',', '.')) || 0,
-          sale_price: parseFloat((obj['valor de venda'] || obj['preco'] || obj['preco de venda'] || '0').toString().replace(/[^\d.,]/g, '').replace(',', '.')) || 0,
+          cost_price: parseBrazilianPrice(obj['valor de custo'] || obj['custo'] || obj['preco de custo'] || '0'),
+          sale_price: parseBrazilianPrice(obj['valor de venda'] || obj['preco'] || obj['preco de venda'] || '0'),
           stock_quantity: parseInt((obj['estoque'] || obj['quantidade'] || '0').toString(), 10) || 0,
           barcode: (obj['codigo de barra'] || obj['codigo de barras'] || obj['barcode'] || '').toString().trim() || null,
           ncm: (obj['ncm'] || '').toString().trim() || null,
