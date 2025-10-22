@@ -37,14 +37,14 @@ export const GET = requestMiddleware(async (request, context) => {
         .range(offset || 0, (offset || 0) + (limit || 100) - 1);
 
       if (dbError) {
-        console.log('❌ Erro ao buscar transações:', dbError.message);
+        console.log('❌ Erro ao buscar transações:', dbError instanceof Error ? dbError.message : String(dbError));
         return createSuccessResponse([]);
       }
 
       console.log('✅ Transações reais retornadas:', transactions?.length || 0);
       return createSuccessResponse(transactions || []);
     } catch (dbError) {
-      console.log('⚠️ Erro ao buscar do banco, retornando lista vazia:', dbError.message);
+      console.log('⚠️ Erro ao buscar do banco, retornando lista vazia:', dbError instanceof Error ? dbError.message : String(dbError));
       // Se não conseguir buscar do banco, retornar lista vazia para evitar dados cruzados
       return createSuccessResponse([]);
     }
