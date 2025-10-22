@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createSuccessResponse } from '@/lib/create-response';
 
 // Configurações hardcoded para garantir funcionamento
 const SUPABASE_URL = 'https://lfxietcasaooenffdodr.supabase.co';
@@ -34,17 +35,17 @@ export async function GET(request: NextRequest) {
         .range(offset, offset + limit - 1);
 
       if (dbError) {
-        console.log('❌ Erro ao buscar transações:', dbError);
-        return NextResponse.json({ success: true, data: [] });
+        console.log('❌ Erro ao buscar transações:', dbError instanceof Error ? dbError.message : String(dbError));
+        return createSuccessResponse([]);
       }
 
       console.log('✅ Transações reais retornadas:', transactions?.length || 0);
-      return NextResponse.json({ success: true, data: transactions || [] });
-
+      return createSuccessResponse(transactions || []);
     } catch (dbError: unknown) {
       const errorMessage = dbError instanceof Error ? dbError.message : String(dbError);
       console.log('⚠️ Erro ao buscar do banco, retornando lista vazia:', errorMessage);
-      return NextResponse.json({ success: true, data: [] });
+      // Se não conseguir buscar do banco, retornar lista vazia para evitar dados cruzados
+      return createSuccessResponse([]);
     }
   } catch (error) {
     console.error('Erro ao buscar transações:', error);
