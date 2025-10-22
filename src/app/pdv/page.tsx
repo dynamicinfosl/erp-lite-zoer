@@ -401,9 +401,18 @@ export default function PDVPage() {
   
   const finalizeSale = useCallback(async (paymentData?: any) => {
     try {
+      // ✅ DEBUG: Verificar tenant antes de criar venda
+      console.log('🔍 DEBUG - Tenant atual:', tenant);
+      console.log('🔍 DEBUG - Tenant ID:', tenant?.id);
+      console.log('🔍 DEBUG - User ID:', user?.id);
+      
+      if (!tenant?.id) {
+        throw new Error('Tenant não disponível para finalizar venda');
+      }
+
       // Preparar dados da venda para o Supabase (versão simplificada)
       const saleData = {
-        tenant_id: tenant?.id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar tenant_id
+        tenant_id: tenant.id, // ✅ Usar tenant.id diretamente
         user_id: user?.id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
         sale_type: null, // ✅ Usar NULL para evitar constraint
         customer_name: customerName || 'Cliente Avulso',

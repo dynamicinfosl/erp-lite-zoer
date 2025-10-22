@@ -27,6 +27,13 @@ async function createSaleHandler(request: NextRequest) {
       user_id: user_id 
     });
 
+    // ✅ DEBUG: Log detalhado do tenant_id
+    console.log('🔍 DEBUG - Tenant ID recebido:', tenant_id);
+    console.log('🔍 DEBUG - Tipo do tenant_id:', typeof tenant_id);
+    console.log('🔍 DEBUG - Tenant_id é string vazia?', tenant_id === '');
+    console.log('🔍 DEBUG - Tenant_id é null?', tenant_id === null);
+    console.log('🔍 DEBUG - Tenant_id é undefined?', tenant_id === undefined);
+
     if (!products || !finalTotal) {
       return NextResponse.json(
         { error: 'Produtos e total são obrigatórios' },
@@ -40,6 +47,23 @@ async function createSaleHandler(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // ✅ Verificar se o tenant existe na base de dados
+    const { data: tenantExists, error: tenantError } = await supabaseAdmin
+      .from('tenants')
+      .select('id')
+      .eq('id', tenant_id)
+      .single();
+
+    if (tenantError || !tenantExists) {
+      console.error('❌ Tenant não encontrado:', tenant_id, tenantError);
+      return NextResponse.json(
+        { error: 'Tenant não encontrado na base de dados' },
+        { status: 400 }
+      );
+    }
+
+    console.log('✅ Tenant validado:', tenantExists.id);
 
     // Gerar número da venda (versão simplificada)
     const { data: saleNumber, error: numberError } = await supabaseAdmin
