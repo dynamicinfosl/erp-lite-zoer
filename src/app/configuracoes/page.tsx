@@ -16,6 +16,7 @@ import { Plus, Search, Edit, Trash2, User, Settings, Shield, Key } from 'lucide-
 import { UserProfile, Category } from '@/types';
 import { api } from '@/lib/api-client';
 import { toast } from 'sonner';
+import { useCouponSettings } from '@/hooks/useCouponSettings';
 
 export default function ConfiguracoesPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -37,6 +38,9 @@ export default function ConfiguracoesPage() {
     description: '',
     color: '#2c3e50',
   });
+
+  // Hook para configurações de cupom
+  const { settings: couponSettings, updateSettings: updateCouponSettings, saveSettings } = useCouponSettings();
 
   useEffect(() => {
     fetchUsers();
@@ -62,6 +66,20 @@ export default function ConfiguracoesPage() {
       setCategories(data);
     } catch (error) {
       console.error('Erro ao carregar categorias:', error);
+    }
+  };
+
+  const handleSaveCouponSettings = async () => {
+    try {
+      const success = saveSettings(couponSettings);
+      if (success) {
+        toast.success('Configurações do cupom salvas com sucesso!');
+      } else {
+        toast.error('Erro ao salvar configurações');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar configurações:', error);
+      toast.error('Erro ao salvar configurações');
     }
   };
 
@@ -214,6 +232,7 @@ export default function ConfiguracoesPage() {
         <TabsList>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
           <TabsTrigger value="categorias">Categorias</TabsTrigger>
+          <TabsTrigger value="cupom">Cupom</TabsTrigger>
           <TabsTrigger value="sistema">Sistema</TabsTrigger>
         </TabsList>
 
@@ -522,6 +541,175 @@ export default function ConfiguracoesPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="cupom" className="space-y-4">
+          <h2 className="text-xl font-semibold">Configurações do Cupom</h2>
+          
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Informações da Empresa</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="companyName">Nome da Empresa</Label>
+                  <Input
+                    id="companyName"
+                    value={couponSettings.companyName}
+                    onChange={(e) => updateCouponSettings({companyName: e.target.value})}
+                    placeholder="Nome da sua empresa"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="companyAddress">Endereço</Label>
+                  <Input
+                    id="companyAddress"
+                    value={couponSettings.companyAddress}
+                    onChange={(e) => updateCouponSettings({companyAddress: e.target.value})}
+                    placeholder="Rua, número, bairro"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="companyCity">Cidade - Estado</Label>
+                  <Input
+                    id="companyCity"
+                    value={couponSettings.companyCity}
+                    onChange={(e) => updateCouponSettings({companyCity: e.target.value})}
+                    placeholder="Cidade - Estado"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="companyPhone">Telefone</Label>
+                  <Input
+                    id="companyPhone"
+                    value={couponSettings.companyPhone}
+                    onChange={(e) => updateCouponSettings({companyPhone: e.target.value})}
+                    placeholder="(11) 99999-9999"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="companyEmail">E-mail</Label>
+                  <Input
+                    id="companyEmail"
+                    type="email"
+                    value={couponSettings.companyEmail}
+                    onChange={(e) => updateCouponSettings({companyEmail: e.target.value})}
+                    placeholder="contato@empresa.com"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Configurações de Exibição</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="fontSize">Tamanho da Fonte</Label>
+                  <Select
+                    value={couponSettings.fontSize.toString()}
+                    onValueChange={(value) => updateCouponSettings({fontSize: parseInt(value)})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10px - Pequena</SelectItem>
+                      <SelectItem value="12">12px - Normal</SelectItem>
+                      <SelectItem value="14">14px - Grande</SelectItem>
+                      <SelectItem value="16">16px - Muito Grande</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Mostrar Endereço</Label>
+                    <Switch
+                      checked={couponSettings.showAddress}
+                      onCheckedChange={(checked) => updateCouponSettings({showAddress: checked})}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label>Mostrar Telefone</Label>
+                    <Switch
+                      checked={couponSettings.showPhone}
+                      onCheckedChange={(checked) => updateCouponSettings({showPhone: checked})}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label>Mostrar E-mail</Label>
+                    <Switch
+                      checked={couponSettings.showEmail}
+                      onCheckedChange={(checked) => updateCouponSettings({showEmail: checked})}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label>Mostrar Data</Label>
+                    <Switch
+                      checked={couponSettings.showDate}
+                      onCheckedChange={(checked) => updateCouponSettings({showDate: checked})}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label>Mostrar Horário</Label>
+                    <Switch
+                      checked={couponSettings.showTime}
+                      onCheckedChange={(checked) => updateCouponSettings({showTime: checked})}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label>Mostrar Caixa</Label>
+                    <Switch
+                      checked={couponSettings.showCashier}
+                      onCheckedChange={(checked) => updateCouponSettings({showCashier: checked})}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label>Mostrar Cliente</Label>
+                    <Switch
+                      checked={couponSettings.showCustomer}
+                      onCheckedChange={(checked) => updateCouponSettings({showCustomer: checked})}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Texto do Rodapé</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div>
+                <Label htmlFor="footerText">Mensagem do Rodapé</Label>
+                <Input
+                  id="footerText"
+                  value={couponSettings.footerText}
+                    onChange={(e) => updateCouponSettings({footerText: e.target.value})}
+                  placeholder="Obrigado pela preferência!"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline">Cancelar</Button>
+            <Button onClick={handleSaveCouponSettings}>Salvar Configurações</Button>
+          </div>
         </TabsContent>
 
         <TabsContent value="sistema" className="space-y-4">
