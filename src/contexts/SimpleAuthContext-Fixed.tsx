@@ -59,7 +59,54 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('🔍 Buscando tenant real para usuário:', userId);
       
-      // ✅ NOVA SOLUÇÃO: Buscar tenant na tabela tenants baseado no user_id
+      // ✅ NOVA SOLUÇÃO: Buscar tenant através de user_memberships
+      try {
+        const { data: membership, error: membershipError } = await supabase
+          .from('user_memberships')
+          .select(`
+            tenant_id,
+            tenants (
+              id,
+              name,
+              status,
+              email,
+              phone,
+              document,
+              address,
+              city,
+              state,
+              zip_code
+            )
+          `)
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (membershipError) {
+          console.log('⚠️ Erro ao buscar membership:', membershipError);
+        }
+
+        if (membership?.tenants) {
+          const tenant = membership.tenants;
+          console.log('✅ Tenant encontrado via membership:', tenant.name, 'ID:', tenant.id);
+          return {
+            id: tenant.id,
+            name: tenant.name || 'Meu Negócio',
+            status: tenant.status || 'trial',
+            email: tenant.email,
+            phone: tenant.phone,
+            document: tenant.document,
+            address: tenant.address,
+            city: tenant.city,
+            state: tenant.state,
+            zip_code: tenant.zip_code,
+          };
+        }
+      } catch (error) {
+        console.log('⚠️ Erro ao verificar membership:', error);
+      }
+
+      // ✅ FALLBACK: Tentar buscar tenant diretamente na tabela tenants
       try {
         const { data: tenant, error } = await supabase
           .from('tenants')
@@ -68,7 +115,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
           .maybeSingle();
 
         if (error) {
-          console.log('⚠️ Erro ao buscar tenant:', error);
+          console.log('⚠️ Erro ao buscar tenant direto:', error);
         }
 
         if (tenant?.id) {
