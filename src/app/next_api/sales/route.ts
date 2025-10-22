@@ -167,6 +167,7 @@ async function createSaleHandler(request: NextRequest) {
     console.log('📦 Tenant ID nos itens:', saleItems[0]?.tenant_id);
     console.log('📦 Sale ID nos itens:', saleItems[0]?.sale_id);
 
+    // ✅ Usar service role que tem bypass de RLS
     const { error: itemsError } = await supabaseAdmin
       .from('sale_items')
       .insert(saleItems);
