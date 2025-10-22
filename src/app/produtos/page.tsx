@@ -600,16 +600,16 @@ export default function ProdutosPage() {
           brand: (obj['marca'] || '').toString().trim() || null,
           cost_price: parseFloat((obj['valor de custo'] || obj['custo'] || obj['preco de custo'] || '0').toString().replace(/[^\d.,]/g, '').replace(',', '.')) || 0,
           sale_price: parseFloat((obj['valor de venda'] || obj['preco'] || obj['preco de venda'] || '0').toString().replace(/[^\d.,]/g, '').replace(',', '.')) || 0,
-          stock_quantity: parseInt((obj['quantidade'] || obj['estoque'] || '0').toString(), 10) || 0,
-          barcode: (obj['codigo de barras'] || obj['barcode'] || '').toString().trim() || null,
+          stock_quantity: parseInt((obj['estoque'] || obj['quantidade'] || '0').toString(), 10) || 0,
+          barcode: (obj['codigo de barra'] || obj['codigo de barras'] || obj['barcode'] || '').toString().trim() || null,
           ncm: (obj['ncm'] || '').toString().trim() || null,
           unit: (obj['unidade'] || obj['und'] || 'UN').toString().trim().toUpperCase() || 'UN',
           imported_at: new Date().toISOString(),
         };
 
-        if (!productData.sku || !productData.name) {
+        if (!productData.sku || !productData.name || productData.sale_price <= 0) {
           fail++;
-          errors.push('Produto com código ou nome vazio, pulado.');
+          errors.push(`Produto com dados inválidos (SKU: ${productData.sku}, Nome: ${productData.name}, Preço: ${productData.sale_price}), pulado.`);
           continue;
         }
 
