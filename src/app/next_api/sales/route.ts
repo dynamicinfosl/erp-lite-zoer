@@ -148,6 +148,7 @@ async function createSaleHandler(request: NextRequest) {
       
       return {
         sale_id: sale.id,
+        tenant_id: tenant_id, // ✅ ADICIONAR tenant_id para RLS
         user_id: user_id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
         product_id: product.id,
         product_name: product.name,
@@ -160,12 +161,24 @@ async function createSaleHandler(request: NextRequest) {
       };
     });
 
+    // ✅ DEBUG: Log dos itens antes da inserção
+    console.log('📦 Itens da venda a serem inseridos:', saleItems.length);
+    console.log('📦 Primeiro item:', saleItems[0]);
+    console.log('📦 Tenant ID nos itens:', saleItems[0]?.tenant_id);
+
     const { error: itemsError } = await supabaseAdmin
       .from('sale_items')
       .insert(saleItems);
 
     if (itemsError) {
-      console.error('Erro ao criar itens da venda:', itemsError);
+      console.error('❌ Erro ao criar itens da venda:', itemsError);
+      console.error('❌ Detalhes do erro:', {
+        message: itemsError.message,
+        details: itemsError.details,
+        hint: itemsError.hint,
+        code: itemsError.code
+      });
+      
       // Tentar deletar a venda criada
       await supabaseAdmin.from('sales').delete().eq('id', sale.id);
       return NextResponse.json(
@@ -173,6 +186,8 @@ async function createSaleHandler(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    console.log('✅ Itens da venda criados com sucesso');
 
     return NextResponse.json({ success: true, data: sale });
 
