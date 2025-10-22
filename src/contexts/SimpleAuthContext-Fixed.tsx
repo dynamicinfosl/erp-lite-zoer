@@ -86,8 +86,8 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
           console.log('⚠️ Erro ao buscar membership:', membershipError);
         }
 
-        if (membership?.tenants) {
-          const tenant = membership.tenants;
+        if (membership?.tenants && Array.isArray(membership.tenants) && membership.tenants.length > 0) {
+          const tenant = membership.tenants[0];
           console.log('✅ Tenant encontrado via membership:', tenant.name, 'ID:', tenant.id);
           return {
             id: tenant.id,
