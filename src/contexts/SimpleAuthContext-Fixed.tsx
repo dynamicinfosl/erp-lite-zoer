@@ -215,6 +215,11 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         if (event === 'SIGNED_IN' && session?.user) {
           setSession(session);
           setUser(session.user);
+          // ✅ CORREÇÃO: Carregar tenant após login
+          console.log('👤 Usuário logado, carregando tenant...');
+          const tenantData = await loadRealTenant(session.user.id);
+          console.log('🏢 Tenant carregado após login:', tenantData);
+          setTenant(tenantData);
           setLoading(false);
         } else if (event === 'SIGNED_OUT') {
           setSession(null);
