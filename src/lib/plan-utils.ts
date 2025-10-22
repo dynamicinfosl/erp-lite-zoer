@@ -1,17 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import { PlanLimits, PlanUsage } from '@/hooks/usePlanLimits';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Criar instância do Supabase para uso no servidor
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImV4cCI6MjA3MjU5Mzc0M30.NBHrAlv8RPxu1QhLta76Uoh6Bc_OnqhfVydy8_TX6GQ';
 
-// Usar valores hardcoded como fallback se variáveis não estiverem configuradas
-const SUPABASE_URL_FALLBACK = 'https://lfxietcasaooenffdodr.supabase.co';
-const SUPABASE_KEY_FALLBACK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImV4cCI6MjA3MjU5Mzc0M30.NBHrAlv8RPxu1QhLta76Uoh6Bc_OnqhfVydy8_TX6GQ';
-
-const finalSupabaseUrl = supabaseUrl || SUPABASE_URL_FALLBACK;
-const finalSupabaseKey = supabaseKey || SUPABASE_KEY_FALLBACK;
-
-const supabase = createClient(finalSupabaseUrl, finalSupabaseKey);
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export interface PlanValidationResult {
   canProceed: boolean;
