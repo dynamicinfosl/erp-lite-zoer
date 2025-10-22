@@ -57,13 +57,50 @@ async function createSaleHandler(request: NextRequest) {
 
     if (tenantError || !tenantExists) {
       console.error('❌ Tenant não encontrado:', tenant_id, tenantError);
-      return NextResponse.json(
-        { error: 'Tenant não encontrado na base de dados' },
-        { status: 400 }
-      );
-    }
+      
+      // ✅ Tentar criar o tenant se não existir
+      console.log('🔄 Tentando criar tenant:', tenant_id);
+      
+      try {
+        const { data: newTenant, error: createError } = await supabaseAdmin
+          .from('tenants')
+          .insert({
+            id: tenant_id,
+            name: 'Minha Empresa',
+            slug: `tenant-${tenant_id.slice(0, 8)}`,
+            status: 'trial',
+            email: null,
+            phone: null,
+            document: null,
+            address: null,
+            city: null,
+            state: null,
+            zip_code: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select('id')
+          .single();
 
-    console.log('✅ Tenant validado:', tenantExists.id);
+        if (createError) {
+          console.error('❌ Erro ao criar tenant:', createError);
+          return NextResponse.json(
+            { error: 'Erro ao criar tenant: ' + createError.message },
+            { status: 400 }
+          );
+        }
+
+        console.log('✅ Tenant criado com sucesso:', newTenant.id);
+      } catch (error) {
+        console.error('❌ Erro ao criar tenant:', error);
+        return NextResponse.json(
+          { error: 'Erro ao criar tenant: ' + (error instanceof Error ? error.message : String(error)) },
+          { status: 400 }
+        );
+      }
+    } else {
+      console.log('✅ Tenant validado:', tenantExists.id);
+    }
 
     // Gerar número da venda (versão simplificada)
     const { data: saleNumber, error: numberError } = await supabaseAdmin
