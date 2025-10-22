@@ -148,7 +148,7 @@ async function createSaleHandler(request: NextRequest) {
       
       return {
         sale_id: sale.id,
-        // tenant_id: tenant_id, // ✅ REMOVIDO - coluna não existe na tabela
+        tenant_id: tenant_id, // ✅ REATIVADO - coluna agora existe na tabela
         user_id: user_id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
         product_id: product.id,
         product_name: product.name,
@@ -164,6 +164,7 @@ async function createSaleHandler(request: NextRequest) {
     // ✅ DEBUG: Log dos itens antes da inserção
     console.log('📦 Itens da venda a serem inseridos:', saleItems.length);
     console.log('📦 Primeiro item:', saleItems[0]);
+    console.log('📦 Tenant ID nos itens:', saleItems[0]?.tenant_id);
     console.log('📦 Sale ID nos itens:', saleItems[0]?.sale_id);
 
     const { error: itemsError } = await supabaseAdmin
