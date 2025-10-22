@@ -1221,6 +1221,7 @@ export default function ClientesPage() {
                 return '';
               };
               const customerData = {
+                tenant_id: tenant?.id || '00000000-0000-0000-0000-000000000000',
                 name: pick(['nome', 'name', 'fantasia']),
                 email: pick(['email', 'e mail']),
                 phone: pick(['telefone', 'celular', 'phone']),
