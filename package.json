@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack --port 3000",
+    "dev": "next dev --port 3000",
     "dev:debug": "NODE_OPTIONS='--inspect' next dev",
     "build": "next build",
     "start": "next start --port 22278",
@@ -54,6 +54,7 @@
     "@radix-ui/react-tooltip": "1.1.6",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/postgrest-js": "^1.19.4",
+    "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.57.0",
     "@types/bcryptjs": "^3.0.0",
     "autoprefixer": "^10.4.20",

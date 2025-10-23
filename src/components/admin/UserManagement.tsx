@@ -22,6 +22,7 @@ import {
   Clock,
   MousePointer,
   Eye,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@supabase/supabase-js';
@@ -142,12 +143,12 @@ export function UserManagement() {
       // Se temos memberships, usar eles como base
       if (memberships.length > 0) {
         console.log('🔄 Usando dados de user_memberships');
-        mappedUsers = memberships.map((membership: any) => {
+        mappedUsers = memberships.map((membership: any, index: number) => {
           const profile = profiles.find((p: any) => p.id === membership.user_id);
           const tenant = tenants.find((t: any) => t.id === membership.tenant_id);
 
           return {
-            user_id: membership.user_id,
+            user_id: membership.user_id || `membership-${index}-${Date.now()}`,
             user_email: profile?.email || 'Desconhecido',
             user_created_at: profile?.created_at || membership.created_at,
             user_last_login: '-',
@@ -165,8 +166,8 @@ export function UserManagement() {
       } else {
         // Fallback: usar apenas tenants se não há profiles
         console.log('🔄 Usando fallback: apenas tenants');
-        mappedUsers = tenants.map((tenant: any) => ({
-          user_id: tenant.id, // Usar tenant.id como user_id temporário
+        mappedUsers = tenants.map((tenant: any, index: number) => ({
+          user_id: `tenant-${tenant.id}-${index}-${Date.now()}`, // Chave única garantida
           user_email: tenant.email || 'Desconhecido',
           user_created_at: tenant.created_at,
           user_last_login: '-',
@@ -182,9 +183,20 @@ export function UserManagement() {
         }));
       }
 
-      console.log('✅ Usuários mapeados:', mappedUsers.length);
-      setUsers(mappedUsers);
-      setFilteredUsers(mappedUsers);
+      // Garantir que não há duplicatas baseadas no user_id
+      const uniqueUsers = mappedUsers.reduce((acc: TenantUser[], current: TenantUser) => {
+        const exists = acc.find(user => user.user_id === current.user_id);
+        if (!exists) {
+          acc.push(current);
+        } else {
+          console.warn('⚠️ Usuário duplicado removido:', current.user_id);
+        }
+        return acc;
+      }, []);
+
+      console.log('✅ Usuários únicos mapeados:', uniqueUsers.length);
+      setUsers(uniqueUsers);
+      setFilteredUsers(uniqueUsers);
     } catch (error) {
       console.error('❌ Erro geral:', error);
       toast.error('Erro ao carregar usuários');
@@ -193,7 +205,80 @@ export function UserManagement() {
     }
   };
 
+  const deleteUser = async (user: TenantUser) => {
+    try {
+      console.log('🗑️ Iniciando exclusão do usuário:', user.user_id);
+      console.log('📊 Dados do usuário:', {
+        user_id: user.user_id,
+        tenant_id: user.tenant_id,
+        user_email: user.user_email,
+        tenant_name: user.tenant_name
+      });
 
+      // Excluir dados relacionados
+      const deletePromises = [];
+      const deleteOperations = [];
+
+      // Excluir user_profile se existir
+      if (user.user_id && !user.user_id.startsWith('tenant-') && !user.user_id.startsWith('membership-')) {
+        console.log('🗑️ Excluindo user_profile:', user.user_id);
+        const deleteProfile = supabase.from('user_profiles').delete().eq('id', user.user_id);
+        deletePromises.push(deleteProfile);
+        deleteOperations.push('user_profiles');
+      }
+
+      // Excluir tenant se existir
+      if (user.tenant_id && !user.tenant_id.startsWith('virtual-')) {
+        console.log('🗑️ Excluindo tenant:', user.tenant_id);
+        const deleteTenant = supabase.from('tenants').delete().eq('id', user.tenant_id);
+        deletePromises.push(deleteTenant);
+        deleteOperations.push('tenants');
+      }
+
+      // Excluir user_memberships se existir
+      console.log('🗑️ Excluindo user_memberships para user_id:', user.user_id);
+      const deleteMemberships = supabase.from('user_memberships').delete().eq('user_id', user.user_id);
+      deletePromises.push(deleteMemberships);
+      deleteOperations.push('user_memberships');
+
+      // Excluir user_tenants se existir
+      console.log('🗑️ Excluindo user_tenants para user_id:', user.user_id);
+      const deleteUserTenants = supabase.from('user_tenants').delete().eq('user_id', user.user_id);
+      deletePromises.push(deleteUserTenants);
+      deleteOperations.push('user_tenants');
+
+      console.log('📋 Operações de exclusão:', deleteOperations);
+
+      // Executar todas as exclusões
+      const results = await Promise.allSettled(deletePromises);
+      
+      // Log detalhado dos resultados
+      results.forEach((result, index) => {
+        const operation = deleteOperations[index];
+        if (result.status === 'fulfilled') {
+          console.log(`✅ Exclusão bem-sucedida em ${operation}:`, result.value);
+        } else {
+          console.error(`❌ Falha na exclusão de ${operation}:`, result.reason);
+        }
+      });
+      
+      // Verificar se houve erros
+      const errors = results.filter(result => result.status === 'rejected');
+      if (errors.length > 0) {
+        console.warn('⚠️ Algumas exclusões falharam:', errors);
+        toast.warning('Algumas exclusões falharam, mas o usuário foi removido da lista');
+      } else {
+        console.log('✅ Todas as exclusões foram bem-sucedidas');
+      }
+
+      toast.success('Usuário excluído com sucesso!');
+      await loadUsers(); // Recarregar lista
+      setDialogOpen(false); // Fechar modal
+    } catch (error) {
+      console.error('❌ Erro ao excluir usuário:', error);
+      toast.error('Erro ao excluir usuário');
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const styles = {
@@ -589,7 +674,19 @@ export function UserManagement() {
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="flex justify-between">
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                if (confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')) {
+                  deleteUser(selectedUser);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Excluir Usuário
+            </Button>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Fechar
             </Button>

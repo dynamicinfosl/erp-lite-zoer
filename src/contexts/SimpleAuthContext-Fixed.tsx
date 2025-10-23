@@ -59,52 +59,82 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('🔍 Buscando tenant real para usuário:', userId);
       
-      // ✅ SOLUÇÃO CORRETA: Buscar tenant através de user_memberships
+      // ✅ NOVA SOLUÇÃO: Buscar tenant através de user_memberships
       try {
-        // 1. Buscar membership do usuário
         const { data: membership, error: membershipError } = await supabase
           .from('user_memberships')
-          .select('tenant_id, role, is_active')
+          .select(`
+            tenant_id,
+            tenants (
+              id,
+              name,
+              status,
+              email,
+              phone,
+              document,
+              address,
+              city,
+              state,
+              zip_code
+            )
+          `)
           .eq('user_id', userId)
           .eq('is_active', true)
-          .single();
+          .maybeSingle();
 
         if (membershipError) {
           console.log('⚠️ Erro ao buscar membership:', membershipError);
         }
 
-        if (membership?.tenant_id) {
-          console.log('✅ Membership encontrado, buscando tenant:', membership.tenant_id);
-          
-          // 2. Buscar dados do tenant
-          const { data: tenant, error: tenantError } = await supabase
-            .from('tenants')
-            .select('*')
-            .eq('id', membership.tenant_id)
-            .single();
-
-          if (tenantError) {
-            console.log('⚠️ Erro ao buscar tenant:', tenantError);
-          }
-
-          if (tenant?.id) {
-            console.log('✅ Tenant encontrado:', tenant.name);
-            return {
-              id: tenant.id,
-              name: tenant.name || 'Meu Negócio',
-              status: tenant.status || 'trial',
-              email: tenant.email,
-              phone: tenant.phone,
-              document: tenant.document,
-              address: tenant.address,
-              city: tenant.city,
-              state: tenant.state,
-              zip_code: tenant.zip_code,
-            };
-          }
+        if (membership?.tenants && Array.isArray(membership.tenants) && membership.tenants.length > 0) {
+          const tenant = membership.tenants[0];
+          console.log('✅ Tenant encontrado via membership:', tenant.name, 'ID:', tenant.id);
+          return {
+            id: tenant.id,
+            name: tenant.name || 'Meu Negócio',
+            status: tenant.status || 'trial',
+            email: tenant.email,
+            phone: tenant.phone,
+            document: tenant.document,
+            address: tenant.address,
+            city: tenant.city,
+            state: tenant.state,
+            zip_code: tenant.zip_code,
+          };
         }
       } catch (error) {
-        console.log('⚠️ Erro ao verificar membership/tenant:', error);
+        console.log('⚠️ Erro ao verificar membership:', error);
+      }
+
+      // ✅ FALLBACK: Tentar buscar tenant diretamente na tabela tenants
+      try {
+        const { data: tenant, error } = await supabase
+          .from('tenants')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (error) {
+          console.log('⚠️ Erro ao buscar tenant direto:', error);
+        }
+
+        if (tenant?.id) {
+          console.log('✅ Tenant encontrado na tabela tenants:', tenant.name);
+          return {
+            id: tenant.id,
+            name: tenant.name || 'Meu Negócio',
+            status: tenant.status || 'trial',
+            email: tenant.email,
+            phone: tenant.phone,
+            document: tenant.document,
+            address: tenant.address,
+            city: tenant.city,
+            state: tenant.state,
+            zip_code: tenant.zip_code,
+          };
+        }
+      } catch (error) {
+        console.log('⚠️ Erro ao verificar tenant na tabela tenants:', error);
       }
 
       // ✅ FALLBACK GARANTIDO: Sempre retornar um tenant válido
@@ -185,6 +215,11 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         if (event === 'SIGNED_IN' && session?.user) {
           setSession(session);
           setUser(session.user);
+          // ✅ CORREÇÃO: Carregar tenant após login
+          console.log('👤 Usuário logado, carregando tenant...');
+          const tenantData = await loadRealTenant(session.user.id);
+          console.log('🏢 Tenant carregado após login:', tenantData);
+          setTenant(tenantData);
           setLoading(false);
         } else if (event === 'SIGNED_OUT') {
           setSession(null);
@@ -311,7 +346,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         },
       },
       status: 'trial',
-      trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
   };
 

@@ -226,27 +226,38 @@ export default function ProdutosPage() {
   useEffect(() => {
     console.log(`🔄 useEffect carregar produtos - tenant atual:`, tenant?.id);
     
-    const loadWithRetry = async () => {
-      // Aguardar tenant estar disponível (máximo 2 segundos)
+    // Se não há tenant, não fazer nada ainda
+    if (!tenant?.id) {
+      console.log(`⏳ Nenhum tenant disponível, aguardando...`);
+      return;
+    }
+    
+    // Se há tenant, carregar produtos
+    console.log(`📦 Carregando produtos para tenant: ${tenant.id}`);
+    loadProducts();
+  }, [tenant?.id]);
+
+  // ✅ Aguardar tenant estar carregado e então carregar produtos
+  useEffect(() => {
+    const waitForTenant = async () => {
+      // Aguardar até 5 segundos pelo tenant
       let attempts = 0;
-      while (!tenant?.id && attempts < 20) {
+      while (!tenant?.id && attempts < 50) {
         await new Promise(resolve => setTimeout(resolve, 100));
         attempts++;
       }
       
-      if (!tenant?.id) {
-        console.log(`⚠️ Nenhum tenant disponível após 2 segundos, limpando produtos`);
+      if (tenant?.id) {
+        console.log(`✅ Tenant carregado, carregando produtos: ${tenant.id}`);
+        loadProducts();
+      } else {
+        console.log(`⚠️ Timeout aguardando tenant`);
         setLoading(false);
-        setProducts([]);
-        return;
       }
-      
-      console.log(`📦 Carregando produtos para tenant: ${tenant.id}`);
-      loadProducts();
     };
     
-    loadWithRetry();
-  }, [tenant?.id]);
+    waitForTenant();
+  }, []); // Executar apenas uma vez na montagem
 
   const loadProducts = async (overrideTenantId?: string) => {
     try {
@@ -567,12 +578,66 @@ export default function ProdutosPage() {
       .trim();
   };
 
+  // ✅ Função para converter preços do formato brasileiro
+  const parseBrazilianPrice = (value: string | number): number => {
+    if (!value) return 0;
+    
+    const str = value.toString().trim();
+    if (!str || str === '0') return 0;
+    
+    // Remover caracteres não numéricos exceto vírgula e ponto
+    const clean = str.replace(/[^\d.,]/g, '');
+    
+    // Se tem vírgula, tratar como separador decimal brasileiro
+    if (clean.includes(',')) {
+      // Se tem ponto também, ponto é milhares e vírgula é decimal
+      if (clean.includes('.')) {
+        const parts = clean.split(',');
+        const integerPart = parts[0].replace(/\./g, '');
+        const decimalPart = parts[1] || '00';
+        return parseFloat(`${integerPart}.${decimalPart}`);
+      } else {
+        // Só vírgula, tratar como decimal
+        return parseFloat(clean.replace(',', '.'));
+      }
+    } else {
+      // Só números, tratar como inteiro
+      return parseFloat(clean);
+    }
+  };
+
   const handleRegisterSelected = async (selected: any[]) => {
     try {
       setIsRegistering(true);
       let success = 0;
       let fail = 0;
       const errors: string[] = [];
+
+      // ✅ DEBUG: Verificar tenant antes de processar
+      console.log('🔍 DEBUG - Tenant atual:', tenant);
+      console.log('🔍 DEBUG - Tenant ID:', tenant?.id);
+      
+      if (!tenant?.id) {
+        console.error('❌ Tenant não disponível para importação');
+        console.log('🔄 Tentando recarregar tenant...');
+        
+        // Tentar recarregar o tenant
+        try {
+          await refreshTenant();
+          console.log('🔄 Tenant após refresh:', tenant);
+          
+          if (!tenant?.id) {
+            toast.error('Erro: Tenant não disponível. Recarregue a página.');
+            setIsRegistering(false);
+            return;
+          }
+        } catch (error) {
+          console.error('❌ Erro ao recarregar tenant:', error);
+          toast.error('Erro: Tenant não disponível. Recarregue a página.');
+          setIsRegistering(false);
+          return;
+        }
+      }
 
       for (const row of selected) {
         const obj: Record<string, any> = Array.isArray(row)
@@ -598,25 +663,34 @@ export default function ProdutosPage() {
           description: (obj['descricao'] || obj['descrição'] || '').toString().trim() || null,
           category: (obj['categoria'] || '').toString().trim() || null,
           brand: (obj['marca'] || '').toString().trim() || null,
-          cost_price: parseFloat((obj['valor de custo'] || obj['custo'] || obj['preco de custo'] || '0').toString().replace(/[^\d.,]/g, '').replace(',', '.')) || 0,
-          sale_price: parseFloat((obj['valor de venda'] || obj['preco'] || obj['preco de venda'] || '0').toString().replace(/[^\d.,]/g, '').replace(',', '.')) || 0,
-          stock_quantity: parseInt((obj['quantidade'] || obj['estoque'] || '0').toString(), 10) || 0,
-          barcode: (obj['codigo de barras'] || obj['barcode'] || '').toString().trim() || null,
+          cost_price: parseBrazilianPrice(obj['valor de custo'] || obj['custo'] || obj['preco de custo'] || '0'),
+          sale_price: parseBrazilianPrice(obj['valor de venda'] || obj['preco'] || obj['preco de venda'] || '0'),
+          stock_quantity: parseInt((obj['estoque'] || obj['quantidade'] || '0').toString(), 10) || 0,
+          barcode: (obj['codigo de barra'] || obj['codigo de barras'] || obj['barcode'] || '').toString().trim() || null,
           ncm: (obj['ncm'] || '').toString().trim() || null,
           unit: (obj['unidade'] || obj['und'] || 'UN').toString().trim().toUpperCase() || 'UN',
           imported_at: new Date().toISOString(),
         };
 
-        if (!productData.sku || !productData.name) {
+        if (!productData.sku || !productData.name || productData.sale_price <= 0) {
           fail++;
-          errors.push('Produto com código ou nome vazio, pulado.');
+          errors.push(`Produto com dados inválidos (SKU: ${productData.sku}, Nome: ${productData.name}, Preço: ${productData.sale_price}), pulado.`);
           continue;
         }
+
+        // ✅ DEBUG: Log dos dados antes do envio
+        const requestData = { tenant_id: tenant?.id, ...productData };
+        console.log('📤 Enviando dados do produto:', {
+          tenant_id: requestData.tenant_id,
+          name: requestData.name,
+          sale_price: requestData.sale_price,
+          sku: requestData.sku
+        });
 
         const response = await fetch('/next_api/products', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tenant_id: tenant?.id, ...productData }),
+          body: JSON.stringify(requestData),
         });
 
         if (response.ok) {

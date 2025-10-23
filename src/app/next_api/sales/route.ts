@@ -27,6 +27,13 @@ async function createSaleHandler(request: NextRequest) {
       user_id: user_id 
     });
 
+    // ✅ DEBUG: Log detalhado do tenant_id
+    console.log('🔍 DEBUG - Tenant ID recebido:', tenant_id);
+    console.log('🔍 DEBUG - Tipo do tenant_id:', typeof tenant_id);
+    console.log('🔍 DEBUG - Tenant_id é string vazia?', tenant_id === '');
+    console.log('🔍 DEBUG - Tenant_id é null?', tenant_id === null);
+    console.log('🔍 DEBUG - Tenant_id é undefined?', tenant_id === undefined);
+
     if (!products || !finalTotal) {
       return NextResponse.json(
         { error: 'Produtos e total são obrigatórios' },
@@ -39,6 +46,60 @@ async function createSaleHandler(request: NextRequest) {
         { error: 'Tenant ID é obrigatório' },
         { status: 400 }
       );
+    }
+
+    // ✅ Verificar se o tenant existe na base de dados
+    const { data: tenantExists, error: tenantError } = await supabaseAdmin
+      .from('tenants')
+      .select('id')
+      .eq('id', tenant_id)
+      .single();
+
+    if (tenantError || !tenantExists) {
+      console.error('❌ Tenant não encontrado:', tenant_id, tenantError);
+      
+      // ✅ Tentar criar o tenant se não existir
+      console.log('🔄 Tentando criar tenant:', tenant_id);
+      
+      try {
+        const { data: newTenant, error: createError } = await supabaseAdmin
+          .from('tenants')
+          .insert({
+            id: tenant_id,
+            name: 'Minha Empresa',
+            slug: `tenant-${tenant_id.slice(0, 8)}`,
+            status: 'trial',
+            email: null,
+            phone: null,
+            document: null,
+            address: null,
+            city: null,
+            state: null,
+            zip_code: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select('id')
+          .single();
+
+        if (createError) {
+          console.error('❌ Erro ao criar tenant:', createError);
+          return NextResponse.json(
+            { error: 'Erro ao criar tenant: ' + createError.message },
+            { status: 400 }
+          );
+        }
+
+        console.log('✅ Tenant criado com sucesso:', newTenant.id);
+      } catch (error) {
+        console.error('❌ Erro ao criar tenant:', error);
+        return NextResponse.json(
+          { error: 'Erro ao criar tenant: ' + (error instanceof Error ? error.message : String(error)) },
+          { status: 400 }
+        );
+      }
+    } else {
+      console.log('✅ Tenant validado:', tenantExists.id);
     }
 
     // Gerar número da venda (versão simplificada)
@@ -87,6 +148,7 @@ async function createSaleHandler(request: NextRequest) {
       
       return {
         sale_id: sale.id,
+        tenant_id: tenant_id, // ✅ REATIVADO - coluna agora existe na tabela
         user_id: user_id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
         product_id: product.id,
         product_name: product.name,
@@ -99,12 +161,26 @@ async function createSaleHandler(request: NextRequest) {
       };
     });
 
+    // ✅ DEBUG: Log dos itens antes da inserção
+    console.log('📦 Itens da venda a serem inseridos:', saleItems.length);
+    console.log('📦 Primeiro item:', saleItems[0]);
+    console.log('📦 Tenant ID nos itens:', saleItems[0]?.tenant_id);
+    console.log('📦 Sale ID nos itens:', saleItems[0]?.sale_id);
+
+    // ✅ Usar service role que tem bypass de RLS
     const { error: itemsError } = await supabaseAdmin
       .from('sale_items')
       .insert(saleItems);
 
     if (itemsError) {
-      console.error('Erro ao criar itens da venda:', itemsError);
+      console.error('❌ Erro ao criar itens da venda:', itemsError);
+      console.error('❌ Detalhes do erro:', {
+        message: itemsError.message,
+        details: itemsError.details,
+        hint: itemsError.hint,
+        code: itemsError.code
+      });
+      
       // Tentar deletar a venda criada
       await supabaseAdmin.from('sales').delete().eq('id', sale.id);
       return NextResponse.json(
@@ -112,6 +188,8 @@ async function createSaleHandler(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    console.log('✅ Itens da venda criados com sucesso');
 
     return NextResponse.json({ success: true, data: sale });
 

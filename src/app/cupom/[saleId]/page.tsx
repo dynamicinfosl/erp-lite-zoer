@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useCouponSettings } from '@/hooks/useCouponSettings';
 
 interface SaleData {
   id: string;
@@ -38,6 +39,9 @@ export default function ReceiptPage() {
   const [saleData, setSaleData] = useState<SaleData | null>(null);
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Hook para configurações do cupom
+  const { settings: couponSettings } = useCouponSettings();
 
   useEffect(() => {
     const fetchSaleData = async () => {
@@ -189,7 +193,7 @@ export default function ReceiptPage() {
           body {
             margin: 0;
             padding: 0;
-            font-size: 9px;
+            font-size: ${couponSettings.fontSize}px;
             line-height: 1.2;
           }
           
@@ -199,7 +203,7 @@ export default function ReceiptPage() {
             margin: 0 auto !important;
             padding: 3mm !important;
             font-family: 'Courier New', monospace !important;
-            font-size: 9px !important;
+            font-size: ${couponSettings.fontSize}px !important;
             line-height: 1.2 !important;
           }
           
@@ -210,7 +214,7 @@ export default function ReceiptPage() {
           table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 8px;
+            font-size: ${couponSettings.fontSize - 2}px;
           }
           
           th, td {
@@ -244,7 +248,7 @@ export default function ReceiptPage() {
           
           .info-item {
             padding: 1px 0;
-            font-size: 8px;
+            font-size: ${couponSettings.fontSize - 2}px;
           }
           
           .signature-line {
@@ -256,7 +260,7 @@ export default function ReceiptPage() {
           
           .footer-note {
             text-align: center;
-            font-size: 7px;
+            font-size: ${couponSettings.fontSize - 3}px;
             margin-top: 10px;
             padding-top: 5px;
             border-top: 1px dashed #333;
@@ -277,7 +281,7 @@ export default function ReceiptPage() {
             border: 1px solid #ddd;
             box-shadow: 0 4px 20px rgba(0,0,0,0.15);
             font-family: 'Courier New', monospace;
-            font-size: 10px;
+            font-size: ${couponSettings.fontSize}px;
             line-height: 1.3;
             background: white;
           }
@@ -286,7 +290,7 @@ export default function ReceiptPage() {
             width: 100%;
             border-collapse: collapse;
             margin: 5px 0;
-            font-size: 9px;
+            font-size: ${couponSettings.fontSize - 1}px;
           }
           
           th, td {
@@ -357,59 +361,66 @@ export default function ReceiptPage() {
 
       {/* Cupom */}
       <div className="receipt-container">
-        {/* Cabeçalho da Empresa */}
+        {/* Cabeçalho da Empresa - Usando configurações personalizáveis */}
         <div className="company-header">
-          <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '3px' }}>
-            {companyData.name.toUpperCase()}
+          <div style={{ fontSize: `${couponSettings.fontSize + 2}px`, fontWeight: 'bold', marginBottom: '3px' }}>
+            {couponSettings.companyName.toUpperCase()}
           </div>
-          {companyData.document && (
-            <div style={{ fontSize: '8px' }}>
-              CNPJ/CPF: {companyData.document}
+          {couponSettings.showAddress && (
+            <div style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
+              {couponSettings.companyAddress}
             </div>
           )}
-          {companyData.address && (
-            <div style={{ fontSize: '8px' }}>
-              {companyData.address}
+          {couponSettings.showAddress && (
+            <div style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
+              {couponSettings.companyCity}
             </div>
           )}
-          {(companyData.zipcode || companyData.city || companyData.state) && (
-            <div style={{ fontSize: '8px' }}>
-              {companyData.zipcode && `${companyData.zipcode} - `}
-              {companyData.city && companyData.city}
-              {companyData.state && ` - ${companyData.state}`}
+          {couponSettings.showPhone && (
+            <div style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
+              Tel: {couponSettings.companyPhone}
             </div>
           )}
-          {companyData.phone && (
-            <div style={{ fontSize: '8px' }}>
-              Tel: {companyData.phone}
-            </div>
-          )}
-          {companyData.seller_name && (
-            <div style={{ fontSize: '8px', marginTop: '3px' }}>
-              <strong>Vendedor:</strong> {companyData.seller_name}
+          {couponSettings.showEmail && (
+            <div style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
+              {couponSettings.companyEmail}
             </div>
           )}
         </div>
 
         {/* Número do Pedido */}
-        <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '8px 0', padding: '4px', borderTop: '1px dashed #333', borderBottom: '1px dashed #333' }}>
+        <div style={{ textAlign: 'center', fontSize: `${couponSettings.fontSize}px`, fontWeight: 'bold', margin: '8px 0', padding: '4px', borderTop: '1px dashed #333', borderBottom: '1px dashed #333' }}>
           PEDIDO Nº {saleData.sale_number}
         </div>
 
         {/* Informações do Pedido */}
-        <div style={{ fontSize: '8px', marginBottom: '8px' }}>
-          <div className="info-item">
-            <strong>Data:</strong> {formatDate(saleData.created_at)}
-          </div>
-          <div className="info-item">
-            <strong>Cliente:</strong> {saleData.customer_name}
-          </div>
+        <div style={{ fontSize: `${couponSettings.fontSize - 2}px`, marginBottom: '8px' }}>
+          {couponSettings.showDate && (
+            <div className="info-item">
+              <strong>Data:</strong> {formatDate(saleData.created_at)}
+            </div>
+          )}
+          {couponSettings.showTime && (
+            <div className="info-item">
+              <strong>Horário:</strong> {new Date(saleData.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          )}
+          {couponSettings.showCustomer && saleData.customer_name && (
+            <div className="info-item">
+              <strong>Cliente:</strong> {saleData.customer_name}
+            </div>
+          )}
+          {couponSettings.showCashier && companyData?.seller_name && (
+            <div className="info-item">
+              <strong>Caixa:</strong> {companyData.seller_name}
+            </div>
+          )}
         </div>
 
         {/* Detalhes da Venda */}
         <div className="section-title">DETALHES DA VENDA</div>
         
-        <table>
+        <table style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
           <thead>
             <tr>
               <th style={{ width: '50%' }}>NOME</th>
@@ -437,7 +448,7 @@ export default function ReceiptPage() {
         <div className="dashed-line"></div>
 
         {/* Total do Pedido */}
-        <div style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '10px', padding: '5px 0' }}>
+        <div style={{ textAlign: 'right', fontWeight: 'bold', fontSize: `${couponSettings.fontSize}px`, padding: '5px 0' }}>
           Total do pedido: R$ {saleData.total_amount.toFixed(2)}
         </div>
 
@@ -446,7 +457,7 @@ export default function ReceiptPage() {
         {/* Pagamento */}
         <div className="section-title">PAGAMENTO</div>
         
-        <table>
+        <table style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
           <tbody>
             <tr>
               <td style={{ width: '50%' }}>
@@ -462,20 +473,20 @@ export default function ReceiptPage() {
         <div className="dashed-line"></div>
 
         {/* Aviso Fiscal */}
-        <div style={{ textAlign: 'center', fontSize: '8px', fontWeight: 'bold', margin: '8px 0' }}>
+        <div style={{ textAlign: 'center', fontSize: `${couponSettings.fontSize - 3}px`, fontWeight: 'bold', margin: '8px 0' }}>
           *** Este cupom não é documento fiscal ***
         </div>
 
         <div className="dashed-line"></div>
 
         {/* Assinatura */}
-        <div className="signature-line">
+        <div className="signature-line" style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
           Assinatura do cliente
         </div>
 
         {/* Rodapé */}
-        <div className="footer-note">
-          <div>Software ERP Lite ZOER</div>
+        <div className="footer-note" style={{ fontSize: `${couponSettings.fontSize - 3}px` }}>
+          <div>{couponSettings.footerText || 'Software ERP Lite ZOER'}</div>
         </div>
       </div>
     </div>

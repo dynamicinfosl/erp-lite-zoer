@@ -88,6 +88,7 @@ const menuGroups = [
       { title: 'Perfil da Empresa', url: '/perfil-empresa', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Perfil do Usuário', url: '/perfil-usuario', icon: UserCog, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Assinatura', url: '/assinatura', icon: CreditCard, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Configurações', url: '/configuracoes', icon: Settings, roles: ['admin', 'vendedor', 'financeiro'] },
       // Botão Administração oculto - acesso restrito apenas para usuário "julga"
       // { title: 'Administração', url: '/admin', icon: Shield, roles: ['admin'] },
     ],

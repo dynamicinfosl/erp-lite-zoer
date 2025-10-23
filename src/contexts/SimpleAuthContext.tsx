@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr';
 import { User, Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { SubscriptionData } from '@/hooks/usePlanLimits';
@@ -37,7 +37,10 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   
   const router = useRouter();
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   // Função SUPER SIMPLES - Cria tenant local sem depender do banco
   const createDefaultTenant = (userEmail: string) => {
@@ -49,12 +52,16 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     };
   };
 
-  // Função SUPER SIMPLES - Cria subscription padrão
-  const createDefaultSubscription = () => {
+  // Função SUPER SIMPLES - Cria subscription padrão baseada na data de criação do usuário
+  const createDefaultSubscription = (userCreatedAt?: string) => {
+    // Se não temos a data de criação, usar data atual (fallback)
+    const baseDate = userCreatedAt ? new Date(userCreatedAt) : new Date();
+    const trialEndsAt = new Date(baseDate.getTime() + 14 * 24 * 60 * 60 * 1000);
+    
     return {
       id: 'trial-default',
       status: 'trial',
-      trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      trial_ends_at: trialEndsAt.toISOString(),
       plan: {
         id: 'trial-plan',
         name: 'Trial Gratuito',
@@ -141,6 +148,25 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       }
     }, 3000); // 3 segundos máximo absoluto
 
+    // Listener para mudanças de autenticação
+    const { data: { subscription: authListener1 } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('🔄 Auth state changed:', event, !!session);
+        
+        if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+          if (mounted) {
+            setSession(session);
+            setUser(session?.user ?? null);
+            
+            if (event === 'SIGNED_OUT') {
+              setTenant(null);
+              setSubscription(null);
+            }
+          }
+        }
+      }
+    );
+
     const initAuth = async () => {
       try {
         console.log('🔄 Iniciando autenticação...');
@@ -149,6 +175,31 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         
         if (error) {
           console.error('❌ Erro ao buscar sessão:', error);
+          
+          // Se for erro de refresh token, limpar sessão e redirecionar para login
+          if (error.message?.includes('Invalid Refresh Token') || 
+              error.message?.includes('Refresh Token Not Found')) {
+            console.log('🔄 Refresh token inválido, limpando sessão...');
+            
+            // Limpar sessão local
+            if (mounted) {
+              setSession(null);
+              setUser(null);
+              setTenant(null);
+              setSubscription(null);
+            }
+            
+            // Limpar cookies do Supabase
+            try {
+              await supabase.auth.signOut();
+            } catch (signOutError) {
+              console.log('⚠️ Erro ao fazer signOut:', signOutError);
+            }
+            
+            // Redirecionar para login
+            router.push('/login');
+          }
+          
           if (mounted) {
             setLoading(false);
           }
@@ -166,7 +217,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         if (session?.user && mounted) {
           console.log('👤 Usuário logado, buscando tenant real...');
           const realTenant = await loadRealTenant(session.user.id);
-          const defaultSubscription = createDefaultSubscription();
+          const defaultSubscription = createDefaultSubscription(session.user.created_at);
           
           setTenant(realTenant);
           setSubscription(defaultSubscription);
@@ -200,7 +251,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     initAuth();
 
     // Listener de mudanças - BUSCAR TENANT REAL
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription: authListener2 } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔄 Mudança de auth:', event, !!session);
       
       if (mounted) {
@@ -245,7 +296,8 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       clearTimeout(loadingTimeout);
       clearTimeout(emergencyTimeout);
-      subscription.unsubscribe();
+      authListener1.unsubscribe();
+      authListener2.unsubscribe();
     };
   }, []);
 

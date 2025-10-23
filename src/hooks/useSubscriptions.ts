@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 
 interface Subscription {
@@ -34,7 +34,7 @@ export function useSubscriptions() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchSubscriptions = async () => {
+  const fetchSubscriptions = useCallback(async () => {
     if (!user?.id) return;
 
     try {
@@ -55,7 +55,7 @@ export function useSubscriptions() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   const createSubscription = async (data: CreateSubscriptionData) => {
     if (!user?.id) {
@@ -189,7 +189,7 @@ export function useSubscriptions() {
     if (user?.id) {
       fetchSubscriptions();
     }
-  }, [user?.id]);
+  }, [user?.id, fetchSubscriptions]);
 
   return {
     subscriptions,
