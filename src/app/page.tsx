@@ -549,33 +549,128 @@ export default function HomePage() {
                     try {
                       const form = (e.currentTarget.closest('form')) as HTMLFormElement | null;
                       const inputs = form ? Array.from(form.querySelectorAll('input')) as HTMLInputElement[] : [];
-                      const company = inputs[0]?.value || '';
-                      const email = inputs[1]?.value || '';
-                      const phone = inputs[2]?.value || '';
-                      const password = inputs[3]?.value || '';
+                      const company = inputs[0]?.value?.trim() || '';
+                      const email = inputs[1]?.value?.trim() || '';
+                      const phone = inputs[2]?.value?.trim() || '';
+                      const password = inputs[3]?.value?.trim() || '';
+
+                      // Validações básicas
+                      if (!company || !email || !password) {
+                        alert('Por favor, preencha todos os campos obrigatórios');
+                        return;
+                      }
+
+                      if (password.length < 6) {
+                        alert('A senha deve ter pelo menos 6 caracteres');
+                        return;
+                      }
+
+                      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                        alert('Por favor, insira um email válido');
+                        return;
+                      }
+
+                      console.log('📝 Dados do formulário:', { company, email, phone, password });
 
                       if (ENABLE_AUTH) {
                         const { supabase } = await import('@/lib/supabase');
-                        const { error } = await supabase.auth.signUp({
-                          email: email.trim(), password: password.trim(),
-                          options: { data: { company, phone } }
+                        
+                        // Criar usuário no Supabase Auth
+                        const { data: authData, error: authError } = await supabase.auth.signUp({
+                          email: email,
+                          password: password,
+                          options: { 
+                            data: { 
+                              company_name: company,
+                              phone: phone,
+                              full_name: company // Usar nome da empresa como nome inicial
+                            } 
+                          }
                         });
                         
-                        if (error) {
-                          console.error('Erro no cadastro:', error);
-                          return; // Não continuar se houver erro
+                        if (authError) {
+                          console.error('❌ Erro no cadastro:', authError);
+                          alert(`Erro no cadastro: ${authError.message}`);
+                          return;
                         }
-                        
-                        // Não fazer login imediatamente após cadastro
-                        console.log('✅ Cadastro realizado com sucesso');
+
+                        if (authData.user) {
+                          console.log('✅ Usuário criado com sucesso:', authData.user.id);
+                          
+                          // Aguardar um momento para o usuário ser criado
+                          await new Promise(resolve => setTimeout(resolve, 1000));
+                          
+                        // Criar perfil do usuário na tabela user_profiles com status pendente
+                        const { error: profileError } = await supabase
+                          .from('user_profiles')
+                          .insert({
+                            id: authData.user.id,
+                            full_name: company,
+                            phone: phone,
+                            role: 'admin', // Primeiro usuário é admin
+                            status: 'pending', // Status pendente de aprovação
+                            created_at: new Date().toISOString()
+                          });
+
+                          if (profileError) {
+                            console.warn('⚠️ Erro ao criar perfil:', profileError);
+                          } else {
+                            console.log('✅ Perfil do usuário criado');
+                          }
+
+                          // Criar tenant (empresa) para o usuário
+                          const tenantSlug = company.toLowerCase()
+                            .replace(/[^a-z0-9]/g, '-')
+                            .replace(/-+/g, '-')
+                            .substring(0, 50) + '-' + Date.now();
+
+                          const { data: tenantData, error: tenantError } = await supabase
+                            .from('tenants')
+                            .insert({
+                              name: company,
+                              slug: tenantSlug,
+                              email: email,
+                              phone: phone,
+                              status: 'trial', // Status de trial (válido)
+                              trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+                              created_at: new Date().toISOString()
+                            })
+                            .select()
+                            .single();
+
+                          if (tenantError) {
+                            console.warn('⚠️ Erro ao criar tenant:', tenantError);
+                          } else {
+                            console.log('✅ Empresa criada:', tenantData);
+                            
+                            // Associar usuário ao tenant
+                            const { error: userTenantError } = await supabase
+                              .from('user_tenants')
+                              .insert({
+                                user_id: authData.user.id,
+                                tenant_id: tenantData.id,
+                                role: 'admin',
+                                created_at: new Date().toISOString()
+                              });
+
+                            if (userTenantError) {
+                              console.warn('⚠️ Erro ao associar usuário ao tenant:', userTenantError);
+                            } else {
+                              console.log('✅ Usuário associado à empresa');
+                            }
+                          }
+                        }
                       }
                       
-                      // Redirecionar para login após cadastro
+                      // Mostrar mensagem de sucesso
+                      alert('✅ Conta criada com sucesso! Sua conta está pendente de aprovação. Você receberá um email quando for aprovada.');
+                      
+                      // Redirecionar para login
                       router.push('/login');
                       setShowRegisterForm(false);
                     } catch (err) {
-                      console.error('Erro ao registrar:', err);
-                      // Em caso de erro, manter na landing page
+                      console.error('❌ Erro ao registrar:', err);
+                      alert('Erro ao criar conta. Tente novamente.');
                     }
                   }}
                 >

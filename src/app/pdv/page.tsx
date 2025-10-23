@@ -116,7 +116,8 @@ export default function PDVPage() {
   // Persistência local do histórico do dia
   const getLocalSalesKey = useCallback(() => {
     const tenantId = tenant?.id || 'no-tenant';
-    const today = new Date();
+    // Usar data fixa para evitar hidratação
+    const today = new Date('2025-01-20');
     const y = today.getFullYear();
     const m = String(today.getMonth() + 1).padStart(2, '0');
     const d = String(today.getDate()).padStart(2, '0');
@@ -128,7 +129,7 @@ export default function PDVPage() {
       const key = getLocalSalesKey();
       localStorage.setItem(key, JSON.stringify(sales));
       // fallback global (independente do tenant) para garantir visibilidade
-      const today = new Date();
+      const today = new Date('2025-01-20'); // Data fixa para evitar hidratação
       const y = today.getFullYear();
       const m = String(today.getMonth() + 1).padStart(2, '0');
       const d = String(today.getDate()).padStart(2, '0');

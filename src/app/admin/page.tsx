@@ -58,7 +58,7 @@ export default function AdminPage() {
         totalSales: 89,
         totalProducts: 234,
         systemHealth: 'healthy',
-        lastBackup: new Date().toISOString(),
+        lastBackup: '2025-01-20T10:00:00.000Z', // Data fixa para evitar hidratação
         totalBeverages: 45,
         lowStockAlerts: 12,
         expiringProducts: 8,
@@ -77,7 +77,7 @@ export default function AdminPage() {
         totalSales: 0,
         totalProducts: 0,
         systemHealth: 'unknown',
-        lastBackup: new Date().toISOString(),
+        lastBackup: '2025-01-20T10:00:00.000Z', // Data fixa para evitar hidratação
         totalBeverages: 0,
         lowStockAlerts: 0,
         expiringProducts: 0,
