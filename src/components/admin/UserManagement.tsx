@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -59,48 +59,7 @@ export function UserManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  useEffect(() => {
-    let filtered = users.filter(user =>
-      user.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.tenant_name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    // Aplicar filtro por status se ativo
-    if (activeFilter) {
-      if (activeFilter === 'pending') {
-        filtered = filtered.filter(user => user.approval_status === 'pending');
-      } else if (activeFilter === 'active') {
-        filtered = filtered.filter(user => user.tenant_status === 'active');
-      } else if (activeFilter === 'trial') {
-        filtered = filtered.filter(user => user.tenant_status === 'trial');
-      } else if (activeFilter === 'suspended') {
-        filtered = filtered.filter(user => user.tenant_status === 'suspended');
-      }
-    }
-
-    setFilteredUsers(filtered);
-  }, [searchTerm, users, activeFilter]);
-
-  const handleCardClick = (filterType: string) => {
-    if (activeFilter === filterType) {
-      // Se já está ativo, desativar filtro
-      setActiveFilter(null);
-    } else {
-      // Ativar novo filtro
-      setActiveFilter(filterType);
-    }
-  };
-
-  const clearFilters = () => {
-    setActiveFilter(null);
-    setSearchTerm('');
-  };
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
       console.log('🔍 Carregando usuários do Supabase...');
@@ -203,7 +162,49 @@ export function UserManagement() {
     } finally {
       setLoading(false);
     }
+  }, [supabase]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
+  useEffect(() => {
+    let filtered = users.filter(user =>
+      user.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.tenant_name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Aplicar filtro por status se ativo
+    if (activeFilter) {
+      if (activeFilter === 'pending') {
+        filtered = filtered.filter(user => (user.approval_status || 'pending') === 'pending');
+      } else if (activeFilter === 'active') {
+        filtered = filtered.filter(user => user.tenant_status === 'active');
+      } else if (activeFilter === 'trial') {
+        filtered = filtered.filter(user => user.tenant_status === 'trial');
+      } else if (activeFilter === 'suspended') {
+        filtered = filtered.filter(user => user.tenant_status === 'suspended');
+      }
+    }
+
+    setFilteredUsers(filtered);
+  }, [searchTerm, users, activeFilter]);
+
+  const handleCardClick = (filterType: string) => {
+    if (activeFilter === filterType) {
+      // Se já está ativo, desativar filtro
+      setActiveFilter(null);
+    } else {
+      // Ativar novo filtro
+      setActiveFilter(filterType);
+    }
   };
+
+  const clearFilters = () => {
+    setActiveFilter(null);
+    setSearchTerm('');
+  };
+
 
   const deleteUser = async (user: TenantUser) => {
     try {
@@ -566,7 +567,7 @@ export function UserManagement() {
                       </TableCell>
                       <TableCell className="py-2">{getRoleBadge(user.role)}</TableCell>
                       <TableCell className="py-2">{getStatusBadge(user.tenant_status)}</TableCell>
-                      <TableCell className="py-2">{getApprovalStatusBadge(user.approval_status)}</TableCell>
+                      <TableCell className="py-2">{getApprovalStatusBadge(user.approval_status || 'pending')}</TableCell>
                       <TableCell className="py-2 hidden md:table-cell">
                         <div className="flex items-center gap-2 text-sm text-gray-300">
                           <Calendar className="h-4 w-4" />

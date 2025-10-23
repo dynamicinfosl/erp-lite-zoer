@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
@@ -131,6 +131,38 @@ export default function JugaDashboard() {
     rose: '#f43f5e'
   };
 
+  // Gerar atividades recentes
+  const generateRecentActivity = useCallback((sales: any[], customers: any[], products: any[]) => {
+    const activities: RecentActivity[] = [];
+    
+    // Adicionar vendas recentes
+    sales.slice(0, 3).forEach(sale => {
+      activities.push({
+        id: `sale-${sale.id}`,
+        type: 'sale',
+        title: 'Nova venda realizada',
+        description: `Pedido #${sale.sale_number || 'N/A'} - R$ ${parseFloat(sale.total_amount || 0).toFixed(2)}`,
+        time: formatTimeAgo(sale.created_at),
+        amount: parseFloat(sale.total_amount || 0),
+        status: 'success'
+      });
+    });
+
+    // Adicionar clientes recentes
+    customers.slice(0, 2).forEach(customer => {
+      activities.push({
+        id: `customer-${customer.id}`,
+        type: 'customer',
+        title: 'Novo cliente cadastrado',
+        description: `${customer.name} - ${customer.email}`,
+        time: formatTimeAgo(customer.created_at),
+        status: 'success'
+      });
+    });
+
+    return activities.slice(0, 5);
+  }, []);
+
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
@@ -260,7 +292,7 @@ export default function JugaDashboard() {
     };
 
     loadDashboardData();
-  }, [tenant?.id]);
+  }, [tenant?.id, generateRecentActivity, initialLoad, lastFetchTime]);
 
   // Gerar dados mensais
   const generateMonthlyData = (sales: any[]) => {
@@ -290,37 +322,6 @@ export default function JugaDashboard() {
     });
   };
 
-  // Gerar atividades recentes
-  const generateRecentActivity = (sales: any[], customers: any[], products: any[]) => {
-    const activities: RecentActivity[] = [];
-    
-    // Adicionar vendas recentes
-    sales.slice(0, 3).forEach(sale => {
-      activities.push({
-        id: `sale-${sale.id}`,
-        type: 'sale',
-        title: 'Nova venda realizada',
-        description: `Pedido #${sale.sale_number || 'N/A'} - R$ ${parseFloat(sale.total_amount || 0).toFixed(2)}`,
-        time: formatTimeAgo(sale.created_at),
-        amount: parseFloat(sale.total_amount || 0),
-        status: 'success'
-      });
-    });
-
-    // Adicionar clientes recentes
-    customers.slice(0, 2).forEach(customer => {
-      activities.push({
-        id: `customer-${customer.id}`,
-        type: 'customer',
-        title: 'Novo cliente cadastrado',
-        description: `${customer.name} - ${customer.email}`,
-        time: formatTimeAgo(customer.created_at),
-        status: 'success'
-      });
-    });
-
-    return activities.slice(0, 5);
-  };
 
 
   // Formatar tempo relativo

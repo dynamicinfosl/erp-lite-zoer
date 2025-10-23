@@ -53,7 +53,7 @@ export default function RelatoriosPage() {
     };
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       if (!tenant?.id) {
@@ -89,7 +89,7 @@ export default function RelatoriosPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenant?.id, dateRange]);
 
   useEffect(() => {
     console.log('🔄 useEffect disparado - tenant:', tenant?.id, 'dateRange:', dateRange);
@@ -99,7 +99,7 @@ export default function RelatoriosPage() {
     }
     console.log('📊 Carregando dados...');
     loadData();
-  }, [tenant?.id, dateRange]);
+  }, [tenant?.id, dateRange, loadData]);
 
   const formatCurrency = useCallback(
     (value: number) =>
@@ -182,7 +182,7 @@ export default function RelatoriosPage() {
     
     console.log('✅ Atualizando dateRange para:', newDateRange);
     setDateRange(newDateRange);
-  }, [dateRange]);
+  }, [dateRange, activeFilter]);
 
 
   const filteredSales = useMemo(
@@ -506,7 +506,7 @@ export default function RelatoriosPage() {
         color: 'warning' as const,
       },
     ],
-    [filteredDeliveries, formatCurrency, salesStats, products],
+    [filteredDeliveries, formatCurrency, salesStats, products, report],
   );
 
   if (loading) {

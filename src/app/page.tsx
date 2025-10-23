@@ -25,7 +25,8 @@ import {
   ChevronRight,
   Mail,
   Building2,
-  Phone
+  Phone,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -485,9 +486,10 @@ export default function HomePage() {
                 <Button 
                   variant="ghost" 
                   size="sm"
+                  className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full p-2"
                   onClick={() => setShowRegisterForm(false)}
                 >
-                  ✕
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
               <CardDescription className="text-gray-600">

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { User, Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
@@ -80,7 +80,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Função para buscar tenant real da conta logada
-  const loadRealTenant = async (userId: string) => {
+  const loadRealTenant = useCallback(async (userId: string) => {
     try {
       console.log('🔍 Buscando tenant real para usuário:', userId);
       
@@ -126,7 +126,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         status: 'trial',
       };
     }
-  };
+  }, [supabase]);
 
   // Carregar sessão inicial - BUSCAR TENANT REAL
   useEffect(() => {
@@ -299,7 +299,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       authListener1.unsubscribe();
       authListener2.unsubscribe();
     };
-  }, []);
+  }, [loadRealTenant, router, supabase.auth]);
 
   const signIn = async (email: string, password: string) => {
     try {

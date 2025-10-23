@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -64,22 +64,7 @@ export default function PerfilUsuarioPage() {
 
   const [originalFormData, setOriginalFormData] = useState(formData);
 
-  useEffect(() => {
-    if (authLoading) return;
-    loadUserData();
-  }, [user, authLoading]);
-
-  // Auto-esconder mensagem de sucesso após 5 segundos
-  useEffect(() => {
-    if (showSuccessMessage) {
-      const timer = setTimeout(() => {
-        setShowSuccessMessage(false);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [showSuccessMessage]);
-
-  const loadUserData = async () => {
+  const loadUserData = useCallback(async () => {
     if (!user) {
       setLoading(false);
       return;
@@ -108,7 +93,22 @@ export default function PerfilUsuarioPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    loadUserData();
+  }, [user, authLoading, loadUserData]);
+
+  // Auto-esconder mensagem de sucesso após 5 segundos
+  useEffect(() => {
+    if (showSuccessMessage) {
+      const timer = setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessMessage]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

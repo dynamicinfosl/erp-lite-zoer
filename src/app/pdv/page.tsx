@@ -288,7 +288,7 @@ export default function PDVPage() {
     };
 
     loadTodaySales();
-  }, [tenant?.id]);
+  }, [tenant?.id, loadTodaySalesLocal, saveTodaySalesLocal]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -318,7 +318,7 @@ export default function PDVPage() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, []); // Array vazio - função addSelectedToCart já é estável com useCallback
+  }, [addSelectedToCart]); // Incluir addSelectedToCart nas dependências
 
   const filteredProducts = useMemo(() => {
     if (loading) return [];
@@ -541,7 +541,7 @@ export default function PDVPage() {
       console.error('Erro ao finalizar venda:', error);
       toast.error(`Erro ao salvar venda: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
-  }, [total, customerName, paymentMethod, clearCart, cart, calculateItemTotal]);
+  }, [total, customerName, paymentMethod, cart, calculateItemTotal, saveTodaySalesLocal, tenant, user?.id]);
 
   // Funções para operações do PDV
   const handleSangria = useCallback(() => {
