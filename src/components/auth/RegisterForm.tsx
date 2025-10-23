@@ -67,10 +67,9 @@ export function RegisterForm({
             <p className="text-gray-600">Escolha o tipo de cadastro que melhor se adequa à sua empresa</p>
           </div>
         </CardHeader>
-
         <CardContent>
           <Tabs value={registrationType} onValueChange={(value) => setRegistrationType(value as 'simple' | 'complete')}>
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="complete" className="flex items-center gap-2">
                 <Building2 className="h-4 w-4" />
                 Cadastro Completo
@@ -89,14 +88,6 @@ export function RegisterForm({
             </TabsContent>
 
             <TabsContent value="simple" className="space-y-4">
-              <div className="text-center space-y-2">
-                <h3 className="text-lg font-semibold">Cadastro Rápido</h3>
-                <p className="text-sm text-gray-600">
-                  Apenas email, senha e nome da empresa. 
-                  Você pode completar os dados depois no perfil.
-                </p>
-              </div>
-
               <SimpleRegisterForm 
                 onSuccess={handleSimpleRegistration}
                 onSwitchToLogin={onSwitchToLogin}
@@ -140,6 +131,7 @@ function SimpleRegisterForm({
     e.preventDefault();
     
     if (formData.password !== formData.confirmPassword) {
+      alert('As senhas não coincidem');
       return;
     }
     
@@ -147,40 +139,40 @@ function SimpleRegisterForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <label htmlFor="email" className="text-sm font-medium">
-          E-mail *
-        </label>
-        <input
-          id="email"
-          type="email"
-          value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="seu@email.com"
-          required
-        />
-      </div>
+    <div className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            E-mail *
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="seu@email.com"
+            required
+          />
+        </div>
 
-      <div className="space-y-2">
-        <label htmlFor="companyName" className="text-sm font-medium">
-          Nome da Empresa *
-        </label>
-        <input
-          id="companyName"
-          type="text"
-          value={formData.companyName}
-          onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Minha Empresa"
-          required
-        />
-      </div>
+        <div>
+          <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-1">
+            Nome da Empresa *
+          </label>
+          <input
+            id="companyName"
+            type="text"
+            value={formData.companyName}
+            onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Minha Empresa Ltda"
+            required
+          />
+        </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label htmlFor="password" className="text-sm font-medium">
+        <div>
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
             Senha *
           </label>
           <input
@@ -191,11 +183,12 @@ function SimpleRegisterForm({
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Mínimo 6 caracteres"
             required
+            minLength={6}
           />
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="confirmPassword" className="text-sm font-medium">
+        <div>
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
             Confirmar Senha *
           </label>
           <input
@@ -208,22 +201,39 @@ function SimpleRegisterForm({
             required
           />
         </div>
-      </div>
 
-      <Button 
-        type="submit" 
-        disabled={isLoading}
-        className="w-full"
-      >
-        {isLoading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Criando conta...
-          </>
-        ) : (
-          'Criar Conta'
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+            {error}
+          </div>
         )}
-      </Button>
-    </form>
+
+        <Button 
+          type="submit" 
+          disabled={isLoading}
+          className="w-full"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Criando conta...
+            </>
+          ) : (
+            'Criar Conta Rápida'
+          )}
+        </Button>
+
+        <div className="text-center text-sm text-gray-600">
+          Já tem uma conta?{' '}
+          <button
+            type="button"
+            onClick={onSwitchToLogin}
+            className="text-blue-600 hover:underline font-medium"
+          >
+            Faça login
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
