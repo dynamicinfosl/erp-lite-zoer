@@ -216,8 +216,8 @@ export function UserManagement() {
       });
 
       // Excluir dados relacionados
-      const deletePromises = [];
-      const deleteOperations = [];
+      const deletePromises: any[] = [];
+      const deleteOperations: string[] = [];
 
       // Excluir user_profile se existir
       if (user.user_id && !user.user_id.startsWith('tenant-') && !user.user_id.startsWith('membership-')) {

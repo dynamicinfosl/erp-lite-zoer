@@ -478,10 +478,10 @@ export default function HomePage() {
       {/* Modal de Registro */}
       {showRegisterForm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md mx-auto shadow-2xl">
+          <Card className="w-full max-w-md mx-auto shadow-2xl bg-white">
             <CardHeader className="border-b">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-2xl">Criar Conta</CardTitle>
+                <CardTitle className="text-2xl text-gray-900">Criar Conta</CardTitle>
                 <Button 
                   variant="ghost" 
                   size="sm"
@@ -490,7 +490,7 @@ export default function HomePage() {
                   ✕
                 </Button>
               </div>
-              <CardDescription>
+              <CardDescription className="text-gray-600">
                 Comece seu teste grátis de 14 dias agora
               </CardDescription>
             </CardHeader>
@@ -498,45 +498,46 @@ export default function HomePage() {
             <CardContent className="pt-6">
               <form className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Nome da Empresa</label>
+                  <label className="text-sm font-medium text-gray-700">Nome da Empresa</label>
                   <div className="relative">
-                    <Building2 className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Building2 className="absolute left-3 top-3 h-4 w-4 text-gray-600" />
                     <Input 
                       placeholder="Minha Empresa Ltda" 
-                      className="pl-10"
+                      className="pl-10 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Email</label>
+                  <label className="text-sm font-medium text-gray-700">Email</label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-600" />
                     <Input 
                       type="email"
                       placeholder="seu@email.com" 
-                      className="pl-10"
+                      className="pl-10 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Telefone</label>
+                  <label className="text-sm font-medium text-gray-700">Telefone</label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-600" />
                     <Input 
                       type="tel"
                       placeholder="(00) 00000-0000" 
-                      className="pl-10"
+                      className="pl-10 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Senha</label>
+                  <label className="text-sm font-medium text-gray-700">Senha</label>
                   <Input 
                     type="password"
                     placeholder="Mínimo 6 caracteres"
+                    className="bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500"
                   />
                 </div>
 
@@ -678,7 +679,7 @@ export default function HomePage() {
                 </Button>
               </form>
 
-              <p className="text-xs text-gray-500 text-center mt-4">
+              <p className="text-xs text-gray-600 text-center mt-4">
                 Ao criar uma conta, você concorda com nossos{' '}
                 <Link href="#" className="text-blue-600 hover:underline">Termos de Uso</Link>
                 {' '}e{' '}
