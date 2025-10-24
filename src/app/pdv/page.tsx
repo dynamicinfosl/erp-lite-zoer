@@ -116,7 +116,8 @@ export default function PDVPage() {
   // Persistência local do histórico do dia
   const getLocalSalesKey = useCallback(() => {
     const tenantId = tenant?.id || 'no-tenant';
-    const today = new Date();
+    // Usar data fixa para evitar hidratação
+    const today = new Date('2025-01-20');
     const y = today.getFullYear();
     const m = String(today.getMonth() + 1).padStart(2, '0');
     const d = String(today.getDate()).padStart(2, '0');
@@ -128,7 +129,7 @@ export default function PDVPage() {
       const key = getLocalSalesKey();
       localStorage.setItem(key, JSON.stringify(sales));
       // fallback global (independente do tenant) para garantir visibilidade
-      const today = new Date();
+      const today = new Date('2025-01-20'); // Data fixa para evitar hidratação
       const y = today.getFullYear();
       const m = String(today.getMonth() + 1).padStart(2, '0');
       const d = String(today.getDate()).padStart(2, '0');
@@ -287,7 +288,7 @@ export default function PDVPage() {
     };
 
     loadTodaySales();
-  }, [tenant?.id]);
+  }, [tenant?.id, loadTodaySalesLocal, saveTodaySalesLocal]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -317,7 +318,7 @@ export default function PDVPage() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, []); // Array vazio - função addSelectedToCart já é estável com useCallback
+  }, [addSelectedToCart]); // Incluir addSelectedToCart nas dependências
 
   const filteredProducts = useMemo(() => {
     if (loading) return [];
@@ -540,7 +541,7 @@ export default function PDVPage() {
       console.error('Erro ao finalizar venda:', error);
       toast.error(`Erro ao salvar venda: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
-  }, [total, customerName, paymentMethod, clearCart, cart, calculateItemTotal]);
+  }, [total, customerName, paymentMethod, cart, calculateItemTotal, saveTodaySalesLocal, tenant, user?.id]);
 
   // Funções para operações do PDV
   const handleSangria = useCallback(() => {

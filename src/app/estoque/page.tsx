@@ -86,6 +86,7 @@ export default function EstoquePage() {
   });
 
   useEffect(() => {
+    // Mover verificação de window para dentro do useEffect
     const storedTenantId = typeof window !== 'undefined' ? localStorage.getItem('lastProductsTenantId') : null;
     const tenantId = tenant?.id || storedTenantId;
     if (tenantId) {

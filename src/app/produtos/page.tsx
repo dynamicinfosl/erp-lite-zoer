@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -222,44 +222,7 @@ export default function ProdutosPage() {
     };
   }, [skuValidationTimeout]);
 
-  // Carregar produtos quando houver tenant
-  useEffect(() => {
-    console.log(`🔄 useEffect carregar produtos - tenant atual:`, tenant?.id);
-    
-    // Se não há tenant, não fazer nada ainda
-    if (!tenant?.id) {
-      console.log(`⏳ Nenhum tenant disponível, aguardando...`);
-      return;
-    }
-    
-    // Se há tenant, carregar produtos
-    console.log(`📦 Carregando produtos para tenant: ${tenant.id}`);
-    loadProducts();
-  }, [tenant?.id]);
-
-  // ✅ Aguardar tenant estar carregado e então carregar produtos
-  useEffect(() => {
-    const waitForTenant = async () => {
-      // Aguardar até 5 segundos pelo tenant
-      let attempts = 0;
-      while (!tenant?.id && attempts < 50) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        attempts++;
-      }
-      
-      if (tenant?.id) {
-        console.log(`✅ Tenant carregado, carregando produtos: ${tenant.id}`);
-        loadProducts();
-      } else {
-        console.log(`⚠️ Timeout aguardando tenant`);
-        setLoading(false);
-      }
-    };
-    
-    waitForTenant();
-  }, []); // Executar apenas uma vez na montagem
-
-  const loadProducts = async (overrideTenantId?: string) => {
+  const loadProducts = useCallback(async (overrideTenantId?: string) => {
     try {
       setLoading(true);
       const currentTenantId = overrideTenantId || tenant?.id;
@@ -289,7 +252,44 @@ export default function ProdutosPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenant?.id]);
+
+  // Carregar produtos quando houver tenant
+  useEffect(() => {
+    console.log(`🔄 useEffect carregar produtos - tenant atual:`, tenant?.id);
+    
+    // Se não há tenant, não fazer nada ainda
+    if (!tenant?.id) {
+      console.log(`⏳ Nenhum tenant disponível, aguardando...`);
+      return;
+    }
+    
+    // Se há tenant, carregar produtos
+    console.log(`📦 Carregando produtos para tenant: ${tenant.id}`);
+    loadProducts();
+  }, [tenant?.id, loadProducts]);
+
+  // ✅ Aguardar tenant estar carregado e então carregar produtos
+  useEffect(() => {
+    const waitForTenant = async () => {
+      // Aguardar até 5 segundos pelo tenant
+      let attempts = 0;
+      while (!tenant?.id && attempts < 50) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+      
+      if (tenant?.id) {
+        console.log(`✅ Tenant carregado, carregando produtos: ${tenant.id}`);
+        loadProducts();
+      } else {
+        console.log(`⚠️ Timeout aguardando tenant`);
+        setLoading(false);
+      }
+    };
+    
+    waitForTenant();
+  }, [loadProducts, tenant?.id]); // Incluir dependências necessárias
 
   // Filtrar produtos
   const filteredProducts = products.filter(product => {

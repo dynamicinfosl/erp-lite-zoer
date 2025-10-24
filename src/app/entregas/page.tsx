@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +23,7 @@ export default function EntregasPage() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const loadDeliveries = async () => {
+  const loadDeliveries = useCallback(async () => {
     if (!tenant?.id) {
       setDeliveries([]);
       return;
@@ -46,16 +46,16 @@ export default function EntregasPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenant?.id]);
 
   useEffect(() => {
     loadDeliveries();
-  }, [tenant?.id]);
+  }, [tenant?.id, loadDeliveries]);
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'todos' | 'aguardando' | 'em_rota' | 'entregue' | 'cancelada'>('todos');
 
-  const safeDeliveries = Array.isArray(deliveries) ? deliveries : [];
+  const safeDeliveries = useMemo(() => Array.isArray(deliveries) ? deliveries : [], [deliveries]);
   const filtered = safeDeliveries.filter((d) => {
     const matchesSearch = `${d.id} ${d.customer_name} ${d.delivery_address}`.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'todos' ? true : d.status === statusFilter;
@@ -69,7 +69,7 @@ export default function EntregasPage() {
     const total = safeDeliveries.length;
     
     return { emRota, aguardando, entregues, total };
-  }, [deliveries]);
+  }, [safeDeliveries]);
 
   return (
     <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">

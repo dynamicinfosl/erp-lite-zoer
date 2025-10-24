@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { User } from '@supabase/supabase-js';
 
@@ -39,7 +39,7 @@ export function SimpleTenantProvider({ children, user }: { children: React.React
   const [loading, setLoading] = useState(true);
   const supabase = createClientComponentClient();
 
-  const loadTenant = async () => {
+  const loadTenant = useCallback(async () => {
     if (!user) {
       setTenant(null);
       setLoading(false);
@@ -83,7 +83,7 @@ export function SimpleTenantProvider({ children, user }: { children: React.React
       console.error('Erro ao carregar tenant:', error);
       setLoading(false);
     }
-  };
+  }, [user, supabase]);
 
   const refreshTenant = async () => {
     await loadTenant();
@@ -111,7 +111,7 @@ export function SimpleTenantProvider({ children, user }: { children: React.React
 
   useEffect(() => {
     loadTenant();
-  }, [user?.id]);
+  }, [user?.id, loadTenant]);
 
   return (
     <TenantContext.Provider value={{ tenant, loading, refreshTenant, updateTenant }}>

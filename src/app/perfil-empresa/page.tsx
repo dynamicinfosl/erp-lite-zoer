@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -114,22 +114,7 @@ export default function PerfilEmpresaPage() {
 
   const [originalFormData, setOriginalFormData] = useState(formData);
 
-  useEffect(() => {
-    if (authLoading) return;
-    loadTenantData();
-  }, [authTenant, authLoading]);
-
-  // Auto-esconder mensagem de sucesso após 5 segundos
-  useEffect(() => {
-    if (showSuccessMessage) {
-      const timer = setTimeout(() => {
-        setShowSuccessMessage(false);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [showSuccessMessage]);
-
-  const loadTenantData = async () => {
+  const loadTenantData = useCallback(async () => {
     if (!authTenant) {
       // Se não tem tenant, buscar ou criar um no banco
       try {
@@ -250,7 +235,7 @@ export default function PerfilEmpresaPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [authTenant, user?.id, user?.email]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -315,6 +300,21 @@ export default function PerfilEmpresaPage() {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (authLoading) return;
+    loadTenantData();
+  }, [authTenant, authLoading, loadTenantData]);
+
+  // Auto-esconder mensagem de sucesso após 5 segundos
+  useEffect(() => {
+    if (showSuccessMessage) {
+      const timer = setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessMessage]);
 
   if (authLoading || loading) {
     return (

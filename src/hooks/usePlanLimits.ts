@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 
 export interface PlanLimits {
@@ -79,7 +79,7 @@ export function usePlanLimits(): PlanLimitsHook {
     }
   };
 
-  const loadUsageData = async () => {
+  const loadUsageData = useCallback(async () => {
     if (!tenant?.id) {
       setLoading(false);
       setUsage({
@@ -110,12 +110,12 @@ export function usePlanLimits(): PlanLimitsHook {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenant?.id]);
 
   useEffect(() => {
     // Carregar dados de uso apenas se necessário
     loadUsageData();
-  }, [tenant?.id]);
+  }, [tenant?.id, loadUsageData]);
 
   // Verificar se trial expirou
   const isTrialExpired = Boolean(currentSubscription?.status === 'trial' && 

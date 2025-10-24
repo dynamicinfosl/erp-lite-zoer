@@ -38,6 +38,10 @@ export function AppLayout({ children }: AppLayoutProps) {
       '/cupom'  // Página de cupom sem sidebar (página pública de impressão)
     ];
     
+    // Páginas de admin NÃO devem usar o AppLayout (elas têm seu próprio layout)
+    if (pathname?.startsWith('/admin')) {
+      return true;
+    }
     
     // Landing page SEMPRE sem sidebar
     if (pathname === '/') {
@@ -54,7 +58,6 @@ export function AppLayout({ children }: AppLayoutProps) {
       return true;
     }
     
-    // A página /admin deve ter sidebar (removida da lista de páginas sem sidebar)
     return noSidebarPages.some((page) => pathname === page || pathname?.startsWith(page + '/'));
   }, [pathname, user]);
 

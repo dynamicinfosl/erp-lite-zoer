@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,15 +16,16 @@ import {
   Mail,
   Calendar,
   Building2,
-  Check,
-  X,
   Loader2,
   AlertTriangle,
   RefreshCw,
   Clock,
+  MousePointer,
+  Eye,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 
 interface TenantUser {
   user_id: string;
@@ -46,163 +47,237 @@ interface TenantUser {
 }
 
 export function UserManagement() {
-  const supabase = createClientComponentClient();
+  const supabase = createClient(
+    'https://lfxietcasaooenffdodr.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImV4cCI6MjA3MjU5Mzc0M30.NBHrAlv8RPxu1QhLta76Uoh6Bc_OnqhfVydy8_TX6GQ'
+  );
   const [users, setUsers] = useState<TenantUser[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<TenantUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<TenantUser | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState('');
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  useEffect(() => {
-    const filtered = users.filter(user =>
-      user.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.tenant_name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredUsers(filtered);
-  }, [searchTerm, users]);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
       console.log('🔍 Carregando usuários do Supabase...');
 
-      // Buscar todos os usuários com seus tenants
-      const { data, error } = await supabase
-        .from('user_memberships')
-        .select(`
-          user_id,
-          role,
-          is_active,
-          tenant:tenants (
-            id,
-            name,
-            status,
-            email,
-            phone,
-            document,
-            created_at
-          )
-        `);
+      // Buscar dados das tabelas relacionadas
+      const [profilesResult, tenantsResult, membershipsResult] = await Promise.all([
+        supabase.from('user_profiles').select('*'),
+        supabase.from('tenants').select('*'),
+        supabase.from('user_memberships').select('*').then(result => {
+          if (result.error) {
+            console.log('⚠️ Tabela user_memberships não existe ou sem permissão:', result.error.message);
+            return { data: [], error: null };
+          }
+          return result;
+        })
+      ]);
 
-      if (error) {
-        console.error('❌ Erro ao buscar usuários:', error);
+      const profiles = profilesResult.data || [];
+      const tenants = tenantsResult.data || [];
+      const memberships = membershipsResult.data || [];
+
+      console.log('📊 Total profiles:', profiles.length);
+      console.log('📊 Total tenants:', tenants.length);
+      console.log('📊 Total memberships:', memberships.length);
+
+      if (profilesResult.error) {
+        console.error('❌ Erro ao buscar profiles:', profilesResult.error);
         toast.error('Erro ao carregar usuários');
         return;
       }
 
-      console.log('📡 Dados recebidos:', data);
+      if (tenantsResult.error) {
+        console.error('❌ Erro ao buscar tenants:', tenantsResult.error);
+        toast.error('Erro ao carregar usuários');
+        return;
+      }
 
-      // Buscar emails dos usuários da tabela auth.users via RPC
-      const { data: authData, error: authError } = await supabase.rpc('get_all_system_users');
+      let mappedUsers: TenantUser[] = [];
 
-      console.log('📡 Dados auth:', authData, authError);
+      // Se temos memberships, usar eles como base
+      if (memberships.length > 0) {
+        console.log('🔄 Usando dados de user_memberships');
+        mappedUsers = memberships.map((membership: any, index: number) => {
+          const profile = profiles.find((p: any) => p.id === membership.user_id);
+          const tenant = tenants.find((t: any) => t.id === membership.tenant_id);
 
-      // Mapear dados
-      const mappedUsers: TenantUser[] = (data || []).map((item: any) => {
-        const authUser = authData?.find((au: any) => au.user_id === item.user_id);
-        
-        return {
-          user_id: item.user_id,
-          user_email: authUser?.email || 'Desconhecido',
-          user_created_at: authUser?.created_at || item.tenant?.created_at,
-          user_last_login: authUser?.last_sign_in_at || '-',
-          tenant_id: item.tenant?.id || '',
-          tenant_name: item.tenant?.name || 'Sem empresa',
-          tenant_status: item.tenant?.status || 'trial',
-          role: item.role,
-          is_active: item.is_active,
-          tenant_email: item.tenant?.email,
-          tenant_phone: item.tenant?.phone,
-          tenant_document: item.tenant?.document,
-        };
-      });
+          return {
+            user_id: membership.user_id || `membership-${index}-${Date.now()}`,
+            user_email: profile?.email || 'Desconhecido',
+            user_created_at: profile?.created_at || membership.created_at,
+            user_last_login: '-',
+            tenant_id: membership.tenant_id || '',
+            tenant_name: tenant?.name || 'Sem empresa',
+            tenant_status: tenant?.status || 'trial',
+            role: membership.role || 'admin',
+            is_active: membership.is_active !== false,
+            tenant_email: tenant?.email,
+            tenant_phone: tenant?.phone,
+            tenant_document: tenant?.document,
+            approval_status: profile?.status || 'pending',
+          };
+        });
+      } else {
+        // Fallback: usar apenas tenants se não há profiles
+        console.log('🔄 Usando fallback: apenas tenants');
+        mappedUsers = tenants.map((tenant: any, index: number) => ({
+          user_id: `tenant-${tenant.id}-${index}-${Date.now()}`, // Chave única garantida
+          user_email: tenant.email || 'Desconhecido',
+          user_created_at: tenant.created_at,
+          user_last_login: '-',
+          tenant_id: tenant.id,
+          tenant_name: tenant.name || 'Sem empresa',
+          tenant_status: tenant.status || 'trial',
+          role: 'admin', // Assumir admin por padrão
+          is_active: true,
+          tenant_email: tenant.email,
+          tenant_phone: tenant.phone,
+          tenant_document: tenant.document,
+          approval_status: 'pending', // Assumir pendente por padrão
+        }));
+      }
 
-      console.log('✅ Usuários mapeados:', mappedUsers);
-      setUsers(mappedUsers);
-      setFilteredUsers(mappedUsers);
+      // Garantir que não há duplicatas baseadas no user_id
+      const uniqueUsers = mappedUsers.reduce((acc: TenantUser[], current: TenantUser) => {
+        const exists = acc.find(user => user.user_id === current.user_id);
+        if (!exists) {
+          acc.push(current);
+        } else {
+          console.warn('⚠️ Usuário duplicado removido:', current.user_id);
+        }
+        return acc;
+      }, []);
+
+      console.log('✅ Usuários únicos mapeados:', uniqueUsers.length);
+      setUsers(uniqueUsers);
+      setFilteredUsers(uniqueUsers);
     } catch (error) {
       console.error('❌ Erro geral:', error);
       toast.error('Erro ao carregar usuários');
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
 
-  const toggleTenantStatus = async (user: TenantUser) => {
-    try {
-      const newStatus = user.tenant_status === 'active' ? 'suspended' : 'active';
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
-      const { error } = await supabase
-        .from('tenants')
-        .update({ status: newStatus })
-        .eq('id', user.tenant_id);
+  useEffect(() => {
+    let filtered = users.filter(user =>
+      user.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.tenant_name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
-      if (error) throw error;
+    // Aplicar filtro por status se ativo
+    if (activeFilter) {
+      if (activeFilter === 'pending') {
+        filtered = filtered.filter(user => (user.approval_status || 'pending') === 'pending');
+      } else if (activeFilter === 'active') {
+        filtered = filtered.filter(user => user.tenant_status === 'active');
+      } else if (activeFilter === 'trial') {
+        filtered = filtered.filter(user => user.tenant_status === 'trial');
+      } else if (activeFilter === 'suspended') {
+        filtered = filtered.filter(user => user.tenant_status === 'suspended');
+      }
+    }
 
-      toast.success(`Conta ${newStatus === 'active' ? 'ativada' : 'suspensa'} com sucesso!`);
-      await loadUsers();
-      setDialogOpen(false);
-    } catch (error) {
-      console.error('Erro:', error);
-      toast.error('Erro ao atualizar status');
+    setFilteredUsers(filtered);
+  }, [searchTerm, users, activeFilter]);
+
+  const handleCardClick = (filterType: string) => {
+    if (activeFilter === filterType) {
+      // Se já está ativo, desativar filtro
+      setActiveFilter(null);
+    } else {
+      // Ativar novo filtro
+      setActiveFilter(filterType);
     }
   };
 
-  const approveClient = async (user: TenantUser) => {
-    try {
-      const { error } = await supabase
-        .from('tenants')
-        .update({ 
-          status: 'active',
-          approval_status: 'approved',
-          approved_at: new Date().toISOString()
-        })
-        .eq('id', user.tenant_id);
-
-      if (error) throw error;
-
-      toast.success('Cliente aprovado com sucesso!');
-      await loadUsers();
-      setApprovalDialogOpen(false);
-    } catch (error) {
-      console.error('Erro:', error);
-      toast.error('Erro ao aprovar cliente');
-    }
+  const clearFilters = () => {
+    setActiveFilter(null);
+    setSearchTerm('');
   };
 
-  const rejectClient = async (user: TenantUser) => {
-    if (!rejectionReason.trim()) {
-      toast.error('Informe o motivo da rejeição');
-      return;
-    }
 
+  const deleteUser = async (user: TenantUser) => {
     try {
-      const { error } = await supabase
-        .from('tenants')
-        .update({ 
-          status: 'cancelled',
-          approval_status: 'rejected',
-          rejected_at: new Date().toISOString(),
-          rejection_reason: rejectionReason
-        })
-        .eq('id', user.tenant_id);
+      console.log('🗑️ Iniciando exclusão do usuário:', user.user_id);
+      console.log('📊 Dados do usuário:', {
+        user_id: user.user_id,
+        tenant_id: user.tenant_id,
+        user_email: user.user_email,
+        tenant_name: user.tenant_name
+      });
 
-      if (error) throw error;
+      // Excluir dados relacionados
+      const deletePromises: any[] = [];
+      const deleteOperations: string[] = [];
 
-      toast.success('Cliente rejeitado com sucesso!');
-      await loadUsers();
-      setApprovalDialogOpen(false);
-      setRejectionReason('');
+      // Excluir user_profile se existir
+      if (user.user_id && !user.user_id.startsWith('tenant-') && !user.user_id.startsWith('membership-')) {
+        console.log('🗑️ Excluindo user_profile:', user.user_id);
+        const deleteProfile = supabase.from('user_profiles').delete().eq('id', user.user_id);
+        deletePromises.push(deleteProfile);
+        deleteOperations.push('user_profiles');
+      }
+
+      // Excluir tenant se existir
+      if (user.tenant_id && !user.tenant_id.startsWith('virtual-')) {
+        console.log('🗑️ Excluindo tenant:', user.tenant_id);
+        const deleteTenant = supabase.from('tenants').delete().eq('id', user.tenant_id);
+        deletePromises.push(deleteTenant);
+        deleteOperations.push('tenants');
+      }
+
+      // Excluir user_memberships se existir
+      console.log('🗑️ Excluindo user_memberships para user_id:', user.user_id);
+      const deleteMemberships = supabase.from('user_memberships').delete().eq('user_id', user.user_id);
+      deletePromises.push(deleteMemberships);
+      deleteOperations.push('user_memberships');
+
+      // Excluir user_tenants se existir
+      console.log('🗑️ Excluindo user_tenants para user_id:', user.user_id);
+      const deleteUserTenants = supabase.from('user_tenants').delete().eq('user_id', user.user_id);
+      deletePromises.push(deleteUserTenants);
+      deleteOperations.push('user_tenants');
+
+      console.log('📋 Operações de exclusão:', deleteOperations);
+
+      // Executar todas as exclusões
+      const results = await Promise.allSettled(deletePromises);
+      
+      // Log detalhado dos resultados
+      results.forEach((result, index) => {
+        const operation = deleteOperations[index];
+        if (result.status === 'fulfilled') {
+          console.log(`✅ Exclusão bem-sucedida em ${operation}:`, result.value);
+        } else {
+          console.error(`❌ Falha na exclusão de ${operation}:`, result.reason);
+        }
+      });
+      
+      // Verificar se houve erros
+      const errors = results.filter(result => result.status === 'rejected');
+      if (errors.length > 0) {
+        console.warn('⚠️ Algumas exclusões falharam:', errors);
+        toast.warning('Algumas exclusões falharam, mas o usuário foi removido da lista');
+      } else {
+        console.log('✅ Todas as exclusões foram bem-sucedidas');
+      }
+
+      toast.success('Usuário excluído com sucesso!');
+      await loadUsers(); // Recarregar lista
+      setDialogOpen(false); // Fechar modal
     } catch (error) {
-      console.error('Erro:', error);
-      toast.error('Erro ao rejeitar cliente');
+      console.error('❌ Erro ao excluir usuário:', error);
+      toast.error('Erro ao excluir usuário');
     }
   };
 
@@ -225,6 +300,26 @@ export function UserManagement() {
 
     return (
       <Badge className={styles[status as keyof typeof styles] || styles.trial}>
+        {labels[status as keyof typeof labels] || status}
+      </Badge>
+    );
+  };
+
+  const getApprovalStatusBadge = (status: string) => {
+    const styles = {
+      pending: 'bg-yellow-500 text-white',
+      approved: 'bg-green-500 text-white',
+      rejected: 'bg-red-500 text-white',
+    };
+    
+    const labels = {
+      pending: 'Pendente',
+      approved: 'Aprovado',
+      rejected: 'Rejeitado',
+    };
+
+    return (
+      <Badge className={styles[status as keyof typeof styles] || styles.pending}>
         {labels[status as keyof typeof labels] || status}
       </Badge>
     );
@@ -276,7 +371,12 @@ export function UserManagement() {
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${
+            activeFilter === null ? 'ring-2 ring-blue-500 bg-blue-500/10' : 'hover:bg-gray-800/50'
+          }`}
+          onClick={() => handleCardClick('all')}
+        >
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -288,7 +388,12 @@ export function UserManagement() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${
+            activeFilter === 'active' ? 'ring-2 ring-green-500 bg-green-500/10' : 'hover:bg-gray-800/50'
+          }`}
+          onClick={() => handleCardClick('active')}
+        >
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -297,12 +402,17 @@ export function UserManagement() {
                   {users.filter(u => u.tenant_status === 'active').length}
                 </p>
               </div>
-              <Check className="h-8 w-8 text-green-600" />
+              <Users className="h-8 w-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${
+            activeFilter === 'trial' ? 'ring-2 ring-blue-500 bg-blue-500/10' : 'hover:bg-gray-800/50'
+          }`}
+          onClick={() => handleCardClick('trial')}
+        >
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -316,13 +426,18 @@ export function UserManagement() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${
+            activeFilter === 'pending' ? 'ring-2 ring-yellow-500 bg-yellow-500/10' : 'hover:bg-gray-800/50'
+          }`}
+          onClick={() => handleCardClick('pending')}
+        >
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-300">Pendentes</p>
                 <p className="text-2xl font-bold text-yellow-600">
-                  {users.filter(u => u.tenant_status === 'pending_approval').length}
+                  {users.filter(u => u.approval_status === 'pending').length}
                 </p>
               </div>
               <Calendar className="h-8 w-8 text-yellow-600" />
@@ -330,7 +445,12 @@ export function UserManagement() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${
+            activeFilter === 'suspended' ? 'ring-2 ring-red-500 bg-red-500/10' : 'hover:bg-gray-800/50'
+          }`}
+          onClick={() => handleCardClick('suspended')}
+        >
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -339,11 +459,38 @@ export function UserManagement() {
                   {users.filter(u => u.tenant_status === 'suspended').length}
                 </p>
               </div>
-              <X className="h-8 w-8 text-red-600" />
+              <AlertTriangle className="h-8 w-8 text-red-600" />
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Indicador de Filtro Ativo */}
+      {activeFilter && (
+        <div className="flex items-center justify-between bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+            <span className="text-sm text-blue-300">
+              Filtro ativo: {activeFilter === 'all' ? 'Todos' : 
+                           activeFilter === 'active' ? 'Ativos' :
+                           activeFilter === 'trial' ? 'Trial' :
+                           activeFilter === 'pending' ? 'Pendentes' :
+                           activeFilter === 'suspended' ? 'Suspensos' : activeFilter}
+            </span>
+            <span className="text-xs text-gray-400">
+              ({filteredUsers.length} de {users.length} usuários)
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={clearFilters}
+            className="text-blue-300 border-blue-300 hover:bg-blue-500/20"
+          >
+            Limpar Filtro
+          </Button>
+        </div>
+      )}
 
       {/* Tabela de Usuários */}
       <Card>
@@ -359,14 +506,14 @@ export function UserManagement() {
             </Button>
           </div>
           
-          <div className="mt-4">
-            <div className="relative">
+          <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="relative w-full sm:w-auto sm:min-w-[250px]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
                 placeholder="Buscar por email ou empresa..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 w-full"
               />
             </div>
           </div>
@@ -387,19 +534,29 @@ export function UserManagement() {
                   <TableRow>
                     <TableHead>Email</TableHead>
                     <TableHead>Empresa</TableHead>
-                    <TableHead>Papel</TableHead>
+                    <TableHead>Responsável</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Aprovação</TableHead>
                     <TableHead className="hidden md:table-cell">Cadastro</TableHead>
+                    <TableHead className="hidden lg:table-cell">Último Login</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.map((user) => (
-                    <TableRow key={user.user_id} className="h-12">
+                    <TableRow 
+                      key={user.user_id} 
+                      className="h-12 cursor-pointer hover:bg-gray-800/50 hover:shadow-md transition-all duration-200 group"
+                      onClick={() => {
+                        setSelectedUser(user);
+                        setDialogOpen(true);
+                      }}
+                    >
                       <TableCell className="py-2">
                         <div className="flex items-center gap-2">
                           <Mail className="h-4 w-4 text-gray-400" />
                           <span className="font-medium truncate max-w-[160px] sm:max-w-[220px]">{user.user_email}</span>
+                          <MousePointer className="h-3 w-3 text-gray-500 ml-auto group-hover:text-blue-400 transition-colors" />
                         </div>
                       </TableCell>
                       <TableCell className="py-2">
@@ -410,22 +567,32 @@ export function UserManagement() {
                       </TableCell>
                       <TableCell className="py-2">{getRoleBadge(user.role)}</TableCell>
                       <TableCell className="py-2">{getStatusBadge(user.tenant_status)}</TableCell>
+                      <TableCell className="py-2">{getApprovalStatusBadge(user.approval_status || 'pending')}</TableCell>
                       <TableCell className="py-2 hidden md:table-cell">
                         <div className="flex items-center gap-2 text-sm text-gray-300">
                           <Calendar className="h-4 w-4" />
                           {formatDate(user.user_created_at)}
                         </div>
                       </TableCell>
+                      <TableCell className="py-2 hidden lg:table-cell">
+                        <div className="flex items-center gap-2 text-sm text-gray-300">
+                          <Clock className="h-4 w-4" />
+                          {user.user_last_login === '-' ? 'Nunca' : formatDate(user.user_last_login)}
+                        </div>
+                      </TableCell>
                       <TableCell className="py-2 w-[1%] whitespace-nowrap">
                         <Button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation(); // Evitar que o clique na linha abra o modal
                             setSelectedUser(user);
                             setDialogOpen(true);
                           }}
                           variant="outline"
                           size="sm"
+                          className="flex items-center gap-1"
                         >
-                          Gerenciar
+                          <Eye className="h-3 w-3" />
+                          Ver
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -458,7 +625,7 @@ export function UserManagement() {
                     <p className="font-medium">{selectedUser.user_email}</p>
                   </div>
                   <div>
-                    <Label className="text-sm text-gray-300">Papel</Label>
+                    <Label className="text-sm text-gray-300">Responsável</Label>
                     <div>{getRoleBadge(selectedUser.role)}</div>
                   </div>
                   <div>
@@ -466,8 +633,8 @@ export function UserManagement() {
                     <p>{formatDate(selectedUser.user_created_at)}</p>
                   </div>
                   <div>
-                    <Label className="text-sm text-gray-300">Último login</Label>
-                    <p>{formatDate(selectedUser.user_last_login)}</p>
+                    <Label className="text-sm text-gray-300">Último Login</Label>
+                    <p>{selectedUser.user_last_login === '-' ? 'Nunca' : formatDate(selectedUser.user_last_login)}</p>
                   </div>
                 </div>
               </div>
@@ -505,62 +672,22 @@ export function UserManagement() {
                 </div>
               </div>
 
-              {/* Ações */}
-              <div className="border-t pt-4">
-                <h3 className="font-semibold mb-4 text-white">Ações</h3>
-                <div className="flex gap-2 flex-wrap">
-                  {selectedUser.tenant_status === 'pending_approval' && (
-                    <>
-                      <Button
-                        onClick={() => {
-                          setSelectedUser(selectedUser);
-                          setApprovalDialogOpen(true);
-                        }}
-                        variant="default"
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        <Check className="h-4 w-4 mr-2" />
-                        Aprovar Cliente
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setSelectedUser(selectedUser);
-                          setApprovalDialogOpen(true);
-                        }}
-                        variant="destructive"
-                      >
-                        <X className="h-4 w-4 mr-2" />
-                        Rejeitar Cliente
-                      </Button>
-                    </>
-                  )}
-                  
-                  {selectedUser.tenant_status === 'active' && (
-                    <Button
-                      onClick={() => toggleTenantStatus(selectedUser)}
-                      variant="destructive"
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Suspender Conta
-                    </Button>
-                  )}
-                  
-                  {(selectedUser.tenant_status === 'suspended' || selectedUser.tenant_status === 'trial') && (
-                    <Button
-                      onClick={() => toggleTenantStatus(selectedUser)}
-                      variant="default"
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      <Check className="h-4 w-4 mr-2" />
-                      Ativar Conta
-                    </Button>
-                  )}
-                </div>
-              </div>
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="flex justify-between">
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                if (selectedUser && confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')) {
+                  deleteUser(selectedUser);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Excluir Usuário
+            </Button>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Fechar
             </Button>
@@ -568,73 +695,6 @@ export function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de Aprovação/Rejeição */}
-      <Dialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
-        <DialogContent className="bg-gray-900 text-white border-gray-700">
-          <DialogHeader>
-            <DialogTitle>Gerenciar Aprovação</DialogTitle>
-            <DialogDescription>
-              {selectedUser?.tenant_status === 'pending_approval' 
-                ? 'Aprovar ou rejeitar este cliente'
-                : 'Ações disponíveis para este cliente'
-              }
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedUser && (
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-medium mb-2">Cliente: {selectedUser.tenant_name}</h4>
-                <p className="text-sm text-gray-300">Email: {selectedUser.user_email}</p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => approveClient(selectedUser)}
-                    className="bg-green-600 hover:bg-green-700 flex-1"
-                  >
-                    <Check className="h-4 w-4 mr-2" />
-                    Aprovar Cliente
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      const reason = prompt('Motivo da rejeição:');
-                      if (reason) {
-                        setRejectionReason(reason);
-                        rejectClient(selectedUser);
-                      }
-                    }}
-                    variant="destructive"
-                    className="flex-1"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Rejeitar Cliente
-                  </Button>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="rejection_reason">Motivo da rejeição (opcional)</Label>
-                  <textarea
-                    id="rejection_reason"
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    placeholder="Informe o motivo da rejeição..."
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    rows={3}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setApprovalDialogOpen(false)}>
-              Cancelar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

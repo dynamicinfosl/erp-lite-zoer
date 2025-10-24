@@ -91,7 +91,7 @@ export default function OrdemServicosPage() {
   const [loading, setLoading] = useState(true);
 
   // Armazenar ordens temporariamente no localStorage
-  const getStoredOrders = (): OrdemServico[] => {
+  const getStoredOrders = useCallback((): OrdemServico[] => {
     if (typeof window === 'undefined') return [];
     try {
       const stored = localStorage.getItem(`ordens_${tenant?.id}`);
@@ -99,16 +99,16 @@ export default function OrdemServicosPage() {
     } catch {
       return [];
     }
-  };
+  }, [tenant?.id]);
 
-  const setStoredOrders = (orders: OrdemServico[]) => {
+  const setStoredOrders = useCallback((orders: OrdemServico[]) => {
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(`ordens_${tenant?.id}`, JSON.stringify(orders));
     } catch {
       // Ignorar erros de localStorage
     }
-  };
+  }, [tenant?.id]);
 
   // Funções para gerenciar preferências de colunas no localStorage
   const getStoredColumnVisibility = (): ColumnVisibility => {
@@ -257,7 +257,7 @@ export default function OrdemServicosPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, getStoredOrders, setStoredOrders]);
 
   useEffect(() => {
     loadOrdens();
