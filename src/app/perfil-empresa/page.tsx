@@ -385,10 +385,10 @@ export default function PerfilEmpresaPage() {
 
           {/* ABA: DADOS GERAIS */}
           <TabsContent value="dados-gerais" className="space-y-6">
-            <Card>
+            <Card className="border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                  <FileText className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                   Informações da Empresa
                 </CardTitle>
               </CardHeader>
@@ -401,7 +401,7 @@ export default function PerfilEmpresaPage() {
                       id="tipo"
                       value={formData.tipo}
                       onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
-                      className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-11 w-full rounded-md border border-input bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 px-3 py-2 text-sm text-gray-900 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       required
                     >
                       <option value="juridica">Pessoa jurídica</option>
@@ -504,7 +504,7 @@ export default function PerfilEmpresaPage() {
                       id="regime_tributario"
                       value={formData.regime_tributario}
                       onChange={(e) => setFormData({ ...formData, regime_tributario: e.target.value })}
-                      className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-11 w-full rounded-md border border-input bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 px-3 py-2 text-sm text-gray-900 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <option value="">Selecione</option>
                       <option value="simples">Simples Nacional</option>
@@ -519,7 +519,7 @@ export default function PerfilEmpresaPage() {
                       id="regime_especial"
                       value={formData.regime_especial}
                       onChange={(e) => setFormData({ ...formData, regime_especial: e.target.value })}
-                      className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-11 w-full rounded-md border border-input bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 px-3 py-2 text-sm text-gray-900 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <option value="">Sem regime</option>
                       <option value="mei">MEI</option>
@@ -529,14 +529,14 @@ export default function PerfilEmpresaPage() {
                 </div>
 
                 {/* I.E. Substitutos Tributários */}
-                <div className="space-y-3 pt-4 border-t">
+                <div className="space-y-3 pt-4 border-t dark:border-gray-700">
                   <div className="flex items-center justify-between">
-                    <Label className="text-base font-semibold">I.E. substitutos tributários</Label>
+                    <Label className="text-base font-semibold text-gray-900 dark:text-gray-100">I.E. substitutos tributários</Label>
                   </div>
-                  <p className="text-sm text-muted-foreground bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-sm text-gray-700 dark:text-gray-300 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
                     Os contribuintes que praticam operações com substituição tributária, tem o recurso de registrar a inscrição estadual do substituto tributário, para que ele referencia recolha o ICMSST na UF de origem da mercadoria.
                   </p>
-                  <Button type="button" variant="outline" size="sm">
+                  <Button type="button" variant="outline" size="sm" className="dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600 dark:hover:bg-gray-600">
                     <Plus className="h-4 w-4 mr-2" />
                     Adicionar inscrição
                   </Button>
@@ -547,10 +547,10 @@ export default function PerfilEmpresaPage() {
 
           {/* ABA: CONTATO */}
           <TabsContent value="contato" className="space-y-6">
-            <Card>
+            <Card className="border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Phone className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                  <Phone className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                   Informações de Contato
                 </CardTitle>
               </CardHeader>
@@ -614,10 +614,10 @@ export default function PerfilEmpresaPage() {
 
           {/* ABA: ENDEREÇO */}
           <TabsContent value="endereco" className="space-y-6">
-            <Card>
+            <Card className="border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                  <MapPin className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                   Endereço
                 </CardTitle>
               </CardHeader>

@@ -228,13 +228,13 @@ export default function PerfilUsuarioPage() {
           </TabsList>
 
           <TabsContent value="dados-gerais" className="space-y-6">
-            <Card>
+            <Card className="border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                  <User className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                   Informações Pessoais
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-gray-600 dark:text-gray-400">
                   Atualize seus dados pessoais
                 </CardDescription>
               </CardHeader>
@@ -316,7 +316,7 @@ export default function PerfilUsuarioPage() {
                       id="gender"
                       value={formData.gender}
                       onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                      className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-11 w-full rounded-md border border-input bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 px-3 py-2 text-sm text-gray-900 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <option value="">Selecione</option>
                       <option value="masculino">Masculino</option>
@@ -348,13 +348,13 @@ export default function PerfilUsuarioPage() {
           </TabsContent>
 
           <TabsContent value="acesso" className="space-y-6">
-            <Card>
+            <Card className="border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lock className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                  <Lock className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                   Dados de Acesso
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-gray-600 dark:text-gray-400">
                   Gerencie seu e-mail e senha de acesso
                 </CardDescription>
               </CardHeader>
@@ -372,45 +372,45 @@ export default function PerfilUsuarioPage() {
                     disabled
                     className="h-11 bg-muted"
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
                     O e-mail não pode ser alterado. Entre em contato com o suporte se necessário.
                   </p>
                 </div>
 
                 {/* Seção de alteração de senha */}
-                <div className="pt-6 border-t">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Lock className="h-5 w-5" />
+                <div className="pt-6 border-t dark:border-gray-700">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                    <Lock className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                     Segurança
                   </h3>
                   
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                    <div className="flex items-center justify-between p-4 bg-gray-100 dark:bg-gray-700 rounded-lg">
                       <div className="flex-1">
-                        <Label className="text-sm font-medium">Senha</Label>
-                        <p className="text-sm text-muted-foreground mt-1">••••••••••••</p>
+                        <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">Senha</Label>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">••••••••••••</p>
                       </div>
                       <Button 
                         type="button" 
                         variant="outline" 
                         size="sm" 
-                        className="ml-4"
+                        className="ml-4 dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500 dark:hover:bg-gray-500"
                         onClick={() => alert('Funcionalidade de alteração de senha em desenvolvimento')}
                       >
                         🔑 Alterar senha
                       </Button>
                     </div>
 
-                    <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                    <div className="flex items-center justify-between p-4 bg-gray-100 dark:bg-gray-700 rounded-lg">
                       <div className="flex-1">
-                        <Label className="text-sm font-medium">Autenticação em duas etapas</Label>
-                        <p className="text-sm text-muted-foreground mt-1">Adicione mais segurança à sua conta</p>
+                        <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">Autenticação em duas etapas</Label>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Adicione mais segurança à sua conta</p>
                       </div>
                       <Button 
                         type="button" 
                         variant="outline" 
                         size="sm" 
-                        className="ml-4"
+                        className="ml-4 dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500 dark:hover:bg-gray-500"
                         onClick={() => alert('Funcionalidade de 2FA em desenvolvimento')}
                       >
                         🛡️ Habilitar
