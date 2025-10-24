@@ -679,7 +679,7 @@ export function UserManagement() {
             <Button 
               variant="destructive" 
               onClick={() => {
-                if (confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')) {
+                if (selectedUser && confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')) {
                   deleteUser(selectedUser);
                 }
               }}
