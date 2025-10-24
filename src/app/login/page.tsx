@@ -1,31 +1,35 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { LoginForm } from '@/components/auth/LoginForm';
-import { RegisterForm } from '@/components/auth/RegisterForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { Loader2, ArrowLeft, Shield, Users, BarChart3, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
-  const { user, loading, signOut } = useSimpleAuth();
-  const [activeTab, setActiveTab] = useState('login');
+  const searchParams = useSearchParams();
+  const { user, loading } = useSimpleAuth();
 
   // Redirecionar se já estiver logado (apenas quando autenticação estiver habilitada)
   useEffect(() => {
     if (ENABLE_AUTH && !loading && user) {
       // Verificar se há um parâmetro de redirecionamento
-      const urlParams = new URLSearchParams(window.location.search);
-      const redirectTo = urlParams.get('redirect') || '/dashboard';
+      const redirectTo = searchParams.get('redirect') || '/dashboard';
       router.push(redirectTo);
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, searchParams]);
+
+  // Mostrar mensagem de sucesso se veio do registro
+  useEffect(() => {
+    if (searchParams.get('registered') === 'true') {
+      toast.success('Cadastro realizado com sucesso! Faça login para continuar.');
+    }
+  }, [searchParams]);
 
   // Mostrar loading enquanto verifica autenticação
   if (loading) {
@@ -44,8 +48,7 @@ export default function LoginPage() {
   const handleLoginSuccess = () => {
     if (ENABLE_AUTH) {
       // Verificar se há um parâmetro de redirecionamento
-      const urlParams = new URLSearchParams(window.location.search);
-      const redirectTo = urlParams.get('redirect') || '/dashboard';
+      const redirectTo = searchParams.get('redirect') || '/dashboard';
       router.push(redirectTo);
     } else {
       // Quando autenticação está desabilitada, apenas redirecionar para dashboard
@@ -53,23 +56,8 @@ export default function LoginPage() {
     }
   };
 
-  const handleRegisterSuccess = async () => {
-    if (ENABLE_AUTH) {
-      // Fazer logout da sessão atual para evitar conflito de usuários
-      try {
-        await signOut();
-        console.log('✅ Logout realizado após registro bem-sucedido');
-      } catch (error) {
-        console.error('❌ Erro ao fazer logout após registro:', error);
-      }
-      
-      setActiveTab('login');
-      // Mostrar mensagem de sucesso
-      toast.success('Cadastro realizado com sucesso! Agora você pode fazer login.');
-    } else {
-      // Quando autenticação está desabilitada, redirecionar para dashboard
-      router.push('/dashboard');
-    }
+  const handleSwitchToRegister = () => {
+    router.push('/register');
   };
 
   return (
@@ -90,37 +78,13 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Card principal com tabs */}
+        {/* Card principal de login */}
         <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-          <CardHeader className="pb-4">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login" className="text-sm font-medium">
-                  Entrar
-                </TabsTrigger>
-                <TabsTrigger value="register" className="text-sm font-medium">
-                  Registrar
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </CardHeader>
-
-          <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsContent value="login" className="space-y-4">
-                <LoginForm 
-                  onSuccess={handleLoginSuccess}
-                  onSwitchToRegister={() => setActiveTab('register')}
-                />
-              </TabsContent>
-
-              <TabsContent value="register" className="space-y-4">
-                <RegisterForm 
-                  onSuccess={handleRegisterSuccess}
-                  onSwitchToLogin={() => setActiveTab('login')}
-                />
-              </TabsContent>
-            </Tabs>
+          <CardContent className="pt-6">
+            <LoginForm 
+              onSuccess={handleLoginSuccess}
+              onSwitchToRegister={handleSwitchToRegister}
+            />
           </CardContent>
         </Card>
 
@@ -159,5 +123,17 @@ export default function LoginPage() {
       </div>
 
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    }>
+      <LoginPageContent />
+    </Suspense>
   );
 }

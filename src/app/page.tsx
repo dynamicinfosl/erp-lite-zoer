@@ -285,7 +285,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto items-stretch">
             {plans.map((plan, index) => {
               const Icon = plan.icon;
               const buttonIconForPlan = (name: string) => {
@@ -304,15 +304,15 @@ export default function HomePage() {
               const CardInner = (
                 <Card 
                   key={index} 
-                  className={`relative border-2 hover:shadow-2xl transition-all duration-300 rounded-2xl ${
+                  className={`relative border-2 hover:shadow-2xl transition-all duration-300 rounded-2xl h-full flex flex-col ${
                     plan.popular 
-                      ? 'border-transparent shadow-xl scale-105 bg-gradient-to-b from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20' 
-                      : 'border-gray-200 hover:border-blue-300 bg-white dark:bg-gray-950'
+                      ? 'border-blue-500 shadow-xl bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 hover:scale-105 hover:shadow-blue-500/50' 
+                      : 'border-gray-200 hover:border-blue-300 bg-white dark:bg-gray-950 hover:-translate-y-1'
                   }`}
                 >
                   {plan.popular && (
                     <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                      <Badge className="bg-blue-600 hover:bg-blue-700 px-4 py-1">
+                      <Badge className="bg-white text-blue-700 hover:bg-blue-50 px-4 py-1 font-semibold">
                         Mais Popular
                       </Badge>
                     </div>
@@ -322,22 +322,22 @@ export default function HomePage() {
                     <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${plan.color} mx-auto mb-4 flex items-center justify-center shadow-lg`}>
                       <Icon className="h-8 w-8 text-white" />
                     </div>
-                    <CardTitle className="text-2xl mb-2">{plan.name}</CardTitle>
-                    <CardDescription className="text-sm text-white">{plan.description}</CardDescription>
+                    <CardTitle className={`text-2xl mb-2 ${plan.popular ? 'text-white' : ''}`}>{plan.name}</CardTitle>
+                    <CardDescription className={`text-sm ${plan.popular ? 'text-blue-100' : 'text-white'}`}>{plan.description}</CardDescription>
                     
                     <div className="mt-6">
-                      <div className="text-5xl font-bold text-white">
+                      <div className={`text-5xl font-bold ${plan.popular ? 'text-white' : 'text-white'}`}>
                         {plan.price === 0 ? 'Grátis' : `R$ ${plan.price.toFixed(2)}`}
                       </div>
-                      <div className="text-gray-600 dark:text-white text-sm mt-1">{plan.period}</div>
+                      <div className={`text-sm mt-1 ${plan.popular ? 'text-blue-100' : 'text-gray-600 dark:text-white'}`}>{plan.period}</div>
                        {plan.price > 0 && (
                          <div
-                           className={`inline-block mt-3 text-xs font-medium px-3 py-1 rounded-full bg-gradient-to-r text-white ${
+                           className={`inline-block mt-3 text-xs font-medium px-3 py-1 rounded-full text-white ${
                              plan.name === 'Básico'
-                               ? 'from-emerald-600 to-teal-600'
+                               ? 'bg-gradient-to-r from-emerald-600 to-teal-600'
                                : plan.name === 'Profissional'
-                               ? 'from-blue-600 to-indigo-600'
-                               : 'from-purple-600 to-fuchsia-600'
+                               ? 'bg-white/20 backdrop-blur-sm'
+                               : 'bg-gradient-to-r from-purple-600 to-fuchsia-600'
                            }`}
                          >
                            Economize 2 meses no anual
@@ -346,47 +346,41 @@ export default function HomePage() {
                     </div>
                   </CardHeader>
 
-                  <CardContent className="space-y-6">
-                    <ul className="space-y-3">
+                  <CardContent className="flex flex-col flex-grow pt-6 pb-6">
+                    <ul className="space-y-3 flex-grow mb-6">
                       {plan.features.map((feature, idx) => (
                         <li key={idx} className="flex items-start gap-3 text-sm">
-                          <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-                          <span className="text-gray-700 dark:text-white">{feature}</span>
+                          <CheckCircle className={`h-5 w-5 mt-0.5 flex-shrink-0 ${plan.popular ? 'text-white' : 'text-green-600'}`} />
+                          <span className={plan.popular ? 'text-white' : 'text-gray-700 dark:text-white'}>{feature}</span>
                         </li>
                       ))}
                     </ul>
 
                     <Button 
-                      className={`w-full text-white bg-gradient-to-r hover:brightness-110 transition rounded-2xl font-semibold inline-flex items-center justify-center gap-1 sm:gap-2 md:gap-3 py-4 sm:py-5 md:py-5 pl-5 sm:pl-6 md:pl-7 pr-4 sm:pr-5 md:pr-6 shadow-md hover:shadow-lg ring-1 ring-white/10 hover:ring-white/40 focus-visible:ring-2 focus-visible:ring-white/60 ${
+                      className={`w-full font-semibold inline-flex items-center justify-center gap-2 h-12 shadow-md hover:shadow-lg transition rounded-xl ${
                         plan.name === 'Trial'
-                          ? 'from-orange-500 to-red-500'
+                          ? 'text-white bg-gradient-to-r from-orange-500 to-red-500 hover:brightness-110'
                           : plan.name === 'Básico'
-                          ? 'from-emerald-600 to-teal-600'
+                          ? 'text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110'
                           : plan.name === 'Profissional'
-                          ? 'from-blue-600 to-indigo-600'
-                          : 'from-purple-600 to-fuchsia-600'
+                          ? 'bg-white text-blue-700 hover:bg-blue-50'
+                          : 'text-white bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:brightness-110'
                       }`}
                       variant="default"
                       size="lg"
                       onClick={() => setShowRegisterForm(true)}
                     >
-                      <ButtonIcon className="h-4 w-4 sm:h-5 sm:w-5 md:h-5 md:w-5 flex-shrink-0" />
-                      <span className="text-xs sm:text-sm md:text-base whitespace-nowrap">
+                      <ButtonIcon className="h-5 w-5 flex-shrink-0" />
+                      <span className="text-sm font-medium">
                         {plan.price === 0 ? 'Começar Grátis' : 'Escolher Plano'}
                       </span>
-                      <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 md:h-5 md:w-5 flex-shrink-0" />
+                      <ChevronRight className="h-5 w-5 flex-shrink-0" />
                     </Button>
                   </CardContent>
                 </Card>
               );
 
-              return plan.popular ? (
-                <div key={`wrap-${index}`} className={`rounded-2xl p-[2px] bg-gradient-to-br ${plan.color}`}>
-                  {CardInner}
-                </div>
-              ) : (
-                  CardInner
-              );
+              return CardInner;
             })}
           </div>
         </div>
@@ -477,72 +471,89 @@ export default function HomePage() {
 
       {/* Modal de Registro */}
       {showRegisterForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md mx-auto shadow-2xl">
-            <CardHeader className="border-b">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md mx-auto shadow-2xl bg-white border-0">
+            <CardHeader className="border-b-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500 text-white rounded-t-lg pb-6">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-2xl">Criar Conta</CardTitle>
+                <CardTitle className="text-2xl font-bold">Criar Conta</CardTitle>
                 <Button 
                   variant="ghost" 
                   size="sm"
                   onClick={() => setShowRegisterForm(false)}
+                  className="text-white hover:bg-white/20 h-8 w-8 p-0"
                 >
                   ✕
                 </Button>
               </div>
-              <CardDescription>
+              <CardDescription className="text-white/90 mt-1">
                 Comece seu teste grátis de 14 dias agora
               </CardDescription>
             </CardHeader>
 
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 bg-white">
               <form className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Nome da Empresa</label>
+                  <label className="text-sm font-medium text-gray-700">Nome da Empresa</label>
                   <div className="relative">
                     <Building2 className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input 
                       placeholder="Minha Empresa Ltda" 
-                      className="pl-10"
+                      className="pl-10 bg-white border-gray-300 h-11"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Email</label>
+                  <label className="text-sm font-medium text-gray-700">Email</label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input 
                       type="email"
                       placeholder="seu@email.com" 
-                      className="pl-10"
+                      className="pl-10 bg-white border-gray-300 h-11"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Telefone</label>
+                  <label className="text-sm font-medium text-gray-700">Telefone</label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input 
                       type="tel"
                       placeholder="(00) 00000-0000" 
-                      className="pl-10"
+                      className="pl-10 bg-white border-gray-300 h-11"
+                      maxLength={15}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '');
+                        let formatted = '';
+                        if (value.length > 0) {
+                          formatted = '(' + value.substring(0, 2);
+                          if (value.length > 2) {
+                            formatted += ') ' + value.substring(2, 7);
+                            if (value.length > 7) {
+                              formatted += '-' + value.substring(7, 11);
+                            }
+                          }
+                        }
+                        e.target.value = formatted;
+                      }}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Senha</label>
+                  <label className="text-sm font-medium text-gray-700">Senha</label>
                   <Input 
                     type="password"
                     placeholder="Mínimo 6 caracteres"
+                    className="bg-white border-gray-300 h-11"
                   />
                 </div>
 
                 <Button 
                   type="submit" 
-                  className="w-full bg-blue-600 hover:bg-blue-700" 
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:brightness-110 transition text-white shadow-md" 
                   size="lg"
                   onClick={async (e) => {
                     e.preventDefault();
@@ -554,28 +565,58 @@ export default function HomePage() {
                       const phone = inputs[2]?.value || '';
                       const password = inputs[3]?.value || '';
 
+                      // Validações básicas
+                      if (!email || !password || !company) {
+                        toast.error('Por favor, preencha todos os campos obrigatórios.');
+                        return;
+                      }
+
+                      if (password.length < 6) {
+                        toast.error('A senha deve ter no mínimo 6 caracteres.');
+                        return;
+                      }
+
                       if (ENABLE_AUTH) {
                         const { supabase } = await import('@/lib/supabase');
                         const { error } = await supabase.auth.signUp({
-                          email: email.trim(), password: password.trim(),
-                          options: { data: { company, phone } }
+                          email: email.trim(), 
+                          password: password.trim(),
+                          options: { 
+                            data: { company, phone },
+                            emailRedirectTo: undefined // Não fazer login automático
+                          }
                         });
                         
                         if (error) {
                           console.error('Erro no cadastro:', error);
-                          return; // Não continuar se houver erro
+                          toast.error('Erro ao criar conta: ' + error.message);
+                          return;
                         }
                         
-                        // Não fazer login imediatamente após cadastro
-                        console.log('✅ Cadastro realizado com sucesso');
+                        console.log('✅ Cadastro realizado, fazendo logout...');
+                        
+                        // Fazer logout imediatamente para garantir que não ficará logado
+                        await supabase.auth.signOut();
+                        
+                        // Aguardar um pouco para garantir que o signOut foi processado
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        toast.success('Conta criada com sucesso! Faça login para continuar.');
+                      } else {
+                        toast.success('Cadastro simulado com sucesso!');
                       }
                       
-                      // Redirecionar para login após cadastro
-                      router.push('/login');
+                      // Fechar modal
                       setShowRegisterForm(false);
+                      
+                      // Aguardar um pouco antes de redirecionar
+                      await new Promise(resolve => setTimeout(resolve, 300));
+                      
+                      // Redirecionar para login
+                      router.push('/login?registered=true');
                     } catch (err) {
                       console.error('Erro ao registrar:', err);
-                      // Em caso de erro, manter na landing page
+                      toast.error('Erro inesperado ao criar conta. Tente novamente.');
                     }
                   }}
                 >

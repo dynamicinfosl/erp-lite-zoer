@@ -47,7 +47,14 @@ export function LoginForm({
       
       console.log('🔐 Tentando fazer login com:', formData.email);
       
-      const result = await signIn(formData.email, formData.password);
+      // Adicionar timeout de 10 segundos
+      const timeoutPromise = new Promise<any>((_, reject) => {
+        setTimeout(() => reject(new Error('Login timeout - tempo esgotado')), 10000);
+      });
+      
+      const loginPromise = signIn(formData.email, formData.password);
+      
+      const result: any = await Promise.race([loginPromise, timeoutPromise]);
       
       if (result.error) {
         throw result.error;
@@ -60,7 +67,9 @@ export function LoginForm({
       console.error('❌ Erro no login:', err);
       const msg = err?.message || err?.errorMessage || '';
       
-      if (typeof msg === 'string' && /invalid login credentials|Invalid login credentials/i.test(msg)) {
+      if (msg.includes('timeout')) {
+        setError('Login demorou muito. Verifique sua conexão e tente novamente.');
+      } else if (typeof msg === 'string' && /invalid login credentials|Invalid login credentials/i.test(msg)) {
         setError('Email ou senha incorretos. Verifique e tente novamente.');
       } else if (typeof msg === 'string' && /email not confirmed/i.test(msg)) {
         setError('Email não confirmado. Verifique sua caixa de entrada.');
