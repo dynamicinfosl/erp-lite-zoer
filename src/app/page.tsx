@@ -305,15 +305,15 @@ export default function HomePage() {
               const CardInner = (
                 <Card 
                   key={index} 
-                  className={`relative border-2 hover:shadow-2xl transition-all duration-300 rounded-2xl ${
+                  className={`relative border-2 hover:shadow-2xl transition-all duration-300 rounded-2xl h-full flex flex-col ${
                     plan.popular 
-                      ? 'border-transparent shadow-xl scale-105 bg-gradient-to-b from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20' 
-                      : 'border-gray-200 hover:border-blue-300 bg-white dark:bg-gray-950'
+                      ? 'border-blue-500 shadow-xl bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 hover:scale-105 hover:shadow-blue-500/50' 
+                      : 'border-gray-200 hover:border-blue-300 bg-white dark:bg-gray-950 hover:-translate-y-1 hover:border-blue-300 hover:shadow-2xl'
                   }`}
                 >
                   {plan.popular && (
                     <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                      <Badge className="bg-blue-600 hover:bg-blue-700 px-4 py-1">
+                      <Badge className="bg-white text-blue-700 hover:bg-blue-50 px-4 py-1 font-semibold">
                         Mais Popular
                       </Badge>
                     </div>
@@ -323,22 +323,24 @@ export default function HomePage() {
                     <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${plan.color} mx-auto mb-4 flex items-center justify-center shadow-lg`}>
                       <Icon className="h-8 w-8 text-white" />
                     </div>
-                    <CardTitle className="text-2xl mb-2">{plan.name}</CardTitle>
-                    <CardDescription className="text-sm text-white">{plan.description}</CardDescription>
+                    <CardTitle className={`text-2xl mb-2 ${plan.popular ? 'text-white' : ''}`}>{plan.name}</CardTitle>
+                    <CardDescription className={`text-sm ${plan.popular ? 'text-blue-100' : ''}`}>{plan.description}</CardDescription>
                     
                     <div className="mt-6">
-                      <div className="text-5xl font-bold text-white">
+                      <div className={`text-5xl font-bold ${plan.popular ? 'text-white' : ''}`}>
                         {plan.price === 0 ? 'Grátis' : `R$ ${plan.price.toFixed(2)}`}
                       </div>
-                      <div className="text-gray-600 dark:text-white text-sm mt-1">{plan.period}</div>
+                      <div className={`text-sm mt-1 ${plan.popular ? 'text-blue-100' : 'text-gray-600 dark:text-white'}`}>{plan.period}</div>
                        {plan.price > 0 && (
                          <div
-                           className={`inline-block mt-3 text-xs font-medium px-3 py-1 rounded-full bg-gradient-to-r text-white ${
-                             plan.name === 'Básico'
-                               ? 'from-emerald-600 to-teal-600'
-                               : plan.name === 'Profissional'
-                               ? 'from-blue-600 to-indigo-600'
-                               : 'from-purple-600 to-fuchsia-600'
+                           className={`inline-block mt-3 text-xs font-medium px-3 py-1 rounded-full ${
+                             plan.popular 
+                               ? 'bg-white text-blue-700' 
+                               : `bg-gradient-to-r text-white ${
+                                   plan.name === 'Básico'
+                                     ? 'from-emerald-600 to-teal-600'
+                                     : 'from-purple-600 to-fuchsia-600'
+                                 }`
                            }`}
                          >
                            Economize 2 meses no anual
@@ -347,25 +349,27 @@ export default function HomePage() {
                     </div>
                   </CardHeader>
 
-                  <CardContent className="space-y-6">
-                    <ul className="space-y-3">
+                  <CardContent className="flex flex-col flex-grow pt-6 pb-6">
+                    <ul className="space-y-3 flex-grow mb-6">
                       {plan.features.map((feature, idx) => (
                         <li key={idx} className="flex items-start gap-3 text-sm">
-                          <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-                          <span className="text-gray-700 dark:text-white">{feature}</span>
+                          <CheckCircle className={`h-5 w-5 mt-0.5 flex-shrink-0 ${plan.popular ? 'text-white' : 'text-green-600'}`} />
+                          <span className={plan.popular ? 'text-white' : 'text-gray-700 dark:text-white'}>{feature}</span>
                         </li>
                       ))}
                     </ul>
 
                     <Button 
-                      className={`w-full text-white bg-gradient-to-r hover:brightness-110 transition rounded-2xl font-semibold inline-flex items-center justify-center gap-1 sm:gap-2 md:gap-3 py-4 sm:py-5 md:py-5 pl-5 sm:pl-6 md:pl-7 pr-4 sm:pr-5 md:pr-6 shadow-md hover:shadow-lg ring-1 ring-white/10 hover:ring-white/40 focus-visible:ring-2 focus-visible:ring-white/60 ${
-                        plan.name === 'Trial'
-                          ? 'from-orange-500 to-red-500'
-                          : plan.name === 'Básico'
-                          ? 'from-emerald-600 to-teal-600'
-                          : plan.name === 'Profissional'
-                          ? 'from-blue-600 to-indigo-600'
-                          : 'from-purple-600 to-fuchsia-600'
+                      className={`w-full transition rounded-2xl font-semibold inline-flex items-center justify-center gap-1 sm:gap-2 md:gap-3 py-4 sm:py-5 md:py-5 pl-5 sm:pl-6 md:pl-7 pr-4 sm:pr-5 md:pr-6 shadow-md hover:shadow-lg ${
+                        plan.popular 
+                          ? 'bg-white text-blue-700 hover:bg-blue-50 border-2 border-white/20 hover:border-white/40' 
+                          : `text-white bg-gradient-to-r hover:brightness-110 ring-1 ring-white/10 hover:ring-white/40 focus-visible:ring-2 focus-visible:ring-white/60 ${
+                              plan.name === 'Trial'
+                                ? 'from-orange-500 to-red-500'
+                                : plan.name === 'Básico'
+                                ? 'from-emerald-600 to-teal-600'
+                                : 'from-purple-600 to-fuchsia-600'
+                            }`
                       }`}
                       variant="default"
                       size="lg"
@@ -480,19 +484,19 @@ export default function HomePage() {
       {showRegisterForm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md mx-auto shadow-2xl bg-white">
-            <CardHeader className="border-b">
+            <CardHeader className="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500 border-b border-white/20 rounded-t-lg">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-2xl text-gray-900">Criar Conta</CardTitle>
+                <CardTitle className="text-2xl text-white font-bold">Criar Conta</CardTitle>
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full p-2"
+                  className="text-white/80 hover:text-white hover:bg-white/20 rounded-full p-2"
                   onClick={() => setShowRegisterForm(false)}
                 >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <CardDescription className="text-gray-600">
+              <CardDescription className="text-white/90">
                 Comece seu teste grátis de 14 dias agora
               </CardDescription>
             </CardHeader>

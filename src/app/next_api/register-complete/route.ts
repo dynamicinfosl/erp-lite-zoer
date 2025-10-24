@@ -131,19 +131,26 @@ export async function POST(request: NextRequest) {
       const fullTenantData = {
         name: data.company.name,
         slug: uniqueSlug,
-        fantasy_name: data.company.fantasy_name,
+        // Dados gerais da empresa
+        tipo: 'juridica', // Default para pessoa jurídica
         document: data.company.document,
         document_type: data.company.document_type,
-        corporate_email: data.company.corporate_email,
-        corporate_phone: data.company.corporate_phone,
+        nome_fantasia: data.company.fantasy_name || data.company.name,
+        razao_social: data.company.name,
+        // Contato
         email: data.responsible.email,
         phone: data.responsible.phone,
-        address: `${data.address.address}, ${data.address.number}`,
-        complement: data.address.complement,
-        neighborhood: data.address.neighborhood,
+        corporate_email: data.company.corporate_email,
+        corporate_phone: data.company.corporate_phone,
+        // Endereço completo
+        address: data.address.address,
+        numero: data.address.number,
+        complemento: data.address.complement,
+        bairro: data.address.neighborhood,
         city: data.address.city,
         state: data.address.state,
         zip_code: data.address.zip_code,
+        // Status e trial
         status: 'trial',
         trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
       };
@@ -170,6 +177,22 @@ export async function POST(request: NextRequest) {
       const basicTenantData = {
         name: data.company.name,
         slug: uniqueSlug,
+        // Dados básicos da empresa
+        tipo: 'juridica',
+        document: data.company.document,
+        document_type: data.company.document_type,
+        nome_fantasia: data.company.fantasy_name || data.company.name,
+        razao_social: data.company.name,
+        // Contato básico
+        email: data.responsible.email,
+        phone: data.responsible.phone,
+        // Endereço básico
+        address: data.address.address,
+        numero: data.address.number,
+        city: data.address.city,
+        state: data.address.state,
+        zip_code: data.address.zip_code,
+        // Status e trial
         status: 'trial',
         trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
       };
