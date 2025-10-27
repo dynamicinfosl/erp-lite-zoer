@@ -70,7 +70,7 @@ export function LoginForm({
       if (msg.includes('timeout')) {
         setError('Login demorou muito. Verifique sua conexão e tente novamente.');
       } else if (typeof msg === 'string' && /invalid login credentials|Invalid login credentials/i.test(msg)) {
-        setError('Email ou senha incorretos. Verifique e tente novamente.');
+        setError('Email ou senha incorretos. Certifique-se de usar as mesmas credenciais do cadastro.');
       } else if (typeof msg === 'string' && /email not confirmed/i.test(msg)) {
         setError('Email não confirmado. Verifique sua caixa de entrada.');
       } else {

@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { 
   Shield, 
@@ -22,11 +21,7 @@ import {
   Sparkles,
   Crown,
   Star,
-  ChevronRight,
-  Mail,
-  Building2,
-  Phone,
-  X
+  ChevronRight
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -154,7 +149,6 @@ const plans = [
 export default function HomePage() {
   const { user, loading } = useSimpleAuth();
   const router = useRouter();
-  const [showRegisterForm, setShowRegisterForm] = useState(false);
 
   // Se autenticação estiver ativada e usuário logado, redirecionar
   useEffect(() => {
@@ -213,7 +207,7 @@ export default function HomePage() {
               </p>
               
               <div className="flex flex-col sm:flex-row justify-center gap-4">
-                <Button size="lg" variant="secondary" className="text-lg px-8 py-6" onClick={() => setShowRegisterForm(true)}>
+                <Button size="lg" variant="secondary" className="text-lg px-8 py-6" onClick={() => router.push('/register')}>
                   Começar Teste Grátis
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
@@ -373,7 +367,7 @@ export default function HomePage() {
                       }`}
                       variant="default"
                       size="lg"
-                      onClick={() => setShowRegisterForm(true)}
+                      onClick={() => router.push('/register')}
                     >
                       <ButtonIcon className="h-4 w-4 sm:h-5 sm:w-5 md:h-5 md:w-5 flex-shrink-0" />
                       <span className="text-xs sm:text-sm md:text-base whitespace-nowrap">
@@ -411,7 +405,7 @@ export default function HomePage() {
               size="lg" 
               variant="secondary" 
               className="text-lg px-8 py-6"
-              onClick={() => setShowRegisterForm(true)}
+              onClick={() => router.push('/register')}
             >
               Começar Teste Grátis
               <ArrowRight className="ml-2 h-5 w-5" />
@@ -479,222 +473,6 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
-
-      {/* Modal de Registro */}
-      {showRegisterForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md mx-auto shadow-2xl bg-white">
-            <CardHeader className="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500 border-b border-white/20 rounded-t-lg">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-2xl text-white font-bold">Criar Conta</CardTitle>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="text-white/80 hover:text-white hover:bg-white/20 rounded-full p-2"
-                  onClick={() => setShowRegisterForm(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <CardDescription className="text-white/90">
-                Comece seu teste grátis de 14 dias agora
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="pt-6">
-              <form className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Nome da Empresa</label>
-                  <div className="relative">
-                    <Building2 className="absolute left-3 top-3 h-4 w-4 text-gray-600" />
-                    <Input 
-                      placeholder="Minha Empresa Ltda" 
-                      className="pl-10 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Email</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-600" />
-                    <Input 
-                      type="email"
-                      placeholder="seu@email.com" 
-                      className="pl-10 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Telefone</label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-600" />
-                    <Input 
-                      type="tel"
-                      placeholder="(00) 00000-0000" 
-                      className="pl-10 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Senha</label>
-                  <Input 
-                    type="password"
-                    placeholder="Mínimo 6 caracteres"
-                    className="bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500"
-                  />
-                </div>
-
-                <Button 
-                  type="submit" 
-                  className="w-full bg-blue-600 hover:bg-blue-700" 
-                  size="lg"
-                  onClick={async (e) => {
-                    e.preventDefault();
-                    try {
-                      const form = (e.currentTarget.closest('form')) as HTMLFormElement | null;
-                      const inputs = form ? Array.from(form.querySelectorAll('input')) as HTMLInputElement[] : [];
-                      const company = inputs[0]?.value?.trim() || '';
-                      const email = inputs[1]?.value?.trim() || '';
-                      const phone = inputs[2]?.value?.trim() || '';
-                      const password = inputs[3]?.value?.trim() || '';
-
-                      // Validações básicas
-                      if (!company || !email || !password) {
-                        alert('Por favor, preencha todos os campos obrigatórios');
-                        return;
-                      }
-
-                      if (password.length < 6) {
-                        alert('A senha deve ter pelo menos 6 caracteres');
-                        return;
-                      }
-
-                      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                        alert('Por favor, insira um email válido');
-                        return;
-                      }
-
-                      console.log('📝 Dados do formulário:', { company, email, phone, password });
-
-                      if (ENABLE_AUTH) {
-                        const { supabase } = await import('@/lib/supabase');
-                        
-                        // Criar usuário no Supabase Auth
-                        const { data: authData, error: authError } = await supabase.auth.signUp({
-                          email: email,
-                          password: password,
-                          options: { 
-                            data: { 
-                              company_name: company,
-                              phone: phone,
-                              full_name: company // Usar nome da empresa como nome inicial
-                            } 
-                          }
-                        });
-                        
-                        if (authError) {
-                          console.error('❌ Erro no cadastro:', authError);
-                          alert(`Erro no cadastro: ${authError.message}`);
-                          return;
-                        }
-
-                        if (authData.user) {
-                          console.log('✅ Usuário criado com sucesso:', authData.user.id);
-                          
-                          // Aguardar um momento para o usuário ser criado
-                          await new Promise(resolve => setTimeout(resolve, 1000));
-                          
-                        // Criar perfil do usuário na tabela user_profiles com status pendente
-                        const { error: profileError } = await supabase
-                          .from('user_profiles')
-                          .insert({
-                            id: authData.user.id,
-                            full_name: company,
-                            phone: phone,
-                            role: 'admin', // Primeiro usuário é admin
-                            status: 'pending', // Status pendente de aprovação
-                            created_at: new Date().toISOString()
-                          });
-
-                          if (profileError) {
-                            console.warn('⚠️ Erro ao criar perfil:', profileError);
-                          } else {
-                            console.log('✅ Perfil do usuário criado');
-                          }
-
-                          // Criar tenant (empresa) para o usuário
-                          const tenantSlug = company.toLowerCase()
-                            .replace(/[^a-z0-9]/g, '-')
-                            .replace(/-+/g, '-')
-                            .substring(0, 50) + '-' + Date.now();
-
-                          const { data: tenantData, error: tenantError } = await supabase
-                            .from('tenants')
-                            .insert({
-                              name: company,
-                              slug: tenantSlug,
-                              email: email,
-                              phone: phone,
-                              status: 'trial', // Status de trial (válido)
-                              trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-                              created_at: new Date().toISOString()
-                            })
-                            .select()
-                            .single();
-
-                          if (tenantError) {
-                            console.warn('⚠️ Erro ao criar tenant:', tenantError);
-                          } else {
-                            console.log('✅ Empresa criada:', tenantData);
-                            
-                            // Associar usuário ao tenant
-                            const { error: userTenantError } = await supabase
-                              .from('user_tenants')
-                              .insert({
-                                user_id: authData.user.id,
-                                tenant_id: tenantData.id,
-                                role: 'admin',
-                                created_at: new Date().toISOString()
-                              });
-
-                            if (userTenantError) {
-                              console.warn('⚠️ Erro ao associar usuário ao tenant:', userTenantError);
-                            } else {
-                              console.log('✅ Usuário associado à empresa');
-                            }
-                          }
-                        }
-                      }
-                      
-                      // Mostrar mensagem de sucesso
-                      alert('✅ Conta criada com sucesso! Sua conta está pendente de aprovação. Você receberá um email quando for aprovada.');
-                      
-                      // Redirecionar para login
-                      router.push('/login');
-                      setShowRegisterForm(false);
-                    } catch (err) {
-                      console.error('❌ Erro ao registrar:', err);
-                      alert('Erro ao criar conta. Tente novamente.');
-                    }
-                  }}
-                >
-                  Criar Minha Conta Grátis
-                </Button>
-              </form>
-
-              <p className="text-xs text-gray-600 text-center mt-4">
-                Ao criar uma conta, você concorda com nossos{' '}
-                <Link href="#" className="text-blue-600 hover:underline">Termos de Uso</Link>
-                {' '}e{' '}
-                <Link href="#" className="text-blue-600 hover:underline">Política de Privacidade</Link>
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }

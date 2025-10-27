@@ -238,17 +238,23 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('🔐 Iniciando login para:', email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
+        console.error('❌ Erro no login:', error.message);
+        console.error('❌ Código do erro:', error.status);
         return { error };
       }
 
+      console.log('✅ Login bem-sucedido!');
       return {};
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ Erro de exceção no login:', error);
       return { error };
     }
   };

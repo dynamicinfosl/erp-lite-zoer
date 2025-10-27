@@ -83,6 +83,9 @@ export async function POST(request: NextRequest) {
 
     // 1. Criar usuário no Supabase Auth
     console.log('👤 Criando usuário no Supabase Auth...');
+    console.log('📧 Email:', data.responsible.email);
+    console.log('🔑 Senha (primeiros 3 caracteres):', data.responsible.password.substring(0, 3) + '***');
+    
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: data.responsible.email,
       password: data.responsible.password,
@@ -96,13 +99,17 @@ export async function POST(request: NextRequest) {
 
     if (authError) {
       console.error('❌ Erro ao criar usuário:', authError);
+      console.error('❌ Código do erro:', authError.status);
       return NextResponse.json(
         { error: 'Erro ao criar usuário: ' + authError.message },
         { status: 400 }
       );
     }
 
-    console.log('✅ Usuário criado com sucesso:', authData.user?.id);
+    console.log('✅ Usuário criado com sucesso!');
+    console.log('👤 User ID:', authData.user?.id);
+    console.log('📧 Email confirmado:', authData.user?.email_confirmed_at);
+    console.log('🎫 Auth UID:', authData.user?.id);
 
     if (!authData.user) {
       return NextResponse.json(
