@@ -467,7 +467,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
                 phone: formatPhone(newValue) 
               });
             }}
-            placeholder="(21) 98765-4321"
+            placeholder="(00) 00000-0000"
             maxLength={15}
             autoComplete="off"
             className={responsibleData.phone && !validatePhone(responsibleData.phone) ? 'border-red-400 focus:border-red-400' : ''}
@@ -593,20 +593,22 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
         </div>
       </div>
 
+      {/* Contato Corporativo lado a lado */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="corporateEmail">E-mail Corporativo</Label>
+          <Label htmlFor="corporateEmail" className="text-sm font-semibold">E-mail Corporativo</Label>
           <Input
             id="corporateEmail"
             type="email"
             value={companyData.corporate_email}
             onChange={(e) => setCompanyData({ ...companyData, corporate_email: e.target.value })}
             placeholder="contato@empresa.com"
+            className="h-11"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="corporatePhone">Telefone Corporativo</Label>
+          <Label htmlFor="corporatePhone" className="text-sm font-semibold">Telefone Corporativo</Label>
           <Input
             id="corporatePhone"
             value={companyData.corporate_phone}
@@ -614,8 +616,9 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
               ...companyData, 
               corporate_phone: formatPhone(e.target.value) 
             })}
-            placeholder="(21) 98765-4321"
+            placeholder="(00) 00000-0000"
             maxLength={15}
+            className="h-11"
           />
         </div>
       </div>
@@ -635,6 +638,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
               zip_code: formatZipCode(e.target.value) 
             })}
             placeholder="00000-000"
+            maxLength={9}
           />
         </div>
 

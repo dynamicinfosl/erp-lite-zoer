@@ -139,16 +139,13 @@ export async function POST(request: NextRequest) {
         name: data.company.name,
         slug: uniqueSlug,
         // Dados gerais da empresa
-        tipo: 'juridica', // Default para pessoa jurídica
+        tipo: data.company.document_type === 'CPF' ? 'fisica' : 'juridica',
         document: data.company.document,
-        document_type: data.company.document_type,
         nome_fantasia: data.company.fantasy_name || data.company.name,
         razao_social: data.company.name,
         // Contato
         email: data.responsible.email,
         phone: data.responsible.phone,
-        corporate_email: data.company.corporate_email,
-        corporate_phone: data.company.corporate_phone,
         // Endereço completo
         address: data.address.address,
         numero: data.address.number,
@@ -185,9 +182,8 @@ export async function POST(request: NextRequest) {
         name: data.company.name,
         slug: uniqueSlug,
         // Dados básicos da empresa
-        tipo: 'juridica',
+        tipo: data.company.document_type === 'CPF' ? 'fisica' : 'juridica',
         document: data.company.document,
-        document_type: data.company.document_type,
         nome_fantasia: data.company.fantasy_name || data.company.name,
         razao_social: data.company.name,
         // Contato básico

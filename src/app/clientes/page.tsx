@@ -56,7 +56,8 @@ import {
   User,
   CreditCard,
   MapPin,
-  CheckCircle
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
@@ -946,112 +947,158 @@ export default function ClientesPage() {
             {/* Conteúdo principal */}
             <div className="p-6 bg-slate-800/50 backdrop-blur-sm">
               <div className="grid gap-6">
-                <div className="grid gap-3">
-                  <Label htmlFor="name" className="text-sm font-medium text-slate-200">Nome Completo *</Label>
-                  <Input
-                    id="name"
-                    value={newCustomer.name}
-                    onChange={(e) => setNewCustomer(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Digite o nome completo do cliente"
-                    className={`h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 ${validationErrors.name ? 'border-red-400 focus:border-red-400' : ''}`}
-                  />
-                  {validationErrors.name && (
-                    <p className="text-sm text-red-400">{validationErrors.name}</p>
-                  )}
-                </div>
-            
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="grid gap-3">
-                    <Label htmlFor="type" className="text-sm font-medium text-slate-200">Tipo de Cliente</Label>
-                    <Select 
-                      value={newCustomer.type}
-                      onValueChange={(value) => setNewCustomer(prev => ({ ...prev, type: value as 'PF' | 'PJ' }))}
-                    >
-                      <SelectTrigger className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white">
-                        <SelectValue placeholder="Selecione o tipo" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-700 border-slate-600 shadow-xl">
-                        <SelectItem value="PF" className="hover:bg-slate-600 text-white">Pessoa Física</SelectItem>
-                        <SelectItem value="PJ" className="hover:bg-slate-600 text-white">Pessoa Jurídica</SelectItem>
-                      </SelectContent>
-                    </Select>
+                {/* Seção: Identificação */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 pb-3 border-b border-slate-700">
+                    <div className="p-2 bg-blue-500/20 rounded-lg">
+                      <User className="h-4 w-4 text-blue-400" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wide">Identificação</h3>
                   </div>
-                  <div className="grid gap-3">
-                    <Label htmlFor="document" className="text-sm font-medium text-slate-200">CPF/CNPJ</Label>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                      Nome Completo
+                      <span className="text-red-400">*</span>
+                    </Label>
                     <Input
-                      id="document"
-                      value={newCustomer.document}
-                      onChange={(e) => {
-                        const formatted = formatDocument(e.target.value, newCustomer.type);
-                        setNewCustomer(prev => ({ ...prev, document: formatted }));
-                      }}
-                      placeholder={newCustomer.type === 'PF' ? '000.000.000-00' : '00.000.000/0000-00'}
-                      className={`h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 ${validationErrors.document ? 'border-red-400 focus:border-red-400' : ''}`}
+                      id="name"
+                      value={newCustomer.name}
+                      onChange={(e) => setNewCustomer(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Digite o nome completo do cliente"
+                      className={`h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 text-base ${validationErrors.name ? 'border-red-400 focus:border-red-400' : ''}`}
                     />
-                    {validationErrors.document && (
-                      <p className="text-sm text-red-400">{validationErrors.document}</p>
+                    {validationErrors.name && (
+                      <p className="text-sm text-red-400 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {validationErrors.name}
+                      </p>
                     )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-2">
+                      <Label htmlFor="type" className="text-sm font-semibold text-slate-200">Tipo de Cliente</Label>
+                      <Select 
+                        value={newCustomer.type}
+                        onValueChange={(value) => setNewCustomer(prev => ({ ...prev, type: value as 'PF' | 'PJ' }))}
+                      >
+                        <SelectTrigger className="h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white text-base">
+                          <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-700 border-slate-600 shadow-xl">
+                          <SelectItem value="PF" className="hover:bg-slate-600 text-white cursor-pointer">Pessoa Física</SelectItem>
+                          <SelectItem value="PJ" className="hover:bg-slate-600 text-white cursor-pointer">Pessoa Jurídica</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="document" className="text-sm font-semibold text-slate-200">
+                        {newCustomer.type === 'PF' ? 'CPF' : 'CNPJ'}
+                      </Label>
+                      <Input
+                        id="document"
+                        value={newCustomer.document}
+                        onChange={(e) => {
+                          const formatted = formatDocument(e.target.value, newCustomer.type);
+                          setNewCustomer(prev => ({ ...prev, document: formatted }));
+                        }}
+                        placeholder={newCustomer.type === 'PF' ? '000.000.000-00' : '00.000.000/0000-00'}
+                        className={`h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 text-base ${validationErrors.document ? 'border-red-400 focus:border-red-400' : ''}`}
+                      />
+                      {validationErrors.document && (
+                        <p className="text-sm text-red-400 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {validationErrors.document}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Campo de Status */}
-                <div className="grid gap-3">
-                  <Label htmlFor="status" className="text-sm font-medium text-slate-200">Status do Cliente</Label>
-                  <Select 
-                    value={newCustomer.status}
-                    onValueChange={(value) => setNewCustomer(prev => ({ ...prev, status: value as 'active' | 'inactive' }))}
-                  >
-                    <SelectTrigger className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white">
-                      <SelectValue placeholder="Selecione o status" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-700 border-slate-600 shadow-xl">
-                      <SelectItem value="active" className="hover:bg-slate-600 text-white">Ativo</SelectItem>
-                      <SelectItem value="inactive" className="hover:bg-slate-600 text-white">Inativo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-            
-                <div className="grid gap-3">
-                  <Label htmlFor="email" className="text-sm font-medium text-slate-200">E-mail</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={newCustomer.email}
-                    onChange={(e) => setNewCustomer(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="email@exemplo.com"
-                    className={`h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 ${validationErrors.email ? 'border-red-400 focus:border-red-400' : ''}`}
-                  />
-                  {validationErrors.email && (
-                    <p className="text-sm text-red-400">{validationErrors.email}</p>
-                  )}
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="grid gap-3">
-                    <Label htmlFor="phone" className="text-sm font-medium text-slate-200">Telefone</Label>
+                {/* Seção: Contato */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 pb-3 border-b border-slate-700">
+                    <div className="p-2 bg-blue-500/20 rounded-lg">
+                      <Mail className="h-4 w-4 text-blue-400" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wide">Contato</h3>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-sm font-semibold text-slate-200">E-mail</Label>
                     <Input
-                      id="phone"
-                      value={newCustomer.phone}
-                      onChange={(e) => {
-                        const formatted = formatPhone(e.target.value);
-                        setNewCustomer(prev => ({ ...prev, phone: formatted }));
-                      }}
-                      placeholder="(11) 99999-9999"
-                      className={`h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 ${validationErrors.phone ? 'border-red-400 focus:border-red-400' : ''}`}
+                      id="email"
+                      type="email"
+                      value={newCustomer.email}
+                      onChange={(e) => setNewCustomer(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="email@exemplo.com"
+                      className={`h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 text-base ${validationErrors.email ? 'border-red-400 focus:border-red-400' : ''}`}
                     />
-                    {validationErrors.phone && (
-                      <p className="text-sm text-red-400">{validationErrors.phone}</p>
+                    {validationErrors.email && (
+                      <p className="text-sm text-red-400 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {validationErrors.email}
+                      </p>
                     )}
                   </div>
-                  <div className="grid gap-3">
-                    <Label htmlFor="city" className="text-sm font-medium text-slate-200">Cidade</Label>
-                    <Input
-                      id="city"
-                      value={newCustomer.city}
-                      onChange={(e) => setNewCustomer(prev => ({ ...prev, city: e.target.value }))}
-                      placeholder="São Paulo"
-                      className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
-                    />
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-sm font-semibold text-slate-200">Telefone</Label>
+                      <Input
+                        id="phone"
+                        value={newCustomer.phone}
+                        onChange={(e) => {
+                          const formatted = formatPhone(e.target.value);
+                          setNewCustomer(prev => ({ ...prev, phone: formatted }));
+                        }}
+                        placeholder="(11) 99999-9999"
+                        className={`h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 text-base ${validationErrors.phone ? 'border-red-400 focus:border-red-400' : ''}`}
+                      />
+                      {validationErrors.phone && (
+                        <p className="text-sm text-red-400 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {validationErrors.phone}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="city" className="text-sm font-semibold text-slate-200">Cidade</Label>
+                      <Input
+                        id="city"
+                        value={newCustomer.city}
+                        onChange={(e) => setNewCustomer(prev => ({ ...prev, city: e.target.value }))}
+                        placeholder="São Paulo"
+                        className="h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 text-base"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Seção: Status */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 pb-3 border-b border-slate-700">
+                    <div className="p-2 bg-blue-500/20 rounded-lg">
+                      <CheckCircle className="h-4 w-4 text-blue-400" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wide">Status</h3>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="status" className="text-sm font-semibold text-slate-200">Status do Cliente</Label>
+                    <Select 
+                      value={newCustomer.status}
+                      onValueChange={(value) => setNewCustomer(prev => ({ ...prev, status: value as 'active' | 'inactive' }))}
+                    >
+                      <SelectTrigger className="h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white text-base">
+                        <SelectValue placeholder="Selecione o status" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-700 border-slate-600 shadow-xl">
+                        <SelectItem value="active" className="hover:bg-slate-600 text-white cursor-pointer">Ativo</SelectItem>
+                        <SelectItem value="inactive" className="hover:bg-slate-600 text-white cursor-pointer">Inativo</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
