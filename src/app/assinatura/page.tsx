@@ -62,14 +62,14 @@ const subscriptionInfo: Record<PlanId, SubscriptionInfo> = {
     icon: CheckCircle,
     color: 'text-green-600',
     bgColor: 'bg-green-100',
-    price: 'R$ 29,90/mês',
+    price: 'R$ 79,90/mês',
   },
   pro: {
     name: 'Plano Profissional',
     icon: Crown,
     color: 'text-blue-600',
     bgColor: 'bg-blue-100',
-    price: 'R$ 59,90/mês',
+    price: 'R$ 139,90/mês',
   },
   enterprise: {
     name: 'Enterprise',
@@ -84,14 +84,14 @@ const plans: Plan[] = [
   {
     id: 'basic',
     name: 'Básico',
-    price: 29.9,
+    price: 79.9,
     description: 'Ideal para pequenas empresas',
     features: ['Até 1.000 clientes', 'Até 500 produtos', 'Vendas ilimitadas', 'Relatórios básicos', 'Suporte por email'],
   },
   {
     id: 'pro',
     name: 'Profissional',
-    price: 59.9,
+    price: 139.9,
     description: 'Para empresas em crescimento',
     popular: true,
     features: [

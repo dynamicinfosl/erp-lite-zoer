@@ -24,7 +24,7 @@ function PagamentoSucessoContent() {
     // Simular dados do pagamento (em produção, viria dos parâmetros da URL ou localStorage)
     const mockPaymentData = {
       planId: searchParams.get('plan') || 'pro',
-      amount: searchParams.get('amount') || '59.90',
+      amount: searchParams.get('amount') || '139.90',
       transactionId: searchParams.get('transaction_id') || `tx_${Date.now()}`,
       status: 'completed',
       paymentMethod: 'credit_card',

@@ -79,7 +79,7 @@ export function PlanManagementFixed() {
           id: '1',
           name: 'Básico',
           description: 'Plano ideal para pequenas empresas',
-          price: 29.90,
+          price: 79.90,
           billing_cycle: 'monthly',
           features: ['Gestão de produtos', 'Gestão de clientes', 'Relatórios básicos', 'Suporte por email'],
           max_users: 1,
@@ -93,7 +93,7 @@ export function PlanManagementFixed() {
           id: '2',
           name: 'Profissional',
           description: 'Para empresas em crescimento',
-          price: 59.90,
+          price: 139.90,
           billing_cycle: 'monthly',
           features: ['Tudo do Básico', 'Múltiplos usuários', 'Relatórios avançados', 'Integração com APIs', 'Suporte prioritário'],
           max_users: 5,
@@ -401,7 +401,7 @@ export function PlanManagementFixed() {
                 </div>
                 <div>
                   <Label htmlFor="price" className="text-gray-700">Preço (R$)</Label>
-                  <Input id="price" type="number" step="0.01" value={formData.price} onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })} placeholder="29.90" className="bg-white border border-gray-200" />
+                  <Input id="price" type="number" step="0.01" value={formData.price} onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })} placeholder="79.90" className="bg-white border border-gray-200" />
                 </div>
               </div>
 

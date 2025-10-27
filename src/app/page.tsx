@@ -95,7 +95,7 @@ const plans = [
   },
   {
     name: 'Básico',
-    price: 49.90,
+    price: 79.90,
     period: '/mês',
     description: 'Ideal para pequenas empresas',
     icon: CheckCircle,
@@ -111,7 +111,7 @@ const plans = [
   },
   {
     name: 'Profissional',
-    price: 99.90,
+    price: 139.90,
     period: '/mês',
     description: 'Para empresas em crescimento',
     icon: Crown,
