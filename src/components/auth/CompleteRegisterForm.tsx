@@ -710,7 +710,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
     <div className="space-y-6">
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2 text-gray-900">Escolha seu plano</h3>
-        <p className="text-gray-700 font-medium">Todos os planos incluem 14 dias de teste gratuito</p>
+        <p className="text-gray-700 font-medium">Todos os planos incluem 7 dias de teste gratuito</p>
       </div>
 
       <div className="space-y-4">
@@ -829,7 +829,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
           <CardContent className="space-y-2 text-sm">
             <p className="text-gray-900"><strong className="text-gray-800">Plano:</strong> <span className="text-gray-700">{selectedPlan?.name}</span></p>
             <p className="text-gray-900"><strong className="text-gray-800">Preço:</strong> <span className="text-gray-700">R$ {selectedPlan?.price.toFixed(2).replace('.', ',')}/mês</span></p>
-            <p className="text-gray-900"><strong className="text-gray-800">Período de Teste:</strong> <span className="text-gray-700">14 dias gratuitos</span></p>
+            <p className="text-gray-900"><strong className="text-gray-800">Período de Teste:</strong> <span className="text-gray-700">7 dias gratuitos</span></p>
           </CardContent>
         </Card>
       </div>

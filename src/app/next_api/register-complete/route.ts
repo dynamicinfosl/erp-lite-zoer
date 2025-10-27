@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
         zip_code: data.address.zip_code,
         // Status e trial
         status: 'trial',
-        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       };
 
       const result = await supabaseAdmin
@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
         zip_code: data.address.zip_code,
         // Status e trial
         status: 'trial',
-        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       };
 
       console.log('📝 Tentando criar tenant com campos básicos...');
@@ -261,7 +261,7 @@ export async function POST(request: NextRequest) {
           plan_id: data.plan_id,
           status: 'trial',
           trial_started_at: new Date().toISOString(),
-          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         });
 
       if (subscriptionError) {

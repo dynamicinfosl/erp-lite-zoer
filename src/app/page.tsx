@@ -80,7 +80,7 @@ const plans = [
   {
     name: 'Trial',
     price: 0,
-    period: '14 dias grátis',
+    period: '7 dias grátis',
     description: 'Experimente todas as funcionalidades',
     icon: Zap,
     color: 'from-orange-500 to-red-500',
@@ -220,7 +220,7 @@ export default function HomePage() {
               <div className="mt-16 flex items-center justify-center gap-8 text-white/70 text-sm">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" />
-                  <span>14 dias grátis</span>
+                  <span>7 dias grátis</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Lock className="h-4 w-4" />

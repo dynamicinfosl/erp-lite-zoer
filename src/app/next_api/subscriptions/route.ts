@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
 
     // Criar subscription
     const trialEndsAt = status === 'trial' 
-      ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 14 dias
+      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dias
       : null;
 
     const { data, error } = await supabaseAdmin
@@ -230,7 +230,7 @@ export async function POST(request: NextRequest) {
         trial_end: trialEndsAt,
         current_period_start: new Date().toISOString(),
         current_period_end: status === 'active' 
-          ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 14 dias
+          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dias
           : null,
       })
       .select(`

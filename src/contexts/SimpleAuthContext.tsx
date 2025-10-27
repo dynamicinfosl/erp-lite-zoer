@@ -56,7 +56,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   const createDefaultSubscription = (userCreatedAt?: string) => {
     // Se não temos a data de criação, usar data atual (fallback)
     const baseDate = userCreatedAt ? new Date(userCreatedAt) : new Date();
-    const trialEndsAt = new Date(baseDate.getTime() + 14 * 24 * 60 * 60 * 1000);
+    const trialEndsAt = new Date(baseDate.getTime() + 7 * 24 * 60 * 60 * 1000);
     
     return {
       id: 'trial-default',

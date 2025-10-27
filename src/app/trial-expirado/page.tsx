@@ -35,7 +35,7 @@ export default function TrialExpiradoPage() {
           </div>
           <h1 className="text-3xl font-bold text-heading">Período de Teste Expirado</h1>
           <p className="text-body text-lg">
-            Seu período gratuito de 14 dias chegou ao fim
+            Seu período gratuito de 7 dias chegou ao fim
           </p>
         </div>
 

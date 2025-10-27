@@ -54,8 +54,8 @@ const subscriptionInfo: Record<PlanId, SubscriptionInfo> = {
     icon: Zap,
     color: 'text-orange-600',
     bgColor: 'bg-orange-100',
-    daysLeft: 14,
-    totalDays: 30,
+    daysLeft: 7,
+    totalDays: 7,
   },
   basic: {
     name: 'Plano Básico',
@@ -356,12 +356,12 @@ export default function AssinaturaPage() {
                 {/* Card de Progresso */}
                 <JugaKPICard
                   title="Progresso do Teste"
-                  value={isTrialExpired ? '100%' : `${Math.round(((14 - daysLeftInTrial) / 14) * 100)}%`}
-                  description={isTrialExpired ? '14 de 14 dias utilizados' : 
-                             `${14 - daysLeftInTrial} de 14 dias utilizados`}
+                  value={isTrialExpired ? '100%' : `${Math.round(((7 - daysLeftInTrial) / 7) * 100)}%`}
+                  description={isTrialExpired ? '7 de 7 dias utilizados' : 
+                             `${7 - daysLeftInTrial} de 7 dias utilizados`}
                   trend="neutral"
                   trendValue={isTrialExpired ? 'Completo' : 
-                             (14 - daysLeftInTrial) >= 14 ? 'Completo' : 'Em andamento'}
+                             (7 - daysLeftInTrial) >= 7 ? 'Completo' : 'Em andamento'}
                   icon={<TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />}
                   color="primary"
                   className="min-h-[120px] sm:min-h-[140px]"
