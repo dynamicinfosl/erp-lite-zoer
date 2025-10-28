@@ -7,6 +7,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Toaster } from "@/components/ui/toaster";
 import { SonnerProvider } from "@/components/SonnerProvider";
 import { ErrorHandler } from "@/components/ErrorHandler";
+import { OfflineNotifier } from "@/components/layout/OfflineNotifier";
 
 import "./globals.css";
 
@@ -50,6 +51,7 @@ export default function RootLayout({
               {children}
             </AppLayout>
             <ErrorHandler />
+            <OfflineNotifier />
             <Toaster />
             <SonnerProvider />
           </SimpleAuthProvider>

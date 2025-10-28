@@ -70,6 +70,15 @@ async function apiRequest<T = any>(
         ...options?.headers,
       },
       ...options,
+    }).catch((fetchError: any) => {
+      // Tratamento de erros de rede
+      if (fetchError.name === 'AbortError') {
+        throw new ApiError(408, 'Timeout: A requisição demorou muito', 'TIMEOUT');
+      } else if (fetchError.message?.includes('Failed to fetch') || 
+                 fetchError.message?.includes('ERR_INTERNET_DISCONNECTED')) {
+        throw new ApiError(503, 'Sem conexão com a internet', 'NO_CONNECTION');
+      }
+      throw fetchError;
     });
 
     // Parsing seguro do corpo, lidando com respostas não-JSON e corpo vazio

@@ -43,11 +43,24 @@ export function createSupabaseClient() {
         headers: {
           'X-Client-Info': 'supabase-js-web'
         },
-        fetch: (url, options = {}) => {
-          return fetch(url, {
-            ...options,
-            signal: AbortSignal.timeout(10000) // Reduzir timeout
-          })
+        fetch: async (url, options = {}) => {
+          try {
+            const response = await fetch(url, {
+              ...options,
+              signal: AbortSignal.timeout(15000) // Aumentar para 15 segundos
+            })
+            return response
+          } catch (error: any) {
+            // Tratamento específico para erros de rede
+            if (error.name === 'AbortError') {
+              console.error('⏱️ Timeout ao conectar com Supabase')
+            } else if (error.message?.includes('Failed to fetch') || error.message?.includes('ERR_INTERNET_DISCONNECTED')) {
+              console.error('📡 Erro de conexão: Verifique sua conexão com a internet')
+            } else {
+              console.error('❌ Erro ao fazer requisição:', error.message)
+            }
+            throw error
+          }
         }
       },
       db: {

@@ -360,7 +360,19 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
       }, 1000);
     } catch (err: any) {
       console.error('Erro no cadastro:', err);
-      setError(err.message || 'Erro ao realizar cadastro');
+      
+      // Detectar erros de conexão
+      let errorMessage = err.message || 'Erro ao realizar cadastro';
+      
+      if (err.message?.includes('Failed to fetch') || 
+          err.message?.includes('ERR_INTERNET_DISCONNECTED') ||
+          err.message?.includes('network error')) {
+        errorMessage = 'Sem conexão com a internet. Verifique sua conexão e tente novamente.';
+      } else if (err.message?.includes('timeout') || err.name === 'AbortError') {
+        errorMessage = 'A requisição demorou muito. Verifique sua conexão e tente novamente.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

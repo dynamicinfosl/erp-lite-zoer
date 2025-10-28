@@ -28,12 +28,25 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
     headers: {
       'X-Client-Info': 'supabase-js-web'
     },
-    fetch: (url, options = {}) => {
-      return fetch(url, {
-        ...options,
-        // Timeout de 15 segundos para requests
-        signal: AbortSignal.timeout(15000)
-      })
+    fetch: async (url, options = {}) => {
+      try {
+        const response = await fetch(url, {
+          ...options,
+          // Timeout de 15 segundos para requests
+          signal: AbortSignal.timeout(15000)
+        })
+        return response
+      } catch (error: any) {
+        // Tratamento específico para erros de rede
+        if (error.name === 'AbortError') {
+          console.error('⏱️ Timeout ao conectar com Supabase')
+        } else if (error.message?.includes('Failed to fetch') || error.message?.includes('ERR_INTERNET_DISCONNECTED')) {
+          console.error('📡 Erro de conexão: Verifique sua conexão com a internet')
+        } else {
+          console.error('❌ Erro ao fazer requisição:', error.message)
+        }
+        throw error
+      }
     }
   },
   db: {
