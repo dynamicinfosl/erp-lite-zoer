@@ -445,7 +445,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
   const renderStep1 = () => (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="name" className="text-gray-900 font-semibold">Nome Completo *</Label>
+        <Label htmlFor="name" className="font-semibold">Nome Completo *</Label>
         <Input
           id="name"
           value={responsibleData.name}
@@ -455,7 +455,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="email" className="text-gray-900 font-semibold">E-mail *</Label>
+        <Label htmlFor="email" className="font-semibold">E-mail *</Label>
         <Input
           id="email"
           type="email"
@@ -468,7 +468,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
 
       <div className="grid grid-cols-2 gap-6">
         <div className="space-y-2">
-          <Label htmlFor="phone" className="text-gray-900 font-semibold">Telefone</Label>
+          <Label htmlFor="phone" className="font-semibold">Telefone</Label>
           <Input
             id="phone"
             value={responsibleData.phone}
@@ -490,7 +490,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="cpf" className="text-gray-900 font-semibold">CPF (opcional)</Label>
+          <Label htmlFor="cpf" className="font-semibold">CPF (opcional)</Label>
           <Input
             id="cpf"
             value={responsibleData.cpf}
@@ -511,7 +511,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
 
       <div className="grid grid-cols-2 gap-6">
         <div className="space-y-2">
-          <Label htmlFor="password" className="text-gray-900 font-semibold">Senha *</Label>
+          <Label htmlFor="password" className="font-semibold">Senha *</Label>
           <Input
             id="password"
             type="password"
@@ -523,7 +523,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword" className="text-gray-900 font-semibold">Confirmar Senha *</Label>
+          <Label htmlFor="confirmPassword" className="font-semibold">Confirmar Senha *</Label>
           <Input
             id="confirmPassword"
             type="password"
@@ -725,8 +725,8 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
   const renderStep4 = () => (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="text-lg font-semibold mb-2 text-gray-900">Escolha seu plano</h3>
-        <p className="text-gray-700 font-medium">Todos os planos incluem 7 dias de teste gratuito</p>
+        <h3 className="text-lg font-semibold mb-2 text-foreground">Escolha seu plano</h3>
+        <p className="text-muted-foreground font-medium">Todos os planos incluem 7 dias de teste gratuito</p>
       </div>
 
       <div className="space-y-4">
@@ -735,40 +735,40 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
             key={plan.id} 
             className={`cursor-pointer transition-all border-2 ${
               selectedPlan?.id === plan.id 
-                ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-50 shadow-lg' 
-                : 'border-gray-200 hover:border-gray-400 hover:shadow-md'
+                ? 'ring-2 ring-primary border-primary bg-primary/10 dark:bg-primary/20 shadow-lg' 
+                : 'border-border hover:border-primary/50 hover:shadow-md'
             }`}
             onClick={() => setSelectedPlan(plan)}
           >
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-base text-gray-900 font-bold">
+                <CardTitle className="flex items-center gap-2 text-base text-card-foreground font-bold">
                   <CreditCard className="h-4 w-4" />
                   {plan.name}
                 </CardTitle>
                 {selectedPlan?.id === plan.id && (
-                  <Badge className="bg-blue-600 text-white font-semibold">Selecionado</Badge>
+                  <Badge className="bg-primary text-primary-foreground font-semibold">Selecionado</Badge>
                 )}
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-700 mb-1 font-medium">{plan.description}</p>
-                  <div className="text-2xl font-bold text-blue-600">
+                  <p className="text-sm text-card-foreground mb-1 font-medium">{plan.description}</p>
+                  <div className="text-2xl font-bold text-primary">
                     R$ {plan.price.toFixed(2).replace('.', ',')}
-                    <span className="text-sm font-normal text-gray-600">/mês</span>
+                    <span className="text-sm font-normal text-muted-foreground">/mês</span>
                   </div>
                 </div>
               </div>
               
-              <div className="border-t pt-3">
-                <h4 className="text-sm font-semibold text-gray-800 mb-2">Recursos incluídos:</h4>
+              <div className="border-t border-border pt-3">
+                <h4 className="text-sm font-semibold text-card-foreground mb-2">Recursos incluídos:</h4>
                 <ul className="space-y-1 text-sm">
                   {plan.features.map((feature, index) => (
                     <li key={index} className="flex items-center gap-2">
-                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
-                      <span className="text-gray-700 font-medium">{feature}</span>
+                      <CheckCircle className="h-3 w-3 text-green-500 dark:text-green-400 flex-shrink-0" />
+                      <span className="text-card-foreground font-medium">{feature}</span>
                     </li>
                   ))}
                 </ul>
@@ -783,75 +783,75 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
   const renderStep5 = () => (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="text-lg font-semibold mb-2">Confirmação dos Dados</h3>
-        <p className="text-gray-600">Revise os dados antes de finalizar o cadastro</p>
+        <h3 className="text-lg font-semibold mb-2 text-foreground">Confirmação dos Dados</h3>
+        <p className="text-muted-foreground">Revise os dados antes de finalizar o cadastro</p>
       </div>
 
       <div className="space-y-4">
-        <Card className="border-2 border-gray-200 shadow-md">
+        <Card className="border-2 border-border shadow-md">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-gray-900 font-bold">
+            <CardTitle className="flex items-center gap-2 text-base text-card-foreground font-bold">
               <User className="h-4 w-4" />
               Dados do Responsável
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <p className="text-gray-900"><strong className="text-gray-800">Nome:</strong> <span className="text-gray-700">{responsibleData.name}</span></p>
-            <p className="text-gray-900"><strong className="text-gray-800">E-mail:</strong> <span className="text-gray-700">{responsibleData.email}</span></p>
-            <p className="text-gray-900"><strong className="text-gray-800">Telefone:</strong> <span className="text-gray-700">{responsibleData.phone || 'Não informado'}</span></p>
-            <p className="text-gray-900"><strong className="text-gray-800">CPF:</strong> <span className="text-gray-700">{responsibleData.cpf || 'Não informado'}</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">Nome:</strong> <span className="text-muted-foreground">{responsibleData.name}</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">E-mail:</strong> <span className="text-muted-foreground">{responsibleData.email}</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">Telefone:</strong> <span className="text-muted-foreground">{responsibleData.phone || 'Não informado'}</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">CPF:</strong> <span className="text-muted-foreground">{responsibleData.cpf || 'Não informado'}</span></p>
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-gray-200 shadow-md">
+        <Card className="border-2 border-border shadow-md">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-gray-900 font-bold">
+            <CardTitle className="flex items-center gap-2 text-base text-card-foreground font-bold">
               <Building2 className="h-4 w-4" />
               Dados da Empresa
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <p className="text-gray-900"><strong className="text-gray-800">Razão Social:</strong> <span className="text-gray-700">{companyData.name}</span></p>
-            <p className="text-gray-900"><strong className="text-gray-800">Nome Fantasia:</strong> <span className="text-gray-700">{companyData.fantasy_name || 'Não informado'}</span></p>
-            <p className="text-gray-900"><strong className="text-gray-800">Documento:</strong> <span className="text-gray-700">{companyData.document} ({companyData.document_type})</span></p>
-            <p className="text-gray-900"><strong className="text-gray-800">E-mail Corporativo:</strong> <span className="text-gray-700">{companyData.corporate_email || 'Não informado'}</span></p>
-            <p className="text-gray-900"><strong className="text-gray-800">Telefone Corporativo:</strong> <span className="text-gray-700">{companyData.corporate_phone || 'Não informado'}</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">Razão Social:</strong> <span className="text-muted-foreground">{companyData.name}</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">Nome Fantasia:</strong> <span className="text-muted-foreground">{companyData.fantasy_name || 'Não informado'}</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">Documento:</strong> <span className="text-muted-foreground">{companyData.document} ({companyData.document_type})</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">E-mail Corporativo:</strong> <span className="text-muted-foreground">{companyData.corporate_email || 'Não informado'}</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">Telefone Corporativo:</strong> <span className="text-muted-foreground">{companyData.corporate_phone || 'Não informado'}</span></p>
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-gray-200 shadow-md">
+        <Card className="border-2 border-border shadow-md">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-gray-900 font-bold">
+            <CardTitle className="flex items-center gap-2 text-base text-card-foreground font-bold">
               <MapPinIcon className="h-4 w-4" />
               Endereço
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <p className="text-gray-900"><strong className="text-gray-800">CEP:</strong> <span className="text-gray-700">{addressData.zip_code}</span></p>
-            <p className="text-gray-900"><strong className="text-gray-800">Endereço:</strong> <span className="text-gray-700">{addressData.address}, {addressData.number}</span></p>
-            <p className="text-gray-900"><strong className="text-gray-800">Complemento:</strong> <span className="text-gray-700">{addressData.complement || 'Não informado'}</span></p>
-            <p className="text-gray-900"><strong className="text-gray-800">Bairro:</strong> <span className="text-gray-700">{addressData.neighborhood || 'Não informado'}</span></p>
-            <p className="text-gray-900"><strong className="text-gray-800">Cidade/Estado:</strong> <span className="text-gray-700">{addressData.city}/{addressData.state}</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">CEP:</strong> <span className="text-muted-foreground">{addressData.zip_code}</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">Endereço:</strong> <span className="text-muted-foreground">{addressData.address}, {addressData.number}</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">Complemento:</strong> <span className="text-muted-foreground">{addressData.complement || 'Não informado'}</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">Bairro:</strong> <span className="text-muted-foreground">{addressData.neighborhood || 'Não informado'}</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">Cidade/Estado:</strong> <span className="text-muted-foreground">{addressData.city}/{addressData.state}</span></p>
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-gray-200 shadow-md">
+        <Card className="border-2 border-border shadow-md">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-gray-900 font-bold">
+            <CardTitle className="flex items-center gap-2 text-base text-card-foreground font-bold">
               <CreditCard className="h-4 w-4" />
               Plano Selecionado
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <p className="text-gray-900"><strong className="text-gray-800">Plano:</strong> <span className="text-gray-700">{selectedPlan?.name}</span></p>
-            <p className="text-gray-900"><strong className="text-gray-800">Preço:</strong> <span className="text-gray-700">R$ {selectedPlan?.price.toFixed(2).replace('.', ',')}/mês</span></p>
-            <p className="text-gray-900"><strong className="text-gray-800">Período de Teste:</strong> <span className="text-gray-700">7 dias gratuitos</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">Plano:</strong> <span className="text-muted-foreground">{selectedPlan?.name}</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">Preço:</strong> <span className="text-muted-foreground">R$ {selectedPlan?.price.toFixed(2).replace('.', ',')}/mês</span></p>
+            <p className="text-card-foreground"><strong className="font-semibold">Período de Teste:</strong> <span className="text-muted-foreground">7 dias gratuitos</span></p>
           </CardContent>
         </Card>
       </div>
 
       <div className="space-y-4">
-        <Card className="border-2 border-gray-200 shadow-md bg-gray-50">
+        <Card className="border-2 border-border shadow-md bg-muted/50">
           <CardContent className="pt-4">
             <div className="flex items-start space-x-3">
               <Checkbox
@@ -863,14 +863,14 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
               <div className="grid gap-1.5 leading-none">
                 <label
                   htmlFor="terms"
-                  className="text-sm font-semibold leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-900 cursor-pointer"
+                  className="text-sm font-semibold leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-card-foreground cursor-pointer"
                 >
                   Aceito os termos de uso e política de privacidade
                 </label>
-                <p className="text-sm text-gray-700">
+                <p className="text-sm text-muted-foreground">
                   Ao continuar, você concorda com nossos{' '}
-                  <a href="#" className="text-blue-600 hover:underline font-medium">Termos de Uso</a> e{' '}
-                  <a href="#" className="text-blue-600 hover:underline font-medium">Política de Privacidade</a>.
+                  <a href="#" className="text-primary hover:underline font-medium">Termos de Uso</a> e{' '}
+                  <a href="#" className="text-primary hover:underline font-medium">Política de Privacidade</a>.
                 </p>
               </div>
             </div>
@@ -897,12 +897,12 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
         {/* Progress Section */}
         <div className="space-y-4">
           <div className="text-center space-y-2">
-            <h2 className="text-xl font-semibold text-gray-900">Cadastro da Empresa</h2>
-            <p className="text-sm text-gray-600">Complete seu cadastro em poucos passos</p>
+            <h2 className="text-xl font-semibold text-foreground">Cadastro da Empresa</h2>
+            <p className="text-sm text-muted-foreground">Complete seu cadastro em poucos passos</p>
           </div>
           
           <div className="space-y-3">
-            <div className="flex justify-between text-sm text-gray-600">
+            <div className="flex justify-between text-sm text-muted-foreground">
               <span>Etapa {currentStep} de {STEPS.length}</span>
               <span>{Math.round(progress)}% concluído</span>
             </div>
@@ -916,14 +916,14 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
                 <div
                   key={step.id}
                   className={`flex flex-col items-center space-y-2 ${
-                    currentStep >= step.id ? 'text-blue-600' : 'text-gray-400'
+                    currentStep >= step.id ? 'text-primary' : 'text-muted-foreground'
                   }`}
                 >
                   <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
                       currentStep >= step.id
-                        ? 'bg-blue-600 text-white shadow-lg'
-                        : 'bg-gray-200 text-gray-400'
+                        ? 'bg-primary text-primary-foreground shadow-lg'
+                        : 'bg-muted text-muted-foreground'
                     }`}
                   >
                     <Icon className="h-5 w-5" />
@@ -936,11 +936,11 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
         </div>
 
         {/* Form Content */}
-        <Card className="border-2 border-gray-200 shadow-lg">
+        <Card className="border-2 border-border shadow-lg">
           <CardContent className="pt-6 space-y-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4">
-              <p className="text-red-800 text-sm">{error}</p>
+            <div className="bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 rounded-md p-4">
+              <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
             </div>
           )}
 
@@ -952,7 +952,7 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
               variant="outline"
               onClick={prevStep}
               disabled={currentStep === 1}
-              className="flex items-center gap-2 px-6 py-3 bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-6 py-3"
             >
               <ArrowLeft className="h-4 w-4" />
               Anterior
@@ -989,13 +989,13 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
             )}
           </div>
 
-            <div className="text-center pt-4 border-t border-gray-200">
-              <p className="text-sm text-gray-600">
+            <div className="text-center pt-4 border-t border-border">
+              <p className="text-sm text-muted-foreground">
                 Já tem uma conta?{' '}
                 <button
                   type="button"
                   onClick={onSwitchToLogin}
-                  className="text-blue-600 hover:underline font-medium"
+                  className="text-primary hover:underline font-medium"
                 >
                   Faça login
                 </button>
