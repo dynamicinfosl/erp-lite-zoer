@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 import {
   TrendingUp,
@@ -23,7 +23,7 @@ import {
   ArrowRight,
   FileText,
 } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, LineChart, Line, PieChart, Pie, Cell, LabelList } from 'recharts';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { Label } from '@/components/ui/label';
 
@@ -84,6 +84,15 @@ export default function RelatoriosPage() {
       setTransactions(Array.isArray(transactionsData?.data) ? transactionsData.data : (transactionsData?.rows || []));
       setDeliveries(Array.isArray(deliveriesData?.data) ? deliveriesData.data : (deliveriesData?.rows || []));
       setReport(reportData);
+      
+      // Debug dos valores do report
+      if (reportData) {
+        console.log('💰 Valores do relatório:', {
+          totalRevenue: reportData.totalRevenue,
+          totalCost: reportData.totalCost,
+          totalProfit: reportData.totalProfit,
+        });
+      }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
@@ -458,6 +467,16 @@ export default function RelatoriosPage() {
       }));
   }, [filteredTransactions]);
 
+  const cashFlowTotals = useMemo(() => {
+    const receitas = filteredTransactions
+      .filter((t) => (t.transaction_type || 'receita') === 'receita' && (t.status || 'pago') === 'pago')
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    const despesas = filteredTransactions
+      .filter((t) => (t.transaction_type || 'receita') === 'despesa' && (t.status || 'pago') === 'pago')
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    return { receitas, despesas, saldo: receitas - despesas };
+  }, [filteredTransactions]);
+
   const summaryCards = useMemo(
     () => [
       {
@@ -586,58 +605,200 @@ export default function RelatoriosPage() {
             </TabsList>
 
             <TabsContent value="vendas">
-              <div className="grid gap-6 lg:grid-cols-2">
-                <Card className="juga-card">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg sm:text-xl text-heading">Volume diário de vendas</CardTitle>
+              <div className="grid gap-2 sm:gap-3 grid-cols-1 md:grid-cols-2">
+                <Card className="juga-card w-full">
+                  <CardHeader className="pb-1 pt-3 px-3 sm:px-4">
+                    <CardTitle className="text-xs sm:text-sm text-heading">Volume diário de vendas</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <ChartContainer config={{ amount: { label: 'Valor', color: 'hsl(var(--chart-1))' } }} className="h-[200px]">
+                  <CardContent className="px-2 sm:px-3 pb-3">
+                    <ChartContainer 
+                      config={{ 
+                        amount: { 
+                          label: 'Valor', 
+                          color: '#3b82f6'
+                        } 
+                      }} 
+                      className="h-[140px] sm:h-[160px] min-w-0 [&_.recharts-surface]:fill-transparent [&_svg]:bg-transparent"
+                    >
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={dailySalesChart} margin={{ left: 5, right: 55, top: 10, bottom: 10 }}>
-                          <XAxis dataKey="date" />
-                          <YAxis tickFormatter={(value) => formatCurrency(value)} />
+                        <BarChart 
+                          data={dailySalesChart} 
+                          margin={{ left: 0, right: 5, top: 3, bottom: 3 }}
+                          barCategoryGap="20%"
+                        >
+                          <XAxis 
+                            dataKey="date" 
+                            tick={{ fill: 'var(--juga-text-muted)', fontSize: 10 }}
+                            stroke="var(--juga-border)"
+                            height={25}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis 
+                            tickFormatter={(value) => {
+                              if (value >= 1000) return `R$ ${(value / 1000).toFixed(1)}k`;
+                              return formatCurrency(value);
+                            }}
+                            tick={{ fill: 'var(--juga-text-muted)', fontSize: 10 }}
+                            stroke="var(--juga-border)"
+                            width={45}
+                            axisLine={false}
+                            tickLine={false}
+                          />
                           {dailySalesChart.length > 0 && (
-                            <ChartTooltip content={<ChartTooltipContent />} />
+                            <ChartTooltip 
+                              content={
+                                <ChartTooltipContent 
+                                  formatter={(value) => 
+                                    formatCurrency(value as number)
+                                  }
+                                />
+                              } 
+                            />
                           )}
-                          <Bar dataKey="amount" fill="hsl(var(--chart-1))" />
+                          <Bar 
+                            dataKey="amount" 
+                            fill="var(--color-amount)"
+                            radius={[4, 4, 0, 0]}
+                            isAnimationActive={true}
+                          >
+                            <LabelList 
+                              dataKey="amount" 
+                              position="top" 
+                              formatter={(value: number) => formatCurrency(value)}
+                              fill="var(--juga-text-primary)"
+                              fontSize={10}
+                              offset={5}
+                            />
+                          </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                     </ChartContainer>
                   </CardContent>
                 </Card>
 
-                <Card className="juga-card">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg sm:text-xl text-heading">Custo x Receita x Lucro</CardTitle>
+                <Card className="juga-card w-full">
+                  <CardHeader className="pb-1 pt-3 px-3 sm:px-4">
+                    <CardTitle className="text-xs sm:text-sm text-heading">Custo x Receita x Lucro</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="px-2 sm:px-3 pb-3">
+                    {/* Resumo de métricas */}
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      <div className="flex flex-col items-center gap-1 py-2 px-2 rounded-md bg-juga-surface-elevated/30 border border-juga-border/30">
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: '#10b981' }} />
+                          <span className="text-[10px] sm:text-[11px] text-juga-text-muted font-medium">Receita</span>
+                        </div>
+                        <span className="text-sm sm:text-base font-semibold text-juga-text-primary">
+                          {formatCurrency((report?.totalRevenue ?? 0) as number)}
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-center gap-1 py-2 px-2 rounded-md bg-juga-surface-elevated/30 border border-juga-border/30">
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: '#ef4444' }} />
+                          <span className="text-[10px] sm:text-[11px] text-juga-text-muted font-medium">Custo</span>
+                        </div>
+                        <span className="text-sm sm:text-base font-semibold text-juga-text-primary">
+                          {formatCurrency((report?.totalCost ?? 0) as number)}
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-center gap-1 py-2 px-2 rounded-md bg-juga-surface-elevated/30 border border-juga-border/30">
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: '#3b82f6' }} />
+                          <span className="text-[10px] sm:text-[11px] text-juga-text-muted font-medium">Lucro</span>
+                        </div>
+                        <span className="text-sm sm:text-base font-semibold text-juga-text-primary">
+                          {formatCurrency((report?.totalProfit ?? 0) as number)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Gráfico */}
                     <ChartContainer
                       config={{
-                        receita: { label: 'Receita', color: 'hsl(var(--chart-1))' },
-                        custo: { label: 'Custo', color: 'hsl(var(--chart-2))' },
-                        lucro: { label: 'Lucro', color: 'hsl(var(--chart-3))' },
+                        receita: { label: 'Receita', color: '#10b981' },
+                        custo: { label: 'Custo', color: '#ef4444' },
+                        lucro: { label: 'Lucro', color: '#3b82f6' },
                       }}
-                      className="h-[200px]"
+                      className="h-[140px] sm:h-[160px] min-w-0 [&_.recharts-surface]:fill-transparent [&_svg]:bg-transparent"
                     >
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={[{
-                          date: 'Período',
-                          receita: report?.totalRevenue ?? 0,
-                          custo: report?.totalCost ?? 0,
-                          lucro: report?.totalProfit ?? 0,
-                        }]}
-                        margin={{ left: 20, right: 20, top: 10, bottom: 10 }}
+                        <BarChart
+                          data={[{
+                            date: 'Período',
+                            receita: report?.totalRevenue ?? 0,
+                            custo: report?.totalCost ?? 0,
+                            lucro: report?.totalProfit ?? 0,
+                          }]}
+                          margin={{ left: 0, right: 5, top: 3, bottom: 3 }}
+                          barCategoryGap="20%"
                         >
-                          <XAxis dataKey="date" hide />
-                          <YAxis />
-                          <ChartTooltip content={<ChartTooltipContent />} />
-                          <Line type="monotone" dataKey="receita" stroke="hsl(var(--chart-1))" strokeWidth={2} />
-                          <Line type="monotone" dataKey="custo" stroke="hsl(var(--chart-2))" strokeWidth={2} />
-                          <Line type="monotone" dataKey="lucro" stroke="hsl(var(--chart-3))" strokeWidth={2} />
-                        </LineChart>
+                          <XAxis 
+                            dataKey="date" 
+                            tick={{ fill: 'var(--juga-text-muted)', fontSize: 10 }}
+                            stroke="var(--juga-border)"
+                            height={25}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis 
+                            tickFormatter={(value) => {
+                              if (value >= 1000) return `R$ ${(value / 1000).toFixed(1)}k`;
+                              return formatCurrency(value);
+                            }}
+                            tick={{ fill: 'var(--juga-text-muted)', fontSize: 10 }}
+                            stroke="var(--juga-border)"
+                            width={45}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <ChartTooltip 
+                            content={
+                              <ChartTooltipContent 
+                                formatter={(value) => 
+                                  formatCurrency(value as number)
+                                }
+                              />
+                            } 
+                          />
+                          <Bar dataKey="receita" fill="var(--color-receita)" radius={[4, 4, 0, 0]} name="Receita" isAnimationActive={true}>
+                            <LabelList 
+                              dataKey="receita" 
+                              position="top" 
+                              formatter={(value: number) => formatCurrency(value)}
+                              fill="var(--juga-text-primary)"
+                              fontSize={10}
+                              offset={5}
+                            />
+                          </Bar>
+                          <Bar dataKey="custo" fill="var(--color-custo)" radius={[4, 4, 0, 0]} name="Custo" isAnimationActive={true}>
+                            <LabelList 
+                              dataKey="custo" 
+                              position="top" 
+                              formatter={(value: number) => formatCurrency(value)}
+                              fill="var(--juga-text-primary)"
+                              fontSize={10}
+                              offset={5}
+                            />
+                          </Bar>
+                          <Bar dataKey="lucro" fill="var(--color-lucro)" radius={[4, 4, 0, 0]} name="Lucro" isAnimationActive={true}>
+                            <LabelList 
+                              dataKey="lucro" 
+                              position="top" 
+                              formatter={(value: number) => formatCurrency(value)}
+                              fill="var(--juga-text-primary)"
+                              fontSize={10}
+                              offset={5}
+                            />
+                          </Bar>
+                        </BarChart>
                       </ResponsiveContainer>
                     </ChartContainer>
+
+                    {/* Estado vazio */}
+                    {((report?.totalRevenue ?? 0) === 0 && (report?.totalCost ?? 0) === 0 && (report?.totalProfit ?? 0) === 0) && (
+                      <div className="text-center text-juga-text-muted text-xs mt-2">Sem dados no período</div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -702,10 +863,25 @@ export default function RelatoriosPage() {
 
             <TabsContent value="financeiro">
               <Card className="juga-card">
-                <CardHeader className="pb-4">
+                <CardHeader className="pb-2">
                   <CardTitle className="text-lg sm:text-xl text-heading">Fluxo de caixa consolidado</CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {/* Totais resumidos */}
+                  <div className="grid grid-cols-3 gap-2 mb-3 text-center">
+                    <div className="rounded-md bg-juga-surface-elevated/30 py-2">
+                      <div className="text-[11px] text-juga-text-muted">Receitas</div>
+                      <div className="text-sm font-semibold text-green-500">{formatCurrency(cashFlowTotals.receitas)}</div>
+                    </div>
+                    <div className="rounded-md bg-juga-surface-elevated/30 py-2">
+                      <div className="text-[11px] text-juga-text-muted">Despesas</div>
+                      <div className="text-sm font-semibold text-red-500">{formatCurrency(cashFlowTotals.despesas)}</div>
+                    </div>
+                    <div className="rounded-md bg-juga-surface-elevated/30 py-2">
+                      <div className="text-[11px] text-juga-text-muted">Saldo</div>
+                      <div className={`text-sm font-semibold ${cashFlowTotals.saldo >= 0 ? 'text-green-500' : 'text-red-500'}`}>{formatCurrency(cashFlowTotals.saldo)}</div>
+                    </div>
+                  </div>
                   <ChartContainer
                     config={{
                       receitas: { label: 'Receitas', color: 'hsl(var(--chart-1))' },
@@ -715,9 +891,9 @@ export default function RelatoriosPage() {
                     className="h-[260px]"
                   >
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={cashFlowChart}>
-                        <XAxis dataKey="date" />
-                        <YAxis />
+                      <LineChart data={cashFlowChart} margin={{ left: 8, right: 8, top: 4, bottom: 4 }}>
+                        <XAxis dataKey="date" stroke="var(--juga-text-muted)" fontSize={12} />
+                        <YAxis stroke="var(--juga-text-muted)" fontSize={12} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : v} />
                         {cashFlowChart.length > 0 && (
                           <ChartTooltip content={<ChartTooltipContent />} />
                         )}
@@ -727,6 +903,9 @@ export default function RelatoriosPage() {
                       </LineChart>
                     </ResponsiveContainer>
                   </ChartContainer>
+                  {cashFlowChart.length === 0 && (
+                    <div className="text-center text-xs text-juga-text-muted mt-2">Sem movimentações financeiras no período</div>
+                  )}
                 </CardContent>
               </Card>
 

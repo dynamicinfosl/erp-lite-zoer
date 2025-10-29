@@ -451,8 +451,8 @@ export function UserManagement() {
                     <TableHead>Responsável</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Aprovação</TableHead>
-                    <TableHead className="hidden md:table-cell">Cadastro</TableHead>
-                    <TableHead className="hidden lg:table-cell">Último Login</TableHead>
+                    <TableHead>Cadastro</TableHead>
+                    <TableHead>Último Login</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -482,13 +482,13 @@ export function UserManagement() {
                       <TableCell className="py-2">{getRoleBadge(user.role)}</TableCell>
                       <TableCell className="py-2">{getStatusBadge(user.tenant_status)}</TableCell>
                       <TableCell className="py-2">{getApprovalStatusBadge(user.approval_status || 'pending')}</TableCell>
-                      <TableCell className="py-2 hidden md:table-cell">
+                      <TableCell className="py-2">
                         <div className="flex items-center gap-2 text-sm text-gray-300">
                           <Calendar className="h-4 w-4" />
                           {formatDate(user.user_created_at)}
                         </div>
                       </TableCell>
-                      <TableCell className="py-2 hidden lg:table-cell">
+                      <TableCell className="py-2">
                         <div className="flex items-center gap-2 text-sm text-gray-300">
                           <Clock className="h-4 w-4" />
                           {user.user_last_login === '-' ? 'Nunca' : formatDate(user.user_last_login)}
