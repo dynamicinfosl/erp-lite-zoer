@@ -25,7 +25,7 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { createClient } from '@supabase/supabase-js';
+import { api } from '@/lib/api';
 
 interface TenantUser {
   user_id: string;
@@ -47,10 +47,7 @@ interface TenantUser {
 }
 
 export function UserManagement() {
-  const supabase = createClient(
-    'https://lfxietcasaooenffdodr.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImV4cCI6MjA3MjU5Mzc0M30.NBHrAlv8RPxu1QhLta76Uoh6Bc_OnqhfVydy8_TX6GQ'
-  );
+  
   const [users, setUsers] = useState<TenantUser[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<TenantUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,107 +59,23 @@ export function UserManagement() {
   const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('🔍 Carregando usuários do Supabase...');
-
-      // Buscar dados das tabelas relacionadas
-      const [profilesResult, tenantsResult, membershipsResult] = await Promise.all([
-        supabase.from('user_profiles').select('*'),
-        supabase.from('tenants').select('*'),
-        supabase.from('user_memberships').select('*').then(result => {
-          if (result.error) {
-            console.log('⚠️ Tabela user_memberships não existe ou sem permissão:', result.error.message);
-            return { data: [], error: null };
-          }
-          return result;
-        })
-      ]);
-
-      const profiles = profilesResult.data || [];
-      const tenants = tenantsResult.data || [];
-      const memberships = membershipsResult.data || [];
-
-      console.log('📊 Total profiles:', profiles.length);
-      console.log('📊 Total tenants:', tenants.length);
-      console.log('📊 Total memberships:', memberships.length);
-
-      if (profilesResult.error) {
-        console.error('❌ Erro ao buscar profiles:', profilesResult.error);
-        toast.error('Erro ao carregar usuários');
-        return;
+      console.log('🔍 Carregando usuários via API interna /next_api/admin/users ...');
+      const response = await fetch('/next_api/admin/users', { cache: 'no-store' })
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err?.error || `Falha ao carregar usuários (${response.status})`)
       }
-
-      if (tenantsResult.error) {
-        console.error('❌ Erro ao buscar tenants:', tenantsResult.error);
-        toast.error('Erro ao carregar usuários');
-        return;
-      }
-
-      let mappedUsers: TenantUser[] = [];
-
-      // Se temos memberships, usar eles como base
-      if (memberships.length > 0) {
-        console.log('🔄 Usando dados de user_memberships');
-        mappedUsers = memberships.map((membership: any, index: number) => {
-          const profile = profiles.find((p: any) => p.id === membership.user_id);
-          const tenant = tenants.find((t: any) => t.id === membership.tenant_id);
-
-          return {
-            user_id: membership.user_id || `membership-${index}-${Date.now()}`,
-            user_email: profile?.email || 'Desconhecido',
-            user_created_at: profile?.created_at || membership.created_at,
-            user_last_login: '-',
-            tenant_id: membership.tenant_id || '',
-            tenant_name: tenant?.name || 'Sem empresa',
-            tenant_status: tenant?.status || 'trial',
-            role: membership.role || 'admin',
-            is_active: membership.is_active !== false,
-            tenant_email: tenant?.email,
-            tenant_phone: tenant?.phone,
-            tenant_document: tenant?.document,
-            approval_status: profile?.status || 'pending',
-          };
-        });
-      } else {
-        // Fallback: usar apenas tenants se não há profiles
-        console.log('🔄 Usando fallback: apenas tenants');
-        mappedUsers = tenants.map((tenant: any, index: number) => ({
-          user_id: `tenant-${tenant.id}-${index}-${Date.now()}`, // Chave única garantida
-          user_email: tenant.email || 'Desconhecido',
-          user_created_at: tenant.created_at,
-          user_last_login: '-',
-          tenant_id: tenant.id,
-          tenant_name: tenant.name || 'Sem empresa',
-          tenant_status: tenant.status || 'trial',
-          role: 'admin', // Assumir admin por padrão
-          is_active: true,
-          tenant_email: tenant.email,
-          tenant_phone: tenant.phone,
-          tenant_document: tenant.document,
-          approval_status: 'pending', // Assumir pendente por padrão
-        }));
-      }
-
-      // Garantir que não há duplicatas baseadas no user_id
-      const uniqueUsers = mappedUsers.reduce((acc: TenantUser[], current: TenantUser) => {
-        const exists = acc.find(user => user.user_id === current.user_id);
-        if (!exists) {
-          acc.push(current);
-        } else {
-          console.warn('⚠️ Usuário duplicado removido:', current.user_id);
-        }
-        return acc;
-      }, []);
-
-      console.log('✅ Usuários únicos mapeados:', uniqueUsers.length);
-      setUsers(uniqueUsers);
-      setFilteredUsers(uniqueUsers);
+      const json = await response.json()
+      const data = (json?.data || []) as TenantUser[]
+      setUsers(data)
+      setFilteredUsers(data)
     } catch (error) {
       console.error('❌ Erro geral:', error);
       toast.error('Erro ao carregar usuários');
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     loadUsers();

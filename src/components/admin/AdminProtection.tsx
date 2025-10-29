@@ -51,13 +51,7 @@ export function AdminProtection({ children }: AdminProtectionProps) {
       return;
     }
 
-    // Para a página /admin, permitir acesso sem verificação rigorosa
-    if (pathname === '/admin') {
-      setIsAdmin(true);
-      setIsCheckingAuth(false);
-      return;
-    }
-
+    // Para páginas do admin, verificar autenticação
     // Verificar autenticação de admin de forma segura para SSR
     const checkAdminAuth = () => {
       try {
