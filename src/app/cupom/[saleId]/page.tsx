@@ -211,6 +211,17 @@ export default function ReceiptPage() {
             display: none !important;
           }
           
+          /* Aumenta contraste/espessura da fonte no conteúdo interno */
+          .receipt-container td,
+          .receipt-container .info-item,
+          .receipt-container .footer-note,
+          .receipt-container .signature-line {
+            font-weight: 600; /* letras mais "acesas" no corpo */
+            color: #000 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
           table {
             width: 100%;
             border-collapse: collapse;
@@ -286,6 +297,15 @@ export default function ReceiptPage() {
             background: white;
           }
           
+          /* Mantém o corpo mais forte também na visualização de tela */
+          .receipt-container td,
+          .receipt-container .info-item,
+          .receipt-container .footer-note,
+          .receipt-container .signature-line {
+            font-weight: 600;
+            color: #000;
+          }
+
           table {
             width: 100%;
             border-collapse: collapse;
