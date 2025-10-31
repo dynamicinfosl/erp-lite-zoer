@@ -569,9 +569,9 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="CNPJ">CNPJ</SelectItem>
-              <SelectItem value="CPF">CPF (MEI)</SelectItem>
+            <SelectContent className="z-50 bg-white text-slate-900 border border-slate-200 shadow-xl dark:bg-slate-900 dark:text-white dark:border-slate-700">
+              <SelectItem value="CNPJ" className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">CNPJ</SelectItem>
+              <SelectItem value="CPF" className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">CPF (MEI)</SelectItem>
             </SelectContent>
           </Select>
         </div>

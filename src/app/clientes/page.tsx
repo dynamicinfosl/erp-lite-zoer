@@ -986,9 +986,9 @@ export default function ClientesPage() {
                         <SelectTrigger className="h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white text-base">
                           <SelectValue placeholder="Selecione o tipo" />
                         </SelectTrigger>
-                        <SelectContent className="bg-slate-700 border-slate-600 shadow-xl">
-                          <SelectItem value="PF" className="hover:bg-slate-600 text-white cursor-pointer">Pessoa Física</SelectItem>
-                          <SelectItem value="PJ" className="hover:bg-slate-600 text-white cursor-pointer">Pessoa Jurídica</SelectItem>
+                        <SelectContent className="z-50 bg-white text-slate-900 border border-slate-200 shadow-xl dark:bg-slate-900 dark:text-white dark:border-slate-700">
+                          <SelectItem value="PF" className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">Pessoa Física</SelectItem>
+                          <SelectItem value="PJ" className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">Pessoa Jurídica</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1094,9 +1094,9 @@ export default function ClientesPage() {
                       <SelectTrigger className="h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white text-base">
                         <SelectValue placeholder="Selecione o status" />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-700 border-slate-600 shadow-xl">
-                        <SelectItem value="active" className="hover:bg-slate-600 text-white cursor-pointer">Ativo</SelectItem>
-                        <SelectItem value="inactive" className="hover:bg-slate-600 text-white cursor-pointer">Inativo</SelectItem>
+                      <SelectContent className="z-50 bg-white text-slate-900 border border-slate-200 shadow-xl dark:bg-slate-900 dark:text-white dark:border-slate-700">
+                        <SelectItem value="active" className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">Ativo</SelectItem>
+                        <SelectItem value="inactive" className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">Inativo</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

@@ -40,6 +40,7 @@ import {
   ArrowDownUp,
   Search,
   Eye,
+  RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
@@ -233,6 +234,21 @@ export default function EstoquePage() {
           >
             <Warehouse className="h-4 w-4" />
             Movimentar Estoque
+          </Button>
+          <Button
+            variant="secondary"
+            className="w-full sm:w-auto gap-2"
+            onClick={() => {
+              setMovementForm((prev) => ({
+                ...prev,
+                movement_type: 'entrada',
+                reason: prev.reason && prev.reason.length > 0 ? prev.reason : 'Devolução',
+              }));
+              setShowMovementDialog(true);
+            }}
+          >
+            <RotateCcw className="h-4 w-4" />
+            Devolução
           </Button>
         </div>
       </div>
@@ -467,6 +483,7 @@ export default function EstoquePage() {
                   <TableRow>
                     <TableHead className="text-slate-900 dark:text-white">Produto</TableHead>
                     <TableHead className="text-slate-900 dark:text-white">Tipo</TableHead>
+                    <TableHead className="text-slate-900 dark:text-white">Motivo</TableHead>
                     <TableHead className="text-slate-900 dark:text-white">Quantidade</TableHead>
                     <TableHead className="text-slate-900 dark:text-white">Data</TableHead>
                   </TableRow>
@@ -486,6 +503,13 @@ export default function EstoquePage() {
                         >
                           {mov.movement_type}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {mov.reason && mov.reason.toLowerCase().includes('devolu') ? (
+                          <Badge variant="outline" className="border-green-500 text-green-700 dark:text-green-400">Devolução</Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">{mov.reason || '-'}</span>
+                        )}
                       </TableCell>
                       <TableCell className="font-semibold text-slate-900 dark:text-white">
                         {mov.movement_type === 'saida' ? '-' : '+'}{mov.quantity}

@@ -38,6 +38,7 @@ import {
   Tag,
   CreditCard,
   Building2,
+  RotateCcw,
 } from 'lucide-react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { ENABLE_AUTH } from '@/constants/auth';
@@ -76,6 +77,7 @@ const menuGroups = [
     title: 'Operações',
     items: [
       { title: 'Estoque', url: '/estoque', icon: Warehouse, roles: ['admin', 'vendedor'] },
+      { title: 'Devolução', url: '/estoque/devolucao', icon: RotateCcw, roles: ['admin', 'vendedor'] },
       { title: 'Entregas', url: '/entregas', icon: Truck, roles: ['admin', 'vendedor'] },
       { title: 'Ordem de Serviços', url: '/ordem-servicos', icon: Wrench, roles: ['admin', 'vendedor'] },
     ],

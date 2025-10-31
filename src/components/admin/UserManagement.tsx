@@ -25,8 +25,6 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { api } from '@/lib/api-client';
-import { supabase } from '@/lib/supabase';
 
 interface TenantUser {
   user_id: string;
@@ -61,18 +59,44 @@ export function UserManagement() {
     try {
       setLoading(true);
       console.log('🔍 Carregando usuários via API interna /next_api/admin/users ...');
-      const response = await fetch('/next_api/admin/users', { cache: 'no-store' })
+      
+      const response = await fetch('/next_api/admin/users', { 
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }).catch((fetchError) => {
+        console.error('❌ Erro de rede ao buscar usuários:', fetchError);
+        throw new Error('Erro de conexão ao carregar usuários');
+      });
+
       if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        throw new Error(err?.error || `Falha ao carregar usuários (${response.status})`)
+        let errorMessage = `Falha ao carregar usuários (${response.status})`;
+        try {
+          const err = await response.json();
+          errorMessage = err?.error || errorMessage;
+        } catch {
+          // Se não conseguir parsear JSON, usar mensagem padrão
+        }
+        throw new Error(errorMessage);
       }
-      const json = await response.json()
-      const data = (json?.data || []) as TenantUser[]
-      setUsers(data)
-      setFilteredUsers(data)
-    } catch (error) {
-      console.error('❌ Erro geral:', error);
-      toast.error('Erro ao carregar usuários');
+
+      const json = await response.json().catch((parseError) => {
+        console.error('❌ Erro ao parsear resposta JSON:', parseError);
+        throw new Error('Resposta inválida do servidor');
+      });
+
+      const data = (json?.data || []) as TenantUser[];
+      setUsers(data);
+      setFilteredUsers(data);
+      console.log('✅ Usuários carregados com sucesso:', data.length);
+    } catch (error: any) {
+      console.error('❌ Erro ao carregar usuários:', error);
+      const errorMessage = error?.message || 'Erro desconhecido ao carregar usuários';
+      toast.error(errorMessage);
+      // Garantir que os estados são limpos em caso de erro
+      setUsers([]);
+      setFilteredUsers([]);
     } finally {
       setLoading(false);
     }
@@ -123,72 +147,14 @@ export function UserManagement() {
   const deleteUser = async (user: TenantUser) => {
     try {
       console.log('🗑️ Iniciando exclusão do usuário:', user.user_id);
-      console.log('📊 Dados do usuário:', {
-        user_id: user.user_id,
-        tenant_id: user.tenant_id,
-        user_email: user.user_email,
-        tenant_name: user.tenant_name
-      });
-
-      // Excluir dados relacionados
-      const deletePromises: any[] = [];
-      const deleteOperations: string[] = [];
-
-      // Excluir user_profile se existir
-      if (user.user_id && !user.user_id.startsWith('tenant-') && !user.user_id.startsWith('membership-')) {
-        console.log('🗑️ Excluindo user_profile:', user.user_id);
-        const deleteProfile = supabase.from('user_profiles').delete().eq('id', user.user_id);
-        deletePromises.push(deleteProfile);
-        deleteOperations.push('user_profiles');
-      }
-
-      // Excluir tenant se existir
-      if (user.tenant_id && !user.tenant_id.startsWith('virtual-')) {
-        console.log('🗑️ Excluindo tenant:', user.tenant_id);
-        const deleteTenant = supabase.from('tenants').delete().eq('id', user.tenant_id);
-        deletePromises.push(deleteTenant);
-        deleteOperations.push('tenants');
-      }
-
-      // Excluir user_memberships se existir
-      console.log('🗑️ Excluindo user_memberships para user_id:', user.user_id);
-      const deleteMemberships = supabase.from('user_memberships').delete().eq('user_id', user.user_id);
-      deletePromises.push(deleteMemberships);
-      deleteOperations.push('user_memberships');
-
-      // Excluir user_tenants se existir
-      console.log('🗑️ Excluindo user_tenants para user_id:', user.user_id);
-      const deleteUserTenants = supabase.from('user_tenants').delete().eq('user_id', user.user_id);
-      deletePromises.push(deleteUserTenants);
-      deleteOperations.push('user_tenants');
-
-      console.log('📋 Operações de exclusão:', deleteOperations);
-
-      // Executar todas as exclusões
-      const results = await Promise.allSettled(deletePromises);
       
-      // Log detalhado dos resultados
-      results.forEach((result, index) => {
-        const operation = deleteOperations[index];
-        if (result.status === 'fulfilled') {
-          console.log(`✅ Exclusão bem-sucedida em ${operation}:`, result.value);
-        } else {
-          console.error(`❌ Falha na exclusão de ${operation}:`, result.reason);
-        }
-      });
+      // TODO: Implementar endpoint de exclusão de usuários via API
+      // Por enquanto, apenas mostrar mensagem
+      toast.info('Funcionalidade de exclusão será implementada em breve via API');
+      setDialogOpen(false);
       
-      // Verificar se houve erros
-      const errors = results.filter(result => result.status === 'rejected');
-      if (errors.length > 0) {
-        console.warn('⚠️ Algumas exclusões falharam:', errors);
-        toast.warning('Algumas exclusões falharam, mas o usuário foi removido da lista');
-      } else {
-        console.log('✅ Todas as exclusões foram bem-sucedidas');
-      }
-
-      toast.success('Usuário excluído com sucesso!');
-      await loadUsers(); // Recarregar lista
-      setDialogOpen(false); // Fechar modal
+      // Removido código antigo que usava supabase diretamente
+      // A exclusão será implementada via endpoint /next_api/admin/users no futuro
     } catch (error) {
       console.error('❌ Erro ao excluir usuário:', error);
       toast.error('Erro ao excluir usuário');
