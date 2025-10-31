@@ -23,7 +23,7 @@ import {
   ArrowRight,
   FileText,
 } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, LineChart, Line, PieChart, Pie, Cell, LabelList } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, LineChart, Line, PieChart, Pie, Cell, LabelList, CartesianGrid, Tooltip } from 'recharts';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { Label } from '@/components/ui/label';
 
@@ -439,6 +439,44 @@ export default function RelatoriosPage() {
       }));
   }, [filteredSales]);
 
+  // Gráfico estático solicitado: meses Jan–Jun com valores zerados
+  const monthlyStaticChart = useMemo(() => (
+    [
+      { month: 'Jan', vendas: 0 },
+      { month: 'Fev', vendas: 0 },
+      { month: 'Mar', vendas: 0 },
+      { month: 'Abr', vendas: 0 },
+      { month: 'Mai', vendas: 0 },
+      { month: 'Jun', vendas: 0 },
+    ]
+  ), []);
+
+  // Agregação real: total de vendas por mês (últimos 6 meses)
+  const monthlySalesChart = useMemo(() => {
+    const now = new Date();
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const months: { key: string; label: string; year: number; monthIdx: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = monthNames[d.getMonth()];
+      months.push({ key, label, year: d.getFullYear(), monthIdx: d.getMonth() });
+    }
+
+    const totalsByKey: Record<string, number> = {};
+    for (const sale of filteredSales) {
+      const dateStr = (sale.sold_at || sale.created_at || '').split('T')[0];
+      if (!dateStr) continue;
+      const d = new Date(dateStr);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!totalsByKey[key]) totalsByKey[key] = 0;
+      const amount = sale.final_amount || sale.total_amount || sale.total || 0;
+      totalsByKey[key] += amount;
+    }
+
+    return months.map(m => ({ month: m.label, total: totalsByKey[m.key] || 0 }));
+  }, [filteredSales]);
+
   const cashFlowChart = useMemo(() => {
     const flowData = filteredTransactions.reduce((acc, transaction) => {
       const date = (transaction.created_at || '').split('T')[0];
@@ -606,74 +644,65 @@ export default function RelatoriosPage() {
 
             <TabsContent value="vendas">
               <div className="grid gap-2 sm:gap-3 grid-cols-1 md:grid-cols-2">
-                <Card className="juga-card w-full">
-                  <CardHeader className="pb-1 pt-3 px-3 sm:px-4">
-                    <CardTitle className="text-xs sm:text-sm text-heading">Volume diário de vendas</CardTitle>
+                {/* Card com gráfico de barras por mês (últimos 6 meses) - Layout igual ao dashboard */}
+                <Card className="juga-card w-full border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/30 hover:shadow-xl transition-all duration-300">
+                  <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg pb-3 pt-4 px-4">
+                    <CardTitle className="flex items-center gap-2 text-white text-base font-semibold">
+                      Vendas dos Últimos 6 Meses
+                    </CardTitle>
+                    <p className="text-blue-100 text-sm mt-1">
+                      Comparativo de vendas mensais
+                    </p>
                   </CardHeader>
-                  <CardContent className="px-2 sm:px-3 pb-3">
-                    <ChartContainer 
-                      config={{ 
-                        amount: { 
-                          label: 'Valor', 
-                          color: '#3b82f6'
-                        } 
-                      }} 
-                      className="h-[140px] sm:h-[160px] min-w-0 [&_.recharts-surface]:fill-transparent [&_svg]:bg-transparent"
-                    >
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart 
-                          data={dailySalesChart} 
-                          margin={{ left: 0, right: 5, top: 3, bottom: 3 }}
-                          barCategoryGap="20%"
+                  <CardContent className="p-4 sm:p-6">
+                    <ResponsiveContainer width="100%" height={180} className="sm:h-[200px]">
+                      <BarChart data={monthlySalesChart} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis 
+                          dataKey="month" 
+                          stroke="#475569"
+                          fontSize={12}
+                          fontWeight={500}
+                          tick={{ fontSize: 12, fill: '#475569' }}
+                          axisLine={{ stroke: '#475569' }}
+                          tickLine={{ stroke: '#475569' }}
+                        />
+                        <YAxis 
+                          stroke="#475569"
+                          fontSize={12}
+                          fontWeight={500}
+                          tick={{ fontSize: 12, fill: '#475569' }}
+                          axisLine={{ stroke: '#475569' }}
+                          tickLine={{ stroke: '#475569' }}
+                          tickFormatter={(value) => `R$ ${value.toLocaleString()}`}
+                        />
+                        <Tooltip 
+                          cursor={{ fill: '#6b7280', fillOpacity: 0.45 }}
+                          contentStyle={{
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #3b82f6',
+                            borderRadius: '12px',
+                            boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.2)',
+                            fontWeight: '500',
+                            fontSize: '12px'
+                          }}
+                          labelStyle={{ color: '#1e293b', fontWeight: '600' }}
+                          formatter={(value: number) => [`Vendas : ${formatCurrency(value || 0)}`, '']}
+                        />
+                        <Bar 
+                          dataKey="total" 
+                          fill="#3b82f6"
+                          radius={[6, 6, 0, 0]}
                         >
-                          <XAxis 
-                            dataKey="date" 
-                            tick={{ fill: 'var(--juga-text-muted)', fontSize: 10 }}
-                            stroke="var(--juga-border)"
-                            height={25}
-                            axisLine={false}
-                            tickLine={false}
-                          />
-                          <YAxis 
-                            tickFormatter={(value) => {
-                              if (value >= 1000) return `R$ ${(value / 1000).toFixed(1)}k`;
-                              return formatCurrency(value);
-                            }}
-                            tick={{ fill: 'var(--juga-text-muted)', fontSize: 10 }}
-                            stroke="var(--juga-border)"
-                            width={45}
-                            axisLine={false}
-                            tickLine={false}
-                          />
-                          {dailySalesChart.length > 0 && (
-                            <ChartTooltip 
-                              content={
-                                <ChartTooltipContent 
-                                  formatter={(value) => 
-                                    formatCurrency(value as number)
-                                  }
-                                />
-                              } 
+                          {monthlySalesChart.map((entry, index) => (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={entry.total > 0 ? '#3b82f6' : '#9ca3af'} 
                             />
-                          )}
-                          <Bar 
-                            dataKey="amount" 
-                            fill="var(--color-amount)"
-                            radius={[4, 4, 0, 0]}
-                            isAnimationActive={true}
-                          >
-                            <LabelList 
-                              dataKey="amount" 
-                              position="top" 
-                              formatter={(value: number) => formatCurrency(value)}
-                              fill="var(--juga-text-primary)"
-                              fontSize={10}
-                              offset={5}
-                            />
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </ChartContainer>
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
                   </CardContent>
                 </Card>
 
