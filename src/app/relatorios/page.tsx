@@ -645,7 +645,7 @@ export default function RelatoriosPage() {
             <TabsContent value="vendas">
               <div className="grid gap-2 sm:gap-3 grid-cols-1 md:grid-cols-2">
                 {/* Card com gráfico de barras por mês (últimos 6 meses) - Layout igual ao dashboard */}
-                <Card className="juga-card w-full border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/30 hover:shadow-xl transition-all duration-300">
+                <Card className="w-full border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/30 hover:shadow-xl transition-all duration-300">
                   <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg pb-3 pt-4 px-4">
                     <CardTitle className="flex items-center gap-2 text-white text-base font-semibold">
                       Vendas dos Últimos 6 Meses
@@ -655,7 +655,7 @@ export default function RelatoriosPage() {
                     </p>
                   </CardHeader>
                   <CardContent className="p-4 sm:p-6">
-                    <ResponsiveContainer width="100%" height={180} className="sm:h-[200px]">
+                    <ResponsiveContainer width="100%" height={280} className="sm:h-[300px]">
                       <BarChart data={monthlySalesChart} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                         <XAxis 
