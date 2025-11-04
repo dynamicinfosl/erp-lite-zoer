@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { AdminProtection } from '@/components/admin/AdminProtection';
 import { AdminStatCard } from '@/components/admin/AdminStatCard';
@@ -164,68 +165,87 @@ export default function AdminPage() {
         </div>
 
         {/* Alertas Específicos */}
-        <div className="grid gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-juga-text-secondary">Estoque Baixo</CardTitle>
-                <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                  <AlertTriangle className="h-4 w-4" />
+        <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 items-stretch">
+          <Card className="juga-card h-full min-h-[150px] sm:min-h-[170px] overflow-hidden transition-transform duration-200 hover:scale-[1.02] hover:border-juga-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juga-primary/50 border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent" aria-label="Estoque baixo - produtos críticos">
+            <CardHeader className="pb-2 sm:pb-3">
+              <div className="flex items-start justify-between gap-2 min-h-10">
+                <CardTitle title="Estoque Baixo" className="min-w-0 flex-1 text-[11px] sm:text-sm font-medium text-juga-text-secondary leading-snug break-words line-clamp-2">Estoque Baixo</CardTitle>
+                <div className="p-1.5 sm:p-2 rounded-md bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/20 flex-shrink-0">
+                  <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-0">
-              <div className="space-y-2">
-                <div className="text-2xl font-bold text-juga-primary">{stats?.lowStockAlerts}</div>
-                <p className="text-sm text-caption">Produtos críticos</p>
+            <CardContent className="pt-0 flex flex-col justify-between">
+              <div className="space-y-2 sm:space-y-3">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <div className={`${ (stats?.lowStockAlerts ?? 0) > 0 ? 'text-amber-600' : 'text-juga-primary'} text-2xl sm:text-3xl lg:text-4xl font-bold leading-none`}>{stats?.lowStockAlerts}</div>
+                  {(stats?.lowStockAlerts ?? 0) > 0 && (
+                    <span className="text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700">atenção</span>
+                  )}
+                </div>
+                <p className="text-xs sm:text-xs text-muted-foreground leading-snug break-words">Produtos críticos</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-juga-text-secondary">Vencendo em 30 dias</CardTitle>
-                <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                  <Clock className="h-4 w-4" />
+          <Card className="juga-card h-full min-h-[150px] sm:min-h-[170px] overflow-hidden transition-transform duration-200 hover:scale-[1.02] hover:border-juga-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juga-primary/50 border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent" aria-label="Produtos vencendo em 30 dias">
+            <CardHeader className="pb-2 sm:pb-3">
+              <div className="flex items-start justify-between gap-2 min-h-10">
+                <CardTitle title="Vencendo em 30 dias" className="min-w-0 flex-1 text-[11px] sm:text-sm font-medium text-juga-text-secondary leading-snug break-words line-clamp-2">Vencendo em 30 dias</CardTitle>
+                <div className="p-1.5 sm:p-2 rounded-md bg-orange-500/10 text-orange-600 ring-1 ring-orange-500/20 flex-shrink-0">
+                  <Clock className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-0">
-              <div className="space-y-2">
-                <div className="text-2xl font-bold text-juga-primary">{stats?.expiringProducts}</div>
-                <p className="text-sm text-caption">Produtos próximos do vencimento</p>
+            <CardContent className="pt-0 flex flex-col justify-between">
+              <div className="space-y-2 sm:space-y-3">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <div className={`${ (stats?.expiringProducts ?? 0) > 0 ? 'text-orange-600' : 'text-juga-primary'} text-2xl sm:text-3xl lg:text-4xl font-bold leading-none`}>{stats?.expiringProducts}</div>
+                  {(stats?.expiringProducts ?? 0) > 0 && (
+                    <span className="text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-700">atenção</span>
+                  )}
+                </div>
+                <p className="text-xs sm:text-xs text-muted-foreground leading-snug break-words">Produtos próximos do vencimento</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-juga-text-secondary">Conformidade</CardTitle>
-                <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                  <Shield className="h-4 w-4" />
+          <Card className="juga-card h-full min-h-[150px] sm:min-h-[170px] overflow-hidden transition-transform duration-200 hover:scale-[1.02] hover:border-juga-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juga-primary/50 border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent" aria-label="Conformidade do sistema">
+            <CardHeader className="pb-2 sm:pb-3">
+              <div className="flex items-start justify-between gap-2 min-h-10">
+                <CardTitle title="Conformidade" className="min-w-0 flex-1 text-[11px] sm:text-sm font-medium text-juga-text-secondary leading-snug break-words line-clamp-2">Conformidade</CardTitle>
+                <div className="p-1.5 sm:p-2 rounded-md bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20 flex-shrink-0">
+                  <Shield className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-0">
-              <div className="space-y-2">
-                <div className="text-2xl font-bold text-juga-primary">{stats?.complianceRate}%</div>
-                <p className="text-sm text-caption">Taxa de conformidade</p>
+            <CardContent className="pt-0 flex flex-col justify-between">
+              <div className="space-y-2 sm:space-y-3">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <div className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-emerald-600 leading-none">{stats?.complianceRate}%</div>
+                  <span className="text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700">ok</span>
+                </div>
+                <Progress value={stats?.complianceRate ?? 0} className="h-1.5 sm:h-2" />
+                <p className="text-xs sm:text-xs text-muted-foreground leading-snug break-words">Taxa de conformidade</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="juga-card transition-all hover:juga-shadow-glow border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-juga-text-secondary">Alertas de Temperatura</CardTitle>
-                <div className="p-2 rounded-lg text-juga-primary bg-juga-primary/10">
-                  <Activity className="h-4 w-4" />
+          <Card className="juga-card h-full min-h-[150px] sm:min-h-[170px] overflow-hidden transition-transform duration-200 hover:scale-[1.02] hover:border-juga-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juga-primary/50 border-juga-primary/20 bg-gradient-to-br from-juga-primary/5 to-transparent" aria-label="Alertas de temperatura">
+            <CardHeader className="pb-2 sm:pb-3">
+              <div className="flex items-start justify-between gap-2 min-h-10">
+                <CardTitle title="Alertas de Temperatura" className="min-w-0 flex-1 text-[11px] sm:text-sm font-medium text-juga-text-secondary leading-snug break-words line-clamp-2">Alertas de Temperatura</CardTitle>
+                <div className="p-1.5 sm:p-2 rounded-md bg-sky-500/10 text-sky-600 ring-1 ring-sky-500/20 flex-shrink-0">
+                  <Activity className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-0">
-              <div className="space-y-2">
-                <div className="text-2xl font-bold text-juga-primary">{stats?.temperatureAlerts}</div>
-                <p className="text-sm text-caption">Alertas ativos</p>
+            <CardContent className="pt-0 flex flex-col justify-between">
+              <div className="space-y-2 sm:space-y-3">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <div className={`${ (stats?.temperatureAlerts ?? 0) > 0 ? 'text-sky-700' : 'text-juga-primary'} text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight leading-none`}>{stats?.temperatureAlerts}</div>
+                  {(stats?.temperatureAlerts ?? 0) === 0 && (
+                    <span className="text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-700">estável</span>
+                  )}
+                </div>
+                <p className="text-xs sm:text-xs text-muted-foreground leading-snug break-words">Alertas ativos</p>
               </div>
             </CardContent>
           </Card>
