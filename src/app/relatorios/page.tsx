@@ -79,7 +79,19 @@ export default function RelatoriosPage() {
       const deliveriesData = deliveriesRes.status === 'fulfilled' ? await deliveriesRes.value.json() : { data: [] };
       const reportData = reportRes.status === 'fulfilled' ? await reportRes.value.json() : null;
 
-      setSales(Array.isArray(salesData?.data) ? salesData.data : (salesData?.rows || []));
+      const salesArray = Array.isArray(salesData?.data) ? salesData.data : (salesData?.rows || []);
+      console.log('💰 Vendas carregadas:', salesArray.length);
+      if (salesArray.length > 0) {
+        console.log('💰 Primeira venda:', {
+          id: salesArray[0].id,
+          total_amount: salesArray[0].total_amount,
+          final_amount: salesArray[0].final_amount,
+          created_at: salesArray[0].created_at,
+          sold_at: salesArray[0].sold_at
+        });
+      }
+
+      setSales(salesArray);
       setProducts(Array.isArray(productsData?.data) ? productsData.data : (productsData?.rows || []));
       setTransactions(Array.isArray(transactionsData?.data) ? transactionsData.data : (transactionsData?.rows || []));
       setDeliveries(Array.isArray(deliveriesData?.data) ? deliveriesData.data : (deliveriesData?.rows || []));
@@ -463,19 +475,57 @@ export default function RelatoriosPage() {
       months.push({ key, label, year: d.getFullYear(), monthIdx: d.getMonth() });
     }
 
+    // Filtrar vendas dos últimos 6 meses
+    // Calcular a data de 6 meses atrás para filtrar
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    sixMonthsAgo.setHours(0, 0, 0, 0);
+    const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0];
+
     const totalsByKey: Record<string, number> = {};
-    for (const sale of filteredSales) {
+    console.log('📊 Calculando gráfico mensal - Total de vendas:', sales.length);
+    console.log('📊 Filtrando vendas a partir de:', sixMonthsAgoStr);
+    
+    let salesInRange = 0;
+    for (const sale of sales) {
       const dateStr = (sale.sold_at || sale.created_at || '').split('T')[0];
-      if (!dateStr) continue;
+      if (!dateStr) {
+        console.warn('⚠️ Venda sem data:', sale.id);
+        continue;
+      }
+      
+      // Filtrar apenas vendas dos últimos 6 meses
+      if (dateStr < sixMonthsAgoStr) {
+        continue;
+      }
+      
       const d = new Date(dateStr);
+      if (isNaN(d.getTime())) {
+        console.warn('⚠️ Data inválida na venda:', sale.id, dateStr);
+        continue;
+      }
+      
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       if (!totalsByKey[key]) totalsByKey[key] = 0;
-      const amount = sale.final_amount || sale.total_amount || sale.total || 0;
+      
+      // Tentar diferentes campos possíveis para o valor total
+      const amount = parseFloat(String(sale.final_amount || sale.total_amount || sale.total || 0));
+      if (isNaN(amount)) {
+        console.warn('⚠️ Valor inválido na venda:', sale.id, sale);
+        continue;
+      }
+      
       totalsByKey[key] += amount;
+      salesInRange++;
     }
+    
+    console.log('📊 Vendas nos últimos 6 meses:', salesInRange);
 
-    return months.map(m => ({ month: m.label, total: totalsByKey[m.key] || 0 }));
-  }, [filteredSales]);
+    const chartData = months.map(m => ({ month: m.label, total: totalsByKey[m.key] || 0 }));
+    console.log('📊 Dados do gráfico mensal:', chartData);
+    console.log('📊 Totais por mês:', totalsByKey);
+    
+    return chartData;
+  }, [sales]);
 
   const cashFlowChart = useMemo(() => {
     const flowData = filteredTransactions.reduce((acc, transaction) => {
