@@ -60,7 +60,7 @@ export function JugaKPICard({
         <div className="flex items-center justify-between">
           <CardTitle className={cn(
             "text-xs sm:text-sm font-semibold leading-tight uppercase tracking-wide",
-            compact && "text-[10px] sm:text-[11px]",
+            compact && "text-[11px] sm:text-[12px]",
             titleCls
           )}>{title}</CardTitle>
           {icon ? <div className={cn("p-1.5 sm:p-2 rounded-lg shadow-sm", compact && "p-1 rounded-md", KPI_ICON_COLORS[color])}>{icon}</div> : null}
@@ -70,14 +70,14 @@ export function JugaKPICard({
         <div className={cn("space-y-1 sm:space-y-2", compact && "space-y-0.5")}>
           <div className={cn(
             "text-lg sm:text-xl lg:text-2xl font-bold text-left leading-tight",
-            compact && "text-sm sm:text-base lg:text-lg",
+            compact && "text-base sm:text-lg lg:text-xl",
             valueCls
           )}>{value}</div>
           {(description || (trend && trendValue)) && (
             <div className="flex items-center justify-between gap-2">
               {description ? <p className={cn(
                 "text-xs sm:text-sm truncate font-medium",
-                compact && "text-[10px] sm:text-[11px]",
+                compact && "text-[11px] sm:text-[12px]",
                 descCls
               )}>{description}</p> : <span />}
               {trend && trendValue ? (
@@ -93,8 +93,8 @@ export function JugaKPICard({
                   )}
                 >
                   {trend === "up" ? <TrendingUp className={cn("h-3 w-3", compact && "h-2.5 w-2.5")} /> : trend === "down" ? <TrendingDown className={cn("h-3 w-3", compact && "h-2.5 w-2.5")} /> : null}
-                  <span className={cn("hidden sm:inline", compact && "text-[10px]")}>{trendValue}</span>
-                  <span className={cn("sm:hidden", compact && "text-[10px]")}>{trendValue.replace('%', '')}</span>
+                  <span className={cn("hidden sm:inline", compact && "text-[11px]")}>{trendValue}</span>
+                  <span className={cn("sm:hidden", compact && "text-[11px]")}>{trendValue.replace('%', '')}</span>
                 </div>
               ) : null}
             </div>
