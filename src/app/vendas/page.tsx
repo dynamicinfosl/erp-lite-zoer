@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Dialog, 
   DialogContent, 
@@ -96,6 +97,10 @@ export default function VendasPage() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editFormData, setEditFormData] = useState<Partial<Sale>>({});
+  const [selectedVendas, setSelectedVendas] = useState<Set<string>>(new Set());
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
     numero: true,
     cliente: true,
@@ -335,6 +340,357 @@ export default function VendasPage() {
     }
   };
 
+  // Exportar lista de vendas para CSV
+  const handleExportarLista = () => {
+    try {
+      const rows: string[] = [];
+      
+      // Cabeçalho
+      rows.push([
+        'Número',
+        'Cliente',
+        'Vendedor',
+        'Data',
+        'Total',
+        'Forma de Pagamento',
+        'Status',
+        'Observações'
+      ].join(','));
+      
+      // Dados
+      filteredVendas.forEach(venda => {
+        const date = formatDate(venda.data_venda).split(' ')[0]; // Apenas data
+        const totalValue = formatCurrency(venda.total).replace(/R\$\s*/g, '').trim();
+        rows.push([
+          `"${venda.numero}"`,
+          `"${venda.cliente}"`,
+          `"${venda.vendedor || ''}"`,
+          `"${date}"`,
+          totalValue,
+          `"${venda.forma_pagamento}"`,
+          `"${venda.status}"`,
+          `"${(venda.observacoes || '').replace(/"/g, '""')}"`
+        ].join(','));
+      });
+
+      const csv = rows.join('\n');
+      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      a.download = `vendas_${dateStr}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success(`${filteredVendas.length} venda(s) exportada(s) com sucesso!`);
+    } catch (error) {
+      console.error('Erro ao exportar vendas:', error);
+      toast.error('Erro ao exportar vendas');
+    }
+  };
+
+  // Importar vendas
+  const handleImportarVendas = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Processar arquivo CSV de importação
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImporting(true);
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      
+      if (ext !== 'csv') {
+        toast.error('Por favor, envie um arquivo CSV');
+        setImporting(false);
+        return;
+      }
+
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      
+      if (lines.length < 2) {
+        toast.error('CSV inválido. Deve conter cabeçalho e pelo menos uma linha de dados');
+        setImporting(false);
+        return;
+      }
+
+      // Detectar delimitador
+      const delimiter = (lines[0].split(';').length - 1) > (lines[0].split(',').length - 1) ? ';' : ',';
+      
+      // Parsear CSV manualmente
+      const parseCSVLine = (line: string): string[] => {
+        const values: string[] = [];
+        let current = '';
+        let quoted = false;
+        
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (quoted && line[i + 1] === '"') {
+              current += '"';
+              i++;
+            } else {
+              quoted = !quoted;
+            }
+          } else if (ch === delimiter && !quoted) {
+            values.push(current.trim());
+            current = '';
+          } else {
+            current += ch;
+          }
+        }
+        values.push(current.trim());
+        return values;
+      };
+
+      const headers = parseCSVLine(lines[0]).map(h => h.replace(/"/g, '').trim());
+      const rows = lines.slice(1).map(line => parseCSVLine(line));
+
+      console.log('📋 Headers:', headers);
+      console.log('📊 Rows:', rows.length);
+
+      // Normalizar nomes de colunas
+      const normalizeHeader = (h: string): string => {
+        return h.toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9\s]/g, '')
+          .trim();
+      };
+
+      // Mapear colunas esperadas
+      const columnMap: Record<string, string> = {
+        'numero': 'numero',
+        'numero da venda': 'numero',
+        'numero venda': 'numero',
+        'cliente': 'cliente',
+        'nome cliente': 'cliente',
+        'customer': 'cliente',
+        'data': 'data',
+        'data venda': 'data',
+        'date': 'data',
+        'total': 'total',
+        'valor': 'total',
+        'amount': 'total',
+        'forma pagamento': 'forma_pagamento',
+        'payment method': 'forma_pagamento',
+        'metodo pagamento': 'forma_pagamento',
+        'status': 'status',
+        'observacoes': 'observacoes',
+        'notes': 'observacoes',
+        'vendedor': 'vendedor',
+        'seller': 'vendedor'
+      };
+
+      // Processar e validar dados
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (row.length === 0 || row.every(cell => !cell || cell.trim() === '')) {
+          continue; // Linha vazia
+        }
+
+        try {
+          // Criar objeto de dados da venda
+          const rowData: Record<string, string> = {};
+          headers.forEach((header, idx) => {
+            const normalized = normalizeHeader(header);
+            const mappedKey = columnMap[normalized] || normalized;
+            rowData[mappedKey] = row[idx] || '';
+          });
+
+          // Validar dados obrigatórios
+          if (!rowData.cliente || !rowData.total) {
+            errors.push(`Linha ${i + 2}: Cliente e Total são obrigatórios`);
+            errorCount++;
+            continue;
+          }
+
+          // Parsear total (remover R$ e formatação)
+          const totalStr = rowData.total.toString().replace(/R\$|\s|\./g, '').replace(',', '.');
+          const total = parseFloat(totalStr);
+          
+          if (isNaN(total) || total <= 0) {
+            errors.push(`Linha ${i + 2}: Total inválido (${rowData.total})`);
+            errorCount++;
+            continue;
+          }
+
+          // Preparar dados para a API
+          // A API exige produtos, então vamos criar um item genérico
+          const saleData: any = {
+            tenant_id: tenant?.id,
+            user_id: '00000000-0000-0000-0000-000000000000', // Usuário padrão para importação
+            customer_name: rowData.cliente.trim(),
+            total_amount: total,
+            payment_method: rowData.forma_pagamento?.toLowerCase() || 'dinheiro',
+            status: rowData.status?.toLowerCase() === 'cancelada' ? 'canceled' : (rowData.status?.toLowerCase() === 'paga' ? 'completed' : null),
+            notes: rowData.observacoes || null,
+            products: [
+              {
+                id: null, // Sem produto específico para vendas importadas
+                name: 'Venda Importada',
+                code: 'IMP',
+                price: total,
+                quantity: 1,
+                discount: 0,
+                subtotal: total
+              }
+            ]
+          };
+
+          // Parsear data se fornecida
+          if (rowData.data) {
+            try {
+              const dateStr = rowData.data.trim();
+              // Tentar diferentes formatos de data
+              let saleDate: Date;
+              if (dateStr.includes('/')) {
+                // Formato DD/MM/YYYY ou DD/MM/YYYY HH:MM
+                const parts = dateStr.split(' ');
+                const datePart = parts[0].split('/');
+                if (datePart.length === 3) {
+                  saleDate = new Date(parseInt(datePart[2]), parseInt(datePart[1]) - 1, parseInt(datePart[0]));
+                  if (parts[1]) {
+                    const timePart = parts[1].split(':');
+                    if (timePart.length >= 2) {
+                      saleDate.setHours(parseInt(timePart[0]), parseInt(timePart[1]));
+                    }
+                  }
+                } else {
+                  saleDate = new Date(dateStr);
+                }
+              } else {
+                saleDate = new Date(dateStr);
+              }
+              
+              if (!isNaN(saleDate.getTime())) {
+                saleData.created_at = saleDate.toISOString();
+              }
+            } catch (e) {
+              console.warn(`Linha ${i + 2}: Data inválida, usando data atual`);
+            }
+          }
+
+          // Criar venda via API
+          const response = await fetch('/next_api/sales', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(saleData),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            errors.push(`Linha ${i + 2}: ${errorData.error || 'Erro ao criar venda'}`);
+            errorCount++;
+          } else {
+            successCount++;
+          }
+        } catch (error) {
+          console.error(`Erro ao processar linha ${i + 2}:`, error);
+          errors.push(`Linha ${i + 2}: Erro ao processar - ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+          errorCount++;
+        }
+      }
+
+      // Limpar input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
+      // Mostrar resultados
+      if (successCount > 0) {
+        toast.success(`${successCount} venda(s) importada(s) com sucesso!`);
+      }
+      if (errorCount > 0) {
+        toast.error(`${errorCount} venda(s) não puderam ser importadas. Verifique o console.`);
+        console.error('Erros de importação:', errors);
+      }
+
+      // Recarregar lista
+      loadVendas();
+    } catch (error) {
+      console.error('Erro ao importar arquivo:', error);
+      toast.error('Erro ao importar arquivo. Verifique o formato do CSV.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // Cancelar vendas selecionadas
+  const handleCancelarSelecionadas = async () => {
+    if (selectedVendas.size === 0) {
+      toast.warning('Selecione pelo menos uma venda para cancelar');
+      return;
+    }
+
+    if (!confirm(`Tem certeza que deseja cancelar ${selectedVendas.size} venda(s) selecionada(s)?`)) {
+      return;
+    }
+
+    try {
+      const promises = Array.from(selectedVendas).map(vendaId => 
+        fetch(`/next_api/sales/${vendaId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+      );
+
+      const results = await Promise.allSettled(promises);
+      const success = results.filter(r => r.status === 'fulfilled' && r.value.ok).length;
+      const failed = results.length - success;
+
+      if (success > 0) {
+        toast.success(`${success} venda(s) cancelada(s) com sucesso`);
+      }
+      if (failed > 0) {
+        toast.error(`${failed} venda(s) não puderam ser canceladas`);
+      }
+
+      setSelectedVendas(new Set());
+      loadVendas(); // Recarregar lista
+    } catch (error) {
+      console.error('Erro ao cancelar vendas selecionadas:', error);
+      toast.error('Erro ao cancelar vendas selecionadas');
+    }
+  };
+
+  // Toggle seleção de venda
+  const toggleVendaSelection = (vendaId: string) => {
+    setSelectedVendas(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(vendaId)) {
+        newSet.delete(vendaId);
+      } else {
+        newSet.add(vendaId);
+      }
+      return newSet;
+    });
+  };
+
+  // Selecionar todas as vendas
+  const toggleSelectAll = () => {
+    if (selectedVendas.size === filteredVendas.length) {
+      setSelectedVendas(new Set());
+    } else {
+      setSelectedVendas(new Set(filteredVendas.map(v => v.id)));
+    }
+  };
+
   return (
     <TenantPageWrapper>
       <div className="space-y-6">
@@ -431,18 +787,22 @@ export default function VendasPage() {
                 <DropdownMenuContent>
                   <DropdownMenuLabel>Ações</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleImportarVendas}>
                     <Upload className="h-4 w-4 mr-2" />
                     Importar Vendas
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportarLista}>
                     <Download className="h-4 w-4 mr-2" />
                     Exportar Lista
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-red-600">
+                  <DropdownMenuItem 
+                    className="text-red-600"
+                    onClick={handleCancelarSelecionadas}
+                    disabled={selectedVendas.size === 0}
+                  >
                     <Trash2 className="h-4 w-4 mr-2" />
-                    Cancelar Selecionadas
+                    Cancelar Selecionadas ({selectedVendas.size})
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -574,6 +934,12 @@ export default function VendasPage() {
               <Table>
                 <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectedVendas.size === filteredVendas.length && filteredVendas.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
                   {columnVisibility.numero && <TableHead>Número</TableHead>}
                   {columnVisibility.cliente && <TableHead>Cliente</TableHead>}
                   {columnVisibility.vendedor && <TableHead>Vendedor</TableHead>}
@@ -588,6 +954,12 @@ export default function VendasPage() {
               <TableBody>
                 {filteredVendas.map((venda) => (
                   <TableRow key={venda.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedVendas.has(venda.id)}
+                        onCheckedChange={() => toggleVendaSelection(venda.id)}
+                      />
+                    </TableCell>
                     {columnVisibility.numero && (
                       <TableCell className="font-mono text-sm font-medium">
                         {venda.numero}
@@ -874,6 +1246,73 @@ export default function VendasPage() {
             </Button>
             <Button onClick={handleSalvarEdicao} className="bg-emerald-600 hover:bg-emerald-700">
               Salvar Alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Input de arquivo oculto */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        onChange={handleImportFile}
+        className="hidden"
+      />
+
+      {/* Dialog de Importação de Vendas */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Importar Vendas</DialogTitle>
+            <DialogDescription>
+              Importe vendas através de um arquivo CSV
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="text-sm text-muted-foreground">
+              <p className="font-medium mb-2">Formato do CSV esperado:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li><strong>Cliente</strong> (obrigatório) - Nome do cliente</li>
+                <li><strong>Total</strong> (obrigatório) - Valor da venda (ex: 100.50 ou R$ 100,50)</li>
+                <li><strong>Data</strong> (opcional) - Data da venda (ex: 01/11/2025 ou 01/11/2025 14:30)</li>
+                <li><strong>Forma de Pagamento</strong> (opcional) - dinheiro, pix, cartao_debito, cartao_credito, boleto</li>
+                <li><strong>Status</strong> (opcional) - pendente, paga, cancelada</li>
+                <li><strong>Observações</strong> (opcional) - Observações adicionais</li>
+              </ul>
+              <p className="mt-4 font-medium">Exemplo de cabeçalho:</p>
+              <code className="block mt-2 p-2 bg-gray-100 rounded text-xs">
+                Cliente,Total,Data,Forma de Pagamento,Status,Observações
+              </code>
+            </div>
+            {importing && (
+              <div className="text-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-2 text-sm text-muted-foreground">Importando vendas...</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowImportDialog(false);
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = '';
+                }
+              }}
+            >
+              Fechar
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowImportDialog(false);
+                fileInputRef.current?.click();
+              }}
+              disabled={importing}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Selecionar Arquivo CSV
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -157,12 +157,12 @@ async function createSaleHandler(request: NextRequest) {
       const discountAmount = (product.price * product.quantity * (product.discount || 0)) / 100;
       const subtotal = (product.price * product.quantity) - discountAmount;
       
-      return {
+      // Permitir product_id como null para vendas importadas ou sem produto específico
+      const itemData: any = {
         sale_id: sale.id,
         tenant_id: tenant_id, // ✅ REATIVADO - coluna agora existe na tabela
         user_id: user_id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
-        product_id: product.id,
-        product_name: product.name,
+        product_name: product.name || 'Produto',
         // product_code: product.code, // ✅ Removido temporariamente
         unit_price: product.price,
         quantity: product.quantity,
@@ -170,6 +170,13 @@ async function createSaleHandler(request: NextRequest) {
         subtotal: subtotal,
         total_price: subtotal, // ✅ Adicionar total_price (mesmo valor do subtotal)
       };
+
+      // Adicionar product_id apenas se fornecido (pode ser null para vendas importadas)
+      if (product.id !== null && product.id !== undefined) {
+        itemData.product_id = product.id;
+      }
+      
+      return itemData;
     });
 
     // ✅ DEBUG: Log dos itens antes da inserção
