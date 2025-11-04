@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -7,6 +6,7 @@ import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -162,8 +162,7 @@ export default function PDVPage() {
   const [currentSection, setCurrentSection] = useState<'pdv' | 'payment'>('pdv');
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [lastSaleData, setLastSaleData] = useState<any>(null);
-
-
+  
   const addSelectedToCart = useCallback(() => {
     if (!selectedProduct) return;
 
@@ -412,32 +411,54 @@ export default function PDVPage() {
       }
 
       // Preparar dados da venda para o Supabase (versão simplificada)
+      const productsArray = cart.map(item => ({
+        id: item.id,
+        name: item.name,
+        code: item.code || 'N/A',
+        price: item.price,
+        quantity: item.quantity,
+        discount: item.discount || 0,
+        subtotal: calculateItemTotal(item)
+      }));
+
+      console.log('📦 Produtos preparados:', productsArray.length, productsArray);
+      console.log('💰 Total da venda:', total);
+      console.log('👤 Tenant ID:', tenant.id);
+      console.log('👤 User ID:', user?.id);
+
+      if (productsArray.length === 0) {
+        throw new Error('Carrinho vazio. Adicione produtos antes de finalizar a venda.');
+      }
+
+      if (!total || total <= 0) {
+        throw new Error('Total da venda inválido.');
+      }
+
       const saleData = {
-        tenant_id: tenant.id, // ✅ Usar tenant.id diretamente
-        user_id: user?.id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
-        sale_type: null, // ✅ Usar NULL para evitar constraint
+        tenant_id: tenant.id,
+        user_id: user?.id || '00000000-0000-0000-0000-000000000000',
+        sale_type: null,
         customer_name: customerName || 'Cliente Avulso',
-        total_amount: total, // ✅ Corrigir: usar 'total_amount' para compatibilidade com API
-        total: total, // ✅ Manter 'total' também para compatibilidade
+        total_amount: total,
+        total: total,
         payment_method: paymentData?.paymentMethod || paymentMethod,
-        status: null, // ✅ Usar NULL para evitar constraint
+        status: null,
         notes: cart.length > 0 ? `Venda com ${cart.length} itens` : '',
-        // Dados de pagamento (se fornecidos)
         amount_paid: paymentData?.amountPaid || total,
         change_amount: paymentData?.change || 0,
         remaining_amount: paymentData?.remaining || 0,
         payment_status: paymentData?.paymentStatus || 'paid',
         payment_notes: paymentData?.notes,
-        products: cart.map(item => ({
-          id: item.id,
-          name: item.name,
-          code: item.code || 'N/A', // ✅ Garantir que code existe
-          price: item.price,
-          quantity: item.quantity,
-          discount: item.discount || 0, // ✅ Garantir que discount existe
-          subtotal: calculateItemTotal(item)
-        }))
+        products: productsArray
       };
+
+      console.log('📤 Enviando dados da venda:', {
+        tenant_id: saleData.tenant_id,
+        user_id: saleData.user_id,
+        total_amount: saleData.total_amount,
+        products_count: saleData.products.length,
+        payment_method: saleData.payment_method
+      });
 
       // Salvar venda no Supabase
       const response = await fetch('/next_api/sales', {
@@ -448,21 +469,44 @@ export default function PDVPage() {
         body: JSON.stringify(saleData),
       });
 
+      console.log('📥 Resposta da API:', response.status, response.statusText);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao salvar venda');
+        let errorMessage = 'Erro ao salvar venda';
+        try {
+          const errorData = await response.json();
+          console.error('❌ Erro da API:', errorData);
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch (e) {
+          const errorText = await response.text();
+          console.error('❌ Erro da API (texto):', errorText);
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
+      console.log('✅ Venda criada com sucesso:', result);
+      
+      // Verificar se a resposta contém os dados esperados
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao criar venda: resposta inválida da API');
+      }
+
+      const savedSaleData = result.data || result;
+      if (!savedSaleData || !savedSaleData.id) {
+        console.error('❌ Dados da venda inválidos:', savedSaleData);
+        throw new Error('Dados da venda inválidos retornados pela API');
+      }
       
       // Criar objeto de venda para o estado local
       const localSaleData: Sale = {
-        id: result.data.id,
-        numero: result.data.sale_number || `VND-${Date.now().toString().slice(-6)}`,
+        id: savedSaleData.id,
+        numero: savedSaleData.sale_number || `VND-${Date.now().toString().slice(-6)}`,
         cliente: customerName || 'Cliente Avulso',
         total: total,
         forma_pagamento: paymentMethod,
-        data_venda: result.data.created_at || new Date().toISOString(),
+        data_venda: savedSaleData.created_at || new Date().toISOString(),
         status: 'paga',
       };
       
@@ -549,10 +593,6 @@ export default function PDVPage() {
     setShowCaixaDialog(true);
   }, []);
 
-  const handleTrocaDevolucao = useCallback(() => {
-    toast.info('Funcionalidade de Troca/Devolução em desenvolvimento');
-  }, []);
-
   const handleReforco = useCallback(() => {
     setCaixaOperationType('reforco');
     setShowCaixaDialog(true);
@@ -594,6 +634,7 @@ export default function PDVPage() {
     { icon: Users, label: 'Clientes', href: '/clientes' },
     { icon: Package, label: 'Produtos', href: '/produtos' },
     { icon: Archive, label: 'Estoque', href: '/estoque' },
+    { icon: RotateCcw, label: 'Devolução', href: '/estoque/devolucao' },
     { icon: DollarSign, label: 'Financeiro', href: '/financeiro' },
     { icon: Settings, label: 'Configurações', href: '/configuracoes' },
   ];
@@ -685,85 +726,84 @@ export default function PDVPage() {
   return (
     <TenantPageWrapper>
       <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <div className="fixed top-4 left-4 z-40">
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="shadow-lg">
+                <Menu className="h-4 w-4" />
+              </Button>
+            </SheetTrigger>
+          </div>
 
-      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <div className="fixed top-4 left-4 z-40">
-          <SheetTrigger asChild>
-            <Button variant="outline" size="sm" className="shadow-lg">
-              <Menu className="h-4 w-4" />
-            </Button>
-          </SheetTrigger>
-        </div>
+          <SheetContent side="left" className="w-64 p-0 juga-sidebar-gradient">
+            <SheetHeader className="p-6 border-b border-white/10">
+              <SheetTitle className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                  <span className="text-white font-bold text-lg">J</span>
+                </div>
+                <div>
+                  <h1 className="text-white font-bold text-xl">JUGA</h1>
+                  <p className="text-white/70 text-xs">ERP SaaS</p>
+                </div>
+              </SheetTitle>
+            </SheetHeader>
 
-        <SheetContent side="left" className="w-64 p-0 juga-sidebar-gradient">
-          <SheetHeader className="p-6 border-b border-white/10">
-            <SheetTitle className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <span className="text-white font-bold text-lg">J</span>
-              </div>
-              <div>
-                <h1 className="text-white font-bold text-xl">JUGA</h1>
-                <p className="text-white/70 text-xs">ERP SaaS</p>
-              </div>
-            </SheetTitle>
-          </SheetHeader>
+            <div className="p-4 space-y-2">
+              {menuItems.map((item) => {
+                const IconComponent = item.icon;
+                return (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setSidebarOpen(false);
+                      router.push(item.href);
+                    }}
+                  >
+                    <IconComponent className="h-5 w-5" />
+                    <span className="font-medium text-sm">{item.label}</span>
+                  </a>
+                );
+              })}
+            </div>
 
-          <div className="p-4 space-y-2">
-            {menuItems.map((item) => {
-              const IconComponent = item.icon;
-              return (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setSidebarOpen(false);
-                    router.push(item.href);
+            <div className="absolute bottom-4 left-4 right-4">
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/10">
+                <div className="flex flex-col gap-2 mb-3">
+                  <span className="text-xs font-semibold text-white truncate">
+                    {user?.email || 'Usuário'}
+                  </span>
+                  <span className="text-xs text-white/60">
+                    {tenant?.name || (user?.email ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ') : 'Meu Negócio')}
+                  </span>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="w-full justify-center gap-2 text-white hover:bg-white/20 border border-white/30"
+                  onClick={() => {
+                    if (confirm('Deseja sair do sistema?')) {
+                      if (ENABLE_AUTH) {
+                        signOut();
+                      } else {
+                        window.location.href = '/login';
+                      }
+                    }
                   }}
                 >
-                  <IconComponent className="h-5 w-5" />
-                  <span className="font-medium text-sm">{item.label}</span>
-                </a>
-              );
-            })}
-          </div>
-
-          <div className="absolute bottom-4 left-4 right-4">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/10">
-              <div className="flex flex-col gap-2 mb-3">
-                <span className="text-xs font-semibold text-white truncate">
-                  {user?.email || 'Usuário'}
-                </span>
-                <span className="text-xs text-white/60">
-                  {tenant?.name || (user?.email ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ') : 'Meu Negócio')}
-                </span>
+                  <LogOut className="h-3 w-3" />
+                  Finalizar sessão
+                </Button>
               </div>
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                className="w-full justify-center gap-2 text-white hover:bg-white/20 border border-white/30"
-                onClick={() => {
-                  if (confirm('Deseja sair do sistema?')) {
-                    if (ENABLE_AUTH) {
-                      signOut();
-                    } else {
-                      window.location.href = '/login';
-                    }
-                  }
-                }}
-              >
-                <LogOut className="h-3 w-3" />
-                Finalizar sessão
-              </Button>
             </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+          </SheetContent>
+        </Sheet>
 
-      <div className="px-2 sm:px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-4 sm:mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div className="px-2 sm:px-4">
+          <div className="max-w-7xl mx-auto">
+            <div className="mb-4 sm:mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
             <div className="space-y-1">
               <h1 className="text-2xl sm:text-3xl font-bold text-heading">Ponto de Venda</h1>
               <p className="text-sm sm:text-base text-body">F1 - Menu | Ctrl+F - Buscar | Ctrl+Enter - Adicionar | Esc - Cancelar</p>
@@ -791,10 +831,6 @@ export default function PDVPage() {
                   <DropdownMenuItem onClick={handleSangria} className="cursor-pointer text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800">
                     <MinusCircle className="mr-2 h-4 w-4 text-red-500" />
                     <span>Sangria</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleTrocaDevolucao} className="cursor-pointer text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800">
-                    <RotateCcw className="mr-2 h-4 w-4 text-orange-500" />
-                    <span>Troca/Devolução</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleReforco} className="cursor-pointer text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800">
                     <RefreshCw className="mr-2 h-4 w-4 text-green-500" />

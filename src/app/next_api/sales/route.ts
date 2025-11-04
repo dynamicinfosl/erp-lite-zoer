@@ -190,13 +190,19 @@ async function createSaleHandler(request: NextRequest) {
     }
 
     console.log('✅ Itens da venda criados com sucesso');
+    console.log('✅ Venda completa criada:', sale.id);
 
     return NextResponse.json({ success: true, data: sale });
 
-  } catch (error) {
-    console.error('Erro no handler de criação:', error);
+  } catch (error: any) {
+    console.error('❌ Erro no handler de criação:', error);
+    console.error('❌ Stack trace:', error?.stack);
     return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+      { 
+        error: 'Erro interno do servidor',
+        message: error?.message || 'Erro desconhecido',
+        details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+      },
       { status: 500 }
     );
   }
