@@ -70,7 +70,8 @@ const menuGroups = [
     items: [
       { title: 'Clientes', url: '/clientes', icon: Users, roles: ['admin', 'vendedor'] },
       { title: 'Produtos', url: '/produtos', icon: Package, roles: ['admin', 'vendedor'] },
-      { title: 'Vendas / PDV', url: '/pdv', icon: ShoppingCart, roles: ['admin', 'vendedor'] },
+      { title: 'Vendas', url: '/vendas', icon: Receipt, roles: ['admin', 'vendedor'] },
+      { title: 'PDV', url: '/pdv', icon: ShoppingCart, roles: ['admin', 'vendedor'] },
     ],
   },
   {

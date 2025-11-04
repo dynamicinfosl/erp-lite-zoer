@@ -53,6 +53,7 @@ import {
 import { toast } from 'sonner';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
+import { TenantPageWrapper } from '@/components/layout/PageWrapper';
 
 interface Sale {
   id: string;
@@ -90,7 +91,6 @@ export default function VendasPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
-  const [showAddDialog, setShowAddDialog] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
     numero: true,
     cliente: true,
@@ -112,46 +112,56 @@ export default function VendasPage() {
     valor_max: ''
   });
 
-  // Estados para formulário
-  const [newVenda, setNewVenda] = useState({
-    cliente: '',
-    vendedor: '',
-    forma_pagamento: 'dinheiro' as 'dinheiro' | 'cartao_debito' | 'cartao_credito' | 'pix' | 'boleto',
-    observacoes: ''
-  });
-
   const loadVendas = useCallback(async () => {
     try {
       setLoading(true);
       if (!tenant?.id) { setVendas([]); return; }
 
+      console.log('📦 Carregando vendas para o tenant:', tenant.id);
+      
       const res = await fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}`);
-      if (!res.ok) throw new Error('Erro ao carregar vendas');
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('❌ Erro na resposta da API:', res.status, errorText);
+        throw new Error(`Erro ao carregar vendas: ${res.status}`);
+      }
+      
       const json = await res.json();
+      console.log('📥 Resposta da API:', json);
+      
+      // A API pode retornar data, rows ou um array direto
       const data = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
+      console.log(`📊 Total de vendas encontradas: ${data.length}`);
+      
+      // Mapear vendas para o formato esperado
       const mapped: Sale[] = (data || []).map((s: any, i: number) => ({
         id: String(s.id ?? i + 1),
-        numero: s.sale_number ?? s.numero ?? `V-${new Date().getFullYear()}-${String(i + 1).padStart(3,'0')}`,
-        cliente: s.customer?.name ?? s.customer_name ?? s.cliente ?? 'Cliente',
+        numero: s.sale_number ?? s.numero ?? `VND-${String(i + 1).padStart(6, '0')}`,
+        cliente: s.customer?.name ?? s.customer_name ?? s.cliente ?? 'Cliente Avulso',
         vendedor: s.seller_name ?? s.vendedor ?? '',
+        // Se os itens vierem junto com a venda, usar; caso contrário, deixar vazio
         itens: Array.isArray(s.items) ? s.items.map((it: any) => ({
-          produto: it.product?.name ?? it.produto ?? 'Item',
+          produto: it.product?.name ?? it.product_name ?? it.produto ?? 'Produto',
           quantidade: Number(it.quantity ?? it.quantidade ?? 1),
-          preco_unitario: Number(it.unit_price ?? it.preco_unitario ?? 0),
-          subtotal: Number(it.total_price ?? it.subtotal ?? 0),
+          preco_unitario: Number(it.unit_price ?? it.price ?? it.preco_unitario ?? 0),
+          subtotal: Number(it.total_price ?? it.subtotal ?? (Number(it.quantity ?? 1) * Number(it.unit_price ?? it.price ?? 0))),
         })) : [],
-        subtotal: Number(s.subtotal ?? 0),
+        subtotal: Number(s.subtotal ?? s.total_amount ?? s.total ?? 0),
         desconto: Number(s.discount_amount ?? s.desconto ?? 0),
-        total: Number(s.total_amount ?? s.total ?? 0),
+        total: Number(s.total_amount ?? s.final_amount ?? s.total ?? 0),
         forma_pagamento: (s.payment_method ?? 'dinheiro') as Sale['forma_pagamento'],
-        status: (s.status ?? 'pendente') as Sale['status'],
-        data_venda: s.created_at ?? s.data_venda ?? new Date().toISOString(),
+        status: (s.status === null || s.status === 'completed' || s.status === 'paga') ? 'paga' : 
+               (s.status === 'canceled' || s.status === 'cancelada') ? 'cancelada' : 'pendente' as Sale['status'],
+        data_venda: s.created_at ?? s.sold_at ?? s.data_venda ?? new Date().toISOString(),
         observacoes: s.notes ?? s.observacoes ?? '',
       }));
+      
+      console.log(`✅ ${mapped.length} vendas carregadas com sucesso`);
       setVendas(mapped);
     } catch (error) {
-      console.error('Erro ao carregar vendas:', error);
-      toast.error('Erro ao carregar vendas');
+      console.error('❌ Erro ao carregar vendas:', error);
+      toast.error('Erro ao carregar vendas. Verifique o console para mais detalhes.');
+      setVendas([]);
     } finally {
       setLoading(false);
     }
@@ -175,24 +185,6 @@ export default function VendasPage() {
 
     return matchesSearch && matchesAdvanced;
   });
-
-  // Adicionar venda
-  const handleAddVenda = async () => {
-    try {
-      // Criação de venda completa ocorre no PDV. Aqui apenas informamos.
-      setShowAddDialog(false);
-      setNewVenda({
-        cliente: '',
-        vendedor: '',
-        forma_pagamento: 'dinheiro',
-        observacoes: ''
-      });
-      toast.info('Criação de venda disponível no PDV. Lista carregada da API.');
-    } catch (error) {
-      console.error('Erro ao criar venda:', error);
-      toast.error('Erro ao criar venda');
-    }
-  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -253,13 +245,14 @@ export default function VendasPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <TenantPageWrapper>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Vendas</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Lista de Vendas</h1>
           <p className="text-muted-foreground">
-            Gerencie suas vendas e acompanhe o faturamento
+            Visualize todas as vendas realizadas no sistema
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -330,11 +323,11 @@ export default function VendasPage() {
             {/* Lado esquerdo - Botões de ação */}
             <div className="flex items-center gap-2">
               <Button 
-                className="bg-emerald-600 hover:bg-emerald-700"
-                onClick={() => setShowAddDialog(true)}
+                variant="outline"
+                onClick={() => window.location.href = '/pdv'}
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Venda
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Ir para PDV
               </Button>
 
               <DropdownMenu>
@@ -597,73 +590,7 @@ export default function VendasPage() {
         </CardContent>
       </Card>
 
-      {/* Dialog Adicionar Venda */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Nova Venda</DialogTitle>
-            <DialogDescription>
-              Para vendas completas, utilize o PDV. Este formulário é para registros simples.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <label htmlFor="cliente">Cliente *</label>
-              <Input
-                id="cliente"
-                value={newVenda.cliente}
-                onChange={(e) => setNewVenda(prev => ({ ...prev, cliente: e.target.value }))}
-                placeholder="Nome do cliente"
-              />
-            </div>
-            <div className="grid gap-2">
-              <label htmlFor="vendedor">Vendedor</label>
-              <Input
-                id="vendedor"
-                value={newVenda.vendedor}
-                onChange={(e) => setNewVenda(prev => ({ ...prev, vendedor: e.target.value }))}
-                placeholder="Nome do vendedor"
-              />
-            </div>
-            <div className="grid gap-2">
-              <label htmlFor="forma_pagamento">Forma de Pagamento</label>
-              <select 
-                id="forma_pagamento"
-                className="px-3 py-2 border rounded-md"
-                value={newVenda.forma_pagamento}
-                onChange={(e) => setNewVenda(prev => ({ ...prev, forma_pagamento: e.target.value as any }))}
-              >
-                <option value="dinheiro">Dinheiro</option>
-                <option value="cartao_debito">Cartão Débito</option>
-                <option value="cartao_credito">Cartão Crédito</option>
-                <option value="pix">PIX</option>
-                <option value="boleto">Boleto</option>
-              </select>
-            </div>
-            <div className="grid gap-2">
-              <label htmlFor="observacoes">Observações</label>
-              <textarea
-                id="observacoes"
-                className="px-3 py-2 border rounded-md min-h-[80px]"
-                value={newVenda.observacoes}
-                onChange={(e) => setNewVenda(prev => ({ ...prev, observacoes: e.target.value }))}
-                placeholder="Observações adicionais..."
-              />
-            </div>
-            <div className="text-sm text-muted-foreground">
-              <p>💡 Para uma venda completa com produtos e valores, utilize o PDV.</p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleAddVenda} className="bg-emerald-600 hover:bg-emerald-700">
-              Criar Venda
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+      </div>
+    </TenantPageWrapper>
   );
 }
