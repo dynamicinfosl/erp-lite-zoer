@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { 
   Dialog, 
   DialogContent, 
@@ -91,6 +92,10 @@ export default function VendasPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [selectedVenda, setSelectedVenda] = useState<Sale | null>(null);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editFormData, setEditFormData] = useState<Partial<Sale>>({});
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
     numero: true,
     cliente: true,
@@ -242,6 +247,92 @@ export default function VendasPage() {
     ticketMedio: vendas.filter(v => v.status === 'paga').length > 0 
       ? vendas.filter(v => v.status === 'paga').reduce((acc, v) => acc + v.total, 0) / vendas.filter(v => v.status === 'paga').length 
       : 0
+  };
+
+  // Funções de ação
+  const handleVerDetalhes = (venda: Sale) => {
+    setSelectedVenda(venda);
+    setShowDetailsDialog(true);
+  };
+
+  const handleImprimirCupom = (venda: Sale) => {
+    // Abrir página de cupom em nova aba
+    window.open(`/cupom/${venda.id}`, '_blank');
+  };
+
+  const handleEditar = (venda: Sale) => {
+    setSelectedVenda(venda);
+    setEditFormData({
+      cliente: venda.cliente,
+      forma_pagamento: venda.forma_pagamento,
+      status: venda.status,
+      observacoes: venda.observacoes || '',
+      total: venda.total,
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleSalvarEdicao = async () => {
+    if (!selectedVenda) return;
+
+    try {
+      const updateData: any = {
+        customer_name: editFormData.cliente,
+        payment_method: editFormData.forma_pagamento,
+        status: editFormData.status,
+        notes: editFormData.observacoes || '',
+      };
+
+      if (editFormData.total !== undefined) {
+        updateData.total_amount = editFormData.total;
+      }
+
+      const response = await fetch(`/next_api/sales/${selectedVenda.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao atualizar venda');
+      }
+
+      toast.success('Venda atualizada com sucesso');
+      setShowEditDialog(false);
+      setEditFormData({});
+      loadVendas(); // Recarregar lista
+    } catch (error) {
+      console.error('Erro ao atualizar venda:', error);
+      toast.error(error instanceof Error ? error.message : 'Erro ao atualizar venda');
+    }
+  };
+
+  const handleCancelarVenda = async (venda: Sale) => {
+    if (!confirm(`Tem certeza que deseja cancelar a venda ${venda.numero}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/next_api/sales/${venda.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao cancelar venda');
+      }
+
+      toast.success('Venda cancelada com sucesso');
+      loadVendas(); // Recarregar lista
+    } catch (error) {
+      console.error('Erro ao cancelar venda:', error);
+      toast.error('Erro ao cancelar venda. Tente novamente.');
+    }
   };
 
   return (
@@ -555,20 +646,23 @@ export default function VendasPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleVerDetalhes(venda)}>
                             <Eye className="h-4 w-4 mr-2" />
                             Ver Detalhes
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleImprimirCupom(venda)}>
                             <Receipt className="h-4 w-4 mr-2" />
                             Imprimir Cupom
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditar(venda)}>
                             <Edit className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600">
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={() => handleCancelarVenda(venda)}
+                          >
                             <Trash2 className="h-4 w-4 mr-2" />
                             Cancelar Venda
                           </DropdownMenuItem>
@@ -589,6 +683,201 @@ export default function VendasPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Dialog de Detalhes da Venda */}
+      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Venda</DialogTitle>
+            <DialogDescription>
+              Informações completas da venda {selectedVenda?.numero}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedVenda && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Número</Label>
+                  <div className="font-mono text-sm mt-1">{selectedVenda.numero}</div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                  <div className="mt-1">{getStatusBadge(selectedVenda.status)}</div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Cliente</Label>
+                  <div className="mt-1">{selectedVenda.cliente}</div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Vendedor</Label>
+                  <div className="mt-1">{selectedVenda.vendedor || '-'}</div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Data</Label>
+                  <div className="mt-1">{formatDate(selectedVenda.data_venda)}</div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Forma de Pagamento</Label>
+                  <div className="mt-1">{getFormaPagamentoBadge(selectedVenda.forma_pagamento)}</div>
+                </div>
+              </div>
+              
+              {selectedVenda.itens && selectedVenda.itens.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Itens</Label>
+                  <div className="mt-2 border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Produto</TableHead>
+                          <TableHead>Qtd</TableHead>
+                          <TableHead>Preço Unit.</TableHead>
+                          <TableHead>Subtotal</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedVenda.itens.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{item.produto}</TableCell>
+                            <TableCell>{item.quantidade}</TableCell>
+                            <TableCell>{formatCurrency(item.preco_unitario)}</TableCell>
+                            <TableCell>{formatCurrency(item.subtotal)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+              
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Subtotal</Label>
+                  <div className="text-lg font-semibold mt-1">{formatCurrency(selectedVenda.subtotal)}</div>
+                </div>
+                {selectedVenda.desconto > 0 && (
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Desconto</Label>
+                    <div className="text-lg text-red-600 mt-1">-{formatCurrency(selectedVenda.desconto)}</div>
+                  </div>
+                )}
+                <div className="col-span-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Total</Label>
+                  <div className="text-2xl font-bold text-primary mt-1">{formatCurrency(selectedVenda.total)}</div>
+                </div>
+              </div>
+              
+              {selectedVenda.observacoes && (
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Observações</Label>
+                  <div className="text-sm mt-1">{selectedVenda.observacoes}</div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
+              Fechar
+            </Button>
+            {selectedVenda && (
+              <Button onClick={() => handleImprimirCupom(selectedVenda)}>
+                <Receipt className="h-4 w-4 mr-2" />
+                Imprimir Cupom
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Edição da Venda */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Editar Venda</DialogTitle>
+            <DialogDescription>
+              Edite as informações da venda {selectedVenda?.numero}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedVenda && (
+            <div className="space-y-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="cliente">Cliente *</Label>
+                <Input
+                  id="cliente"
+                  value={editFormData.cliente || ''}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, cliente: e.target.value }))}
+                  placeholder="Nome do cliente"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="forma_pagamento">Forma de Pagamento</Label>
+                <select
+                  id="forma_pagamento"
+                  className="px-3 py-2 border rounded-md"
+                  value={editFormData.forma_pagamento || 'dinheiro'}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, forma_pagamento: e.target.value as Sale['forma_pagamento'] }))}
+                >
+                  <option value="dinheiro">Dinheiro</option>
+                  <option value="cartao_debito">Cartão Débito</option>
+                  <option value="cartao_credito">Cartão Crédito</option>
+                  <option value="pix">PIX</option>
+                  <option value="boleto">Boleto</option>
+                </select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <select
+                  id="status"
+                  className="px-3 py-2 border rounded-md"
+                  value={editFormData.status || 'pendente'}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, status: e.target.value as Sale['status'] }))}
+                >
+                  <option value="pendente">Pendente</option>
+                  <option value="paga">Paga</option>
+                  <option value="cancelada">Cancelada</option>
+                </select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="total">Total (R$)</Label>
+                <Input
+                  id="total"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editFormData.total || 0}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, total: parseFloat(e.target.value) || 0 }))}
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="observacoes">Observações</Label>
+                <textarea
+                  id="observacoes"
+                  className="px-3 py-2 border rounded-md min-h-[80px]"
+                  value={editFormData.observacoes || ''}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, observacoes: e.target.value }))}
+                  placeholder="Observações adicionais..."
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowEditDialog(false);
+              setEditFormData({});
+            }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSalvarEdicao} className="bg-emerald-600 hover:bg-emerald-700">
+              Salvar Alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       </div>
     </TenantPageWrapper>

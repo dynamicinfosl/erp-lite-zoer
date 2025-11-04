@@ -105,3 +105,189 @@ export async function GET(
     );
   }
 }
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ saleId: string }> }
+) {
+  try {
+    const { saleId } = await params;
+    const body = await request.json();
+    
+    console.log('✏️ API - Editando venda:', saleId);
+    console.log('📝 Dados recebidos:', body);
+    
+    if (!saleId) {
+      console.error('❌ ID da venda não fornecido');
+      return NextResponse.json(
+        { error: 'ID da venda é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    // Verificar se a venda existe
+    const isNumber = /^\d+$/.test(saleId);
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(saleId);
+    
+    let query = supabaseAdmin
+      .from('sales')
+      .select('id');
+    
+    if (isNumber) {
+      query = query.eq('id', parseInt(saleId));
+    } else if (isUUID) {
+      query = query.eq('id', saleId);
+    } else {
+      query = query.eq('sale_number', saleId);
+    }
+    
+    const { data: sales, error: saleError } = await query;
+    
+    if (saleError || !sales || sales.length === 0) {
+      console.error('❌ Venda não encontrada:', saleError);
+      return NextResponse.json(
+        { error: 'Venda não encontrada' },
+        { status: 404 }
+      );
+    }
+
+    const sale = sales[0];
+    
+    // Preparar dados de atualização
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    // Adicionar apenas campos que foram enviados
+    if (body.customer_name !== undefined) updateData.customer_name = body.customer_name;
+    if (body.payment_method !== undefined) updateData.payment_method = body.payment_method;
+    if (body.status !== undefined) updateData.status = body.status;
+    if (body.notes !== undefined) updateData.notes = body.notes;
+    if (body.total_amount !== undefined) {
+      const total = parseFloat(body.total_amount);
+      if (!isNaN(total) && total >= 0) {
+        updateData.total_amount = total;
+        updateData.final_amount = total;
+      }
+    }
+
+    console.log('💾 Atualizando venda:', updateData);
+
+    const { data: updatedSale, error: updateError } = await supabaseAdmin
+      .from('sales')
+      .update(updateData)
+      .eq('id', sale.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('❌ Erro ao atualizar venda:', updateError);
+      return NextResponse.json(
+        { error: 'Erro ao atualizar venda: ' + updateError.message },
+        { status: 500 }
+      );
+    }
+
+    console.log('✅ Venda atualizada com sucesso:', updatedSale.id);
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Venda atualizada com sucesso',
+      data: updatedSale
+    });
+
+  } catch (error: any) {
+    console.error('❌ Erro no handler de atualização:', error);
+    return NextResponse.json(
+      { 
+        error: 'Erro interno do servidor',
+        message: error?.message || 'Erro desconhecido'
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ saleId: string }> }
+) {
+  try {
+    const { saleId } = await params;
+    console.log('🗑️ API - Cancelando venda:', saleId);
+    
+    if (!saleId) {
+      console.error('❌ ID da venda não fornecido');
+      return NextResponse.json(
+        { error: 'ID da venda é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    // Verificar se a venda existe
+    const isNumber = /^\d+$/.test(saleId);
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(saleId);
+    
+    let query = supabaseAdmin
+      .from('sales')
+      .select('id, status');
+    
+    if (isNumber) {
+      query = query.eq('id', parseInt(saleId));
+    } else if (isUUID) {
+      query = query.eq('id', saleId);
+    } else {
+      query = query.eq('sale_number', saleId);
+    }
+    
+    const { data: sales, error: saleError } = await query;
+    
+    if (saleError || !sales || sales.length === 0) {
+      console.error('❌ Venda não encontrada:', saleError);
+      return NextResponse.json(
+        { error: 'Venda não encontrada' },
+        { status: 404 }
+      );
+    }
+
+    const sale = sales[0];
+    
+    // Verificar se já está cancelada
+    if (sale.status === 'canceled' || sale.status === 'cancelada') {
+      return NextResponse.json(
+        { error: 'Venda já está cancelada' },
+        { status: 400 }
+      );
+    }
+
+    // Atualizar status para cancelada em vez de deletar (melhor prática)
+    const { error: updateError } = await supabaseAdmin
+      .from('sales')
+      .update({ status: 'canceled' })
+      .eq('id', sale.id);
+
+    if (updateError) {
+      console.error('❌ Erro ao cancelar venda:', updateError);
+      return NextResponse.json(
+        { error: 'Erro ao cancelar venda: ' + updateError.message },
+        { status: 500 }
+      );
+    }
+
+    console.log('✅ Venda cancelada com sucesso:', sale.id);
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Venda cancelada com sucesso',
+      data: { id: sale.id, status: 'canceled' }
+    });
+
+  } catch (error: any) {
+    console.error('❌ Erro no handler de cancelamento:', error);
+    return NextResponse.json(
+      { 
+        error: 'Erro interno do servidor',
+        message: error?.message || 'Erro desconhecido'
+      },
+      { status: 500 }
+    );
+  }
+}
