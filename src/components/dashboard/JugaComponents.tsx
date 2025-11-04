@@ -19,6 +19,7 @@ interface JugaKPICardProps {
   color?: "primary" | "success" | "warning" | "error" | "accent"
   className?: string
   variant?: 'light' | 'dark'
+  compact?: boolean
 }
 
 const KPI_COLORS: Record<NonNullable<JugaKPICardProps["color"]>, string> = {
@@ -47,6 +48,7 @@ export function JugaKPICard({
   color = "primary",
   className,
   variant = 'light',
+  compact = false,
 }: JugaKPICardProps) {
   const titleCls = variant === 'dark' ? 'text-blue-100' : 'text-gray-700 dark:text-gray-300'
   const valueCls = variant === 'dark' ? 'text-white' : 'text-gray-900 dark:text-gray-100'
@@ -54,22 +56,35 @@ export function JugaKPICard({
 
   return (
     <Card className={cn("juga-card transition-all hover:juga-shadow-glow hover:shadow-md", KPI_COLORS[color], className)}>
-      <CardHeader className="pb-2 sm:pb-3">
+      <CardHeader className={cn("pb-2 sm:pb-3", compact && "pb-1.5 px-2 sm:px-3 pt-2 sm:pt-3")}>
         <div className="flex items-center justify-between">
-          <CardTitle className={cn("text-xs sm:text-sm font-semibold leading-tight uppercase tracking-wide", titleCls)}>{title}</CardTitle>
-          {icon ? <div className={cn("p-1.5 sm:p-2 rounded-lg shadow-sm", KPI_ICON_COLORS[color])}>{icon}</div> : null}
+          <CardTitle className={cn(
+            "text-xs sm:text-sm font-semibold leading-tight uppercase tracking-wide",
+            compact && "text-[10px] sm:text-[11px]",
+            titleCls
+          )}>{title}</CardTitle>
+          {icon ? <div className={cn("p-1.5 sm:p-2 rounded-lg shadow-sm", compact && "p-1 rounded-md", KPI_ICON_COLORS[color])}>{icon}</div> : null}
         </div>
       </CardHeader>
-      <CardContent className="pt-0 px-3 sm:px-4">
-        <div className="space-y-1 sm:space-y-2">
-          <div className={cn("text-lg sm:text-xl lg:text-2xl font-bold text-left leading-tight", valueCls)}>{value}</div>
+      <CardContent className={cn("pt-0 px-3 sm:px-4", compact && "px-2 sm:px-3 pt-0")}>
+        <div className={cn("space-y-1 sm:space-y-2", compact && "space-y-0.5")}>
+          <div className={cn(
+            "text-lg sm:text-xl lg:text-2xl font-bold text-left leading-tight",
+            compact && "text-sm sm:text-base lg:text-lg",
+            valueCls
+          )}>{value}</div>
           {(description || (trend && trendValue)) && (
             <div className="flex items-center justify-between gap-2">
-              {description ? <p className={cn("text-xs sm:text-sm truncate font-medium", descCls)}>{description}</p> : <span />}
+              {description ? <p className={cn(
+                "text-xs sm:text-sm truncate font-medium",
+                compact && "text-[10px] sm:text-[11px]",
+                descCls
+              )}>{description}</p> : <span />}
               {trend && trendValue ? (
                 <div
                   className={cn(
                     "flex items-center gap-1 text-xs font-semibold px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full flex-shrink-0 border",
+                    compact && "px-1.5 py-0.5 text-[10px] gap-0.5",
                     trend === "up"
                       ? "text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/50 border-green-300 dark:border-green-700"
                       : trend === "down"
@@ -77,9 +92,9 @@ export function JugaKPICard({
                       : "text-gray-700 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600",
                   )}
                 >
-                  {trend === "up" ? <TrendingUp className="h-3 w-3" /> : trend === "down" ? <TrendingDown className="h-3 w-3" /> : null}
-                  <span className="hidden sm:inline">{trendValue}</span>
-                  <span className="sm:hidden">{trendValue.replace('%', '')}</span>
+                  {trend === "up" ? <TrendingUp className={cn("h-3 w-3", compact && "h-2.5 w-2.5")} /> : trend === "down" ? <TrendingDown className={cn("h-3 w-3", compact && "h-2.5 w-2.5")} /> : null}
+                  <span className={cn("hidden sm:inline", compact && "text-[10px]")}>{trendValue}</span>
+                  <span className={cn("sm:hidden", compact && "text-[10px]")}>{trendValue.replace('%', '')}</span>
                 </div>
               ) : null}
             </div>

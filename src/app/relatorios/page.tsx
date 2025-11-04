@@ -573,7 +573,7 @@ export default function RelatoriosPage() {
         description: `${salesStats.totalSales} vendas concluídas`,
         trend: 'up' as const,
         trendValue: '+8,2%',
-        icon: <DollarSign className="h-5 w-5" />,
+        icon: <DollarSign className="h-4 w-4" />,
         color: 'primary' as const,
       },
       {
@@ -582,7 +582,7 @@ export default function RelatoriosPage() {
         description: `Margem ${report ? report.profitMargin + '%' : '-'}`,
         trend: 'neutral' as const,
         trendValue: '—',
-        icon: <TrendingUp className="h-5 w-5" />,
+        icon: <TrendingUp className="h-4 w-4" />,
         color: 'accent' as const,
       },
       {
@@ -591,7 +591,7 @@ export default function RelatoriosPage() {
         description: 'Média por transação',
         trend: 'neutral' as const,
         trendValue: 'Estável',
-        icon: <TrendingUp className="h-5 w-5" />,
+        icon: <TrendingUp className="h-4 w-4" />,
         color: 'accent' as const,
       },
       {
@@ -600,7 +600,7 @@ export default function RelatoriosPage() {
         description: `${products.length} no catálogo`,
         trend: 'up' as const,
         trendValue: '+12 itens',
-        icon: <Package className="h-5 w-5" />,
+        icon: <Package className="h-4 w-4" />,
         color: 'success' as const,
       },
       {
@@ -609,7 +609,7 @@ export default function RelatoriosPage() {
         description: `${filteredDeliveries.length} no período`,
         trend: 'up' as const,
         trendValue: '+5%',
-        icon: <Truck className="h-5 w-5" />,
+        icon: <Truck className="h-4 w-4" />,
         color: 'warning' as const,
       },
     ],
@@ -665,7 +665,7 @@ export default function RelatoriosPage() {
       </div>
 
       {/* KPI Cards - Responsivo */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
         {summaryCards.map((card) => (
           <JugaKPICard
             key={card.title}
@@ -676,7 +676,8 @@ export default function RelatoriosPage() {
             trendValue={card.trendValue}
             icon={card.icon}
             color={card.color}
-            className="min-h-[120px] sm:min-h-[140px]"
+            compact={true}
+            className="min-h-[75px] sm:min-h-[80px]"
           />
         ))}
       </div>
@@ -1118,7 +1119,7 @@ export default function RelatoriosPage() {
             </TabsContent>
 
             <TabsContent value="entregas">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-stretch">
+              <div className="grid gap-2 sm:gap-3 sm:grid-cols-2 lg:grid-cols-3 items-stretch">
                 <JugaKPICard
                   title="Entregas realizadas"
                   value={`${filteredDeliveries.filter((d) => d.status === 'entregue').length}`}
@@ -1127,7 +1128,7 @@ export default function RelatoriosPage() {
                   icon={<Truck className="h-5 w-5" />}
                   trend="up"
                   trendValue="+3 entregas"
-                  className="h-full min-h-[140px]"
+                  className="h-full min-h-[100px] sm:min-h-[115px]"
                 />
                 <JugaKPICard
                   title="Em trânsito"
@@ -1137,7 +1138,7 @@ export default function RelatoriosPage() {
                   icon={<Truck className="h-5 w-5" />}
                   trend="neutral"
                   trendValue="Estável"
-                  className="h-full min-h-[140px]"
+                  className="h-full min-h-[100px] sm:min-h-[115px]"
                 />
                 <JugaKPICard
                   title="Aguardando"
@@ -1147,7 +1148,7 @@ export default function RelatoriosPage() {
                   icon={<Truck className="h-5 w-5" />}
                   trend="down"
                   trendValue="-2 ocorrências"
-                  className="h-full min-h-[140px]"
+                  className="h-full min-h-[100px] sm:min-h-[115px]"
                 />
               </div>
 
