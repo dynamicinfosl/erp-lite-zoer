@@ -294,17 +294,48 @@ export default function JugaDashboard() {
     loadDashboardData();
   }, [tenant?.id, generateRecentActivity, initialLoad, lastFetchTime]);
 
-  // Gerar dados mensais
+  // Gerar dados mensais (semestre atual)
   const generateMonthlyData = (sales: any[]) => {
-    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
-    const currentMonth = new Date().getMonth();
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-11
     
-    return months.map((month, index) => {
-      const monthIndex = (currentMonth - 5 + index + 12) % 12;
+    // Determinar se estamos no 1º semestre (Jan-Jun) ou 2º semestre (Jul-Dez)
+    const isFirstHalf = currentMonth < 6; // Jan (0) a Jun (5)
+    
+    let monthsData;
+    if (isFirstHalf) {
+      // 1º semestre: Janeiro a Junho
+      monthsData = [
+        { month: 'Jan', monthIndex: 0, year: currentYear },
+        { month: 'Fev', monthIndex: 1, year: currentYear },
+        { month: 'Mar', monthIndex: 2, year: currentYear },
+        { month: 'Abr', monthIndex: 3, year: currentYear },
+        { month: 'Mai', monthIndex: 4, year: currentYear },
+        { month: 'Jun', monthIndex: 5, year: currentYear }
+      ];
+    } else {
+      // 2º semestre: Julho a Dezembro
+      monthsData = [
+        { month: 'Jul', monthIndex: 6, year: currentYear },
+        { month: 'Ago', monthIndex: 7, year: currentYear },
+        { month: 'Set', monthIndex: 8, year: currentYear },
+        { month: 'Out', monthIndex: 9, year: currentYear },
+        { month: 'Nov', monthIndex: 10, year: currentYear },
+        { month: 'Dez', monthIndex: 11, year: currentYear }
+      ];
+    }
+    
+    console.log(`📅 JugaDashboard - ${isFirstHalf ? '1º' : '2º'} Semestre:`, monthsData.map(m => `${m.month}/${m.year}`));
+    
+    return monthsData.map(({ month, monthIndex, year }) => {
       const monthSales = sales.filter(sale => {
         if (!sale?.created_at) return false;
         const saleDate = new Date(sale.created_at);
-        return !isNaN(saleDate.getTime()) && saleDate.getMonth() === monthIndex;
+        if (isNaN(saleDate.getTime())) return false;
+        
+        // Comparar mês e ano
+        return saleDate.getMonth() === monthIndex && saleDate.getFullYear() === year;
       });
       
       const total = monthSales.reduce((sum, sale) => {

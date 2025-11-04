@@ -115,6 +115,17 @@ async function createSaleHandler(request: NextRequest) {
     }
 
     // Criar a venda (versão simplificada)
+    const currentDate = new Date();
+    const createdAt = currentDate.toISOString();
+    
+    console.log('📅 Data da venda sendo criada:', {
+      iso: createdAt,
+      local: currentDate.toLocaleString('pt-BR'),
+      year: currentDate.getFullYear(),
+      month: currentDate.getMonth() + 1,
+      day: currentDate.getDate()
+    });
+    
     const { data: sale, error: saleError } = await supabaseAdmin
       .from('sales')
       .insert({
@@ -128,7 +139,7 @@ async function createSaleHandler(request: NextRequest) {
         payment_method,
         status: null, // ✅ Usar NULL para evitar constraint
         notes: body.notes || null,
-        created_at: new Date().toISOString(),
+        created_at: createdAt,
       })
       .select()
       .single();

@@ -42,6 +42,13 @@ export default function RelatoriosPage() {
   const [activeExport, setActiveExport] = useState<'all' | 'financial' | 'sales' | 'logistics'>('all');
   const [isDarkMode, setIsDarkMode] = useState(false);
   
+  // Determinar qual semestre estamos (para o título do gráfico)
+  const currentSemester = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth(); // 0-11
+    return currentMonth < 6 ? '1º Semestre' : '2º Semestre';
+  }, []);
+  
   // Log do estado inicial
   console.log('🎯 Estado inicial - activeFilter:', activeFilter);
   console.log('🎯 Estado inicial - activeExport:', activeExport);
@@ -482,27 +489,52 @@ export default function RelatoriosPage() {
     ]
   ), []);
 
-  // Agregação real: total de vendas por mês (últimos 6 meses)
+  // Agregação real: total de vendas por mês (semestre atual)
   const monthlySalesChart = useMemo(() => {
     const now = new Date();
-    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    const months: { key: string; label: string; year: number; monthIdx: number }[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const label = monthNames[d.getMonth()];
-      months.push({ key, label, year: d.getFullYear(), monthIdx: d.getMonth() });
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-11
+    
+    // Determinar se estamos no 1º semestre (Jan-Jun) ou 2º semestre (Jul-Dez)
+    const isFirstHalf = currentMonth < 6; // Jan (0) a Jun (5)
+    
+    let months, semesterStart, semesterEnd, semesterStartStr, semesterEndStr;
+    
+    if (isFirstHalf) {
+      // 1º semestre: Janeiro a Junho
+      months = [
+        { key: `${currentYear}-01`, label: 'Jan', year: currentYear, monthIdx: 0 },
+        { key: `${currentYear}-02`, label: 'Fev', year: currentYear, monthIdx: 1 },
+        { key: `${currentYear}-03`, label: 'Mar', year: currentYear, monthIdx: 2 },
+        { key: `${currentYear}-04`, label: 'Abr', year: currentYear, monthIdx: 3 },
+        { key: `${currentYear}-05`, label: 'Mai', year: currentYear, monthIdx: 4 },
+        { key: `${currentYear}-06`, label: 'Jun', year: currentYear, monthIdx: 5 }
+      ];
+      semesterStart = new Date(currentYear, 0, 1); // Janeiro
+      semesterEnd = new Date(currentYear, 5, 30, 23, 59, 59); // Junho
+    } else {
+      // 2º semestre: Julho a Dezembro
+      months = [
+        { key: `${currentYear}-07`, label: 'Jul', year: currentYear, monthIdx: 6 },
+        { key: `${currentYear}-08`, label: 'Ago', year: currentYear, monthIdx: 7 },
+        { key: `${currentYear}-09`, label: 'Set', year: currentYear, monthIdx: 8 },
+        { key: `${currentYear}-10`, label: 'Out', year: currentYear, monthIdx: 9 },
+        { key: `${currentYear}-11`, label: 'Nov', year: currentYear, monthIdx: 10 },
+        { key: `${currentYear}-12`, label: 'Dez', year: currentYear, monthIdx: 11 }
+      ];
+      semesterStart = new Date(currentYear, 6, 1); // Julho
+      semesterEnd = new Date(currentYear, 11, 31, 23, 59, 59); // Dezembro
     }
-
-    // Filtrar vendas dos últimos 6 meses
-    // Calcular a data de 6 meses atrás para filtrar
-    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-    sixMonthsAgo.setHours(0, 0, 0, 0);
-    const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0];
+    
+    semesterStart.setHours(0, 0, 0, 0);
+    semesterStartStr = semesterStart.toISOString().split('T')[0];
+    semesterEndStr = semesterEnd.toISOString().split('T')[0];
+    
+    console.log(`📅 Relatórios - ${isFirstHalf ? '1º' : '2º'} Semestre:`, months.map(m => `${m.label}/${m.year}`));
 
     const totalsByKey: Record<string, number> = {};
     console.log('📊 Calculando gráfico mensal - Total de vendas:', sales.length);
-    console.log('📊 Filtrando vendas a partir de:', sixMonthsAgoStr);
+    console.log(`📊 Filtrando vendas do ${isFirstHalf ? '1º' : '2º'} semestre:`, `${semesterStartStr} até ${semesterEndStr}`);
     
     let salesInRange = 0;
     for (const sale of sales) {
@@ -512,8 +544,8 @@ export default function RelatoriosPage() {
         continue;
       }
       
-      // Filtrar apenas vendas dos últimos 6 meses
-      if (dateStr < sixMonthsAgoStr) {
+      // Filtrar apenas vendas do semestre atual
+      if (dateStr < semesterStartStr || dateStr > semesterEndStr) {
         continue;
       }
       
@@ -537,10 +569,10 @@ export default function RelatoriosPage() {
       salesInRange++;
     }
     
-    console.log('📊 Vendas nos últimos 6 meses:', salesInRange);
+    console.log(`📊 Vendas do ${isFirstHalf ? '1º' : '2º'} semestre:`, salesInRange);
 
     const chartData = months.map(m => ({ month: m.label, total: totalsByKey[m.key] || 0 }));
-    console.log('📊 Dados do gráfico mensal:', chartData);
+    console.log(`📊 Dados do gráfico mensal (${isFirstHalf ? '1º' : '2º'} semestre):`, chartData);
     console.log('📊 Totais por mês:', totalsByKey);
     
     return chartData;
@@ -718,10 +750,10 @@ export default function RelatoriosPage() {
                 <Card className="w-full border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/30 dark:from-slate-800 dark:to-slate-900/50 hover:shadow-xl transition-all duration-300">
                   <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 text-white rounded-t-lg pb-3 pt-4 px-4">
                     <CardTitle className="flex items-center gap-2 text-white text-base font-semibold">
-                      Vendas dos Últimos 6 Meses
+                      Vendas do {currentSemester}
                     </CardTitle>
                     <p className="text-blue-100 dark:text-blue-200 text-sm mt-1">
-                      Comparativo de vendas mensais
+                      Comparativo de vendas mensais do semestre
                     </p>
                   </CardHeader>
                   <CardContent className="p-4 sm:p-6">
