@@ -40,6 +40,7 @@ export default function RelatoriosPage() {
   const [report, setReport] = useState<any | null>(null);
   const [activeFilter, setActiveFilter] = useState<'30days' | 'thismonth' | 'sales' | 'products'>('30days');
   const [activeExport, setActiveExport] = useState<'all' | 'financial' | 'sales' | 'logistics'>('all');
+  const [isDarkMode, setIsDarkMode] = useState(false);
   
   // Log do estado inicial
   console.log('🎯 Estado inicial - activeFilter:', activeFilter);
@@ -121,6 +122,24 @@ export default function RelatoriosPage() {
     console.log('📊 Carregando dados...');
     loadData();
   }, [tenant?.id, dateRange, loadData]);
+
+  // Detectar dark mode
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(document.documentElement.classList.contains('dark'));
+    };
+    
+    checkDarkMode();
+    
+    // Observar mudanças no atributo dark
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+    
+    return () => observer.disconnect();
+  }, []);
 
   const formatCurrency = useCallback(
     (value: number) =>
@@ -696,59 +715,66 @@ export default function RelatoriosPage() {
             <TabsContent value="vendas">
               <div className="grid gap-2 sm:gap-3 grid-cols-1 md:grid-cols-2">
                 {/* Card com gráfico de barras por mês (últimos 6 meses) - Layout igual ao dashboard */}
-                <Card className="w-full border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/30 hover:shadow-xl transition-all duration-300">
-                  <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg pb-3 pt-4 px-4">
+                <Card className="w-full border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/30 dark:from-slate-800 dark:to-slate-900/50 hover:shadow-xl transition-all duration-300">
+                  <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 text-white rounded-t-lg pb-3 pt-4 px-4">
                     <CardTitle className="flex items-center gap-2 text-white text-base font-semibold">
                       Vendas dos Últimos 6 Meses
                     </CardTitle>
-                    <p className="text-blue-100 text-sm mt-1">
+                    <p className="text-blue-100 dark:text-blue-200 text-sm mt-1">
                       Comparativo de vendas mensais
                     </p>
                   </CardHeader>
                   <CardContent className="p-4 sm:p-6">
                     <ResponsiveContainer width="100%" height={280} className="sm:h-[300px]">
                       <BarChart data={monthlySalesChart} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <CartesianGrid 
+                          strokeDasharray="3 3" 
+                          stroke={isDarkMode ? '#475569' : '#e2e8f0'} 
+                        />
                         <XAxis 
                           dataKey="month" 
-                          stroke="#475569"
+                          stroke={isDarkMode ? '#94a3b8' : '#475569'}
                           fontSize={12}
                           fontWeight={500}
-                          tick={{ fontSize: 12, fill: '#475569' }}
-                          axisLine={{ stroke: '#475569' }}
-                          tickLine={{ stroke: '#475569' }}
+                          tick={{ fontSize: 12, fill: isDarkMode ? '#cbd5e1' : '#475569' }}
+                          axisLine={{ stroke: isDarkMode ? '#94a3b8' : '#475569' }}
+                          tickLine={{ stroke: isDarkMode ? '#94a3b8' : '#475569' }}
                         />
                         <YAxis 
-                          stroke="#475569"
+                          stroke={isDarkMode ? '#94a3b8' : '#475569'}
                           fontSize={12}
                           fontWeight={500}
-                          tick={{ fontSize: 12, fill: '#475569' }}
-                          axisLine={{ stroke: '#475569' }}
-                          tickLine={{ stroke: '#475569' }}
+                          tick={{ fontSize: 12, fill: isDarkMode ? '#cbd5e1' : '#475569' }}
+                          axisLine={{ stroke: isDarkMode ? '#94a3b8' : '#475569' }}
+                          tickLine={{ stroke: isDarkMode ? '#94a3b8' : '#475569' }}
                           tickFormatter={(value) => `R$ ${value.toLocaleString()}`}
                         />
                         <Tooltip 
-                          cursor={{ fill: '#6b7280', fillOpacity: 0.45 }}
+                          cursor={{ fill: isDarkMode ? '#475569' : '#6b7280', fillOpacity: isDarkMode ? 0.3 : 0.45 }}
                           contentStyle={{
-                            backgroundColor: '#ffffff',
-                            border: '1px solid #3b82f6',
+                            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                            border: `1px solid ${isDarkMode ? '#3b82f6' : '#3b82f6'}`,
                             borderRadius: '12px',
                             boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.2)',
                             fontWeight: '500',
-                            fontSize: '12px'
+                            fontSize: '12px',
+                            color: isDarkMode ? '#f1f5f9' : '#1e293b'
                           }}
-                          labelStyle={{ color: '#1e293b', fontWeight: '600' }}
+                          labelStyle={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontWeight: '600' }}
                           formatter={(value: number) => [`Vendas : ${formatCurrency(value || 0)}`, '']}
                         />
                         <Bar 
                           dataKey="total" 
-                          fill="#3b82f6"
+                          fill={isDarkMode ? '#60a5fa' : '#3b82f6'}
                           radius={[6, 6, 0, 0]}
                         >
                           {monthlySalesChart.map((entry, index) => (
                             <Cell 
                               key={`cell-${index}`} 
-                              fill={entry.total > 0 ? '#3b82f6' : '#9ca3af'} 
+                              fill={entry.total > 0 
+                                ? (isDarkMode ? '#60a5fa' : '#3b82f6') 
+                                : (isDarkMode ? '#64748b' : '#9ca3af')
+                              } 
                             />
                           ))}
                         </Bar>
