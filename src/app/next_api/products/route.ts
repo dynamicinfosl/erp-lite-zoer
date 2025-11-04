@@ -132,9 +132,10 @@ async function createProductHandler(request: NextRequest) {
     if (stockQty > 0) {
       await supabaseAdmin.from('stock_movements').insert({
         product_id: data.id,
+        user_id: user_id || '00000000-0000-0000-0000-000000000000',
         movement_type: 'entrada',
         quantity: stockQty,
-        reason: 'Cadastro inicial do produto',
+        notes: 'Cadastro inicial do produto',
         created_at: new Date().toISOString(),
       });
     }

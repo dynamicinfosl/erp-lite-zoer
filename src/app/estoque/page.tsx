@@ -62,14 +62,15 @@ interface StockMovement {
   product_sku?: string;
   movement_type: 'entrada' | 'saida' | 'ajuste';
   quantity: number;
-  reason?: string;
+  notes?: string;
+  reason?: string; // Mantido para compatibilidade
   created_at: string;
 }
 
 const lowStockThreshold = 10;
 
 export default function EstoquePage() {
-  const { tenant } = useSimpleAuth();
+  const { tenant, user } = useSimpleAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -147,12 +148,14 @@ export default function EstoquePage() {
       setIsSubmitting(true);
       const storedTenantId = typeof window !== 'undefined' ? localStorage.getItem('lastProductsTenantId') : null;
       const tenantId = tenant?.id || storedTenantId;
+      const userId = user?.id || '00000000-0000-0000-0000-000000000000';
 
       const response = await fetch('/next_api/stock-movements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenant_id: tenantId,
+          user_id: userId,
           product_id: movementForm.product_id,
           movement_type: movementForm.movement_type,
           quantity: parseInt(movementForm.quantity) || 0,

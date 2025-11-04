@@ -26,12 +26,13 @@ interface StockMovement {
   product_sku?: string;
   movement_type: 'entrada' | 'saida' | 'ajuste';
   quantity: number;
-  reason?: string;
+  notes?: string;
+  reason?: string; // Mantido para compatibilidade
   created_at: string;
 }
 
 export default function DevolucaoEstoquePage() {
-  const { tenant } = useSimpleAuth();
+  const { tenant, user } = useSimpleAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -83,7 +84,7 @@ export default function DevolucaoEstoquePage() {
   };
 
   const devolucoes = useMemo(() => {
-    return movements.filter((m) => m.movement_type === 'entrada' && (m.reason?.toLowerCase().includes('devolu') ?? false));
+    return movements.filter((m) => m.movement_type === 'entrada' && ((m.notes || m.reason)?.toLowerCase().includes('devolu') ?? false));
   }, [movements]);
 
   const filteredProducts = useMemo(() => {
@@ -95,28 +96,52 @@ export default function DevolucaoEstoquePage() {
       if (!form.product_id || !form.quantity) {
         return toast.error('Selecione o produto e a quantidade');
       }
+
+      const qty = parseInt(form.quantity);
+      if (isNaN(qty) || qty <= 0) {
+        return toast.error('Quantidade deve ser um número positivo');
+      }
+
       setIsSubmitting(true);
       const storedTenantId = typeof window !== 'undefined' ? localStorage.getItem('lastProductsTenantId') : null;
       const tenantId = tenant?.id || storedTenantId;
+      const userId = user?.id || '00000000-0000-0000-0000-000000000000';
+
+      console.log('📤 Enviando devolução:', {
+        tenant_id: tenantId,
+        user_id: userId,
+        product_id: form.product_id,
+        quantity: qty,
+        notes: form.reason || 'Devolução'
+      });
+
       const response = await fetch('/next_api/stock-movements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenant_id: tenantId,
+          user_id: userId,
           product_id: form.product_id,
           movement_type: 'entrada',
-          quantity: parseInt(form.quantity) || 0,
-          reason: form.reason || 'Devolução',
+          quantity: qty,
+          notes: form.reason || 'Devolução',
         }),
       });
+
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error);
+        const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
+        console.error('❌ Erro na resposta:', errorData);
+        throw new Error(errorData.error || errorData.message || `Erro ${response.status}`);
       }
-      toast.success('Devolução registrada');
+
+      const result = await response.json();
+      console.log('✅ Devolução registrada:', result);
+
+      toast.success('Devolução registrada com sucesso!');
       setForm({ product_id: '', quantity: '', reason: 'Devolução' });
       await Promise.all([loadProducts(), loadMovements()]);
     } catch (e: any) {
+      console.error('❌ Erro ao registrar devolução:', e);
       toast.error(e?.message || 'Erro ao registrar devolução');
     } finally {
       setIsSubmitting(false);
@@ -165,9 +190,9 @@ export default function DevolucaoEstoquePage() {
               <Input value={form.reason} onChange={(e) => setForm((p) => ({ ...p, reason: e.target.value }))} />
             </div>
           </div>
-          <div className="flex gap-3">
-            <Button onClick={handleSubmit} disabled={isSubmitting || !form.product_id || !form.quantity} className="gap-2">
-              <RotateCcw className="h-4 w-4" />
+          <div className="flex justify-center mt-6">
+            <Button onClick={handleSubmit} disabled={isSubmitting || !form.product_id || !form.quantity} className="gap-2 juga-gradient text-white px-8 py-2 text-base font-semibold">
+              <RotateCcw className="h-5 w-5" />
               {isSubmitting ? 'Registrando...' : 'Registrar Devolução'}
             </Button>
           </div>
@@ -206,7 +231,7 @@ export default function DevolucaoEstoquePage() {
                       </TableCell>
                       <TableCell className="font-semibold">+{m.quantity}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="border-green-500 text-green-700">{m.reason || 'Devolução'}</Badge>
+                        <Badge variant="outline" className="border-green-500 text-green-700">{m.notes || m.reason || 'Devolução'}</Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{new Date(m.created_at).toLocaleDateString('pt-BR')}</TableCell>
                     </TableRow>

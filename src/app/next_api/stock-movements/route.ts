@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
         product_id,
         movement_type,
         quantity,
+        notes,
         created_at
       `)
       .order('created_at', { ascending: false })
@@ -67,28 +68,64 @@ export async function POST(request: NextRequest) {
   try {
 
     const body = await request.json();
-    const { product_id, movement_type, quantity, reason } = body;
+    const { product_id, movement_type, quantity, reason, notes, tenant_id, user_id } = body;
+    const notesValue = notes || reason || null;
+    // Usar user_id fornecido ou UUID padrão
+    const finalUserId = user_id || '00000000-0000-0000-0000-000000000000';
+
+    console.log('📦 Recebendo requisição de movimentação:', { 
+      product_id, 
+      movement_type, 
+      quantity, 
+      tenant_id,
+      user_id: finalUserId,
+      notes: notesValue 
+    });
 
     if (!product_id || !movement_type || !quantity) {
+      console.error('❌ Validação falhou: campos obrigatórios ausentes');
       return NextResponse.json(
         { error: 'Produto, tipo e quantidade são obrigatórios' },
         { status: 400 }
       );
     }
 
-    // Buscar produto para atualizar estoque
-    const { data: product, error: productError } = await supabaseAdmin
+    // Buscar produto para atualizar estoque (com filtro de tenant se fornecido)
+    let productQuery = supabaseAdmin
       .from('products')
-      .select('stock_quantity')
-      .eq('id', product_id)
-      .single();
+      .select('stock_quantity, tenant_id')
+      .eq('id', product_id);
+    
+    // Se tenant_id foi fornecido, validar que o produto pertence ao tenant
+    if (tenant_id) {
+      productQuery = productQuery.eq('tenant_id', tenant_id);
+    }
+    
+    const { data: product, error: productError } = await productQuery.single();
 
     if (productError || !product) {
-      return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
+      console.error('❌ Produto não encontrado:', { product_id, tenant_id, error: productError });
+      return NextResponse.json({ 
+        error: 'Produto não encontrado' + (tenant_id ? ' para este tenant' : ''),
+        details: productError?.message 
+      }, { status: 404 });
     }
+
+    console.log('✅ Produto encontrado:', { 
+      product_id, 
+      stock_atual: product.stock_quantity,
+      tenant_id: product.tenant_id 
+    });
 
     let newStock = product.stock_quantity;
     const qty = parseInt(quantity);
+
+    if (isNaN(qty) || qty <= 0) {
+      console.error('❌ Quantidade inválida:', { quantity, qty });
+      return NextResponse.json({ 
+        error: 'Quantidade deve ser um número positivo' 
+      }, { status: 400 });
+    }
 
     switch (movement_type) {
       case 'entrada':
@@ -101,45 +138,74 @@ export async function POST(request: NextRequest) {
         newStock = qty;
         break;
       default:
+        console.error('❌ Tipo de movimentação inválido:', movement_type);
         return NextResponse.json({ error: 'Tipo de movimentação inválido' }, { status: 400 });
     }
 
+    console.log('📊 Calculando novo estoque:', { 
+      stock_anterior: product.stock_quantity, 
+      quantidade: qty, 
+      tipo: movement_type,
+      novo_estoque: newStock 
+    });
+
     if (newStock < 0) {
+      console.error('❌ Estoque ficaria negativo:', { newStock });
       return NextResponse.json({ error: 'Estoque não pode ficar negativo' }, { status: 400 });
     }
 
     // Registrar movimentação
+    console.log('💾 Inserindo movimentação no banco...');
     const { data: movement, error: movError } = await supabaseAdmin
       .from('stock_movements')
       .insert({
         product_id,
+        user_id: finalUserId,
         movement_type,
         quantity: qty,
-        reason: reason || null,
+        notes: notesValue,
         created_at: new Date().toISOString(),
       })
       .select()
       .single();
 
     if (movError) {
-      console.error('Erro ao criar movimentação:', movError);
-      return NextResponse.json({ error: movError.message }, { status: 400 });
+      console.error('❌ Erro ao criar movimentação:', movError);
+      return NextResponse.json({ 
+        error: 'Erro ao criar movimentação: ' + movError.message,
+        details: movError 
+      }, { status: 400 });
     }
 
+    console.log('✅ Movimentação criada com sucesso:', movement.id);
+
     // Atualizar estoque do produto
+    console.log('💾 Atualizando estoque do produto...');
     const { error: updateError } = await supabaseAdmin
       .from('products')
       .update({ stock_quantity: newStock, updated_at: new Date().toISOString() })
       .eq('id', product_id);
 
     if (updateError) {
-      console.error('Erro ao atualizar estoque:', updateError);
-      return NextResponse.json({ error: 'Erro ao atualizar estoque' }, { status: 400 });
+      console.error('❌ Erro ao atualizar estoque:', updateError);
+      return NextResponse.json({ 
+        error: 'Erro ao atualizar estoque: ' + updateError.message,
+        details: updateError 
+      }, { status: 400 });
     }
 
+    console.log('✅ Estoque atualizado com sucesso:', { 
+      product_id, 
+      novo_estoque: newStock 
+    });
+
     return NextResponse.json({ success: true, data: movement });
-  } catch (error) {
-    console.error('Erro no handler de criação:', error);
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+  } catch (error: any) {
+    console.error('❌ Erro no handler de criação:', error);
+    return NextResponse.json({ 
+      error: 'Erro interno do servidor',
+      message: error?.message || 'Erro desconhecido',
+      details: error 
+    }, { status: 500 });
   }
 }
