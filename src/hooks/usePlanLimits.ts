@@ -124,7 +124,7 @@ export function usePlanLimits(): PlanLimitsHook {
 
   // Calcular dias restantes no trial
   const daysLeftInTrial = currentSubscription?.trial_ends_at 
-    ? Math.max(0, Math.ceil((new Date(currentSubscription.trial_ends_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+    ? Math.max(0, Math.floor((new Date(currentSubscription.trial_ends_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
     : 0;
 
   // Verificar se pode criar um item
