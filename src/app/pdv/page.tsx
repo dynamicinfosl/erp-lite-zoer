@@ -43,10 +43,8 @@ import {
   Check,
   Home,
   Users,
-  Archive,
   DollarSign,
   Settings,
-  LogOut,
   ArrowLeft,
   MoreVertical,
   MinusCircle,
@@ -60,6 +58,13 @@ import {
   Clock,
   CheckCircle2,
   Smartphone,
+  LayoutDashboard,
+  Warehouse,
+  Truck,
+  Wrench,
+  BarChart3,
+  Building2,
+  UserCog,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -75,6 +80,11 @@ interface MenuItem {
   icon: React.ElementType;
   label: string;
   href: string;
+}
+
+interface MenuGroup {
+  title: string;
+  items: MenuItem[];
 }
 
 interface Sale {
@@ -633,14 +643,37 @@ export default function PDVPage() {
     setShowCaixaDialog(false);
   }, [caixaOperationType, user]);
 
-  const menuItems: MenuItem[] = [
-    { icon: Home, label: 'Dashboard', href: '/dashboard' },
-    { icon: Users, label: 'Clientes', href: '/clientes' },
-    { icon: Package, label: 'Produtos', href: '/produtos' },
-    { icon: Archive, label: 'Estoque', href: '/estoque' },
-    { icon: RotateCcw, label: 'Devolução', href: '/estoque/devolucao' },
-    { icon: DollarSign, label: 'Financeiro', href: '/financeiro' },
-    { icon: Settings, label: 'Configurações', href: '/configuracoes' },
+  const menuGroups: MenuGroup[] = [
+    {
+      title: 'Principal',
+      items: [
+        { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
+        { icon: Users, label: 'Clientes', href: '/clientes' },
+        { icon: Package, label: 'Produtos', href: '/produtos' },
+        { icon: Receipt, label: 'Vendas', href: '/vendas' },
+        { icon: ShoppingCart, label: 'PDV', href: '/pdv' },
+      ],
+    },
+    {
+      title: 'Operações',
+      items: [
+        { icon: Warehouse, label: 'Estoque', href: '/estoque' },
+        { icon: RotateCcw, label: 'Devolução', href: '/estoque/devolucao' },
+        { icon: Truck, label: 'Entregas', href: '/entregas' },
+        { icon: Wrench, label: 'Ordem de Serviços', href: '/ordem-servicos' },
+      ],
+    },
+    {
+      title: 'Gestão',
+      items: [
+        { icon: DollarSign, label: 'Financeiro', href: '/financeiro' },
+        { icon: BarChart3, label: 'Relatórios', href: '/relatorios' },
+        { icon: Building2, label: 'Perfil da Empresa', href: '/perfil-empresa' },
+        { icon: UserCog, label: 'Perfil do Usuário', href: '/perfil-usuario' },
+        { icon: CreditCard, label: 'Assinatura', href: '/assinatura' },
+        { icon: Settings, label: 'Configurações', href: '/configuracoes' },
+      ],
+    },
   ];
 
   // Cálculos de KPIs
@@ -739,7 +772,7 @@ export default function PDVPage() {
             </SheetTrigger>
           </div>
 
-          <SheetContent side="left" className="w-64 p-0 juga-sidebar-gradient">
+          <SheetContent side="left" className="w-64 p-0 juga-sidebar-gradient flex flex-col">
             <SheetHeader className="p-6 border-b border-white/10">
               <SheetTitle className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
@@ -752,56 +785,37 @@ export default function PDVPage() {
               </SheetTitle>
             </SheetHeader>
 
-            <div className="p-4 space-y-2">
-              {menuItems.map((item) => {
-                const IconComponent = item.icon;
-                return (
-                  <a
-                    key={item.label}
-                    href={item.href}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setSidebarOpen(false);
-                      router.push(item.href);
-                    }}
-                  >
-                    <IconComponent className="h-5 w-5" />
-                    <span className="font-medium text-sm">{item.label}</span>
-                  </a>
-                );
-              })}
+            <div className="p-4 space-y-5 flex-1 overflow-y-auto">
+              {menuGroups.map((group) => (
+                <div key={group.title} className="space-y-2">
+                  <div className="px-3 text-[10px] font-semibold uppercase tracking-wider text-white/60">
+                    {group.title}
+                  </div>
+                  <div className="space-y-1">
+                    {group.items.filter((item) => item.href !== '/pdv').map((item) => {
+                      const IconComponent = item.icon;
+                      return (
+                        <a
+                          key={item.label}
+                          href={item.href}
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setSidebarOpen(false);
+                            router.push(item.href);
+                          }}
+                        >
+                          <IconComponent className="h-5 w-5" />
+                          <span className="font-medium text-sm">{item.label}</span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
 
-            <div className="absolute bottom-4 left-4 right-4">
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/10">
-                <div className="flex flex-col gap-2 mb-3">
-                  <span className="text-xs font-semibold text-white truncate">
-                    {user?.email || 'Usuário'}
-                  </span>
-                  <span className="text-xs text-white/60">
-                    {tenant?.name || (user?.email ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ') : 'Meu Negócio')}
-                  </span>
-                </div>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="w-full justify-center gap-2 text-white hover:bg-white/20 border border-white/30"
-                  onClick={() => {
-                    if (confirm('Deseja sair do sistema?')) {
-                      if (ENABLE_AUTH) {
-                        signOut();
-                      } else {
-                        window.location.href = '/login';
-                      }
-                    }
-                  }}
-                >
-                  <LogOut className="h-3 w-3" />
-                  Finalizar sessão
-                </Button>
-              </div>
-            </div>
+            {/* Área de usuário e finalizar sessão removida conforme solicitação */}
           </SheetContent>
         </Sheet>
 
