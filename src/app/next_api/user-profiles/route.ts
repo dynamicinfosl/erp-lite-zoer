@@ -41,7 +41,7 @@ export const GET = requestMiddleware(async (request: NextRequest, context) => {
 }, true);
 
 // POST - criar perfil de usuário
-export const POST = requestMiddleware(async (request, context) => {
+export const POST = requestMiddleware(async (request: NextRequest, context) => {
   try {
     const body = await validateRequestBody(request);
     
@@ -52,12 +52,12 @@ export const POST = requestMiddleware(async (request, context) => {
       });
     }
 
-    // Primeiro criar o usuário na tabela users
-    const usersCrud = new CrudOperations("users", context.token);
-    const profilesCrud = new CrudOperations("user_profiles", context.token);
-    
     // Verificar se o e-mail já existe
-    const existingUsers = await usersCrud.findMany({ email: body.email });
+    const { data: existingUsers } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('email', body.email);
+
     if (existingUsers && existingUsers.length > 0) {
       return createErrorResponse({
         errorMessage: "E-mail já está em uso",
@@ -72,7 +72,16 @@ export const POST = requestMiddleware(async (request, context) => {
       role: body.role_type === 'admin' ? 'app20250905011157fofcdvmgil_v1_admin_user' : 'app20250905011157fofcdvmgil_v1_user',
     };
 
-    const user = await usersCrud.create(userData);
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .insert(userData)
+      .select()
+      .single();
+
+    if (userError) {
+      console.error('❌ Erro ao criar usuário no Supabase:', userError);
+      throw userError;
+    }
 
     // Criar perfil
     const profileData = {
@@ -83,12 +92,22 @@ export const POST = requestMiddleware(async (request, context) => {
       is_active: body.is_active !== false,
     };
 
-    const profile = await profilesCrud.create(profileData);
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .insert(profileData)
+      .select()
+      .single();
+
+    if (profileError) {
+      console.error('❌ Erro ao criar perfil no Supabase:', profileError);
+      throw profileError;
+    }
+
     return createSuccessResponse(profile, 201);
   } catch (error) {
-    console.error('Erro ao criar perfil:', error);
+    console.error('❌ Erro ao criar perfil:', error);
     return createErrorResponse({
-      errorMessage: "Erro ao criar perfil de usuário",
+      errorMessage: `Erro ao criar perfil de usuário: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
       status: 500,
     });
   }
