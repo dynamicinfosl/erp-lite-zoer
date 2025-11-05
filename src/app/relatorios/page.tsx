@@ -815,127 +815,110 @@ export default function RelatoriosPage() {
                   </CardContent>
                 </Card>
 
-                <Card className="juga-card w-full">
-                  <CardHeader className="pb-1 pt-3 px-3 sm:px-4">
-                    <CardTitle className="text-xs sm:text-sm text-heading">Custo x Receita x Lucro</CardTitle>
+                <Card className="w-full border-0 shadow-lg bg-gradient-to-br from-white to-green-50/30 dark:from-slate-800 dark:to-slate-900/50 hover:shadow-xl transition-all duration-300">
+                  <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-700 dark:from-green-700 dark:to-emerald-800 text-white rounded-t-lg pb-3 pt-4 px-4">
+                    <CardTitle className="flex items-center gap-2 text-white text-base font-semibold">
+                      <TrendingUp className="h-4 w-4" />
+                      Análise Financeira
+                    </CardTitle>
+                    <p className="text-green-100 dark:text-green-200 text-sm mt-1">
+                      Receita, custo e lucro no período
+                    </p>
                   </CardHeader>
-                  <CardContent className="px-2 sm:px-3 pb-3">
-                    {/* Resumo de métricas */}
-                    <div className="grid grid-cols-3 gap-2 mb-3">
-                      <div className="flex flex-col items-center gap-1 py-2 px-2 rounded-md bg-juga-surface-elevated/30 border border-juga-border/30">
+                  <CardContent className="p-4 sm:p-6">
+                    {/* Resumo de métricas com melhor visual */}
+                    <div className="grid grid-cols-3 gap-3 mb-5">
+                      <div className="flex flex-col items-center gap-2 py-3 px-3 rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 border border-green-200 dark:border-green-800 shadow-sm hover:shadow-md transition-all">
                         <div className="flex items-center gap-1.5">
-                          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: '#10b981' }} />
-                          <span className="text-[10px] sm:text-[11px] text-juga-text-muted font-medium">Receita</span>
+                          <div className="h-3 w-3 rounded-full bg-green-500 shadow-sm" />
+                          <span className="text-[10px] sm:text-xs text-green-700 dark:text-green-300 font-semibold uppercase tracking-wide">Receita</span>
                         </div>
-                        <span className="text-sm sm:text-base font-semibold text-juga-text-primary">
+                        <span className="text-base sm:text-lg font-bold text-green-700 dark:text-green-300">
                           {formatCurrency((report?.totalRevenue ?? 0) as number)}
                         </span>
                       </div>
-                      <div className="flex flex-col items-center gap-1 py-2 px-2 rounded-md bg-juga-surface-elevated/30 border border-juga-border/30">
+                      <div className="flex flex-col items-center gap-2 py-3 px-3 rounded-lg bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/30 dark:to-rose-900/30 border border-red-200 dark:border-red-800 shadow-sm hover:shadow-md transition-all">
                         <div className="flex items-center gap-1.5">
-                          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: '#ef4444' }} />
-                          <span className="text-[10px] sm:text-[11px] text-juga-text-muted font-medium">Custo</span>
+                          <div className="h-3 w-3 rounded-full bg-red-500 shadow-sm" />
+                          <span className="text-[10px] sm:text-xs text-red-700 dark:text-red-300 font-semibold uppercase tracking-wide">Custo</span>
                         </div>
-                        <span className="text-sm sm:text-base font-semibold text-juga-text-primary">
+                        <span className="text-base sm:text-lg font-bold text-red-700 dark:text-red-300">
                           {formatCurrency((report?.totalCost ?? 0) as number)}
                         </span>
                       </div>
-                      <div className="flex flex-col items-center gap-1 py-2 px-2 rounded-md bg-juga-surface-elevated/30 border border-juga-border/30">
+                      <div className="flex flex-col items-center gap-2 py-3 px-3 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border border-blue-200 dark:border-blue-800 shadow-sm hover:shadow-md transition-all">
                         <div className="flex items-center gap-1.5">
-                          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: '#3b82f6' }} />
-                          <span className="text-[10px] sm:text-[11px] text-juga-text-muted font-medium">Lucro</span>
+                          <div className="h-3 w-3 rounded-full bg-blue-500 shadow-sm" />
+                          <span className="text-[10px] sm:text-xs text-blue-700 dark:text-blue-300 font-semibold uppercase tracking-wide">Lucro</span>
                         </div>
-                        <span className="text-sm sm:text-base font-semibold text-juga-text-primary">
+                        <span className="text-base sm:text-lg font-bold text-blue-700 dark:text-blue-300">
                           {formatCurrency((report?.totalProfit ?? 0) as number)}
                         </span>
                       </div>
                     </div>
 
-                    {/* Gráfico */}
-                    <ChartContainer
-                      config={{
-                        receita: { label: 'Receita', color: '#10b981' },
-                        custo: { label: 'Custo', color: '#ef4444' },
-                        lucro: { label: 'Lucro', color: '#3b82f6' },
-                      }}
-                      className="h-[140px] sm:h-[160px] min-w-0 [&_.recharts-surface]:fill-transparent [&_svg]:bg-transparent"
-                    >
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={[{
-                            date: 'Período',
-                            receita: report?.totalRevenue ?? 0,
-                            custo: report?.totalCost ?? 0,
-                            lucro: report?.totalProfit ?? 0,
-                          }]}
-                          margin={{ left: 0, right: 5, top: 3, bottom: 3 }}
-                          barCategoryGap="20%"
-                        >
-                          <XAxis 
-                            dataKey="date" 
-                            tick={{ fill: 'var(--juga-text-muted)', fontSize: 10 }}
-                            stroke="var(--juga-border)"
-                            height={25}
-                            axisLine={false}
-                            tickLine={false}
-                          />
-                          <YAxis 
-                            tickFormatter={(value) => {
-                              if (value >= 1000) return `R$ ${(value / 1000).toFixed(1)}k`;
-                              return formatCurrency(value);
-                            }}
-                            tick={{ fill: 'var(--juga-text-muted)', fontSize: 10 }}
-                            stroke="var(--juga-border)"
-                            width={45}
-                            axisLine={false}
-                            tickLine={false}
-                          />
-                          <ChartTooltip 
-                            content={
-                              <ChartTooltipContent 
-                                formatter={(value) => 
-                                  formatCurrency(value as number)
-                                }
-                              />
-                            } 
-                          />
-                          <Bar dataKey="receita" fill="var(--color-receita)" radius={[4, 4, 0, 0]} name="Receita" isAnimationActive={true}>
-                            <LabelList 
-                              dataKey="receita" 
-                              position="top" 
-                              formatter={(value: number) => formatCurrency(value)}
-                              fill="var(--juga-text-primary)"
-                              fontSize={10}
-                              offset={5}
-                            />
-                          </Bar>
-                          <Bar dataKey="custo" fill="var(--color-custo)" radius={[4, 4, 0, 0]} name="Custo" isAnimationActive={true}>
-                            <LabelList 
-                              dataKey="custo" 
-                              position="top" 
-                              formatter={(value: number) => formatCurrency(value)}
-                              fill="var(--juga-text-primary)"
-                              fontSize={10}
-                              offset={5}
-                            />
-                          </Bar>
-                          <Bar dataKey="lucro" fill="var(--color-lucro)" radius={[4, 4, 0, 0]} name="Lucro" isAnimationActive={true}>
-                            <LabelList 
-                              dataKey="lucro" 
-                              position="top" 
-                              formatter={(value: number) => formatCurrency(value)}
-                              fill="var(--juga-text-primary)"
-                              fontSize={10}
-                              offset={5}
-                            />
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </ChartContainer>
+                    {/* Gráfico com melhor visual */}
+                    <ResponsiveContainer width="100%" height={240} className="sm:h-[260px]">
+                      <BarChart
+                        data={[{
+                          name: 'Financeiro',
+                          receita: report?.totalRevenue ?? 0,
+                          custo: report?.totalCost ?? 0,
+                          lucro: report?.totalProfit ?? 0,
+                        }]}
+                        margin={{ top: 20, right: 10, left: 10, bottom: 10 }}
+                        barGap={8}
+                      >
+                        <CartesianGrid 
+                          strokeDasharray="3 3" 
+                          stroke={isDarkMode ? '#475569' : '#e2e8f0'} 
+                          vertical={false}
+                        />
+                        <XAxis 
+                          dataKey="name" 
+                          stroke={isDarkMode ? '#94a3b8' : '#475569'}
+                          fontSize={12}
+                          fontWeight={600}
+                          tick={{ fontSize: 13, fill: isDarkMode ? '#cbd5e1' : '#475569', fontWeight: 600 }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis 
+                          stroke={isDarkMode ? '#94a3b8' : '#475569'}
+                          fontSize={11}
+                          tick={{ fontSize: 11, fill: isDarkMode ? '#cbd5e1' : '#475569' }}
+                          axisLine={false}
+                          tickLine={false}
+                          tickFormatter={(value) => value >= 1000 ? `R$ ${(value / 1000).toFixed(1)}k` : `R$ ${value}`}
+                        />
+                        <Tooltip 
+                          cursor={{ fill: isDarkMode ? '#334155' : '#f1f5f9', fillOpacity: 0.3 }}
+                          contentStyle={{
+                            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                            border: `2px solid ${isDarkMode ? '#10b981' : '#10b981'}`,
+                            borderRadius: '12px',
+                            boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.3)',
+                            padding: '12px',
+                            fontWeight: '600',
+                          }}
+                          formatter={(value: number, name: string) => {
+                            const labels = { receita: 'Receita', custo: 'Custo', lucro: 'Lucro' };
+                            return [formatCurrency(value), labels[name as keyof typeof labels]];
+                          }}
+                        />
+                        <Bar dataKey="receita" fill="#10b981" radius={[8, 8, 0, 0]} name="receita" />
+                        <Bar dataKey="custo" fill="#ef4444" radius={[8, 8, 0, 0]} name="custo" />
+                        <Bar dataKey="lucro" fill="#3b82f6" radius={[8, 8, 0, 0]} name="lucro" />
+                      </BarChart>
+                    </ResponsiveContainer>
 
-                    {/* Estado vazio */}
+                    {/* Estado vazio melhorado */}
                     {((report?.totalRevenue ?? 0) === 0 && (report?.totalCost ?? 0) === 0 && (report?.totalProfit ?? 0) === 0) && (
-                      <div className="text-center text-juga-text-muted text-xs mt-2">Sem dados no período</div>
+                      <div className="flex flex-col items-center justify-center py-6 text-center">
+                        <DollarSign className="h-8 w-8 text-gray-300 dark:text-gray-600 mb-2" />
+                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Sem dados no período selecionado</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Ajuste o filtro de datas para visualizar os dados</p>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
