@@ -65,6 +65,7 @@ import {
   BarChart3,
   Building2,
   UserCog,
+  LogOut,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -785,7 +786,7 @@ export default function PDVPage() {
               </SheetTitle>
             </SheetHeader>
 
-            <div className="p-4 space-y-5 flex-1 overflow-y-auto">
+            <div className="p-4 pb-8 space-y-5 flex-1 overflow-y-auto">
               {menuGroups.map((group) => (
                 <div key={group.title} className="space-y-2">
                   <div className="px-3 text-[10px] font-semibold uppercase tracking-wider text-white/60">
@@ -815,7 +816,23 @@ export default function PDVPage() {
               ))}
             </div>
 
-            {/* Área de usuário e finalizar sessão removida conforme solicitação */}
+            <div className="p-4 pt-0">
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="w-full justify-center gap-2 text-white hover:bg-white/20 border border-white/30"
+                onClick={() => {
+                  if (ENABLE_AUTH) {
+                    signOut();
+                  } else {
+                    window.location.href = '/login';
+                  }
+                }}
+              >
+                <LogOut className="h-3 w-3" />
+                Finalizar sessão
+              </Button>
+            </div>
           </SheetContent>
         </Sheet>
 
