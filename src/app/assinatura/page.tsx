@@ -76,7 +76,7 @@ const subscriptionInfo: Record<PlanId, SubscriptionInfo> = {
     icon: Shield,
     color: 'text-purple-600',
     bgColor: 'bg-purple-100',
-    price: 'R$ 99,90/mês',
+    price: 'R$ 299,90/mês',
   },
 };
 
@@ -107,7 +107,7 @@ const plans: Plan[] = [
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: 99.9,
+    price: 299.9,
     description: 'Para grandes empresas',
     features: [
       'Clientes ilimitados',
