@@ -825,10 +825,10 @@ export default function ConfiguracoesPage() {
                 <CardTitle>Ações do Sistema</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button variant="outline" className="w-full">
+                <Button variant="default" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
                   Fazer Backup Manual
                 </Button>
-                <Button variant="outline" className="w-full">
+                <Button variant="default" className="w-full bg-green-600 hover:bg-green-700 text-white">
                   Exportar Dados
                 </Button>
                 <Button variant="destructive" className="w-full">
