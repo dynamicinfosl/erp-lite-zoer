@@ -110,9 +110,10 @@ export function requestMiddleware(
   
       return await handler(request, params);
     }
-    catch {
+    catch (error) {
+      console.error('Request middleware error:', error);
       return createErrorResponse({
-        errorMessage: "Request middleware error",
+        errorMessage: error instanceof Error ? error.message : "Request middleware error",
         status: 500,
       });
     }

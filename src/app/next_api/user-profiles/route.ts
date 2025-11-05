@@ -1,29 +1,40 @@
 
-import CrudOperations from '@/lib/crud-operations';
+import { createClient } from '@supabase/supabase-js';
 import { createSuccessResponse, createErrorResponse } from '@/lib/create-response';
 import { requestMiddleware, parseQueryParams, validateRequestBody } from "@/lib/api-utils";
+import { NextRequest } from 'next/server';
+
+// Usar valores hardcoded como fallback (igual aos outros endpoints)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co'
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10'
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
 // GET - buscar perfis de usuário
-export const GET = requestMiddleware(async (request, context) => {
+export const GET = requestMiddleware(async (request: NextRequest, context) => {
   try {
+    console.log('🔍 GET /user-profiles - Iniciando busca...');
     const { limit, offset } = parseQueryParams(request);
-    const profilesCrud = new CrudOperations("user_profiles", context.token);
+    console.log('🔍 Parâmetros:', { limit, offset });
     
-    const filters = {
-      is_active: true,
-    };
+    const { data: profiles, error } = await supabaseAdmin
+      .from('user_profiles')
+      .select('*')
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+      .range(offset || 0, (offset || 0) + (limit || 50) - 1);
 
-    const profiles = await profilesCrud.findMany(filters, { 
-      limit: limit || 50, 
-      offset,
-      orderBy: { column: 'name', direction: 'asc' }
-    });
+    if (error) {
+      console.error('❌ Erro ao buscar perfis do Supabase:', error);
+      throw error;
+    }
 
+    console.log('✅ Perfis encontrados:', profiles?.length || 0);
     return createSuccessResponse(profiles || []);
   } catch (error) {
-    console.error('Erro ao buscar perfis:', error);
+    console.error('❌ Erro ao buscar perfis:', error);
+    console.error('❌ Stack trace:', error instanceof Error ? error.stack : 'N/A');
     return createErrorResponse({
-      errorMessage: "Erro ao buscar perfis de usuário",
+      errorMessage: `Erro ao buscar perfis de usuário: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
       status: 500,
     });
   }
@@ -136,7 +147,7 @@ export const PUT = requestMiddleware(async (request, context) => {
 }, true);
 
 // DELETE - excluir perfil de usuário
-export const DELETE = requestMiddleware(async (request, context) => {
+export const DELETE = requestMiddleware(async (request: NextRequest, context) => {
   try {
     const { id } = parseQueryParams(request);
     
@@ -147,10 +158,14 @@ export const DELETE = requestMiddleware(async (request, context) => {
       });
     }
 
-    const profilesCrud = new CrudOperations("user_profiles", context.token);
-    
-    const existing = await profilesCrud.findById(id);
-    if (!existing) {
+    // Verificar se o perfil existe
+    const { data: existing, error: findError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (findError || !existing) {
       return createErrorResponse({
         errorMessage: "Perfil não encontrado",
         status: 404,
@@ -158,16 +173,24 @@ export const DELETE = requestMiddleware(async (request, context) => {
     }
 
     // Soft delete - marcar como inativo
-    await profilesCrud.update(id, { 
-      is_active: false,
-      updated_at: new Date().toISOString(),
-    });
+    const { error } = await supabaseAdmin
+      .from('user_profiles')
+      .update({ 
+        is_active: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (error) {
+      console.error('❌ Erro ao excluir perfil no Supabase:', error);
+      throw error;
+    }
     
     return createSuccessResponse({ id });
   } catch (error) {
-    console.error('Erro ao excluir perfil:', error);
+    console.error('❌ Erro ao excluir perfil:', error);
     return createErrorResponse({
-      errorMessage: "Erro ao excluir perfil",
+      errorMessage: `Erro ao excluir perfil: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
       status: 500,
     });
   }
