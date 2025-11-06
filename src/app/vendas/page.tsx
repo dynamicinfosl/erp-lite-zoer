@@ -764,7 +764,7 @@ export default function VendasPage() {
       </div>
 
       {/* Toolbar */}
-      <Card>
+      <Card className="juga-card">
         <CardContent className="pt-6">
           <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
             {/* Lado esquerdo - Botões de ação */}
@@ -772,6 +772,7 @@ export default function VendasPage() {
               <Button 
                 variant="outline"
                 onClick={() => window.location.href = '/pdv'}
+                className="border-border bg-background hover:bg-accent hover:text-accent-foreground"
               >
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 Ir para PDV
@@ -779,7 +780,7 @@ export default function VendasPage() {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="outline" className="border-border bg-background hover:bg-accent hover:text-accent-foreground">
                     <MoreHorizontal className="h-4 w-4 mr-2" />
                     Mais Ações
                   </Button>
@@ -797,7 +798,7 @@ export default function VendasPage() {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
-                    className="text-red-600"
+                    className="text-red-600 dark:text-red-400"
                     onClick={handleCancelarSelecionadas}
                     disabled={selectedVendas.size === 0}
                   >
@@ -809,7 +810,7 @@ export default function VendasPage() {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="outline" className="border-border bg-background hover:bg-accent hover:text-accent-foreground">
                     <Settings2 className="h-4 w-4 mr-2" />
                     Colunas
                   </Button>
@@ -841,7 +842,7 @@ export default function VendasPage() {
             {/* Lado direito - Busca */}
             <div className="flex items-center gap-2">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   placeholder="Buscar vendas..."
                   value={searchTerm}
@@ -852,6 +853,7 @@ export default function VendasPage() {
               <Button 
                 variant="outline" 
                 onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                className="border-border bg-background hover:bg-accent hover:text-accent-foreground"
               >
                 <Filter className="h-4 w-4 mr-2" />
                 Busca Avançada
@@ -861,10 +863,10 @@ export default function VendasPage() {
 
           {/* Busca Avançada */}
           {showAdvancedSearch && (
-            <div className="mt-4 p-4 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+            <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 <select 
-                  className="px-3 py-2 border rounded-md bg-white dark:bg-slate-900 text-foreground dark:text-slate-100 border-gray-300 dark:border-slate-600"
+                  className="px-3 py-2 border rounded-md bg-background text-foreground border-input"
                   value={advancedFilters.status}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))}
                 >
@@ -874,7 +876,7 @@ export default function VendasPage() {
                   <option value="cancelada">Cancelada</option>
                 </select>
                 <select 
-                  className="px-3 py-2 border rounded-md bg-white dark:bg-slate-900 text-foreground dark:text-slate-100 border-gray-300 dark:border-slate-600"
+                  className="px-3 py-2 border rounded-md bg-background text-foreground border-input"
                   value={advancedFilters.forma_pagamento}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, forma_pagamento: e.target.value }))}
                 >
@@ -919,7 +921,7 @@ export default function VendasPage() {
       </Card>
 
       {/* Tabela */}
-      <Card>
+      <Card className="juga-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5" />
@@ -928,7 +930,7 @@ export default function VendasPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8">Carregando vendas...</div>
+            <div className="text-center py-8 text-muted-foreground">Carregando vendas...</div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -968,7 +970,7 @@ export default function VendasPage() {
                     {columnVisibility.cliente && (
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          <User className="h-3 w-3 text-gray-400" />
+                          <User className="h-3 w-3 text-muted-foreground" />
                           {venda.cliente}
                         </div>
                       </TableCell>
@@ -986,7 +988,7 @@ export default function VendasPage() {
                     {columnVisibility.total && (
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-1">
-                          <DollarSign className="h-3 w-3 text-green-600" />
+                          <DollarSign className="h-3 w-3 text-green-600 dark:text-green-400" />
                           {formatCurrency(venda.total)}
                         </div>
                         {venda.desconto > 0 && (
@@ -1003,7 +1005,7 @@ export default function VendasPage() {
                     {columnVisibility.data_venda && (
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-gray-400" />
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
                           <div className="text-sm">
                             {formatDate(venda.data_venda)}
                           </div>
@@ -1032,7 +1034,7 @@ export default function VendasPage() {
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
-                            className="text-red-600"
+                            className="text-red-600 dark:text-red-400"
                             onClick={() => handleCancelarVenda(venda)}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
@@ -1186,7 +1188,7 @@ export default function VendasPage() {
                 <Label htmlFor="forma_pagamento">Forma de Pagamento</Label>
                 <select
                   id="forma_pagamento"
-                  className="px-3 py-2 border rounded-md bg-white dark:bg-slate-800 text-foreground dark:text-slate-100 border-gray-300 dark:border-slate-600"
+                  className="px-3 py-2 border rounded-md bg-background text-foreground border-input"
                   value={editFormData.forma_pagamento || 'dinheiro'}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, forma_pagamento: e.target.value as Sale['forma_pagamento'] }))}
                 >
@@ -1202,7 +1204,7 @@ export default function VendasPage() {
                 <Label htmlFor="status">Status</Label>
                 <select
                   id="status"
-                  className="px-3 py-2 border rounded-md bg-white dark:bg-slate-800 text-foreground dark:text-slate-100 border-gray-300 dark:border-slate-600"
+                  className="px-3 py-2 border rounded-md bg-background text-foreground border-input"
                   value={editFormData.status || 'pendente'}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, status: e.target.value as Sale['status'] }))}
                 >
@@ -1229,7 +1231,7 @@ export default function VendasPage() {
                 <Label htmlFor="observacoes">Observações</Label>
                 <textarea
                   id="observacoes"
-                  className="px-3 py-2 border rounded-md min-h-[80px] bg-white dark:bg-slate-800 text-foreground dark:text-slate-100 border-gray-300 dark:border-slate-600"
+                  className="px-3 py-2 border rounded-md min-h-[80px] bg-background text-foreground border-input"
                   value={editFormData.observacoes || ''}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, observacoes: e.target.value }))}
                   placeholder="Observações adicionais..."
@@ -1281,7 +1283,7 @@ export default function VendasPage() {
                 <li><strong>Observações</strong> (opcional) - Observações adicionais</li>
               </ul>
               <p className="mt-4 font-medium">Exemplo de cabeçalho:</p>
-              <code className="block mt-2 p-2 bg-gray-100 dark:bg-slate-800 rounded text-xs">
+              <code className="block mt-2 p-2 bg-muted rounded text-xs">
                 Cliente,Total,Data,Forma de Pagamento,Status,Observações
               </code>
             </div>
