@@ -861,10 +861,10 @@ export default function VendasPage() {
 
           {/* Busca Avançada */}
           {showAdvancedSearch && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
+            <div className="mt-4 p-4 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 <select 
-                  className="px-3 py-2 border rounded-md"
+                  className="px-3 py-2 border rounded-md bg-white dark:bg-slate-900 text-foreground dark:text-slate-100 border-gray-300 dark:border-slate-600"
                   value={advancedFilters.status}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))}
                 >
@@ -874,7 +874,7 @@ export default function VendasPage() {
                   <option value="cancelada">Cancelada</option>
                 </select>
                 <select 
-                  className="px-3 py-2 border rounded-md"
+                  className="px-3 py-2 border rounded-md bg-white dark:bg-slate-900 text-foreground dark:text-slate-100 border-gray-300 dark:border-slate-600"
                   value={advancedFilters.forma_pagamento}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, forma_pagamento: e.target.value }))}
                 >
@@ -1186,7 +1186,7 @@ export default function VendasPage() {
                 <Label htmlFor="forma_pagamento">Forma de Pagamento</Label>
                 <select
                   id="forma_pagamento"
-                  className="px-3 py-2 border rounded-md"
+                  className="px-3 py-2 border rounded-md bg-white dark:bg-slate-800 text-foreground dark:text-slate-100 border-gray-300 dark:border-slate-600"
                   value={editFormData.forma_pagamento || 'dinheiro'}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, forma_pagamento: e.target.value as Sale['forma_pagamento'] }))}
                 >
@@ -1202,7 +1202,7 @@ export default function VendasPage() {
                 <Label htmlFor="status">Status</Label>
                 <select
                   id="status"
-                  className="px-3 py-2 border rounded-md"
+                  className="px-3 py-2 border rounded-md bg-white dark:bg-slate-800 text-foreground dark:text-slate-100 border-gray-300 dark:border-slate-600"
                   value={editFormData.status || 'pendente'}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, status: e.target.value as Sale['status'] }))}
                 >
@@ -1229,7 +1229,7 @@ export default function VendasPage() {
                 <Label htmlFor="observacoes">Observações</Label>
                 <textarea
                   id="observacoes"
-                  className="px-3 py-2 border rounded-md min-h-[80px]"
+                  className="px-3 py-2 border rounded-md min-h-[80px] bg-white dark:bg-slate-800 text-foreground dark:text-slate-100 border-gray-300 dark:border-slate-600"
                   value={editFormData.observacoes || ''}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, observacoes: e.target.value }))}
                   placeholder="Observações adicionais..."
@@ -1281,7 +1281,7 @@ export default function VendasPage() {
                 <li><strong>Observações</strong> (opcional) - Observações adicionais</li>
               </ul>
               <p className="mt-4 font-medium">Exemplo de cabeçalho:</p>
-              <code className="block mt-2 p-2 bg-gray-100 rounded text-xs">
+              <code className="block mt-2 p-2 bg-gray-100 dark:bg-slate-800 rounded text-xs">
                 Cliente,Total,Data,Forma de Pagamento,Status,Observações
               </code>
             </div>
