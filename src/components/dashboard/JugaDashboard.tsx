@@ -380,8 +380,8 @@ export default function JugaDashboard() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="text-slate-600 text-sm">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 dark:border-indigo-400 mx-auto"></div>
+          <p className="text-slate-600 dark:text-slate-400 text-sm">
             Carregando dashboard...
           </p>
         </div>
@@ -529,7 +529,7 @@ export default function JugaDashboard() {
       {/* Gráficos */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Vendas Mensais */}
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/30 hover:shadow-xl transition-all duration-300">
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-white dark:from-slate-800 to-blue-50/30 dark:to-slate-900/50 hover:shadow-xl transition-all duration-300">
           <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
             <CardTitle className="flex items-center gap-2 text-white">
               <BarChart3 className="h-5 w-5" />
@@ -542,15 +542,17 @@ export default function JugaDashboard() {
           <CardContent className="p-6">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" className="dark:stroke-slate-700" />
                 <XAxis 
                   dataKey="month" 
                   stroke="#475569"
+                  className="dark:stroke-slate-400"
                   fontSize={12}
                   fontWeight={500}
                 />
                 <YAxis 
                   stroke="#475569"
+                  className="dark:stroke-slate-400"
                   fontSize={12}
                   fontWeight={500}
                   tickFormatter={(value) => `R$ ${value.toLocaleString()}`}
@@ -559,12 +561,14 @@ export default function JugaDashboard() {
                   formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Vendas']}
                   labelStyle={{ color: '#1e293b', fontWeight: '600' }}
                   contentStyle={{ 
-                    backgroundColor: '#ffffff', 
+                    backgroundColor: 'hsl(var(--background))', 
                     border: '1px solid #3b82f6',
                     borderRadius: '12px',
                     boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.2)',
-                    fontWeight: '500'
+                    fontWeight: '500',
+                    color: 'hsl(var(--foreground))'
                   }}
+                  itemStyle={{ color: 'hsl(var(--foreground))' }}
                 />
                 <Bar 
                   dataKey="sales" 
@@ -577,7 +581,7 @@ export default function JugaDashboard() {
         </Card>
 
         {/* Atividades Recentes */}
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50/30 hover:shadow-xl transition-all duration-300">
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-white dark:from-slate-800 to-slate-50/30 dark:to-slate-900/50 hover:shadow-xl transition-all duration-300">
           <CardHeader className="bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-t-lg">
             <CardTitle className="flex items-center gap-2 text-white">
               <Activity className="h-5 w-5" />
@@ -591,7 +595,7 @@ export default function JugaDashboard() {
             <div className="space-y-4">
               {recentActivity.length > 0 ? (
                 recentActivity.map((activity, index) => (
-                  <div key={activity.id} className="flex items-start gap-3 p-4 rounded-lg bg-gradient-to-r from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-200 transition-all duration-200 border border-slate-200">
+                  <div key={activity.id} className="flex items-start gap-3 p-4 rounded-lg bg-gradient-to-r from-slate-50 dark:from-slate-700/50 to-slate-100 dark:to-slate-800/50 hover:from-slate-100 dark:hover:from-slate-700 hover:to-slate-200 dark:hover:to-slate-800 transition-all duration-200 border border-slate-200 dark:border-slate-700">
                     <div className={`p-2 rounded-full ${
                       activity.status === 'success' ? 'bg-green-500 text-white' :
                       activity.status === 'warning' ? 'bg-yellow-500 text-white' :
@@ -604,21 +608,21 @@ export default function JugaDashboard() {
                        <Activity className="h-4 w-4" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-800 text-sm">
+                      <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm">
                         {activity.title}
                       </p>
-                      <p className="text-slate-600 text-xs mt-1">
+                      <p className="text-slate-600 dark:text-slate-400 text-xs mt-1">
                         {activity.description}
                       </p>
-                      <p className="text-slate-500 text-xs mt-1 font-medium">
+                      <p className="text-slate-500 dark:text-slate-500 text-xs mt-1 font-medium">
                         {activity.time}
                       </p>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8 text-slate-500">
-                  <Activity className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+                <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                  <Activity className="h-12 w-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
                   <p className="font-medium">Nenhuma atividade recente</p>
                 </div>
               )}
@@ -630,7 +634,7 @@ export default function JugaDashboard() {
       {/* Cards de Ação Rápida */}
       <div className="grid gap-6 md:grid-cols-3">
         <Card 
-          className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white to-blue-50/30 hover:from-blue-50 hover:to-blue-100"
+          className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white dark:from-slate-800 to-blue-50/30 dark:to-slate-900/50 hover:from-blue-50 dark:hover:from-slate-700 hover:to-blue-100 dark:hover:to-slate-800"
           onClick={handleNavigateToPDV}
         >
           <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
@@ -654,7 +658,7 @@ export default function JugaDashboard() {
         </Card>
 
         <Card 
-          className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white to-slate-50/30 hover:from-slate-50 hover:to-slate-100"
+          className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white dark:from-slate-800 to-slate-50/30 dark:to-slate-900/50 hover:from-slate-50 dark:hover:from-slate-700 hover:to-slate-100 dark:hover:to-slate-800"
           onClick={handleNavigateToCustomers}
         >
           <CardHeader className="bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-t-lg">
@@ -669,7 +673,7 @@ export default function JugaDashboard() {
           <CardContent className="p-6">
             <Button 
               variant="outline" 
-              className="w-full border-slate-300 text-slate-700 hover:border-slate-400 hover:text-slate-800 hover:bg-slate-50 font-semibold py-3 rounded-lg transition-all duration-200"
+              className="w-full border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:border-slate-400 dark:hover:border-slate-500 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold py-3 rounded-lg transition-all duration-200"
               onClick={handleNavigateToCustomers}
             >
               <ArrowRight className="h-4 w-4 mr-2" />
@@ -679,7 +683,7 @@ export default function JugaDashboard() {
         </Card>
 
         <Card 
-          className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white to-indigo-50/30 hover:from-indigo-50 hover:to-indigo-100"
+          className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white dark:from-slate-800 to-indigo-50/30 dark:to-slate-900/50 hover:from-indigo-50 dark:hover:from-slate-700 hover:to-indigo-100 dark:hover:to-slate-800"
           onClick={handleNavigateToReports}
         >
           <CardHeader className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-t-lg">
@@ -694,7 +698,7 @@ export default function JugaDashboard() {
           <CardContent className="p-6">
             <Button 
               variant="outline" 
-              className="w-full border-indigo-300 text-indigo-700 hover:border-indigo-400 hover:text-indigo-800 hover:bg-indigo-50 font-semibold py-3 rounded-lg transition-all duration-200"
+              className="w-full border-indigo-300 dark:border-indigo-600 text-indigo-700 dark:text-indigo-200 hover:border-indigo-400 dark:hover:border-indigo-500 hover:text-indigo-800 dark:hover:text-indigo-100 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 font-semibold py-3 rounded-lg transition-all duration-200"
               onClick={handleNavigateToReports}
             >
               <ArrowRight className="h-4 w-4 mr-2" />
