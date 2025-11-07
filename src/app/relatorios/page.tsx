@@ -158,26 +158,42 @@ export default function RelatoriosPage() {
     [],
   );
 
+  const delimiter = ';';
+
+  const csvSafe = useCallback((value: string | number | null | undefined) => {
+    if (value === null || value === undefined) {
+      return '""';
+    }
+    const stringValue = String(value).replace(/"/g, '""');
+    return `"${stringValue}"`;
+  }, []);
+
   const exportReportCSV = useCallback(() => {
     try {
       const rows: string[] = [];
-      rows.push(['Data','Receita','Custo','Lucro'].join(','));
+      rows.push([
+        csvSafe('Data'),
+        csvSafe('Receita'),
+        csvSafe('Custo'),
+        csvSafe('Lucro'),
+      ].join(delimiter));
       const items = report?.items || [];
       for (const it of items) {
         const date = new Date(it.date).toLocaleDateString('pt-BR');
         rows.push([
-          date,
-          (it.revenue ?? 0).toFixed(2).replace('.', ','),
-          (it.cost ?? 0).toFixed(2).replace('.', ','),
-          (it.profit ?? 0).toFixed(2).replace('.', ',')
-        ].join(','));
+          csvSafe(date),
+          csvSafe((it.revenue ?? 0).toFixed(2).replace('.', ',')),
+          csvSafe((it.cost ?? 0).toFixed(2).replace('.', ',')),
+          csvSafe((it.profit ?? 0).toFixed(2).replace('.', ','))
+        ].join(delimiter));
       }
       rows.push('');
-      rows.push(['Totais',
-        (report?.totalRevenue ?? 0).toFixed(2).replace('.', ','),
-        (report?.totalCost ?? 0).toFixed(2).replace('.', ','),
-        (report?.totalProfit ?? 0).toFixed(2).replace('.', ','),
-      ].join(','));
+      rows.push([
+        csvSafe('Totais'),
+        csvSafe((report?.totalRevenue ?? 0).toFixed(2).replace('.', ',')),
+        csvSafe((report?.totalCost ?? 0).toFixed(2).replace('.', ',')),
+        csvSafe((report?.totalProfit ?? 0).toFixed(2).replace('.', ',')),
+      ].join(delimiter));
 
       const csv = rows.join('\n');
       const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
@@ -192,7 +208,7 @@ export default function RelatoriosPage() {
     } catch (e) {
       console.error('Falha ao exportar CSV', e);
     }
-  }, [report, dateRange]);
+  }, [report, dateRange, csvSafe, delimiter]);
 
   const handleFilterChange = useCallback((filter: '30days' | 'thismonth' | 'sales' | 'products') => {
     console.log('🔄 Filtro clicado:', filter);
@@ -269,42 +285,48 @@ export default function RelatoriosPage() {
   const exportAllData = useCallback(() => {
     try {
       const rows: string[] = [];
-      rows.push(['Tipo','Data','Descrição','Valor','Status'].join(','));
+      rows.push([
+        csvSafe('Tipo'),
+        csvSafe('Data'),
+        csvSafe('Descrição'),
+        csvSafe('Valor'),
+        csvSafe('Status'),
+      ].join(delimiter));
       
       // Vendas
       filteredSales.forEach(sale => {
         const date = new Date(sale.sold_at || sale.created_at || '').toLocaleDateString('pt-BR');
         rows.push([
-          'Venda',
-          date,
-          `Venda #${sale.id}`,
-          (sale.total_amount || 0).toFixed(2).replace('.', ','),
-          sale.status || 'Concluída'
-        ].join(','));
+          csvSafe('Venda'),
+          csvSafe(date),
+          csvSafe(`Venda #${sale.id}`),
+          csvSafe((sale.total_amount || 0).toFixed(2).replace('.', ',')),
+          csvSafe(sale.status || 'Concluída')
+        ].join(delimiter));
       });
       
       // Transações
       filteredTransactions.forEach(transaction => {
         const date = new Date(transaction.created_at || '').toLocaleDateString('pt-BR');
         rows.push([
-          'Transação',
-          date,
-          transaction.description || 'Transação financeira',
-          (transaction.amount || 0).toFixed(2).replace('.', ','),
-          transaction.status || 'Processada'
-        ].join(','));
+          csvSafe('Transação'),
+          csvSafe(date),
+          csvSafe(transaction.description || 'Transação financeira'),
+          csvSafe((transaction.amount || 0).toFixed(2).replace('.', ',')),
+          csvSafe(transaction.status || 'Processada')
+        ].join(delimiter));
       });
       
       // Entregas
       filteredDeliveries.forEach(delivery => {
         const date = new Date(delivery.created_at || '').toLocaleDateString('pt-BR');
         rows.push([
-          'Entrega',
-          date,
-          `Entrega #${delivery.id}`,
-          (delivery.delivery_cost || 0).toFixed(2).replace('.', ','),
-          delivery.status || 'Pendente'
-        ].join(','));
+          csvSafe('Entrega'),
+          csvSafe(date),
+          csvSafe(`Entrega #${delivery.id}`),
+          csvSafe((delivery.delivery_cost || 0).toFixed(2).replace('.', ',')),
+          csvSafe(delivery.status || 'Pendente')
+        ].join(delimiter));
       });
 
       const csv = rows.join('\n');
@@ -320,22 +342,28 @@ export default function RelatoriosPage() {
     } catch (e) {
       console.error('Falha ao exportar dados completos', e);
     }
-  }, [filteredSales, filteredTransactions, filteredDeliveries, dateRange]);
+  }, [filteredSales, filteredTransactions, filteredDeliveries, dateRange, csvSafe, delimiter]);
 
   const exportFinancialReport = useCallback(() => {
     try {
       const rows: string[] = [];
-      rows.push(['Data','Tipo','Descrição','Valor','Status'].join(','));
+      rows.push([
+        csvSafe('Data'),
+        csvSafe('Tipo'),
+        csvSafe('Descrição'),
+        csvSafe('Valor'),
+        csvSafe('Status'),
+      ].join(delimiter));
       
       filteredTransactions.forEach(transaction => {
         const date = new Date(transaction.created_at || '').toLocaleDateString('pt-BR');
         rows.push([
-          date,
-          transaction.type || 'Transação',
-          transaction.description || 'Transação financeira',
-          (transaction.amount || 0).toFixed(2).replace('.', ','),
-          transaction.status || 'Processada'
-        ].join(','));
+          csvSafe(date),
+          csvSafe(transaction.type || 'Transação'),
+          csvSafe(transaction.description || 'Transação financeira'),
+          csvSafe((transaction.amount || 0).toFixed(2).replace('.', ',')),
+          csvSafe(transaction.status || 'Processada')
+        ].join(delimiter));
       });
 
       const csv = rows.join('\n');
@@ -351,23 +379,30 @@ export default function RelatoriosPage() {
     } catch (e) {
       console.error('Falha ao exportar relatório financeiro', e);
     }
-  }, [filteredTransactions, dateRange]);
+  }, [filteredTransactions, dateRange, csvSafe, delimiter]);
 
   const exportSalesReport = useCallback(() => {
     try {
       const rows: string[] = [];
-      rows.push(['Data','ID Venda','Cliente','Produtos','Valor Total','Status'].join(','));
+      rows.push([
+        csvSafe('Data'),
+        csvSafe('ID Venda'),
+        csvSafe('Cliente'),
+        csvSafe('Produtos'),
+        csvSafe('Valor Total'),
+        csvSafe('Status'),
+      ].join(delimiter));
       
       filteredSales.forEach(sale => {
         const date = new Date(sale.sold_at || sale.created_at || '').toLocaleDateString('pt-BR');
         rows.push([
-          date,
-          sale.id || '',
-          sale.customer_name || 'Cliente não informado',
-          sale.items?.length || 0,
-          (sale.total_amount || 0).toFixed(2).replace('.', ','),
-          sale.status || 'Concluída'
-        ].join(','));
+          csvSafe(date),
+          csvSafe(sale.id || ''),
+          csvSafe(sale.customer_name || 'Cliente não informado'),
+          csvSafe(sale.items?.length || 0),
+          csvSafe((sale.total_amount || 0).toFixed(2).replace('.', ',')),
+          csvSafe(sale.status || 'Concluída')
+        ].join(delimiter));
       });
 
       const csv = rows.join('\n');
@@ -383,23 +418,30 @@ export default function RelatoriosPage() {
     } catch (e) {
       console.error('Falha ao exportar relatório de vendas', e);
     }
-  }, [filteredSales, dateRange]);
+  }, [filteredSales, dateRange, csvSafe, delimiter]);
 
   const exportLogisticsReport = useCallback(() => {
     try {
       const rows: string[] = [];
-      rows.push(['Data','ID Entrega','Cliente','Endereço','Status','Custo'].join(','));
+      rows.push([
+        csvSafe('Data'),
+        csvSafe('ID Entrega'),
+        csvSafe('Cliente'),
+        csvSafe('Endereço'),
+        csvSafe('Status'),
+        csvSafe('Custo'),
+      ].join(delimiter));
       
       filteredDeliveries.forEach(delivery => {
         const date = new Date(delivery.created_at || '').toLocaleDateString('pt-BR');
         rows.push([
-          date,
-          delivery.id || '',
-          delivery.customer_name || 'Cliente não informado',
-          delivery.delivery_address || 'Endereço não informado',
-          delivery.status || 'Pendente',
-          (delivery.delivery_cost || 0).toFixed(2).replace('.', ',')
-        ].join(','));
+          csvSafe(date),
+          csvSafe(delivery.id || ''),
+          csvSafe(delivery.customer_name || 'Cliente não informado'),
+          csvSafe(delivery.delivery_address || 'Endereço não informado'),
+          csvSafe(delivery.status || 'Pendente'),
+          csvSafe((delivery.delivery_cost || 0).toFixed(2).replace('.', ','))
+        ].join(delimiter));
       });
 
       const csv = rows.join('\n');
@@ -415,7 +457,7 @@ export default function RelatoriosPage() {
     } catch (e) {
       console.error('Falha ao exportar relatório de logística', e);
     }
-  }, [filteredDeliveries, dateRange]);
+  }, [filteredDeliveries, dateRange, csvSafe, delimiter]);
 
   const handleExportChange = useCallback((exportType: 'all' | 'financial' | 'sales' | 'logistics') => {
     console.log('📤 Exportação clicada:', exportType);
@@ -1301,6 +1343,7 @@ export default function RelatoriosPage() {
             </CardHeader>
             <CardContent className="space-y-2 sm:space-y-3">
               <Button 
+                type="button"
                 className="w-full justify-start text-sm"
                 variant={activeFilter === '30days' ? 'default' : 'outline'}
                 onClick={() => {
@@ -1317,6 +1360,7 @@ export default function RelatoriosPage() {
                 <span className="sm:hidden">30 dias</span>
               </Button>
               <Button 
+                type="button"
                 className="w-full justify-start text-sm"
                 variant={activeFilter === 'thismonth' ? 'default' : 'outline'}
                 onClick={() => {
@@ -1333,6 +1377,7 @@ export default function RelatoriosPage() {
                 <span className="sm:hidden">Mês</span>
               </Button>
               <Button 
+                type="button"
                 className="w-full justify-start text-sm"
                 variant={activeFilter === 'sales' ? 'default' : 'outline'}
                 onClick={() => {
@@ -1349,6 +1394,7 @@ export default function RelatoriosPage() {
                 <span className="sm:hidden">Vendas</span>
               </Button>
               <Button 
+                type="button"
                 className="w-full justify-start text-sm"
                 variant={activeFilter === 'products' ? 'default' : 'outline'}
                 onClick={() => {
