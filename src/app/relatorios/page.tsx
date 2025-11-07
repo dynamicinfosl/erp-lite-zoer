@@ -40,6 +40,7 @@ export default function RelatoriosPage() {
   const [report, setReport] = useState<any | null>(null);
   const [activeFilter, setActiveFilter] = useState<'30days' | 'thismonth' | 'sales' | 'products'>('30days');
   const [activeExport, setActiveExport] = useState<'all' | 'financial' | 'sales' | 'logistics'>('all');
+  const [activeTab, setActiveTab] = useState<'vendas' | 'financeiro' | 'produtos' | 'entregas'>('vendas');
   const [isDarkMode, setIsDarkMode] = useState(false);
   
   // Determinar qual semestre estamos (para o título do gráfico)
@@ -195,9 +196,7 @@ export default function RelatoriosPage() {
 
   const handleFilterChange = useCallback((filter: '30days' | 'thismonth' | 'sales' | 'products') => {
     console.log('🔄 Filtro clicado:', filter);
-    console.log('🔄 Estado atual activeFilter:', activeFilter);
     setActiveFilter(filter);
-    console.log('🔄 Novo estado será:', filter);
     
     const now = new Date();
     let newDateRange = { ...dateRange };
@@ -221,15 +220,23 @@ export default function RelatoriosPage() {
         console.log('📅 Este mês:', newDateRange);
         break;
       case 'sales':
+        // Muda para a aba de vendas e mantém o período atual
+        setActiveTab('vendas');
+        console.log('📊 Mudando para aba de vendas');
+        // Não atualiza o dateRange, mantém o período atual
+        return; // Retorna antes de atualizar o dateRange
       case 'products':
-        console.log('📊 Filtro de categoria:', filter);
-        // Para filtros de categoria, mantém o período atual
-        break;
+        // Muda para a aba de produtos e mantém o período atual
+        setActiveTab('produtos');
+        console.log('📊 Mudando para aba de produtos');
+        // Não atualiza o dateRange, mantém o período atual
+        return; // Retorna antes de atualizar o dateRange
     }
     
+    // Atualiza o dateRange para filtros de período
     console.log('✅ Atualizando dateRange para:', newDateRange);
     setDateRange(newDateRange);
-  }, [dateRange, activeFilter]);
+  }, [dateRange]);
 
 
   const filteredSales = useMemo(
@@ -736,7 +743,16 @@ export default function RelatoriosPage() {
       {/* Main Content - Responsivo */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
         <div className="xl:col-span-2 space-y-4 sm:space-y-6">
-          <Tabs defaultValue="vendas" className="space-y-4">
+          <Tabs value={activeTab} onValueChange={(value) => {
+            const tab = value as 'vendas' | 'financeiro' | 'produtos' | 'entregas';
+            setActiveTab(tab);
+            // Sincroniza o filtro ativo quando a aba muda
+            if (tab === 'vendas' && activeFilter !== 'sales') {
+              setActiveFilter('sales');
+            } else if (tab === 'produtos' && activeFilter !== 'products') {
+              setActiveFilter('products');
+            }
+          }} className="space-y-4">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="vendas" className="text-xs sm:text-sm">Vendas</TabsTrigger>
               <TabsTrigger value="financeiro" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
@@ -756,7 +772,7 @@ export default function RelatoriosPage() {
                       Comparativo de vendas mensais do semestre
                     </p>
                   </CardHeader>
-                  <CardContent className="p-4 sm:p-6">
+                  <CardContent className="px-4 py-4 sm:px-5 sm:py-5">
                     <ResponsiveContainer width="100%" height={280} className="sm:h-[300px]">
                       <BarChart data={monthlySalesChart} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                         <CartesianGrid 
@@ -825,40 +841,40 @@ export default function RelatoriosPage() {
                       Receita, custo e lucro no período
                     </p>
                   </CardHeader>
-                  <CardContent className="p-4 sm:p-6">
+                  <CardContent className="px-4 py-4 sm:px-5 sm:py-5">
                     {/* Resumo de métricas com melhor visual */}
-                    <div className="grid grid-cols-3 gap-3 mb-5">
-                      <div className="flex flex-col items-center gap-2 py-3 px-3 rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 border border-green-200 dark:border-green-800 shadow-sm hover:shadow-md transition-all">
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      <div className="flex flex-col items-center gap-1.5 py-2 px-2.5 rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 border border-green-200 dark:border-green-800 shadow-sm">
                         <div className="flex items-center gap-1.5">
                           <div className="h-3 w-3 rounded-full bg-green-500 shadow-sm" />
-                          <span className="text-[10px] sm:text-xs text-green-700 dark:text-green-300 font-semibold uppercase tracking-wide">Receita</span>
+                          <span className="text-[9px] sm:text-[11px] text-green-700 dark:text-green-300 font-semibold uppercase tracking-wide">Receita</span>
                         </div>
-                        <span className="text-base sm:text-lg font-bold text-green-700 dark:text-green-300">
+                        <span className="text-sm sm:text-base font-bold text-green-700 dark:text-green-300">
                           {formatCurrency((report?.totalRevenue ?? 0) as number)}
                         </span>
                       </div>
-                      <div className="flex flex-col items-center gap-2 py-3 px-3 rounded-lg bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/30 dark:to-rose-900/30 border border-red-200 dark:border-red-800 shadow-sm hover:shadow-md transition-all">
+                      <div className="flex flex-col items-center gap-1.5 py-2 px-2.5 rounded-lg bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/30 dark:to-rose-900/30 border border-red-200 dark:border-red-800 shadow-sm">
                         <div className="flex items-center gap-1.5">
                           <div className="h-3 w-3 rounded-full bg-red-500 shadow-sm" />
-                          <span className="text-[10px] sm:text-xs text-red-700 dark:text-red-300 font-semibold uppercase tracking-wide">Custo</span>
+                          <span className="text-[9px] sm:text-[11px] text-red-700 dark:text-red-300 font-semibold uppercase tracking-wide">Custo</span>
                         </div>
-                        <span className="text-base sm:text-lg font-bold text-red-700 dark:text-red-300">
+                        <span className="text-sm sm:text-base font-bold text-red-700 dark:text-red-300">
                           {formatCurrency((report?.totalCost ?? 0) as number)}
                         </span>
                       </div>
-                      <div className="flex flex-col items-center gap-2 py-3 px-3 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border border-blue-200 dark:border-blue-800 shadow-sm hover:shadow-md transition-all">
+                      <div className="flex flex-col items-center gap-1.5 py-2 px-2.5 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border border-blue-200 dark:border-blue-800 shadow-sm">
                         <div className="flex items-center gap-1.5">
                           <div className="h-3 w-3 rounded-full bg-blue-500 shadow-sm" />
-                          <span className="text-[10px] sm:text-xs text-blue-700 dark:text-blue-300 font-semibold uppercase tracking-wide">Lucro</span>
+                          <span className="text-[9px] sm:text-[11px] text-blue-700 dark:text-blue-300 font-semibold uppercase tracking-wide">Lucro</span>
                         </div>
-                        <span className="text-base sm:text-lg font-bold text-blue-700 dark:text-blue-300">
+                        <span className="text-sm sm:text-base font-bold text-blue-700 dark:text-blue-300">
                           {formatCurrency((report?.totalProfit ?? 0) as number)}
                         </span>
                       </div>
                     </div>
 
                     {/* Gráfico com melhor visual */}
-                    <ResponsiveContainer width="100%" height={240} className="sm:h-[260px]">
+                    <ResponsiveContainer width="100%" height={220} className="sm:h-[240px]">
                       <BarChart
                         data={[{
                           name: 'Financeiro',
@@ -866,7 +882,7 @@ export default function RelatoriosPage() {
                           custo: report?.totalCost ?? 0,
                           lucro: report?.totalProfit ?? 0,
                         }]}
-                        margin={{ top: 20, right: 10, left: 10, bottom: 10 }}
+                        margin={{ top: 12, right: 8, left: 8, bottom: 8 }}
                         barGap={8}
                       >
                         <CartesianGrid 
