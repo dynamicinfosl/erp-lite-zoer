@@ -330,8 +330,15 @@ export default function ClientesPage() {
 
     setIsSubmitting(true);
     
+    if (!tenant?.id) {
+      toast.error('Não foi possível identificar sua empresa. Atualize a página e tente novamente.');
+      console.warn('🚫 Tentativa de cadastrar cliente sem tenant carregado.');
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
-      const tenantId = tenant?.id || '00000000-0000-0000-0000-000000000000';
+      const tenantId = tenant.id;
       console.log('🔍 Debug - Tenant ID:', tenantId, 'Tenant object:', tenant);
       
       const response = await fetch('/next_api/customers', {
@@ -466,11 +473,17 @@ export default function ClientesPage() {
   // Botão de diagnóstico: cria um cliente simples para validar a rota
   const testCreateCustomer = async () => {
     try {
+      if (!tenant?.id) {
+        toast.error('Tenant ainda não carregado. Aguarde alguns segundos e tente novamente.');
+        console.warn('🚫 Teste API cancelado: tenant indisponível.');
+        return;
+      }
+
       console.log('🧪 Teste API: criando cliente de teste...');
       const res = await fetch('/next_api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenant_id: tenant?.id || '00000000-0000-0000-0000-000000000000', name: 'Cliente Teste API', email: 'teste@example.com' })
+        body: JSON.stringify({ tenant_id: tenant.id, name: 'Cliente Teste API', email: 'teste@example.com' })
       });
       const text = await res.text();
       console.log('🧪 Teste API status:', res.status, 'body:', text);
@@ -1209,13 +1222,19 @@ export default function ClientesPage() {
           try {
             setIsRegistering(true);
             let success = 0, fail = 0;
+            if (!tenant?.id) {
+              toast.error('Tenant não identificado. Feche e reabra a tela após alguns segundos.');
+              console.warn('🚫 Importação cancelada: tenant indefinido.');
+              return;
+            }
+
             for (const row of importRows) {
               try {
                 const response = await fetch('/next_api/customers', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    tenant_id: tenant?.id || '00000000-0000-0000-0000-000000000000',
+                    tenant_id: tenant.id,
                     name: row.nome || '',
                     email: row.email || '',
                     phone: row.telefone || '',
@@ -1242,6 +1261,12 @@ export default function ClientesPage() {
             setIsRegistering(true);
             let success = 0, fail = 0;
             const errors: string[] = [];
+            if (!tenant?.id) {
+              toast.error('Tenant não identificado. Feche e reabra a tela após alguns segundos.');
+              console.warn('🚫 Cadastro selecionado cancelado: tenant indefinido.');
+              return;
+            }
+
             for (const row of selected) {
               const obj: any = Array.isArray(row)
                 ? (() => {
@@ -1268,7 +1293,7 @@ export default function ClientesPage() {
                 return '';
               };
               const customerData = {
-                tenant_id: tenant?.id || '00000000-0000-0000-0000-000000000000',
+                tenant_id: tenant.id,
                 name: pick(['nome', 'name', 'fantasia']),
                 email: pick(['email', 'e mail']),
                 phone: pick(['telefone', 'celular', 'phone']),
