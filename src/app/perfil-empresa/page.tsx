@@ -115,121 +115,93 @@ export default function PerfilEmpresaPage() {
   const [originalFormData, setOriginalFormData] = useState(formData);
 
   const loadTenantData = useCallback(async () => {
-    if (!authTenant) {
-      // Se não tem tenant, buscar ou criar um no banco
-      try {
-        setLoading(true);
-        const userId = user?.id || '00000000-0000-0000-0000-000000000000';
-        
-        // Tentar buscar tenant existente
-        const response = await fetch(`/next_api/tenants?tenant_id=${userId}`);
-        const result = await response.json();
-        
-        if (response.ok && result.data) {
-          // Tenant existe, usar ele
-          const existingTenant = result.data;
-          setTenant(existingTenant);
-          const loadedFormData = {
-            tipo: existingTenant.tipo || 'juridica',
-            document: existingTenant.document || '',
-            nome_fantasia: existingTenant.nome_fantasia || existingTenant.name || '',
-            razao_social: existingTenant.razao_social || '',
-            inscricao_estadual: existingTenant.inscricao_estadual || '',
-            inscricao_municipal: existingTenant.inscricao_municipal || '',
-            cnae_principal: existingTenant.cnae_principal || '',
-            regime_tributario: existingTenant.regime_tributario || '',
-            regime_especial: existingTenant.regime_especial || '',
-            email: existingTenant.email || '',
-            phone: existingTenant.phone || '',
-            celular: existingTenant.celular || '',
-            site: existingTenant.site || '',
-            zip_code: existingTenant.zip_code || '',
-            address: existingTenant.address || '',
-            numero: existingTenant.numero || '',
-            complemento: existingTenant.complemento || '',
-            bairro: existingTenant.bairro || '',
-            city: existingTenant.city || '',
-            state: existingTenant.state || '',
-          };
-          setFormData(loadedFormData);
-          setOriginalFormData(loadedFormData);
-        } else {
-          // Tenant não existe, mostrar formulário vazio para criar
-          const defaultTenant = {
-            id: userId,
+    const fallbackTenantId = user?.id || '00000000-0000-0000-0000-000000000000';
+    const tenantId = authTenant?.id || fallbackTenantId;
+    try {
+      setLoading(true);
+      const response = await fetch(`/next_api/tenants?tenant_id=${tenantId}`);
+      const result = await response.json();
+
+      if (response.ok && result?.data) {
+        const tenantData: TenantData = {
+          ...result.data,
+          slug: (result.data.slug ||
+            result.data.name?.toLowerCase().replace(/\s+/g, '-') ||
+            'minha-empresa') as string,
+        };
+
+        setTenant(tenantData);
+        const loadedFormData = {
+          tipo: tenantData.tipo || 'juridica',
+          document: tenantData.document || '',
+          nome_fantasia: tenantData.nome_fantasia || tenantData.name || '',
+          razao_social: tenantData.razao_social || '',
+          inscricao_estadual: tenantData.inscricao_estadual || '',
+          inscricao_municipal: tenantData.inscricao_municipal || '',
+          cnae_principal: tenantData.cnae_principal || '',
+          regime_tributario: tenantData.regime_tributario || '',
+          regime_especial: tenantData.regime_especial || '',
+          email: tenantData.email || '',
+          phone: tenantData.phone || '',
+          celular: tenantData.celular || '',
+          site: tenantData.site || '',
+          zip_code: tenantData.zip_code || '',
+          address: tenantData.address || '',
+          numero: tenantData.numero || '',
+          complemento: tenantData.complemento || '',
+          bairro: tenantData.bairro || '',
+          city: tenantData.city || '',
+          state: tenantData.state || '',
+        };
+
+        setFormData(loadedFormData);
+        setOriginalFormData(loadedFormData);
+        return;
+      }
+
+      // Fallback caso não exista tenant salvo
+      const baseTenant = authTenant
+        ? ({
+            ...authTenant,
+            slug:
+              authTenant.name?.toLowerCase().replace(/\s+/g, '-') ||
+              'minha-empresa',
+          } as TenantData)
+        : ({
+            id: tenantId,
             name: user?.email?.split('@')[0] || 'Minha Empresa',
             slug: 'minha-empresa',
             status: 'trial',
             tipo: 'juridica',
             email: user?.email || '',
-          } as TenantData;
-          
-          setTenant(defaultTenant);
-          const defaultFormData = {
-            tipo: 'juridica',
-            document: '',
-            nome_fantasia: defaultTenant.name,
-            razao_social: '',
-            inscricao_estadual: '',
-            inscricao_municipal: '',
-            cnae_principal: '',
-            regime_tributario: '',
-            regime_especial: '',
-            email: defaultTenant.email || '',
-            phone: '',
-            celular: '',
-            site: '',
-            zip_code: '',
-            address: '',
-            numero: '',
-            complemento: '',
-            bairro: '',
-            city: '',
-            state: '',
-          };
-          setFormData(defaultFormData);
-          setOriginalFormData(defaultFormData);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar tenant:', error);
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
+          } as TenantData);
 
-    try {
-      setLoading(true);
-      const tenantData: TenantData = {
-        ...authTenant,
-        slug: authTenant.name.toLowerCase().replace(/\s+/g, '-')
+      setTenant(baseTenant);
+      const defaultFormData = {
+        tipo: baseTenant.tipo || 'juridica',
+        document: baseTenant.document || '',
+        nome_fantasia: baseTenant.nome_fantasia || baseTenant.name || '',
+        razao_social: baseTenant.razao_social || '',
+        inscricao_estadual: baseTenant.inscricao_estadual || '',
+        inscricao_municipal: baseTenant.inscricao_municipal || '',
+        cnae_principal: baseTenant.cnae_principal || '',
+        regime_tributario: baseTenant.regime_tributario || '',
+        regime_especial: baseTenant.regime_especial || '',
+        email: baseTenant.email || '',
+        phone: baseTenant.phone || '',
+        celular: baseTenant.celular || '',
+        site: baseTenant.site || '',
+        zip_code: baseTenant.zip_code || '',
+        address: baseTenant.address || '',
+        numero: baseTenant.numero || '',
+        complemento: baseTenant.complemento || '',
+        bairro: baseTenant.bairro || '',
+        city: baseTenant.city || '',
+        state: baseTenant.state || '',
       };
-      
-      setTenant(tenantData);
-      const loadedFormData = {
-        tipo: tenantData.tipo || 'juridica',
-        document: tenantData.document || '',
-        nome_fantasia: tenantData.nome_fantasia || tenantData.name || '',
-        razao_social: tenantData.razao_social || '',
-        inscricao_estadual: tenantData.inscricao_estadual || '',
-        inscricao_municipal: tenantData.inscricao_municipal || '',
-        cnae_principal: tenantData.cnae_principal || '',
-        regime_tributario: tenantData.regime_tributario || '',
-        regime_especial: tenantData.regime_especial || '',
-        email: tenantData.email || '',
-        phone: tenantData.phone || '',
-        celular: tenantData.celular || '',
-        site: tenantData.site || '',
-        zip_code: tenantData.zip_code || '',
-        address: tenantData.address || '',
-        numero: tenantData.numero || '',
-        complemento: tenantData.complemento || '',
-        bairro: tenantData.bairro || '',
-        city: tenantData.city || '',
-        state: tenantData.state || '',
-      };
-      setFormData(loadedFormData);
-      setOriginalFormData(loadedFormData);
+
+      setFormData(defaultFormData);
+      setOriginalFormData(defaultFormData);
     } catch (error) {
       console.error('Erro:', error);
     } finally {
@@ -287,11 +259,13 @@ export default function PerfilEmpresaPage() {
       console.log('✅ Dados salvos com sucesso');
       setShowSuccessMessage(true);
       setOriginalFormData(formData);
-      
+
       // Atualizar o tenant local com os dados salvos
       if (result.data) {
         setTenant(result.data);
       }
+
+      await loadTenantData();
     } catch (error) {
       console.error('❌ Erro ao salvar:', error);
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
