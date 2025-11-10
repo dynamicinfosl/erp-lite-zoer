@@ -6,21 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, Mail, Phone, CreditCard, Calendar, Save, Loader2, UserCog, Lock } from 'lucide-react';
-
-interface UserProfileData {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  cpf?: string;
-  rg?: string;
-  birth_date?: string;
-  gender?: string;
-  created_at?: string;
-}
+import { User, Mail, Phone, CreditCard, Save, Loader2, UserCog, Lock, Calendar } from 'lucide-react';
 
 export default function PerfilUsuarioPage() {
   const { user, loading: authLoading } = useSimpleAuth();
@@ -60,6 +47,7 @@ export default function PerfilUsuarioPage() {
     rg: '',
     birth_date: '',
     gender: '',
+    role_type: 'vendedor',
   });
 
   const [originalFormData, setOriginalFormData] = useState(formData);
@@ -73,21 +61,58 @@ export default function PerfilUsuarioPage() {
     try {
       setLoading(true);
 
-      // Carregar dados do user_metadata ou usar valores padrão
-      const userData = {
-        name: user.user_metadata?.name || user.email?.split('@')[0] || '',
-        email: user.email || '',
-        phone: user.user_metadata?.phone || '',
-        cpf: user.user_metadata?.cpf || '',
-        rg: user.user_metadata?.rg || '',
-        birth_date: user.user_metadata?.birth_date || '',
-        gender: user.user_metadata?.gender || '',
+      const normalizeDate = (value: any) => {
+        if (!value) return '';
+        const str = String(value);
+        if (str.length >= 10) return str.slice(0, 10);
+        return str;
       };
 
-      console.log('👤 Dados do usuário carregados:', userData);
+      let profileData: typeof formData | null = null;
 
-      setFormData(userData);
-      setOriginalFormData(userData);
+      try {
+        const response = await fetch(`/next_api/user-profiles?user_id=${encodeURIComponent(user.id)}`);
+        if (response.ok) {
+          const result = await response.json();
+          const profile = result?.data?.profile;
+          const userMetadata = result?.data?.user_metadata || {};
+          if (profile || userMetadata) {
+            profileData = {
+              name: profile?.name || userMetadata?.name || user.user_metadata?.name || user.email?.split('@')[0] || '',
+              email: user.email || '',
+              phone: profile?.phone || userMetadata?.phone || user.user_metadata?.phone || '',
+              cpf: userMetadata?.cpf || user.user_metadata?.cpf || '',
+              rg: userMetadata?.rg || user.user_metadata?.rg || '',
+              birth_date:
+                normalizeDate(profile?.birth_date) ||
+                normalizeDate(userMetadata?.birth_date) ||
+                normalizeDate(user.user_metadata?.birth_date),
+              gender: userMetadata?.gender || user.user_metadata?.gender || '',
+              role_type: profile?.role_type || userMetadata?.role_type || user.user_metadata?.role_type || 'vendedor',
+            };
+            console.log('👤 Dados carregados de user_profiles:', profileData);
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Não foi possível carregar perfil do banco:', err);
+      }
+
+      if (!profileData) {
+        profileData = {
+          name: user.user_metadata?.name || user.email?.split('@')[0] || '',
+          email: user.email || '',
+          phone: user.user_metadata?.phone || '',
+          cpf: user.user_metadata?.cpf || '',
+          rg: user.user_metadata?.rg || '',
+          birth_date: normalizeDate(user.user_metadata?.birth_date),
+          gender: user.user_metadata?.gender || '',
+          role_type: user.user_metadata?.role_type || 'vendedor',
+        };
+        console.log('👤 Dados carregados do metadata:', profileData);
+      }
+
+      setFormData(profileData);
+      setOriginalFormData({ ...profileData });
     } catch (error) {
       console.error('❌ Erro ao carregar dados do usuário:', error);
     } finally {
@@ -129,7 +154,8 @@ export default function PerfilUsuarioPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          user_id: user.id,
+          id: user.id,
+          email: user.email,
           ...formData,
         }),
       });
@@ -137,13 +163,39 @@ export default function PerfilUsuarioPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Erro ao salvar dados');
+        console.error('❌ Resposta da API (erro):', result);
+        throw new Error(result.errorMessage || result.error || 'Erro ao salvar dados');
       }
 
       console.log('✅ Dados salvos com sucesso:', result);
-      
+
+      const normalizeDate = (value: any) => {
+        if (!value) return '';
+        const str = String(value);
+        if (str.length >= 10) return str.slice(0, 10);
+        return str;
+      };
+
+      const profile = result?.data?.profile;
+      const metadata = result?.data?.user_metadata || {};
+
+      const updatedData = {
+        name: profile?.name || metadata?.name || formData.name,
+        email: user.email || '',
+        phone: profile?.phone || metadata?.phone || formData.phone,
+        cpf: metadata?.cpf ?? formData.cpf,
+        rg: metadata?.rg ?? formData.rg,
+        birth_date:
+          normalizeDate(profile?.birth_date) ||
+          normalizeDate(metadata?.birth_date) ||
+          formData.birth_date,
+        gender: metadata?.gender ?? formData.gender,
+        role_type: profile?.role_type || metadata?.role_type || formData.role_type,
+      };
+
+      setFormData(updatedData);
+      setOriginalFormData({ ...updatedData });
       setShowSuccessMessage(true);
-      setOriginalFormData(formData);
     } catch (error) {
       console.error('❌ Erro ao salvar:', error);
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
@@ -291,7 +343,7 @@ export default function PerfilUsuarioPage() {
                   </div>
                 </div>
 
-                {/* Terceira linha: Data de nascimento, Sexo */}
+                {/* Terceira linha: Data de nascimento e Sexo */}
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="birth_date" className="flex items-center gap-2">
@@ -428,7 +480,7 @@ export default function PerfilUsuarioPage() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => setFormData(originalFormData)}
+            onClick={() => setFormData({ ...originalFormData })}
             disabled={saving || loading}
             className="min-w-[120px]"
           >

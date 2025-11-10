@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { randomUUID } from 'crypto';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImV4cCI6MjA3MjU5Mzc0M30.NBHrAlv8RPxu1QhLta76Uoh6Bc_OnqhfVydy8_TX6GQ';
@@ -168,12 +169,38 @@ export async function POST(request: NextRequest) {
       .from('tenants')
       .select('id')
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
     if (existingTenant) {
       return NextResponse.json({ 
         error: 'Tenant já existe. Use PUT para atualizar.' 
       }, { status: 409 });
+    }
+
+    const baseSlug = (slug || name || 'minha empresa')
+      .toString()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'minha-empresa';
+
+    let finalSlug = baseSlug;
+    let suffix = 1;
+    while (true) {
+      const { data: slugConflict } = await supabaseAdmin
+        .from('tenants')
+        .select('id')
+        .eq('slug', finalSlug)
+        .maybeSingle();
+
+      if (!slugConflict) break;
+      finalSlug = `${baseSlug}-${suffix}`;
+      suffix++;
+      if (suffix > 50) {
+        finalSlug = `${baseSlug}-${randomUUID().slice(0, 6)}`;
+        break;
+      }
     }
 
     // Criar novo tenant
@@ -182,7 +209,7 @@ export async function POST(request: NextRequest) {
       .insert({
         id,
         name,
-        slug: slug || name.toLowerCase().replace(/\s+/g, '-'),
+        slug: finalSlug,
         status: 'trial',
         ...extraData
       })
