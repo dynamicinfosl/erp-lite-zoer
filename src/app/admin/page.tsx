@@ -119,46 +119,46 @@ export default function AdminPage() {
           </div>
         </div>
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 2xl:grid-cols-8 gap-3 sm:gap-4">
-                  <AdminStatCard
-                    title="Total de Usuários"
-                    value={stats?.totalUsers || 0}
-                    icon={<Users className="h-5 w-5" />}
-                    variant="primary"
-                    trend={{ value: "+12%", direction: "up" }}
-                  />
-                  <AdminStatCard
-                    title="Usuários Ativos"
-                    value={stats?.activeUsers || 0}
-                    icon={<Activity className="h-5 w-5" />}
-                    variant="success"
-                    trend={{ value: "+8%", direction: "up" }}
-                  />
-                  <AdminStatCard
-                    title="Vendas Totais"
-                    value={stats?.totalSales || 0}
-                    icon={<BarChart3 className="h-5 w-5" />}
-                    variant="primary"
-                    trend={{ value: "+15%", direction: "up" }}
-                  />
-                  <AdminStatCard
-                    title="Produtos"
-                    value={stats?.totalProducts || 0}
-                    icon={<Package className="h-5 w-5" />}
-                    variant="warning"
-                    trend={{ value: "+5%", direction: "up" }}
-                  />
-                  <AdminStatCard
-                    title="Bebidas"
-                    value={stats?.totalBeverages || 0}
-                    icon={<Database className="h-5 w-5" />}
-                    variant="primary"
-                    trend={{ value: "+3%", direction: "up" }}
-                  />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <AdminStatCard
+            title="Total de Usuários"
+            value={stats?.totalUsers || 0}
+            icon={<Users className="h-4 w-4" />}
+            variant="primary"
+            trend={{ value: "+12%", direction: "up" }}
+          />
+          <AdminStatCard
+            title="Usuários Ativos"
+            value={stats?.activeUsers || 0}
+            icon={<Activity className="h-4 w-4" />}
+            variant="success"
+            trend={{ value: "+8%", direction: "up" }}
+          />
+          <AdminStatCard
+            title="Vendas Totais"
+            value={stats?.totalSales || 0}
+            icon={<BarChart3 className="h-4 w-4" />}
+            variant="primary"
+            trend={{ value: "+15%", direction: "up" }}
+          />
+          <AdminStatCard
+            title="Produtos"
+            value={stats?.totalProducts || 0}
+            icon={<Package className="h-4 w-4" />}
+            variant="warning"
+            trend={{ value: "+5%", direction: "up" }}
+          />
+          <AdminStatCard
+            title="Bebidas"
+            value={stats?.totalBeverages || 0}
+            icon={<Database className="h-4 w-4" />}
+            variant="primary"
+            trend={{ value: "+3%", direction: "up" }}
+          />
           <AdminStatCard
             title="Valor do Estoque"
             value={`R$ ${stats?.totalInventoryValue?.toLocaleString('pt-BR') || 0}`}
-            icon={<CreditCard className="h-5 w-5" />}
+            icon={<CreditCard className="h-4 w-4" />}
             variant="success"
             trend={{ value: "+7%", direction: "up" }}
           />

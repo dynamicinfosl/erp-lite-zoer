@@ -52,18 +52,18 @@ export function AdminStatCard({
 }: AdminStatCardProps) {
   return (
     <Card className={cn(
-      'border-2 transition-all duration-200 hover:shadow-lg hover:scale-105',
+      'h-full border-2 transition-all duration-200 hover:shadow-lg hover:scale-105 flex flex-col',
       cardVariants[variant],
       className
     )}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium text-gray-300 leading-tight">
+      <CardHeader className="pb-2 pt-3 px-4 flex-shrink-0">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-xs font-medium text-gray-300 leading-tight line-clamp-2 flex-1">
             {title}
           </CardTitle>
           {icon && (
             <div className={cn(
-              'p-2 rounded-lg',
+              'p-1.5 rounded-lg flex-shrink-0',
               iconVariants[variant]
             )}>
               <div className="text-white">
@@ -73,24 +73,24 @@ export function AdminStatCard({
           )}
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="space-y-2">
-          <div className="text-3xl font-bold text-white">
+      <CardContent className="pt-0 px-4 pb-3 flex-1 flex flex-col justify-between">
+        <div className="space-y-1.5">
+          <div className="text-2xl font-bold text-white break-words">
             {value}
           </div>
           {subtitle && (
-            <p className="text-sm text-gray-400">
+            <p className="text-xs text-gray-400 line-clamp-2">
               {subtitle}
             </p>
           )}
           {trend && (
             <div className={cn(
-              'flex items-center gap-1 text-xs px-2 py-1 rounded-full',
+              'flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full w-fit',
               textVariants[variant],
               'bg-opacity-20'
             )}>
               <span className={cn(
-                'text-xs',
+                'text-[10px] font-semibold',
                 trend.direction === 'up' ? 'text-green-400' : 
                 trend.direction === 'down' ? 'text-red-400' : 'text-gray-400'
               )}>
