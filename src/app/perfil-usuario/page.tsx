@@ -155,7 +155,6 @@ export default function PerfilUsuarioPage() {
         },
         body: JSON.stringify({
           id: user.id,
-          email: user.email,
           ...formData,
         }),
       });

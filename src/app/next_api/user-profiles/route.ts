@@ -411,7 +411,6 @@ export const PUT = requestMiddleware(async (request, context) => {
     return createErrorResponse({
       errorMessage: `Erro ao atualizar perfil: ${error instanceof Error ? error.message : 'erro desconhecido'}`,
       status: 500,
-      details: error instanceof Error ? error.stack : undefined,
     });
   }
 }, true);

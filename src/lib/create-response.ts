@@ -29,13 +29,15 @@ export function createErrorResponse(params: {
   errorCode?: string,
   errorMessage: string,
   status?: number,
+  details?: any,
 }): Response {
-  const { errorCode, errorMessage, status = 500 } = params;
+  const { errorCode, errorMessage, status = 500, details } = params;
   return new Response(
     JSON.stringify({
       success: false,
       errorCode,
       errorMessage,
+      details,
     }),
     {
       status,
