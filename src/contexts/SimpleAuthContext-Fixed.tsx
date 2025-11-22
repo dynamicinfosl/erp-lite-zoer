@@ -180,11 +180,12 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     }
   }, [supabase]);
 
-  // Carregar sessão inicial - VERSÃO ULTRA SIMPLIFICADA
+  // Carregar sessão inicial - VERSÃO OTIMIZADA
   useEffect(() => {
     console.log('🔄 Iniciando autenticação...');
     
     let isInitialized = false;
+    let mounted = true;
     
     const initAuth = async () => {
       if (isInitialized) return;
@@ -193,82 +194,129 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       try {
         console.log('🔍 Verificando sessão existente...');
         
-        // Verificação simples e direta
-        const { data: { session } } = await supabase.auth.getSession();
+        // ✅ PRIMEIRO: Verificação rápida de sessão (não bloqueia)
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<{ data: { session: null }, error: null }>((resolve) => 
+          setTimeout(() => resolve({ data: { session: null }, error: null }), 2000)
+        );
         
-        setSession(session);
-        setUser(session?.user ?? null);
+        const { data: { session }, error: sessionError } = await Promise.race([
+          sessionPromise,
+          timeoutPromise
+        ]) as { data: { session: any }, error: any };
         
-        if (session?.user) {
-          console.log('👤 Usuário encontrado:', session.user.email);
-          // Buscar tenant de forma mais simples
-          const tenantData = await loadRealTenant(session.user.id);
-          console.log('🏢 Tenant carregado:', tenantData);
-          setTenant(tenantData);
-          
-          // Carregar subscription após carregar tenant
-          if (tenantData?.id) {
-            const response = await fetch(`/next_api/subscriptions?tenant_id=${tenantData.id}`);
-            if (response.ok) {
-              const result = await response.json();
-              if (result.success && result.data) {
-                const subData = result.data;
-                const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
-                
-                const subscriptionData: SubscriptionData = {
-                  id: subData.id,
-                  status: subData.status || 'trial',
-                  trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
-                  current_period_end: subData.current_period_end || undefined,
-                  plan: {
-                    id: plan?.id || 'trial',
-                    name: plan?.name || 'Trial',
-                    slug: plan?.slug || 'trial',
-                    price_monthly: plan?.price_monthly || 0,
-                    price_yearly: plan?.price_yearly || 0,
-                    features: plan?.features || {},
-                    limits: plan?.limits || {
-                      max_users: 1,
-                      max_customers: 100,
-                      max_products: 100,
-                      max_sales_per_month: 1000,
-                    },
-                  },
-                };
-                
-                console.log('✅ Subscription carregada:', subscriptionData);
-                setSubscription(subscriptionData);
-              }
-            }
+        if (sessionError) {
+          console.error('❌ Erro ao buscar sessão:', sessionError);
+          if (mounted) {
+            setSession(null);
+            setUser(null);
+            setLoading(false);
           }
-        } else {
+          return;
+        }
+        
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+        }
+        
+        // ✅ LIBERAR LOADING RAPIDAMENTE após verificar sessão
+        if (mounted) {
+          setLoading(false);
+          console.log('✅ Sessão verificada, loading liberado');
+        }
+        
+        // ✅ CARREGAR TENANT E SUBSCRIPTION EM BACKGROUND (não bloqueia)
+        if (session?.user && mounted) {
+          console.log('👤 Usuário encontrado, carregando dados em background...');
+          
+          // Carregar tenant de forma assíncrona
+          loadRealTenant(session.user.id)
+            .then((tenantData) => {
+              if (mounted && tenantData) {
+                console.log('🏢 Tenant carregado:', tenantData);
+                setTenant(tenantData);
+                
+                // Carregar subscription após carregar tenant
+                if (tenantData?.id) {
+                  fetch(`/next_api/subscriptions?tenant_id=${tenantData.id}`)
+                    .then((response) => {
+                      if (response.ok) {
+                        return response.json();
+                      }
+                      return null;
+                    })
+                    .then((result) => {
+                      if (mounted && result?.success && result.data) {
+                        const subData = result.data;
+                        const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
+                        
+                        const subscriptionData: SubscriptionData = {
+                          id: subData.id,
+                          status: subData.status || 'trial',
+                          trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
+                          current_period_end: subData.current_period_end || undefined,
+                          plan: {
+                            id: plan?.id || 'trial',
+                            name: plan?.name || 'Trial',
+                            slug: plan?.slug || 'trial',
+                            price_monthly: plan?.price_monthly || 0,
+                            price_yearly: plan?.price_yearly || 0,
+                            features: plan?.features || {},
+                            limits: plan?.limits || {
+                              max_users: 1,
+                              max_customers: 100,
+                              max_products: 100,
+                              max_sales_per_month: 1000,
+                            },
+                          },
+                        };
+                        
+                        console.log('✅ Subscription carregada:', subscriptionData);
+                        setSubscription(subscriptionData);
+                      }
+                    })
+                    .catch((err) => {
+                      console.error('⚠️ Erro ao carregar subscription:', err);
+                    });
+                }
+              }
+            })
+            .catch((err) => {
+              console.error('⚠️ Erro ao carregar tenant:', err);
+            });
+        } else if (mounted) {
           console.log('👤 Nenhum usuário logado');
           setTenant(null);
           setSubscription(null);
         }
       } catch (error) {
         console.error('❌ Erro na autenticação:', error);
-        setSession(null);
-        setUser(null);
-        setTenant(null);
-      } finally {
-        setLoading(false);
-        console.log('✅ Autenticação inicializada');
+        if (mounted) {
+          setSession(null);
+          setUser(null);
+          setTenant(null);
+          setLoading(false);
+        }
       }
     };
 
-    // Timeout mais curto
+    // ✅ TIMEOUT REDUZIDO para 3 segundos
     const timeoutId = setTimeout(() => {
-      if (!isInitialized) {
-        console.log('⏰ Timeout na inicialização');
+      if (!isInitialized && mounted) {
+        console.log('⏰ Timeout na inicialização (3s)');
         setLoading(false);
         isInitialized = true;
       }
-    }, 10000); // 10 segundos
+    }, 3000);
 
     initAuth().finally(() => {
       clearTimeout(timeoutId);
     });
+    
+    return () => {
+      mounted = false;
+    };
   }, [supabase, loadRealTenant]);
 
   // Escutar mudanças de autenticação - VERSÃO ULTRA SIMPLIFICADA

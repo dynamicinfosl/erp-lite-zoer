@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, Suspense } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,8 +31,25 @@ function LoginPageContent() {
     }
   }, [searchParams]);
 
-  // Mostrar loading enquanto verifica autenticação
-  if (loading) {
+  // Mostrar loading apenas por um tempo muito curto (máximo 1.5s)
+  const [showLoading, setShowLoading] = useState(true);
+  
+  useEffect(() => {
+    // Mostrar loading por no máximo 1.5 segundos
+    const timer = setTimeout(() => {
+      setShowLoading(false);
+    }, 1500);
+    
+    // Se o loading terminar antes, também liberar
+    if (!loading) {
+      clearTimeout(timer);
+      setShowLoading(false);
+    }
+    
+    return () => clearTimeout(timer);
+  }, [loading]);
+  
+  if (showLoading && loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
         <div className="text-center">
