@@ -60,8 +60,9 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       console.log('🔍 Buscando tenant real para usuário:', userId);
       
       // ✅ NOVA SOLUÇÃO: Buscar tenant através de user_memberships
+      // Priorizar tenant que tem subscription ativa
       try {
-        const { data: membership, error: membershipError } = await supabase
+        const { data: memberships, error: membershipError } = await supabase
           .from('user_memberships')
           .select(`
             tenant_id,
@@ -75,32 +76,59 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
               address,
               city,
               state,
-              zip_code
+              zip_code,
+              subscriptions (
+                id,
+                status,
+                current_period_end
+              )
             )
           `)
           .eq('user_id', userId)
-          .eq('is_active', true)
-          .maybeSingle();
+          .eq('is_active', true);
 
         if (membershipError) {
           console.log('⚠️ Erro ao buscar membership:', membershipError);
         }
 
-        if (membership?.tenants && Array.isArray(membership.tenants) && membership.tenants.length > 0) {
-          const tenant = membership.tenants[0];
-          console.log('✅ Tenant encontrado via membership:', tenant.name, 'ID:', tenant.id);
-          return {
-            id: tenant.id,
-            name: tenant.name || 'Meu Negócio',
-            status: tenant.status || 'trial',
-            email: tenant.email,
-            phone: tenant.phone,
-            document: tenant.document,
-            address: tenant.address,
-            city: tenant.city,
-            state: tenant.state,
-            zip_code: tenant.zip_code,
-          };
+        if (memberships && memberships.length > 0) {
+          // Priorizar tenant que tem subscription ativa
+          let selectedMembership = memberships.find(m => {
+            const tenant = Array.isArray(m.tenants) ? m.tenants[0] : m.tenants;
+            if (!tenant) return false;
+            const subscriptions = tenant.subscriptions;
+            if (Array.isArray(subscriptions) && subscriptions.length > 0) {
+              const sub = subscriptions[0];
+              return sub.status === 'active' && 
+                     (sub.current_period_end ? new Date(sub.current_period_end) > new Date() : true);
+            }
+            return false;
+          });
+
+          // Se não encontrou com subscription ativa, pegar o primeiro
+          if (!selectedMembership) {
+            selectedMembership = memberships[0];
+          }
+
+          const tenant = Array.isArray(selectedMembership.tenants) 
+            ? selectedMembership.tenants[0] 
+            : selectedMembership.tenants;
+
+          if (tenant) {
+            console.log('✅ Tenant encontrado via membership:', tenant.name, 'ID:', tenant.id);
+            return {
+              id: tenant.id,
+              name: tenant.name || 'Meu Negócio',
+              status: tenant.status || 'trial',
+              email: tenant.email,
+              phone: tenant.phone,
+              document: tenant.document,
+              address: tenant.address,
+              city: tenant.city,
+              state: tenant.state,
+              zip_code: tenant.zip_code,
+            };
+          }
         }
       } catch (error) {
         console.log('⚠️ Erro ao verificar membership:', error);

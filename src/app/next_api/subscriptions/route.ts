@@ -29,42 +29,62 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`🔍 Buscando subscription para tenant: ${tenant_id}`);
-    const { data, error } = await supabaseAdmin
-      .from('subscriptions')
-      .select(`
-        *,
-        plan:plans(*)
-      `)
-      .eq('tenant_id', tenant_id)
-      .maybeSingle();
+    
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('subscriptions')
+        .select(`
+          *,
+          plan:plans(*)
+        `)
+        .eq('tenant_id', tenant_id)
+        .maybeSingle();
 
-    if (error) {
-      console.error('❌ Erro ao buscar subscription:', error);
-      return NextResponse.json(
-        { error: 'Erro ao buscar subscription: ' + error.message },
-        { status: 400 }
-      );
-    }
+      if (error) {
+        console.error('❌ Erro ao buscar subscription:', error);
+        // Se o erro for "not found", retornar null ao invés de erro
+        if (error.code === 'PGRST116' || error.message?.includes('0 rows')) {
+          console.log('⚠️ Nenhuma subscription encontrada para tenant:', tenant_id);
+          return NextResponse.json({ 
+            success: true, 
+            data: null,
+            message: 'Nenhuma subscription encontrada para este tenant'
+          });
+        }
+        return NextResponse.json(
+          { error: 'Erro ao buscar subscription: ' + error.message },
+          { status: 400 }
+        );
+      }
 
-    // Se não encontrou subscription, retornar null ao invés de erro
-    if (!data) {
-      console.log('⚠️ Nenhuma subscription encontrada para tenant:', tenant_id);
+      // Se não encontrou subscription, retornar null ao invés de erro
+      if (!data) {
+        console.log('⚠️ Nenhuma subscription encontrada para tenant:', tenant_id);
+        return NextResponse.json({ 
+          success: true, 
+          data: null,
+          message: 'Nenhuma subscription encontrada para este tenant'
+        });
+      }
+
+      console.log('✅ Subscription encontrada:', {
+        id: data.id,
+        status: data.status,
+        plan_id: data.plan_id,
+        plan_name: Array.isArray(data.plan) ? data.plan[0]?.name : data.plan?.name,
+        current_period_end: data.current_period_end
+      });
+
+      return NextResponse.json({ success: true, data });
+    } catch (queryError) {
+      console.error('❌ Erro na query de subscription:', queryError);
+      // Em caso de erro inesperado, retornar null ao invés de erro 500
       return NextResponse.json({ 
         success: true, 
         data: null,
-        message: 'Nenhuma subscription encontrada para este tenant'
+        message: 'Erro ao buscar subscription, retornando null'
       });
     }
-
-    console.log('✅ Subscription encontrada:', {
-      id: data.id,
-      status: data.status,
-      plan_id: data.plan_id,
-      plan_name: Array.isArray(data.plan) ? data.plan[0]?.name : data.plan?.name,
-      current_period_end: data.current_period_end
-    });
-
-    return NextResponse.json({ success: true, data });
 
   } catch (error) {
     console.error('Erro no handler de busca:', error);
