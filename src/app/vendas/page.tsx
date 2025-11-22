@@ -267,14 +267,14 @@ export default function VendasPage() {
   };
 
   // Calcular estatísticas
+  const vendasPagas = vendas.filter(v => v.status === 'paga');
+  const faturamentoTotal = vendasPagas.reduce((acc, v) => acc + v.total, 0);
   const stats = {
     totalVendas: vendas.length,
-    vendasPagas: vendas.filter(v => v.status === 'paga').length,
+    vendasPagas: vendasPagas.length,
     vendasPendentes: vendas.filter(v => v.status === 'pendente').length,
-    faturamento: vendas.filter(v => v.status === 'paga').reduce((acc, v) => acc + v.total, 0),
-    ticketMedio: vendas.filter(v => v.status === 'paga').length > 0 
-      ? vendas.filter(v => v.status === 'paga').reduce((acc, v) => acc + v.total, 0) / vendas.filter(v => v.status === 'paga').length 
-      : 0
+    faturamento: faturamentoTotal,
+    ticketMedio: vendasPagas.length > 0 ? faturamentoTotal / vendasPagas.length : 0
   };
 
   // Funções de ação
