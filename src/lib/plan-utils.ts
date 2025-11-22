@@ -29,6 +29,7 @@ export async function validatePlanLimits(
     }
 
     // Buscar subscription atual
+    console.log(`🔍 Validando plano para tenant: ${tenantId}, operação: ${operation}`);
     const { data: subscription, error: subError } = await supabase
       .from('subscriptions')
       .select(`
@@ -42,7 +43,7 @@ export async function validatePlanLimits(
       .single();
 
     if (subError) {
-      console.log('⚠️ Subscription não encontrada, permitindo operação (modo trial)');
+      console.log('⚠️ Subscription não encontrada, permitindo operação (modo trial):', subError.message);
       return { canProceed: true };
     }
 
@@ -50,6 +51,12 @@ export async function validatePlanLimits(
       console.log('⚠️ Nenhum plano encontrado, permitindo operação (modo trial)');
       return { canProceed: true };
     }
+
+    console.log('📦 Subscription encontrada:', {
+      status: subscription.status,
+      current_period_end: subscription.current_period_end,
+      plan: subscription.plan
+    });
 
     const now = new Date();
 
@@ -67,14 +74,20 @@ export async function validatePlanLimits(
     }
 
     // Verificar se plano ativo expirou (current_period_end)
-    if (subscription.status === 'active' && subscription.current_period_end) {
-      const periodEnd = new Date(subscription.current_period_end);
-      if (periodEnd < now) {
-        return { 
-          canProceed: false, 
-          reason: 'Plano expirado. Entre em contato com o suporte para renovar.',
-          trialExpired: true 
-        };
+    if (subscription.status === 'active') {
+      if (subscription.current_period_end) {
+        const periodEnd = new Date(subscription.current_period_end);
+        if (periodEnd < now) {
+          return { 
+            canProceed: false, 
+            reason: 'Plano expirado. Entre em contato com o suporte para renovar.',
+            trialExpired: true 
+          };
+        }
+        // Se chegou aqui, plano está ativo e válido - continuar para verificar limites
+      } else {
+        // Plano ativo mas sem data de expiração - permitir (pode ser plano ilimitado)
+        console.log('⚠️ Plano ativo sem current_period_end, permitindo operação');
       }
     }
 
@@ -92,8 +105,12 @@ export async function validatePlanLimits(
     const plan = Array.isArray(subscription.plan) ? subscription.plan[0] : subscription.plan;
     const limits = plan?.limits;
 
+    console.log('📊 Limites do plano:', limits);
+    console.log('📈 Uso atual:', usage);
+
     if (!limits) {
-      return { canProceed: false, reason: 'Limites do plano não encontrados' };
+      console.warn('⚠️ Limites do plano não encontrados, permitindo operação');
+      return { canProceed: true }; // Permitir se não há limites definidos
     }
 
     // Verificar limites específicos
