@@ -480,6 +480,12 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       
       if (response.ok) {
         const result = await response.json();
+        console.log('🔍 [refreshSubscription] Resultado da busca:', {
+          success: result.success,
+          hasData: !!result.data,
+          message: result.message
+        });
+        
         if (result.success && result.data) {
           const subData = result.data;
           const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
@@ -507,8 +513,10 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
           
           console.log('✅ Subscription atualizada:', subscriptionData);
           setSubscription(subscriptionData);
+          return; // IMPORTANTE: retornar aqui para não tentar criar
         } else {
-          console.log('⚠️ Nenhuma subscription encontrada, verificando se precisa criar...');
+          console.log('⚠️ Nenhuma subscription encontrada na resposta. Mensagem:', result.message);
+          console.log('⚠️ Verificando se realmente não existe antes de criar...');
           // Tentar criar subscription automaticamente via API
           try {
             const createResponse = await fetch('/next_api/subscriptions', {

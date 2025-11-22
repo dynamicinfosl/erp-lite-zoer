@@ -85,6 +85,14 @@ export async function GET(request: NextRequest) {
       // Se não encontrou subscription, retornar null
       if (!subscriptions || subscriptions.length === 0) {
         console.log('⚠️ [SUBSCRIPTIONS API] Nenhuma subscription encontrada para tenant:', tenant_id);
+        console.log('⚠️ [SUBSCRIPTIONS API] Verificando se há problema com a query...');
+        // Tentar uma query mais simples para debug
+        const { data: debugSubs, error: debugError } = await supabaseAdmin
+          .from('subscriptions')
+          .select('id, tenant_id, status')
+          .eq('tenant_id', tenant_id);
+        console.log('🔍 [SUBSCRIPTIONS API] Debug query - encontradas:', debugSubs?.length || 0, 'erro:', debugError);
+        
         return NextResponse.json({ 
           success: true, 
           data: null,
@@ -345,25 +353,46 @@ export async function POST(request: NextRequest) {
     }
 
     if (existingSubs && existingSubs.length > 0) {
-      // Se já existe subscription ativa, retornar ela ao invés de criar nova
+      // Se já existe subscription, retornar ela ao invés de criar nova
       const activeSub = existingSubs.find(s => s.status === 'active') || existingSubs[0];
       console.log('⚠️ [POST] Tenant já possui subscription, retornando existente:', activeSub.id);
       
-      // Buscar subscription completa
-      const { data: fullSub } = await supabaseAdmin
+      // Buscar subscription completa sem join (que pode estar causando problema)
+      const { data: subData, error: subError } = await supabaseAdmin
         .from('subscriptions')
-        .select(`
-          *,
-          plan:plans(*)
-        `)
+        .select('*')
         .eq('id', activeSub.id)
         .maybeSingle();
       
-      if (fullSub) {
+      if (subError) {
+        console.error('❌ [POST] Erro ao buscar subscription existente:', subError);
+        // Continuar para criar nova se não conseguir buscar
+      } else if (subData) {
+        // Buscar plan separadamente
+        let plan = null;
+        if (subData.plan_id) {
+          try {
+            const { data: planData } = await supabaseAdmin
+              .from('plans')
+              .select('*')
+              .eq('id', subData.plan_id)
+              .maybeSingle();
+            plan = planData;
+          } catch (e) {
+            console.warn('⚠️ [POST] Erro ao buscar plan da subscription existente');
+          }
+        }
+        
+        const responseData = {
+          ...subData,
+          plan: plan
+        };
+        
+        console.log('✅ [POST] Retornando subscription existente:', responseData.id);
         return NextResponse.json({ 
           success: true, 
           message: 'Subscription já existe',
-          data: fullSub 
+          data: responseData 
         });
       }
     }
