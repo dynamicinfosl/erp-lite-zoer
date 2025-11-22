@@ -12,9 +12,14 @@ const supabaseAdmin = supabaseUrl && supabaseServiceKey
 export async function GET(request: NextRequest) {
   try {
     if (!supabaseAdmin) {
+      console.error('❌ Cliente Supabase não configurado');
       return NextResponse.json(
-        { error: 'Cliente Supabase não configurado' },
-        { status: 500 }
+        { 
+          success: true, 
+          data: null,
+          message: 'Cliente Supabase não configurado' 
+        },
+        { status: 200 }
       );
     }
 
@@ -22,9 +27,14 @@ export async function GET(request: NextRequest) {
     const tenant_id = searchParams.get('tenant_id');
 
     if (!tenant_id) {
+      console.warn('⚠️ Tenant ID não fornecido');
       return NextResponse.json(
-        { error: 'Tenant ID é obrigatório' },
-        { status: 400 }
+        { 
+          success: true, 
+          data: null,
+          message: 'Tenant ID é obrigatório' 
+        },
+        { status: 200 }
       );
     }
 
@@ -40,8 +50,8 @@ export async function GET(request: NextRequest) {
 
       if (subError) {
         console.error('❌ Erro ao buscar subscription:', subError);
-        // Se o erro for "not found", retornar null ao invés de erro
-        if (subError.code === 'PGRST116' || subError.message?.includes('0 rows')) {
+        // Sempre retornar sucesso com data null, mesmo em caso de erro
+        if (subError.code === 'PGRST116' || subError.message?.includes('0 rows') || subError.message?.includes('not found')) {
           console.log('⚠️ Nenhuma subscription encontrada para tenant:', tenant_id);
           return NextResponse.json({ 
             success: true, 
@@ -49,10 +59,13 @@ export async function GET(request: NextRequest) {
             message: 'Nenhuma subscription encontrada para este tenant'
           });
         }
-        return NextResponse.json(
-          { error: 'Erro ao buscar subscription: ' + subError.message },
-          { status: 400 }
-        );
+        // Para outros erros, também retornar null ao invés de erro
+        console.warn('⚠️ Erro ao buscar subscription, retornando null:', subError.message);
+        return NextResponse.json({ 
+          success: true, 
+          data: null,
+          message: 'Erro ao buscar subscription: ' + subError.message
+        });
       }
 
       // Se não encontrou subscription, retornar null ao invés de erro
@@ -77,9 +90,11 @@ export async function GET(request: NextRequest) {
           
           if (!planError && planData) {
             plan = planData;
+          } else {
+            console.warn('⚠️ Erro ao buscar plan:', planError?.message);
           }
-        } catch (planErr) {
-          console.warn('⚠️ Erro ao buscar plan, continuando sem plan:', planErr);
+        } catch (planErr: any) {
+          console.warn('⚠️ Erro ao buscar plan, continuando sem plan:', planErr?.message || planErr);
         }
       }
 
@@ -98,22 +113,24 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.json({ success: true, data: responseData });
-    } catch (queryError) {
+    } catch (queryError: any) {
       console.error('❌ Erro na query de subscription:', queryError);
       // Em caso de erro inesperado, retornar null ao invés de erro 500
       return NextResponse.json({ 
         success: true, 
         data: null,
-        message: 'Erro ao buscar subscription, retornando null'
+        message: 'Erro ao buscar subscription: ' + (queryError?.message || 'Erro desconhecido')
       });
     }
 
-  } catch (error) {
-    console.error('Erro no handler de busca:', error);
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    console.error('❌ Erro no handler de busca:', error);
+    // Sempre retornar sucesso com data null, nunca erro 500
+    return NextResponse.json({ 
+      success: true, 
+      data: null,
+      message: 'Erro interno: ' + (error?.message || 'Erro desconhecido')
+    });
   }
 }
 
