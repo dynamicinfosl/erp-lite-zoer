@@ -402,16 +402,23 @@ export async function POST(request: NextRequest) {
     console.log('✅ [POST] Tenant verificado:', tenantData.name);
     
     // Primeiro inserir sem o join para evitar problemas
-    const { data: insertedData, error: insertError } = await supabaseAdmin
-      .from('subscriptions')
-      .insert({
+    // Usar .rpc() ou garantir que estamos usando service_role corretamente
+    console.log('📝 [POST] Tentando inserir subscription...');
+    
+    const insertPayload = {
         tenant_id,
         plan_id,
         status,
         trial_end: trialEndsAt,
         current_period_start: currentPeriodStart,
         current_period_end: currentPeriodEnd,
-      })
+    };
+    
+    console.log('📝 [POST] Payload de inserção:', JSON.stringify(insertPayload, null, 2));
+    
+    const { data: insertedData, error: insertError } = await supabaseAdmin
+      .from('subscriptions')
+      .insert(insertPayload)
       .select('*')
       .single();
 
