@@ -7,7 +7,6 @@ SELECT
     s.plan_id,
     s.status,
     s.trial_end,
-    s.trial_ends_at, -- caso exista esta coluna também
     s.current_period_start,
     s.current_period_end,
     s.created_at,
@@ -18,7 +17,8 @@ SELECT
     p.is_active AS plan_is_active,
     t.id AS tenant_id_verificado,
     t.name AS tenant_name,
-    t.status AS tenant_status
+    t.status AS tenant_status,
+    t.trial_ends_at AS tenant_trial_ends_at -- esta coluna existe na tabela tenants
 FROM subscriptions s
 LEFT JOIN plans p ON s.plan_id = p.id
 LEFT JOIN tenants t ON s.tenant_id = t.id
