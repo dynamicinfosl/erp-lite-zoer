@@ -56,17 +56,66 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
 
   // Função para buscar tenant real da conta logada
   const loadRealTenant = useCallback(async (userId: string): Promise<Tenant> => {
-    console.log('🔍 Buscando tenant real para usuário:', userId);
+    console.log('🔍 [SIMPLE] Buscando tenant para usuário:', userId);
     
-    // ✅ USAR API ROUTE para garantir que encontre o tenant correto (usa service role)
+    // ✅ VERSÃO ULTRA SIMPLIFICADA: Usar API route com timeout curto
     try {
-      const response = await fetch(`/next_api/admin/get-tenant?user_id=${userId}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+      
+      const response = await fetch(`/next_api/admin/get-tenant?user_id=${userId}`, {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
       
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.data) {
           const tenant = result.data;
-          console.log('✅ Tenant encontrado via API:', tenant.name, 'ID:', tenant.id);
+          console.log('✅ [SIMPLE] Tenant encontrado:', tenant.name, 'ID:', tenant.id);
+          return {
+            id: tenant.id,
+            name: tenant.name || 'Meu Negócio',
+            status: tenant.status || 'trial',
+            email: tenant.email,
+            phone: tenant.phone,
+            document: tenant.document,
+            address: tenant.address,
+            city: tenant.city,
+            state: tenant.state,
+            zip_code: tenant.zip_code,
+          };
+        }
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.warn('⏰ [SIMPLE] Timeout ao buscar tenant via API');
+      } else {
+        console.error('⚠️ [SIMPLE] Erro ao buscar tenant via API:', error);
+      }
+    }
+
+    // ✅ FALLBACK SIMPLES: Query direta sem joins complexos
+    try {
+      const { data: membership, error: memError } = await supabase
+        .from('user_memberships')
+        .select('tenant_id')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!memError && membership?.tenant_id) {
+        const { data: tenant, error: tenantError } = await supabase
+          .from('tenants')
+          .select('id, name, status, email, phone, document, address, city, state, zip_code')
+          .eq('id', membership.tenant_id)
+          .maybeSingle();
+
+        if (!tenantError && tenant) {
+          console.log('✅ [SIMPLE] Tenant encontrado via query direta:', tenant.name);
           return {
             id: tenant.id,
             name: tenant.name || 'Meu Negócio',
@@ -82,71 +131,12 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (error) {
-      console.error('⚠️ Erro ao buscar tenant via API:', error);
+      console.error('⚠️ [SIMPLE] Erro na query direta:', error);
     }
 
-    // ✅ FALLBACK: Tentar query direta (caso API não funcione)
-    try {
-      const membershipPromise = supabase
-        .from('user_memberships')
-        .select('tenant_id')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
-
-      // Timeout de 5 segundos para a query de membership
-      const membershipResult = await Promise.race([
-        membershipPromise,
-        new Promise<{ data: any, error: any }>((resolve) => 
-          setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), 5000)
-        )
-      ]);
-
-      if (membershipResult.data?.tenant_id) {
-        const tenantId = membershipResult.data.tenant_id;
-        console.log('✅ Membership encontrado, tenant_id:', tenantId);
-        
-        // Buscar dados do tenant
-        const tenantPromise = supabase
-          .from('tenants')
-          .select('id, name, status, email, phone, document, address, city, state, zip_code')
-          .eq('id', tenantId)
-          .maybeSingle();
-
-        // Timeout de 5 segundos para a query de tenant
-        const tenantResult = await Promise.race([
-          tenantPromise,
-          new Promise<{ data: any, error: any }>((resolve) => 
-            setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), 5000)
-          )
-        ]);
-
-        if (tenantResult.data?.id) {
-          console.log('✅ Tenant encontrado:', tenantResult.data.name);
-          return {
-            id: tenantResult.data.id,
-            name: tenantResult.data.name || 'Meu Negócio',
-            status: tenantResult.data.status || 'trial',
-            email: tenantResult.data.email,
-            phone: tenantResult.data.phone,
-            document: tenantResult.data.document,
-            address: tenantResult.data.address,
-            city: tenantResult.data.city,
-            state: tenantResult.data.state,
-            zip_code: tenantResult.data.zip_code,
-          };
-        }
-      }
-    } catch (error) {
-      console.error('⚠️ Erro ao buscar tenant via query direta:', error);
-    }
-
-    // ✅ FALLBACK FINAL: Usar user_id como tenant_id (não ideal, mas funciona)
-    console.warn('⚠️ Usando user_id como tenant_id (fallback final):', userId);
-    const fallbackTenant = createDefaultTenant(userId);
-    console.log('✅ Tenant fallback criado:', fallbackTenant);
-    return fallbackTenant;
+    // ✅ ÚLTIMO RECURSO: Retornar null e deixar o sistema criar um tenant padrão depois
+    console.warn('⚠️ [SIMPLE] Não foi possível encontrar tenant, retornando null');
+    return null as any; // Retornar null para indicar que não encontrou
   }, [supabase]);
 
   // Carregar sessão inicial - VERSÃO OTIMIZADA
@@ -310,16 +300,16 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
           setUser(session.user);
           setLoading(true);
           
-          console.log('👤 Usuário logado, carregando tenant...');
+          console.log('👤 [SIMPLE] Usuário logado, carregando tenant...');
           
-          // ✅ Carregar tenant (já tem timeout interno de 3s por query)
+          // ✅ VERSÃO SIMPLIFICADA: Carregar tenant de forma direta
           loadRealTenant(session.user.id)
             .then((tenantData) => {
-              console.log('🏢 Tenant carregado após login:', tenantData);
-              setTenant(tenantData);
-              
-              // Carregar subscription em background (não bloqueia)
-              if (tenantData?.id) {
+              if (tenantData && tenantData.id) {
+                console.log('✅ [SIMPLE] Tenant carregado:', tenantData.name, 'ID:', tenantData.id);
+                setTenant(tenantData);
+                
+                // Carregar subscription em background (não bloqueia redirecionamento)
                 fetch(`/next_api/subscriptions?tenant_id=${tenantData.id}`)
                   .then((response) => response.ok ? response.json() : null)
                   .then((result) => {
@@ -327,7 +317,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
                       const subData = result.data;
                       const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
                       
-                      const subscriptionData: SubscriptionData = {
+                      setSubscription({
                         id: subData.id,
                         status: subData.status || 'trial',
                         trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
@@ -346,22 +336,21 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
                             max_sales_per_month: 1000,
                           },
                         },
-                      };
-                      
-                      console.log('✅ Subscription carregada após login:', subscriptionData);
-                      setSubscription(subscriptionData);
+                      });
                     }
                   })
                   .catch((err) => {
-                    console.error('⚠️ Erro ao carregar subscription:', err);
+                    console.warn('⚠️ [SIMPLE] Subscription não carregada (não crítico):', err);
                   });
+              } else {
+                console.warn('⚠️ [SIMPLE] Tenant não encontrado, mas continuando login');
+                // Não definir tenant - deixar null para que o sistema funcione mesmo assim
+                setTenant(null);
               }
             })
             .catch((error) => {
-              console.error('❌ Erro ao carregar tenant após login:', error);
-              // Usar fallback mesmo com erro
-              const fallbackTenant = createDefaultTenant(session.user.id);
-              setTenant(fallbackTenant);
+              console.error('❌ [SIMPLE] Erro ao carregar tenant:', error);
+              setTenant(null);
             })
             .finally(() => {
               setLoading(false);
