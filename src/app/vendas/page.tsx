@@ -171,8 +171,15 @@ export default function VendasPage() {
           desconto: Number(s.discount_amount ?? s.desconto ?? 0),
           total: Number(s.total_amount ?? s.final_amount ?? s.total ?? 0),
           forma_pagamento: (s.payment_method ?? 'dinheiro') as Sale['forma_pagamento'],
-          status: (s.status === null || s.status === 'completed' || s.status === 'paga') ? 'paga' : 
-                 (s.status === 'canceled' || s.status === 'cancelada') ? 'cancelada' : 'pendente' as Sale['status'],
+          status: (() => {
+            if (s.status === null || s.status === 'completed' || s.status === 'paga') {
+              return 'paga' as Sale['status'];
+            }
+            if (s.status === 'canceled' || s.status === 'cancelada') {
+              return 'cancelada' as Sale['status'];
+            }
+            return 'pendente' as Sale['status'];
+          })(),
           data_venda: s.created_at ?? s.sold_at ?? s.data_venda ?? new Date().toISOString(),
           observacoes: s.notes ?? s.observacoes ?? '',
         };
