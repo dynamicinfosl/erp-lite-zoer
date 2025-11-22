@@ -55,129 +55,71 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Função para buscar tenant real da conta logada
-  const loadRealTenant = useCallback(async (userId: string) => {
+  const loadRealTenant = useCallback(async (userId: string): Promise<Tenant> => {
+    console.log('🔍 Buscando tenant real para usuário:', userId);
+    
+    // ✅ QUERY SIMPLIFICADA E RÁPIDA: Buscar apenas tenant_id primeiro
     try {
-      console.log('🔍 Buscando tenant real para usuário:', userId);
-      
-      // ✅ NOVA SOLUÇÃO: Buscar tenant através de user_memberships
-      // Priorizar tenant que tem subscription ativa
-      try {
-        const { data: memberships, error: membershipError } = await supabase
-          .from('user_memberships')
-          .select(`
-            tenant_id,
-            tenants (
-              id,
-              name,
-              status,
-              email,
-              phone,
-              document,
-              address,
-              city,
-              state,
-              zip_code,
-              subscriptions (
-                id,
-                status,
-                current_period_end
-              )
-            )
-          `)
-          .eq('user_id', userId)
-          .eq('is_active', true);
+      const membershipPromise = supabase
+        .from('user_memberships')
+        .select('tenant_id')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
 
-        if (membershipError) {
-          console.log('⚠️ Erro ao buscar membership:', membershipError);
-        }
+      // Timeout de 3 segundos para a query de membership
+      const membershipResult = await Promise.race([
+        membershipPromise,
+        new Promise<{ data: any, error: any }>((resolve) => 
+          setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), 3000)
+        )
+      ]);
 
-        if (memberships && memberships.length > 0) {
-          // Priorizar tenant que tem subscription ativa
-          let selectedMembership = memberships.find(m => {
-            const tenant = Array.isArray(m.tenants) ? m.tenants[0] : m.tenants;
-            if (!tenant) return false;
-            const subscriptions = tenant.subscriptions;
-            if (Array.isArray(subscriptions) && subscriptions.length > 0) {
-              const sub = subscriptions[0];
-              return sub.status === 'active' && 
-                     (sub.current_period_end ? new Date(sub.current_period_end) > new Date() : true);
-            }
-            return false;
-          });
-
-          // Se não encontrou com subscription ativa, pegar o primeiro
-          if (!selectedMembership) {
-            selectedMembership = memberships[0];
-          }
-
-          const tenant = Array.isArray(selectedMembership.tenants) 
-            ? selectedMembership.tenants[0] 
-            : selectedMembership.tenants;
-
-          if (tenant) {
-            console.log('✅ Tenant encontrado via membership:', tenant.name, 'ID:', tenant.id);
-            return {
-              id: tenant.id,
-              name: tenant.name || 'Meu Negócio',
-              status: tenant.status || 'trial',
-              email: tenant.email,
-              phone: tenant.phone,
-              document: tenant.document,
-              address: tenant.address,
-              city: tenant.city,
-              state: tenant.state,
-              zip_code: tenant.zip_code,
-            };
-          }
-        }
-      } catch (error) {
-        console.log('⚠️ Erro ao verificar membership:', error);
-      }
-
-      // ✅ FALLBACK: Tentar buscar tenant diretamente na tabela tenants
-      try {
-        const { data: tenant, error } = await supabase
+      if (membershipResult.data?.tenant_id) {
+        const tenantId = membershipResult.data.tenant_id;
+        console.log('✅ Membership encontrado, tenant_id:', tenantId);
+        
+        // Buscar dados do tenant (query simples, sem joins complexos)
+        const tenantPromise = supabase
           .from('tenants')
-          .select('*')
-          .eq('id', userId)
+          .select('id, name, status, email, phone, document, address, city, state, zip_code')
+          .eq('id', tenantId)
           .maybeSingle();
 
-        if (error) {
-          console.log('⚠️ Erro ao buscar tenant direto:', error);
-        }
+        // Timeout de 3 segundos para a query de tenant
+        const tenantResult = await Promise.race([
+          tenantPromise,
+          new Promise<{ data: any, error: any }>((resolve) => 
+            setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), 3000)
+          )
+        ]);
 
-        if (tenant?.id) {
-          console.log('✅ Tenant encontrado na tabela tenants:', tenant.name);
+        if (tenantResult.data?.id) {
+          console.log('✅ Tenant encontrado:', tenantResult.data.name);
           return {
-            id: tenant.id,
-            name: tenant.name || 'Meu Negócio',
-            status: tenant.status || 'trial',
-            email: tenant.email,
-            phone: tenant.phone,
-            document: tenant.document,
-            address: tenant.address,
-            city: tenant.city,
-            state: tenant.state,
-            zip_code: tenant.zip_code,
+            id: tenantResult.data.id,
+            name: tenantResult.data.name || 'Meu Negócio',
+            status: tenantResult.data.status || 'trial',
+            email: tenantResult.data.email,
+            phone: tenantResult.data.phone,
+            document: tenantResult.data.document,
+            address: tenantResult.data.address,
+            city: tenantResult.data.city,
+            state: tenantResult.data.state,
+            zip_code: tenantResult.data.zip_code,
           };
         }
-      } catch (error) {
-        console.log('⚠️ Erro ao verificar tenant na tabela tenants:', error);
       }
-
-      // ✅ FALLBACK GARANTIDO: Sempre retornar um tenant válido
-      console.log('👤 Usando user_id como tenant_id (fallback garantido):', userId);
-      const fallbackTenant = createDefaultTenant(userId);
-      console.log('✅ Tenant fallback criado:', fallbackTenant);
-      return fallbackTenant;
-
     } catch (error) {
-      console.error('❌ Erro ao buscar tenant real:', error);
-      // ✅ FALLBACK FINAL: Sempre retornar um tenant válido
-      const fallbackTenant = createDefaultTenant(userId);
-      console.log('✅ Tenant fallback final criado:', fallbackTenant);
-      return fallbackTenant;
+      console.error('⚠️ Erro ao buscar tenant:', error);
     }
+
+    // ✅ FALLBACK RÁPIDO: Usar user_id como tenant_id
+    console.log('👤 Usando user_id como tenant_id (fallback):', userId);
+    const fallbackTenant = createDefaultTenant(userId);
+    console.log('✅ Tenant fallback criado:', fallbackTenant);
+    return fallbackTenant;
   }, [supabase]);
 
   // Carregar sessão inicial - VERSÃO OTIMIZADA
@@ -339,75 +281,64 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         if (event === 'SIGNED_IN' && session?.user) {
           setSession(session);
           setUser(session.user);
-          setLoading(true); // Mostrar loading enquanto carrega tenant
+          setLoading(true);
           
-          // ✅ CORREÇÃO: Carregar tenant após login com timeout
           console.log('👤 Usuário logado, carregando tenant...');
           
-          try {
-            // Timeout de 10 segundos para carregar tenant
-            const tenantPromise = loadRealTenant(session.user.id);
-            const timeoutPromise = new Promise<Tenant | null>((resolve) => 
-              setTimeout(() => {
-                console.warn('⏰ Timeout ao carregar tenant (10s)');
-                resolve(null);
-              }, 10000)
-            );
-            
-            const tenantData = await Promise.race([tenantPromise, timeoutPromise]);
-            console.log('🏢 Tenant carregado após login:', tenantData);
-            setTenant(tenantData);
-            
-            // Carregar subscription após carregar tenant (em background, não bloqueia)
-            if (tenantData?.id) {
-              fetch(`/next_api/subscriptions?tenant_id=${tenantData.id}`)
-                .then((response) => {
-                  if (response.ok) {
-                    return response.json();
-                  }
-                  return null;
-                })
-                .then((result) => {
-                  if (result?.success && result.data) {
-                    const subData = result.data;
-                    const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
-                    
-                    const subscriptionData: SubscriptionData = {
-                      id: subData.id,
-                      status: subData.status || 'trial',
-                      trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
-                      current_period_end: subData.current_period_end || undefined,
-                      plan: {
-                        id: plan?.id || 'trial',
-                        name: plan?.name || 'Trial',
-                        slug: plan?.slug || 'trial',
-                        price_monthly: plan?.price_monthly || 0,
-                        price_yearly: plan?.price_yearly || 0,
-                        features: plan?.features || {},
-                        limits: plan?.limits || {
-                          max_users: 1,
-                          max_customers: 100,
-                          max_products: 100,
-                          max_sales_per_month: 1000,
+          // ✅ Carregar tenant (já tem timeout interno de 3s por query)
+          loadRealTenant(session.user.id)
+            .then((tenantData) => {
+              console.log('🏢 Tenant carregado após login:', tenantData);
+              setTenant(tenantData);
+              
+              // Carregar subscription em background (não bloqueia)
+              if (tenantData?.id) {
+                fetch(`/next_api/subscriptions?tenant_id=${tenantData.id}`)
+                  .then((response) => response.ok ? response.json() : null)
+                  .then((result) => {
+                    if (result?.success && result.data) {
+                      const subData = result.data;
+                      const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
+                      
+                      const subscriptionData: SubscriptionData = {
+                        id: subData.id,
+                        status: subData.status || 'trial',
+                        trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
+                        current_period_end: subData.current_period_end || undefined,
+                        plan: {
+                          id: plan?.id || 'trial',
+                          name: plan?.name || 'Trial',
+                          slug: plan?.slug || 'trial',
+                          price_monthly: plan?.price_monthly || 0,
+                          price_yearly: plan?.price_yearly || 0,
+                          features: plan?.features || {},
+                          limits: plan?.limits || {
+                            max_users: 1,
+                            max_customers: 100,
+                            max_products: 100,
+                            max_sales_per_month: 1000,
+                          },
                         },
-                      },
-                    };
-                    
-                    console.log('✅ Subscription carregada após login:', subscriptionData);
-                    setSubscription(subscriptionData);
-                  }
-                })
-                .catch((err) => {
-                  console.error('⚠️ Erro ao carregar subscription:', err);
-                });
-            }
-          } catch (error) {
-            console.error('❌ Erro ao carregar tenant após login:', error);
-            // Mesmo com erro, liberar loading para não travar
-            setTenant(null);
-          } finally {
-            setLoading(false);
-          }
+                      };
+                      
+                      console.log('✅ Subscription carregada após login:', subscriptionData);
+                      setSubscription(subscriptionData);
+                    }
+                  })
+                  .catch((err) => {
+                    console.error('⚠️ Erro ao carregar subscription:', err);
+                  });
+              }
+            })
+            .catch((error) => {
+              console.error('❌ Erro ao carregar tenant após login:', error);
+              // Usar fallback mesmo com erro
+              const fallbackTenant = createDefaultTenant(session.user.id);
+              setTenant(fallbackTenant);
+            })
+            .finally(() => {
+              setLoading(false);
+            });
         } else if (event === 'SIGNED_OUT') {
           setSession(null);
           setUser(null);
