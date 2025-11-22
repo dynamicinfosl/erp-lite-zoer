@@ -716,9 +716,8 @@ export default function VendasPage() {
 
   // Renderizar componente
   return (
-    <>
-      <TenantPageWrapper>
-        <div className="space-y-6">
+    <TenantPageWrapper>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div className="space-y-1">
@@ -1073,6 +1072,7 @@ export default function VendasPage() {
                 ))}
               </TableBody>
               </Table>
+              </div>
             </div>
           )}
 
@@ -1346,8 +1346,7 @@ export default function VendasPage() {
         </DialogContent>
       </Dialog>
 
-        </div>
-      </TenantPageWrapper>
-    </>
+      </div>
+    </TenantPageWrapper>
   );
 }
