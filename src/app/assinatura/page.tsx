@@ -156,8 +156,43 @@ export default function AssinaturaPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Determinar plano atual baseado nos dados reais
-  const currentPlan: PlanId = subscription?.status === 'trial' ? 'trial' : 
-    subscription?.plan?.slug as PlanId || 'trial';
+  const getCurrentPlan = (): PlanId => {
+    if (!subscription) return 'trial';
+    
+    // Se status é trial, retornar trial
+    if (subscription.status === 'trial') return 'trial';
+    
+    // Se status é active, usar o slug do plano
+    if (subscription.status === 'active' && subscription.plan?.slug) {
+      const slug = subscription.plan.slug;
+      // Mapear slugs para PlanId
+      const slugMap: Record<string, PlanId> = {
+        'free': 'trial',
+        'trial': 'trial',
+        'basic': 'basic',
+        'pro': 'pro',
+        'professional': 'pro', // Mapear professional para pro
+        'enterprise': 'enterprise'
+      };
+      
+      return slugMap[slug] || 'trial';
+    }
+    
+    return 'trial';
+  };
+  
+  const currentPlan: PlanId = getCurrentPlan();
+  
+  // Log para debug
+  useEffect(() => {
+    console.log('📋 Página de Assinatura - Estado atual:', {
+      subscription_status: subscription?.status,
+      subscription_plan_slug: subscription?.plan?.slug,
+      subscription_plan_name: subscription?.plan?.name,
+      currentPlan,
+      subscription
+    });
+  }, [subscription, currentPlan]);
   
   const currentInfo = subscriptionInfo[currentPlan];
   const CurrentIcon = currentInfo.icon;
@@ -295,10 +330,10 @@ export default function AssinaturaPage() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-        <JugaKPICard
+          <JugaKPICard
           title="Plano Atual"
-          value={currentInfo.name}
-          description={currentPlan === 'trial' ? 'Período de teste' : currentInfo.price || ''}
+          value={subscription?.plan?.name || currentInfo.name}
+          description={currentPlan === 'trial' ? 'Período de teste' : subscription?.plan?.name || currentInfo.price || ''}
           color="primary"
           icon={<CurrentIcon className="h-5 w-5" />}
           trend="neutral"
