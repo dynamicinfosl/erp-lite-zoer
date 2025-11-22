@@ -393,11 +393,16 @@ export default function AssinaturaPage() {
           description={
             currentPlan === 'trial' 
               ? `Período de teste${daysLeftInTrial > 0 ? ` - ${daysLeftInTrial} ${daysLeftInTrial === 1 ? 'dia' : 'dias'} restantes` : ' - Expirado'}`
-              : subscription?.plan?.price_monthly && subscription.plan.price_monthly > 0
-                ? `${formatPrice(subscription.plan.price_monthly)}/mês`
-                : currentPlan !== 'trial' && subscription?.plan?.name
-                  ? subscription.plan.name
-                  : currentInfo.price || 'Plano ativo'
+              : (() => {
+                  // Para planos não-trial, mostrar preço ou nome
+                  if (subscription?.plan?.price_monthly && subscription.plan.price_monthly > 0) {
+                    return `${formatPrice(subscription.plan.price_monthly)}/mês`;
+                  }
+                  if (subscription?.plan?.name) {
+                    return subscription.plan.name;
+                  }
+                  return currentInfo.price || 'Plano ativo';
+                })()
           }
           color="primary"
           icon={<CurrentIcon className="h-5 w-5" />}
