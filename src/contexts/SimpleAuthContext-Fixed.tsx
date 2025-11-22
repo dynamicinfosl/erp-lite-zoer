@@ -508,13 +508,64 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
           console.log('✅ Subscription atualizada:', subscriptionData);
           setSubscription(subscriptionData);
         } else {
-          console.log('⚠️ Nenhuma subscription encontrada, usando padrão');
-          // Se não encontrou, criar subscription padrão
+          console.log('⚠️ Nenhuma subscription encontrada, verificando se precisa criar...');
+          // Tentar criar subscription automaticamente via API
+          try {
+            const createResponse = await fetch('/next_api/subscriptions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tenant_id: tenant.id,
+                plan_id: null, // Deixar API escolher o plano padrão
+                status: 'trial'
+              })
+            });
+            
+            if (createResponse.ok) {
+              const createResult = await createResponse.json();
+              if (createResult.success && createResult.data) {
+                const subData = createResult.data;
+                const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
+                
+                const subscriptionData: SubscriptionData = {
+                  id: subData.id,
+                  status: subData.status || 'trial',
+                  trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
+                  current_period_end: subData.current_period_end || undefined,
+                  plan: {
+                    id: plan?.id || 'trial',
+                    name: plan?.name || 'Trial',
+                    slug: plan?.slug || 'trial',
+                    price_monthly: plan?.price_monthly || 0,
+                    price_yearly: plan?.price_yearly || 0,
+                    features: plan?.features || {},
+                    limits: plan?.limits || {
+                      max_users: 1,
+                      max_customers: 100,
+                      max_products: 100,
+                      max_sales_per_month: 1000,
+                    },
+                  },
+                };
+                
+                console.log('✅ Subscription criada automaticamente:', subscriptionData);
+                setSubscription(subscriptionData);
+                return;
+              }
+            }
+          } catch (createError) {
+            console.error('⚠️ Erro ao criar subscription automaticamente:', createError);
+          }
+          
+          // Se não conseguiu criar, usar subscription padrão com trial de 7 dias
+          const trialEndDate = new Date();
+          trialEndDate.setDate(trialEndDate.getDate() + 7);
+          
           setSubscription({
             id: '00000000-0000-0000-0000-000000000000',
             plan: {
               id: 'trial',
-              name: 'Trial',
+              name: 'Trial Gratuito',
               slug: 'trial',
               price_monthly: 0,
               price_yearly: 0,
@@ -527,7 +578,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
               },
             },
             status: 'trial',
-            trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            trial_ends_at: trialEndDate.toISOString(),
           });
         }
       } else {

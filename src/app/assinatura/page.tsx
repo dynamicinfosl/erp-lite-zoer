@@ -490,12 +490,22 @@ export default function AssinaturaPage() {
                 {/* Card de Progresso */}
                 <JugaKPICard
                   title="Progresso do Teste"
-                  value={isTrialExpired ? '100%' : `${Math.round(((7 - daysLeftInTrial) / 7) * 100)}%`}
-                  description={isTrialExpired ? '7 de 7 dias utilizados' : 
-                             `${7 - daysLeftInTrial} de 7 dias utilizados`}
+                  value={(() => {
+                    if (isTrialExpired) return '100%';
+                    // Calcular dias totais do trial (7 dias padrão)
+                    const totalTrialDays = 7;
+                    const daysUsed = Math.max(0, totalTrialDays - daysLeftInTrial);
+                    const progress = Math.min(100, Math.max(0, Math.round((daysUsed / totalTrialDays) * 100)));
+                    return `${progress}%`;
+                  })()}
+                  description={(() => {
+                    if (isTrialExpired) return '7 de 7 dias utilizados';
+                    const totalTrialDays = 7;
+                    const daysUsed = Math.max(0, Math.min(totalTrialDays, totalTrialDays - daysLeftInTrial));
+                    return `${daysUsed} de ${totalTrialDays} dias utilizados`;
+                  })()}
                   trend="neutral"
-                  trendValue={isTrialExpired ? 'Completo' : 
-                             (7 - daysLeftInTrial) >= 7 ? 'Completo' : 'Em andamento'}
+                  trendValue={isTrialExpired ? 'Completo' : 'Em andamento'}
                   icon={<TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />}
                   color="primary"
                   className="min-h-[120px] sm:min-h-[140px]"
