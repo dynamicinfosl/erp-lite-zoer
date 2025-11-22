@@ -58,7 +58,34 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   const loadRealTenant = useCallback(async (userId: string): Promise<Tenant> => {
     console.log('🔍 Buscando tenant real para usuário:', userId);
     
-    // ✅ QUERY SIMPLIFICADA E RÁPIDA: Buscar apenas tenant_id primeiro
+    // ✅ USAR API ROUTE para garantir que encontre o tenant correto (usa service role)
+    try {
+      const response = await fetch(`/next_api/admin/get-tenant?user_id=${userId}`);
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          const tenant = result.data;
+          console.log('✅ Tenant encontrado via API:', tenant.name, 'ID:', tenant.id);
+          return {
+            id: tenant.id,
+            name: tenant.name || 'Meu Negócio',
+            status: tenant.status || 'trial',
+            email: tenant.email,
+            phone: tenant.phone,
+            document: tenant.document,
+            address: tenant.address,
+            city: tenant.city,
+            state: tenant.state,
+            zip_code: tenant.zip_code,
+          };
+        }
+      }
+    } catch (error) {
+      console.error('⚠️ Erro ao buscar tenant via API:', error);
+    }
+
+    // ✅ FALLBACK: Tentar query direta (caso API não funcione)
     try {
       const membershipPromise = supabase
         .from('user_memberships')
@@ -68,11 +95,11 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         .limit(1)
         .maybeSingle();
 
-      // Timeout de 3 segundos para a query de membership
+      // Timeout de 5 segundos para a query de membership
       const membershipResult = await Promise.race([
         membershipPromise,
         new Promise<{ data: any, error: any }>((resolve) => 
-          setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), 3000)
+          setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), 5000)
         )
       ]);
 
@@ -80,18 +107,18 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         const tenantId = membershipResult.data.tenant_id;
         console.log('✅ Membership encontrado, tenant_id:', tenantId);
         
-        // Buscar dados do tenant (query simples, sem joins complexos)
+        // Buscar dados do tenant
         const tenantPromise = supabase
           .from('tenants')
           .select('id, name, status, email, phone, document, address, city, state, zip_code')
           .eq('id', tenantId)
           .maybeSingle();
 
-        // Timeout de 3 segundos para a query de tenant
+        // Timeout de 5 segundos para a query de tenant
         const tenantResult = await Promise.race([
           tenantPromise,
           new Promise<{ data: any, error: any }>((resolve) => 
-            setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), 3000)
+            setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), 5000)
           )
         ]);
 
@@ -112,11 +139,11 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (error) {
-      console.error('⚠️ Erro ao buscar tenant:', error);
+      console.error('⚠️ Erro ao buscar tenant via query direta:', error);
     }
 
-    // ✅ FALLBACK RÁPIDO: Usar user_id como tenant_id
-    console.log('👤 Usando user_id como tenant_id (fallback):', userId);
+    // ✅ FALLBACK FINAL: Usar user_id como tenant_id (não ideal, mas funciona)
+    console.warn('⚠️ Usando user_id como tenant_id (fallback final):', userId);
     const fallbackTenant = createDefaultTenant(userId);
     console.log('✅ Tenant fallback criado:', fallbackTenant);
     return fallbackTenant;
