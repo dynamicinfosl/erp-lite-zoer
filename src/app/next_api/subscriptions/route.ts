@@ -237,9 +237,16 @@ export async function PUT(request: NextRequest) {
 // Criar subscription para um tenant
 export async function POST(request: NextRequest) {
   try {
+    // Verificação mais rigorosa do cliente Supabase
     if (!supabaseAdmin) {
+      console.error('❌ [POST] Cliente Supabase não configurado');
+      console.error('❌ [POST] NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? '✅ Configurado' : '❌ Não configurado');
+      console.error('❌ [POST] SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ Configurado' : '❌ Não configurado');
       return NextResponse.json(
-        { error: 'Cliente Supabase não configurado' },
+        { 
+          error: 'Cliente Supabase não configurado',
+          details: 'Verifique as variáveis de ambiente NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY'
+        },
         { status: 500 }
       );
     }
@@ -366,6 +373,34 @@ export async function POST(request: NextRequest) {
       current_period_end: currentPeriodEnd
     });
 
+    // Verificar se o tenant existe antes de criar subscription
+    const { data: tenantData, error: tenantError } = await supabaseAdmin
+      .from('tenants')
+      .select('id, name')
+      .eq('id', tenant_id)
+      .maybeSingle();
+    
+    if (tenantError) {
+      console.error('❌ [POST] Erro ao verificar tenant:', tenantError);
+      return NextResponse.json(
+        { 
+          error: 'Erro ao verificar tenant: ' + tenantError.message,
+          code: tenantError.code
+        },
+        { status: 400 }
+      );
+    }
+    
+    if (!tenantData) {
+      console.error('❌ [POST] Tenant não encontrado:', tenant_id);
+      return NextResponse.json(
+        { error: 'Tenant não encontrado. Verifique se o tenant_id está correto.' },
+        { status: 400 }
+      );
+    }
+    
+    console.log('✅ [POST] Tenant verificado:', tenantData.name);
+    
     // Primeiro inserir sem o join para evitar problemas
     const { data: insertedData, error: insertError } = await supabaseAdmin
       .from('subscriptions')
