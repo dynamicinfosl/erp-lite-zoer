@@ -38,21 +38,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log(`🔍 Buscando subscription para tenant: ${tenant_id}`);
+    console.log(`🔍 [SUBSCRIPTIONS API] Buscando subscription para tenant: ${tenant_id}`);
     
     try {
-      // Buscar subscription primeiro sem o join com plans
-      const { data: subscription, error: subError } = await supabaseAdmin
+      // ✅ Buscar TODAS as subscriptions do tenant (pode haver múltiplas)
+      const { data: subscriptions, error: subError } = await supabaseAdmin
         .from('subscriptions')
         .select('*')
         .eq('tenant_id', tenant_id)
-        .maybeSingle();
+        .order('created_at', { ascending: false });
 
       if (subError) {
-        console.error('❌ Erro ao buscar subscription:', subError);
+        console.error('❌ [SUBSCRIPTIONS API] Erro ao buscar subscription:', subError);
         // Sempre retornar sucesso com data null, mesmo em caso de erro
         if (subError.code === 'PGRST116' || subError.message?.includes('0 rows') || subError.message?.includes('not found')) {
-          console.log('⚠️ Nenhuma subscription encontrada para tenant:', tenant_id);
+          console.log('⚠️ [SUBSCRIPTIONS API] Nenhuma subscription encontrada para tenant:', tenant_id);
           return NextResponse.json({ 
             success: true, 
             data: null,
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
           });
         }
         // Para outros erros, também retornar null ao invés de erro
-        console.warn('⚠️ Erro ao buscar subscription, retornando null:', subError.message);
+        console.warn('⚠️ [SUBSCRIPTIONS API] Erro ao buscar subscription, retornando null:', subError.message);
         return NextResponse.json({ 
           success: true, 
           data: null,
@@ -68,15 +68,24 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // Se não encontrou subscription, retornar null ao invés de erro
-      if (!subscription) {
-        console.log('⚠️ Nenhuma subscription encontrada para tenant:', tenant_id);
+      // Se não encontrou subscription, retornar null
+      if (!subscriptions || subscriptions.length === 0) {
+        console.log('⚠️ [SUBSCRIPTIONS API] Nenhuma subscription encontrada para tenant:', tenant_id);
         return NextResponse.json({ 
           success: true, 
           data: null,
           message: 'Nenhuma subscription encontrada para este tenant'
         });
       }
+
+      // ✅ Priorizar subscription ativa, senão pegar a mais recente
+      let subscription = subscriptions.find(s => s.status === 'active') || subscriptions[0];
+      
+      console.log(`✅ [SUBSCRIPTIONS API] Encontradas ${subscriptions.length} subscription(s), usando:`, {
+        id: subscription.id,
+        status: subscription.status,
+        created_at: subscription.created_at
+      });
 
       // Buscar plan separadamente se plan_id existir
       let plan = null;
@@ -104,17 +113,20 @@ export async function GET(request: NextRequest) {
         plan: plan
       };
 
-      console.log('✅ Subscription encontrada:', {
+      console.log('✅ [SUBSCRIPTIONS API] Subscription encontrada e retornada:', {
         id: subscription.id,
         status: subscription.status,
         plan_id: subscription.plan_id,
         plan_name: plan?.name,
-        current_period_end: subscription.current_period_end
+        plan_slug: plan?.slug,
+        current_period_end: subscription.current_period_end,
+        trial_end: subscription.trial_end
       });
 
       return NextResponse.json({ success: true, data: responseData });
     } catch (queryError: any) {
-      console.error('❌ Erro na query de subscription:', queryError);
+      console.error('❌ [SUBSCRIPTIONS API] Erro na query de subscription:', queryError);
+      console.error('❌ [SUBSCRIPTIONS API] Stack:', queryError?.stack);
       // Em caso de erro inesperado, retornar null ao invés de erro 500
       return NextResponse.json({ 
         success: true, 
