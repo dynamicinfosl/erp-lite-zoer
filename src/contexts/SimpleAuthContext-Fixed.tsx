@@ -195,15 +195,26 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         console.log('🔍 Verificando sessão existente...');
         
         // ✅ PRIMEIRO: Verificação rápida de sessão (não bloqueia)
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise<{ data: { session: null }, error: null }>((resolve) => 
-          setTimeout(() => resolve({ data: { session: null }, error: null }), 2000)
-        );
+        // Usar timeout de 2 segundos para não travar
+        let session: any = null;
+        let sessionError: any = null;
         
-        const { data: { session }, error: sessionError } = await Promise.race([
-          sessionPromise,
-          timeoutPromise
-        ]) as { data: { session: any }, error: any };
+        try {
+          const sessionResult = await Promise.race([
+            supabase.auth.getSession(),
+            new Promise<{ data: { session: null }, error: null }>((resolve) => 
+              setTimeout(() => resolve({ data: { session: null }, error: null }), 2000)
+            )
+          ]);
+          
+          if (sessionResult && 'data' in sessionResult) {
+            session = sessionResult.data?.session;
+            sessionError = sessionResult.error;
+          }
+        } catch (err) {
+          console.error('⚠️ Erro ao buscar sessão:', err);
+          sessionError = err;
+        }
         
         if (sessionError) {
           console.error('❌ Erro ao buscar sessão:', sessionError);
