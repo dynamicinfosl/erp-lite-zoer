@@ -278,7 +278,60 @@ async function listSalesHandler(request: NextRequest) {
     }
 
     console.log(`✅ Vendas encontradas: ${data?.length || 0} para tenant: ${tenant_id}`);
-    // ✅ REMOVIDO FALLBACK: Não buscar dados de outros tenants por segurança
+    
+    // Buscar itens de venda para cada venda
+    if (data && data.length > 0) {
+      const saleIds = data.map((sale: any) => sale.id);
+      console.log(`🔍 Buscando itens para ${saleIds.length} vendas...`);
+      
+      const { data: items, error: itemsError } = await supabaseAdmin
+        .from('sale_items')
+        .select('*')
+        .in('sale_id', saleIds);
+      
+      if (itemsError) {
+        console.error('❌ Erro ao buscar itens de venda:', itemsError);
+        // Continuar mesmo com erro, apenas sem itens
+      } else {
+        console.log(`✅ Itens encontrados: ${items?.length || 0}`);
+        
+        // Agrupar itens por sale_id (garantir que seja número)
+        const itemsBySaleId: Record<number, any[]> = {};
+        (items || []).forEach((item: any) => {
+          const saleId = Number(item.sale_id);
+          if (!isNaN(saleId)) {
+            if (!itemsBySaleId[saleId]) {
+              itemsBySaleId[saleId] = [];
+            }
+            itemsBySaleId[saleId].push(item);
+          } else {
+            console.warn(`⚠️ sale_id inválido no item:`, item.sale_id, item);
+          }
+        });
+        
+        console.log(`📊 Itens agrupados por sale_id:`, Object.keys(itemsBySaleId).length, 'vendas com itens');
+        
+        // Adicionar itens a cada venda
+        data = data.map((sale: any) => {
+          const saleId = Number(sale.id);
+          const saleItems = itemsBySaleId[saleId] || [];
+          console.log(`📦 Venda ${sale.sale_number} (ID: ${saleId}): ${saleItems.length} itens`);
+          if (saleItems.length > 0) {
+            console.log(`   Primeiro item:`, saleItems[0]);
+          }
+          return {
+            ...sale,
+            items: saleItems
+          };
+        });
+      }
+    }
+    
+    // Debug: verificar se os itens foram adicionados
+    if (data && data.length > 0) {
+      const totalItems = data.reduce((sum: number, sale: any) => sum + (sale.items?.length || 0), 0);
+      console.log(`✅ Total de itens em todas as vendas: ${totalItems}`);
+    }
     
     // Retornar no formato esperado pelo frontend
     if (today === 'true') {
