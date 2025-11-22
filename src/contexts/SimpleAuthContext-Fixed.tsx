@@ -521,40 +521,50 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
               })
             });
             
-            if (createResponse.ok) {
-              const createResult = await createResponse.json();
-              if (createResult.success && createResult.data) {
-                const subData = createResult.data;
-                const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
-                
-                const subscriptionData: SubscriptionData = {
-                  id: subData.id,
-                  status: subData.status || 'trial',
-                  trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
-                  current_period_end: subData.current_period_end || undefined,
-                  plan: {
-                    id: plan?.id || 'trial',
-                    name: plan?.name || 'Trial',
-                    slug: plan?.slug || 'trial',
-                    price_monthly: plan?.price_monthly || 0,
-                    price_yearly: plan?.price_yearly || 0,
-                    features: plan?.features || {},
-                    limits: plan?.limits || {
-                      max_users: 1,
-                      max_customers: 100,
-                      max_products: 100,
-                      max_sales_per_month: 1000,
-                    },
+            const createResult = await createResponse.json();
+            
+            if (createResponse.ok && createResult.success && createResult.data) {
+              const subData = createResult.data;
+              const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
+              
+              const subscriptionData: SubscriptionData = {
+                id: subData.id,
+                status: subData.status || 'trial',
+                trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
+                current_period_end: subData.current_period_end || undefined,
+                plan: {
+                  id: plan?.id || 'trial',
+                  name: plan?.name || 'Trial',
+                  slug: plan?.slug || 'trial',
+                  price_monthly: plan?.price_monthly || 0,
+                  price_yearly: plan?.price_yearly || 0,
+                  features: plan?.features || {},
+                  limits: plan?.limits || {
+                    max_users: 1,
+                    max_customers: 100,
+                    max_products: 100,
+                    max_sales_per_month: 1000,
                   },
-                };
-                
-                console.log('✅ Subscription criada automaticamente:', subscriptionData);
-                setSubscription(subscriptionData);
-                return;
-              }
+                },
+              };
+              
+              console.log('✅ Subscription criada automaticamente:', subscriptionData);
+              setSubscription(subscriptionData);
+              return;
+            } else {
+              console.error('❌ Erro ao criar subscription:', {
+                status: createResponse.status,
+                statusText: createResponse.statusText,
+                result: createResult
+              });
+              // Não lançar erro, apenas logar - o sistema pode funcionar sem subscription
             }
-          } catch (createError) {
-            console.error('⚠️ Erro ao criar subscription automaticamente:', createError);
+          } catch (createError: any) {
+            console.error('❌ Erro ao tentar criar subscription:', {
+              message: createError?.message,
+              stack: createError?.stack
+            });
+            // Não lançar erro, apenas logar - o sistema pode funcionar sem subscription
           }
           
           // Se não conseguiu criar, usar subscription padrão com trial de 7 dias
