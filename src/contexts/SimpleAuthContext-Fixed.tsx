@@ -339,49 +339,75 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         if (event === 'SIGNED_IN' && session?.user) {
           setSession(session);
           setUser(session.user);
-          // ✅ CORREÇÃO: Carregar tenant após login
+          setLoading(true); // Mostrar loading enquanto carrega tenant
+          
+          // ✅ CORREÇÃO: Carregar tenant após login com timeout
           console.log('👤 Usuário logado, carregando tenant...');
-          const tenantData = await loadRealTenant(session.user.id);
-          console.log('🏢 Tenant carregado após login:', tenantData);
-          setTenant(tenantData);
           
-          // Carregar subscription após carregar tenant
-          if (tenantData?.id) {
-            const response = await fetch(`/next_api/subscriptions?tenant_id=${tenantData.id}`);
-            if (response.ok) {
-              const result = await response.json();
-              if (result.success && result.data) {
-                const subData = result.data;
-                const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
-                
-                const subscriptionData: SubscriptionData = {
-                  id: subData.id,
-                  status: subData.status || 'trial',
-                  trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
-                  current_period_end: subData.current_period_end || undefined,
-                  plan: {
-                    id: plan?.id || 'trial',
-                    name: plan?.name || 'Trial',
-                    slug: plan?.slug || 'trial',
-                    price_monthly: plan?.price_monthly || 0,
-                    price_yearly: plan?.price_yearly || 0,
-                    features: plan?.features || {},
-                    limits: plan?.limits || {
-                      max_users: 1,
-                      max_customers: 100,
-                      max_products: 100,
-                      max_sales_per_month: 1000,
-                    },
-                  },
-                };
-                
-                console.log('✅ Subscription carregada após login:', subscriptionData);
-                setSubscription(subscriptionData);
-              }
+          try {
+            // Timeout de 10 segundos para carregar tenant
+            const tenantPromise = loadRealTenant(session.user.id);
+            const timeoutPromise = new Promise<Tenant | null>((resolve) => 
+              setTimeout(() => {
+                console.warn('⏰ Timeout ao carregar tenant (10s)');
+                resolve(null);
+              }, 10000)
+            );
+            
+            const tenantData = await Promise.race([tenantPromise, timeoutPromise]);
+            console.log('🏢 Tenant carregado após login:', tenantData);
+            setTenant(tenantData);
+            
+            // Carregar subscription após carregar tenant (em background, não bloqueia)
+            if (tenantData?.id) {
+              fetch(`/next_api/subscriptions?tenant_id=${tenantData.id}`)
+                .then((response) => {
+                  if (response.ok) {
+                    return response.json();
+                  }
+                  return null;
+                })
+                .then((result) => {
+                  if (result?.success && result.data) {
+                    const subData = result.data;
+                    const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
+                    
+                    const subscriptionData: SubscriptionData = {
+                      id: subData.id,
+                      status: subData.status || 'trial',
+                      trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
+                      current_period_end: subData.current_period_end || undefined,
+                      plan: {
+                        id: plan?.id || 'trial',
+                        name: plan?.name || 'Trial',
+                        slug: plan?.slug || 'trial',
+                        price_monthly: plan?.price_monthly || 0,
+                        price_yearly: plan?.price_yearly || 0,
+                        features: plan?.features || {},
+                        limits: plan?.limits || {
+                          max_users: 1,
+                          max_customers: 100,
+                          max_products: 100,
+                          max_sales_per_month: 1000,
+                        },
+                      },
+                    };
+                    
+                    console.log('✅ Subscription carregada após login:', subscriptionData);
+                    setSubscription(subscriptionData);
+                  }
+                })
+                .catch((err) => {
+                  console.error('⚠️ Erro ao carregar subscription:', err);
+                });
             }
+          } catch (error) {
+            console.error('❌ Erro ao carregar tenant após login:', error);
+            // Mesmo com erro, liberar loading para não travar
+            setTenant(null);
+          } finally {
+            setLoading(false);
           }
-          
-          setLoading(false);
         } else if (event === 'SIGNED_OUT') {
           setSession(null);
           setUser(null);
