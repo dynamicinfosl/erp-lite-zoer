@@ -156,26 +156,26 @@ export default function VendasPage() {
         console.log(`📦 Venda ${i + 1} (${s.sale_number}): ${items.length} itens`, items);
         
         return {
-        id: String(s.id ?? i + 1),
-        numero: s.sale_number ?? s.numero ?? `VND-${String(i + 1).padStart(6, '0')}`,
-        cliente: s.customer?.name ?? s.customer_name ?? s.cliente ?? 'Cliente Avulso',
-        vendedor: s.seller_name ?? s.vendedor ?? '',
-        // Se os itens vierem junto com a venda, usar; caso contrário, deixar vazio
-        itens: items.map((it: any) => ({
-          produto: it.product?.name ?? it.product_name ?? it.produto ?? 'Produto',
-          quantidade: Number(it.quantity ?? it.quantidade ?? 1),
-          preco_unitario: Number(it.unit_price ?? it.price ?? it.preco_unitario ?? 0),
-          subtotal: Number(it.total_price ?? it.subtotal ?? (Number(it.quantity ?? 1) * Number(it.unit_price ?? it.price ?? 0))),
-        })),
-        subtotal: Number(s.subtotal ?? s.total_amount ?? s.total ?? 0),
-        desconto: Number(s.discount_amount ?? s.desconto ?? 0),
-        total: Number(s.total_amount ?? s.final_amount ?? s.total ?? 0),
-        forma_pagamento: (s.payment_method ?? 'dinheiro') as Sale['forma_pagamento'],
-        status: (s.status === null || s.status === 'completed' || s.status === 'paga') ? 'paga' : 
-               (s.status === 'canceled' || s.status === 'cancelada') ? 'cancelada' : 'pendente' as Sale['status'],
-        data_venda: s.created_at ?? s.sold_at ?? s.data_venda ?? new Date().toISOString(),
-        observacoes: s.notes ?? s.observacoes ?? '',
-      };
+          id: String(s.id ?? i + 1),
+          numero: s.sale_number ?? s.numero ?? `VND-${String(i + 1).padStart(6, '0')}`,
+          cliente: s.customer?.name ?? s.customer_name ?? s.cliente ?? 'Cliente Avulso',
+          vendedor: s.seller_name ?? s.vendedor ?? '',
+          // Se os itens vierem junto com a venda, usar; caso contrário, deixar vazio
+          itens: items.map((it: any) => ({
+            produto: it.product?.name ?? it.product_name ?? it.produto ?? 'Produto',
+            quantidade: Number(it.quantity ?? it.quantidade ?? 1),
+            preco_unitario: Number(it.unit_price ?? it.price ?? it.preco_unitario ?? 0),
+            subtotal: Number(it.total_price ?? it.subtotal ?? (Number(it.quantity ?? 1) * Number(it.unit_price ?? it.price ?? 0))),
+          })),
+          subtotal: Number(s.subtotal ?? s.total_amount ?? s.total ?? 0),
+          desconto: Number(s.discount_amount ?? s.desconto ?? 0),
+          total: Number(s.total_amount ?? s.final_amount ?? s.total ?? 0),
+          forma_pagamento: (s.payment_method ?? 'dinheiro') as Sale['forma_pagamento'],
+          status: (s.status === null || s.status === 'completed' || s.status === 'paga') ? 'paga' : 
+                 (s.status === 'canceled' || s.status === 'cancelada') ? 'cancelada' : 'pendente' as Sale['status'],
+          data_venda: s.created_at ?? s.sold_at ?? s.data_venda ?? new Date().toISOString(),
+          observacoes: s.notes ?? s.observacoes ?? '',
+        };
       });
       
       console.log(`✅ ${mapped.length} vendas carregadas com sucesso`);
