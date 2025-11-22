@@ -122,19 +122,27 @@ export function UserManagement() {
 
   const loadPlans = async () => {
     try {
+      console.log('🔄 Carregando planos disponíveis...');
       const response = await fetch('/next_api/plans');
       if (response.ok) {
         const result = await response.json();
+        console.log('📦 Resposta da API de planos:', result);
         if (result.success && result.data) {
-          setAvailablePlans(result.data.map((plan: any) => ({
+          const plans = result.data.map((plan: any) => ({
             id: plan.id,
             name: plan.name,
             slug: plan.slug
-          })));
+          }));
+          console.log('✅ Planos carregados:', plans);
+          setAvailablePlans(plans);
+        } else {
+          console.warn('⚠️ Nenhum plano encontrado na resposta');
         }
+      } else {
+        console.error('❌ Erro ao buscar planos:', response.status, response.statusText);
       }
     } catch (error) {
-      console.error('Erro ao carregar planos:', error);
+      console.error('❌ Erro ao carregar planos:', error);
     }
   };
 
@@ -333,12 +341,21 @@ export function UserManagement() {
 
       toast.success(result.message || 'Plano ativado com sucesso!');
       await loadUsers(); // Recarregar lista
+      
+      // Log detalhado para debug
+      console.log('✅ Plano ativado com sucesso:', {
+        tenant_id: user.tenant_id,
+        plan_id: selectedPlanId,
+        expiration_date: expirationDate,
+        response: result
+      });
+      
       // Resetar campos
       setSelectedPlanId('');
       setExpirationDate('');
       
       // Notificar o cliente para recarregar a página (se estiver logado)
-      toast.info('O cliente precisa recarregar a página para ver as mudanças', {
+      toast.info('Plano ativado! O cliente precisa recarregar a página para ver as mudanças', {
         duration: 5000,
       });
     } catch (error: any) {
@@ -349,12 +366,18 @@ export function UserManagement() {
     }
   };
 
-  // Quando abrir o modal, definir data padrão (30 dias a partir de hoje)
+  // Quando abrir o modal, definir data padrão (30 dias a partir de hoje) e carregar planos
   useEffect(() => {
     if (dialogOpen && selectedUser) {
       const defaultDate = new Date();
       defaultDate.setDate(defaultDate.getDate() + 30);
       setExpirationDate(defaultDate.toISOString().split('T')[0]);
+      
+      // Garantir que os planos estão carregados
+      if (availablePlans.length === 0) {
+        console.log('🔄 Carregando planos ao abrir modal...');
+        loadPlans();
+      }
     }
   }, [dialogOpen, selectedUser]);
 
@@ -796,7 +819,7 @@ export function UserManagement() {
                     <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white">
                       <SelectValue placeholder="Escolha um plano" className="text-white" />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectContent className="bg-gray-800 border-gray-700 z-[100]">
                       {availablePlans.length > 0 ? (
                         availablePlans.map((plan) => (
                           <SelectItem key={plan.id} value={plan.id} className="text-white focus:bg-blue-600">
@@ -804,7 +827,7 @@ export function UserManagement() {
                           </SelectItem>
                         ))
                       ) : (
-                        <SelectItem value="" disabled className="text-gray-400">Carregando planos...</SelectItem>
+                        <div className="px-2 py-1.5 text-sm text-gray-400">Carregando planos...</div>
                       )}
                     </SelectContent>
                   </Select>

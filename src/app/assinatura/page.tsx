@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { JugaKPICard, JugaProgressCard } from '@/components/dashboard/JugaComponents';
 import { usePlanLimits } from '@/hooks/usePlanLimits';
 import { useSubscriptions } from '@/hooks/useSubscriptions';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { PaymentModal } from '@/components/payment/PaymentModal';
 import { formatPrice, calculateYearlyDiscount } from '@/lib/plan-utils';
 import { 
@@ -24,7 +25,8 @@ import {
   TrendingUp,
   Clock,
   User,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 
 type PlanId = 'trial' | 'basic' | 'pro' | 'enterprise';
@@ -135,6 +137,18 @@ export default function AssinaturaPage() {
     getUsagePercentage,
     refreshData
   } = usePlanLimits();
+  
+  const { refreshSubscription } = useSimpleAuth();
+  
+  // Forçar refresh da subscription ao carregar a página
+  useEffect(() => {
+    const refresh = async () => {
+      console.log('🔄 Forçando refresh da subscription na página de assinatura...');
+      await refreshSubscription();
+      await refreshData();
+    };
+    refresh();
+  }, [refreshSubscription, refreshData]);
 
   // Estados para modal de pagamento
   const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
@@ -243,6 +257,19 @@ export default function AssinaturaPage() {
           <p className="text-sm sm:text-base text-body">Gerencie seu plano e faturamento</p>
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-fit">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              console.log('🔄 Refresh manual da subscription...');
+              await refreshSubscription();
+              await refreshData();
+            }}
+            className="text-xs"
+          >
+            <RefreshCw className="h-3 w-3 mr-1" />
+            Atualizar
+          </Button>
           <Badge variant="secondary" className="px-3 py-1">
             <CurrentIcon className="h-3 w-3" />
             {currentInfo.name}

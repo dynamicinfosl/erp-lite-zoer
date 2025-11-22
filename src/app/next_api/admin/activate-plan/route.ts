@@ -74,10 +74,20 @@ export async function POST(request: NextRequest) {
       }
 
       // Atualizar status do tenant também
-      await supabaseAdmin
+      const { error: tenantUpdateError } = await supabaseAdmin
         .from('tenants')
-        .update({ status: 'active' })
+        .update({ 
+          status: 'active',
+          trial_ends_at: null // Limpar trial_ends_at quando ativar plano
+        })
         .eq('id', tenant_id)
+      
+      if (tenantUpdateError) {
+        console.error('⚠️ Erro ao atualizar tenant:', tenantUpdateError);
+        // Não falhar a requisição, apenas logar o erro
+      } else {
+        console.log('✅ Tenant atualizado para status: active');
+      }
 
       const daysDiff = Math.ceil((periodEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
       
@@ -137,10 +147,20 @@ export async function POST(request: NextRequest) {
       }
 
       // Atualizar status do tenant
-      await supabaseAdmin
+      const { error: tenantUpdateError } = await supabaseAdmin
         .from('tenants')
-        .update({ status: 'active' })
+        .update({ 
+          status: 'active',
+          trial_ends_at: null // Limpar trial_ends_at quando ativar plano
+        })
         .eq('id', tenant_id)
+      
+      if (tenantUpdateError) {
+        console.error('⚠️ Erro ao atualizar tenant:', tenantUpdateError);
+        // Não falhar a requisição, apenas logar o erro
+      } else {
+        console.log('✅ Tenant atualizado para status: active');
+      }
 
       const daysDiff = Math.ceil((periodEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
       
