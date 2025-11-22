@@ -140,15 +140,29 @@ export default function AssinaturaPage() {
   
   const { refreshSubscription } = useSimpleAuth();
   
+  const { tenant } = useSimpleAuth();
+  
   // Forçar refresh da subscription ao carregar a página
   useEffect(() => {
     const refresh = async () => {
+      if (!tenant?.id) {
+        console.log('⚠️ Sem tenant, aguardando...');
+        return;
+      }
+      
       console.log('🔄 Forçando refresh da subscription na página de assinatura...');
-      await refreshSubscription();
-      await refreshData();
+      try {
+        await refreshSubscription();
+        await refreshData();
+      } catch (error) {
+        console.error('❌ Erro ao atualizar subscription:', error);
+      }
     };
-    refresh();
-  }, [refreshSubscription, refreshData]);
+    
+    // Aguardar um pouco para garantir que o tenant esteja carregado
+    const timer = setTimeout(refresh, 500);
+    return () => clearTimeout(timer);
+  }, [tenant?.id, refreshSubscription, refreshData]);
 
   // Estados para modal de pagamento
   const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
@@ -157,7 +171,10 @@ export default function AssinaturaPage() {
 
   // Determinar plano atual baseado nos dados reais
   const getCurrentPlan = (): PlanId => {
-    if (!subscription) return 'trial';
+    if (!subscription) {
+      console.log('⚠️ Sem subscription, retornando trial');
+      return 'trial';
+    }
     
     console.log('🔍 getCurrentPlan - subscription:', {
       status: subscription.status,
@@ -169,15 +186,18 @@ export default function AssinaturaPage() {
     
     // Se status é active e tem plano, usar o slug do plano
     if (subscription.status === 'active' && subscription.plan?.slug) {
-      const slug = subscription.plan.slug.toLowerCase();
+      const slug = subscription.plan.slug.toLowerCase().trim();
       // Mapear slugs para PlanId
       const slugMap: Record<string, PlanId> = {
         'free': 'trial',
         'trial': 'trial',
         'basic': 'basic',
+        'basico': 'basic',
         'pro': 'pro',
         'professional': 'pro', // Mapear professional para pro
-        'enterprise': 'enterprise'
+        'profissional': 'pro',
+        'enterprise': 'enterprise',
+        'empresarial': 'enterprise'
       };
       
       const mappedPlan = slugMap[slug] || 'trial';
@@ -185,10 +205,29 @@ export default function AssinaturaPage() {
       return mappedPlan;
     }
     
+    // Se status é active mas não tem slug, tentar pelo nome do plano
+    if (subscription.status === 'active' && subscription.plan?.name) {
+      const planName = subscription.plan.name.toLowerCase();
+      if (planName.includes('básico') || planName.includes('basic')) return 'basic';
+      if (planName.includes('profissional') || planName.includes('professional') || planName.includes('pro')) return 'pro';
+      if (planName.includes('enterprise') || planName.includes('empresarial')) return 'enterprise';
+    }
+    
     // Se status é trial, retornar trial
     if (subscription.status === 'trial') {
       console.log('⚠️ Status é trial');
       return 'trial';
+    }
+    
+    // Verificar se tem current_period_end válido (plano ativo)
+    if (subscription.current_period_end) {
+      const periodEnd = new Date(subscription.current_period_end);
+      const now = new Date();
+      if (periodEnd > now) {
+        // Plano ativo mas sem slug claro, tentar inferir
+        console.log('⚠️ Plano ativo mas sem slug claro, retornando pro como padrão');
+        return 'pro'; // Assumir pro como padrão para planos ativos
+      }
     }
     
     console.log('⚠️ Retornando trial como padrão');
@@ -354,9 +393,11 @@ export default function AssinaturaPage() {
           description={
             currentPlan === 'trial' 
               ? `Período de teste${daysLeftInTrial > 0 ? ` - ${daysLeftInTrial} ${daysLeftInTrial === 1 ? 'dia' : 'dias'} restantes` : ' - Expirado'}`
-              : subscription?.plan?.price_monthly 
+              : subscription?.plan?.price_monthly && subscription.plan.price_monthly > 0
                 ? `${formatPrice(subscription.plan.price_monthly)}/mês`
-                : currentInfo.price || 'Plano ativo'
+                : currentPlan !== 'trial' && subscription?.plan?.name
+                  ? subscription.plan.name
+                  : currentInfo.price || 'Plano ativo'
           }
           color="primary"
           icon={<CurrentIcon className="h-5 w-5" />}
