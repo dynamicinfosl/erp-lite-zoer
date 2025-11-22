@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    console.log(`🔍 Buscando subscription para tenant: ${tenant_id}`);
     const { data, error } = await supabaseAdmin
       .from('subscriptions')
       .select(`
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
 
     if (error) {
-      console.error('Erro ao buscar subscription:', error);
+      console.error('❌ Erro ao buscar subscription:', error);
       return NextResponse.json(
         { error: 'Erro ao buscar subscription: ' + error.message },
         { status: 400 }
@@ -47,12 +48,21 @@ export async function GET(request: NextRequest) {
 
     // Se não encontrou subscription, retornar null ao invés de erro
     if (!data) {
+      console.log('⚠️ Nenhuma subscription encontrada para tenant:', tenant_id);
       return NextResponse.json({ 
         success: true, 
         data: null,
         message: 'Nenhuma subscription encontrada para este tenant'
       });
     }
+
+    console.log('✅ Subscription encontrada:', {
+      id: data.id,
+      status: data.status,
+      plan_id: data.plan_id,
+      plan_name: Array.isArray(data.plan) ? data.plan[0]?.name : data.plan?.name,
+      current_period_end: data.current_period_end
+    });
 
     return NextResponse.json({ success: true, data });
 
