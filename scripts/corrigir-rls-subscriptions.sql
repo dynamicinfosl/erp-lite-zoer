@@ -21,38 +21,39 @@ SELECT
 FROM pg_policies
 WHERE tablename = 'subscriptions';
 
--- 3. Desabilitar RLS temporariamente para service_role (se necessário)
--- NOTA: O service_role DEVE bypassar RLS automaticamente, mas vamos garantir
-
--- 4. Criar política permissiva para service_role (bypass completo)
+-- 3. Criar política permissiva para service_role (bypass completo)
 -- Primeiro, remover políticas conflitantes se existirem
 DO $$
 BEGIN
     -- Remover políticas antigas que possam estar bloqueando
     DROP POLICY IF EXISTS "service_role_bypass" ON subscriptions;
     DROP POLICY IF EXISTS "Allow service_role full access" ON subscriptions;
+    DROP POLICY IF EXISTS "service_role_full_access" ON subscriptions;
     
     RAISE NOTICE '✅ Políticas antigas removidas (se existiam)';
 END $$;
 
--- 5. Garantir que service_role pode fazer tudo
+-- 4. Garantir que service_role pode fazer tudo
 -- O service_role já deve ter permissões, mas vamos criar uma política explícita
 -- que permite tudo para service_role
 DO $$
 BEGIN
     -- Criar política que permite tudo para service_role
-    CREATE POLICY IF NOT EXISTS "service_role_full_access" ON subscriptions
+    -- NOTA: CREATE POLICY IF NOT EXISTS não é suportado, então removemos antes
+    CREATE POLICY "service_role_full_access" ON subscriptions
         FOR ALL
         TO service_role
         USING (true)
         WITH CHECK (true);
     
     RAISE NOTICE '✅ Política criada para service_role';
-EXCEPTION WHEN OTHERS THEN
+EXCEPTION WHEN duplicate_object THEN
+    RAISE NOTICE '⚠️ Política já existe, pulando criação';
+WHEN OTHERS THEN
     RAISE NOTICE '⚠️ Erro ao criar política: %', SQLERRM;
 END $$;
 
--- 6. Verificar se há constraints que podem estar bloqueando
+-- 5. Verificar se há constraints que podem estar bloqueando
 SELECT
     conname AS constraint_name,
     contype AS constraint_type,
@@ -60,7 +61,7 @@ SELECT
 FROM pg_constraint
 WHERE conrelid = 'subscriptions'::regclass;
 
--- 7. Verificar foreign keys
+-- 6. Verificar foreign keys
 SELECT
     tc.constraint_name,
     tc.table_name,
@@ -79,7 +80,7 @@ JOIN information_schema.referential_constraints AS rc
 WHERE tc.constraint_type = 'FOREIGN KEY'
     AND tc.table_name = 'subscriptions';
 
--- 8. Testar inserção direta com service_role (simulado)
+-- 7. Testar inserção direta com service_role (simulado)
 -- NOTA: Isso só funciona se executado como service_role
 DO $$
 DECLARE
@@ -150,10 +151,9 @@ BEGIN
     END IF;
 END $$;
 
--- 9. Resumo final
+-- 8. Resumo final
 SELECT 
     'Resumo' AS info,
     (SELECT COUNT(*) FROM subscriptions) AS total_subscriptions,
     (SELECT COUNT(*) FROM subscriptions WHERE tenant_id = '7a56008e-0a31-4084-8c70-de7a5cdd083b') AS subscriptions_para_tenant,
     (SELECT COUNT(*) FROM plans WHERE is_active = true) AS planos_ativos;
-
