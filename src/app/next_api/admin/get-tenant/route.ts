@@ -60,16 +60,94 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // ✅ Se não tem membership, criar tenant e membership automaticamente
     if (!membership?.tenant_id) {
-      console.log('⚠️ [API] Nenhum membership encontrado para usuário:', user_id);
-      return NextResponse.json(
-        { 
-          success: false, 
-          data: null,
-          error: 'Nenhum membership ativo encontrado para este usuário' 
-        },
-        { status: 200 }
-      );
+      console.log('⚠️ [API] Nenhum membership encontrado, criando tenant automaticamente...');
+      
+      // Buscar email do usuário
+      const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(user_id);
+      
+      if (authError || !authUser?.user?.email) {
+        console.error('❌ [API] Erro ao buscar dados do usuário:', authError);
+        return NextResponse.json(
+          { 
+            success: false, 
+            data: null,
+            error: 'Erro ao buscar dados do usuário' 
+          },
+          { status: 200 }
+        );
+      }
+
+      const userEmail = authUser.user.email;
+      const tenantName = userEmail.split('@')[0] || 'Minha Empresa';
+
+      // Criar tenant
+      const { data: newTenant, error: tenantCreateError } = await supabaseAdmin
+        .from('tenants')
+        .insert({
+          id: user_id, // Usar user_id como tenant_id
+          name: tenantName,
+          status: 'trial',
+          email: userEmail,
+        })
+        .select('id, name, status, email, phone, document, address, city, state, zip_code')
+        .single();
+
+      if (tenantCreateError) {
+        // Se já existe, buscar o existente
+        const { data: existingTenant } = await supabaseAdmin
+          .from('tenants')
+          .select('id, name, status, email, phone, document, address, city, state, zip_code')
+          .eq('id', user_id)
+          .maybeSingle();
+
+        if (existingTenant) {
+          // Criar membership se não existir
+          await supabaseAdmin
+            .from('user_memberships')
+            .insert({
+              user_id: user_id,
+              tenant_id: user_id,
+              role: 'owner',
+              is_active: true,
+            })
+            .select()
+            .maybeSingle();
+
+          console.log('✅ [API] Tenant existente encontrado e membership criado:', existingTenant.name);
+          return NextResponse.json({ 
+            success: true, 
+            data: existingTenant 
+          });
+        }
+
+        console.error('❌ [API] Erro ao criar tenant:', tenantCreateError);
+        return NextResponse.json(
+          { 
+            success: false, 
+            data: null,
+            error: 'Erro ao criar tenant: ' + tenantCreateError.message 
+          },
+          { status: 200 }
+        );
+      }
+
+      // Criar membership
+      await supabaseAdmin
+        .from('user_memberships')
+        .insert({
+          user_id: user_id,
+          tenant_id: newTenant.id,
+          role: 'owner',
+          is_active: true,
+        });
+
+      console.log('✅ [API] Tenant e membership criados automaticamente:', newTenant.name);
+      return NextResponse.json({ 
+        success: true, 
+        data: newTenant 
+      });
     }
 
     const tenantId = membership.tenant_id;

@@ -298,18 +298,18 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         if (event === 'SIGNED_IN' && session?.user) {
           setSession(session);
           setUser(session.user);
-          setLoading(true);
+          setLoading(false); // ✅ Liberar loading imediatamente para redirecionar rápido
           
-          console.log('👤 [SIMPLE] Usuário logado, carregando tenant...');
+          console.log('👤 [FAST] Usuário logado, carregando tenant em background...');
           
-          // ✅ VERSÃO SIMPLIFICADA: Carregar tenant de forma direta
+          // ✅ Carregar tenant em background (não bloqueia redirecionamento)
           loadRealTenant(session.user.id)
             .then((tenantData) => {
               if (tenantData && tenantData.id) {
-                console.log('✅ [SIMPLE] Tenant carregado:', tenantData.name, 'ID:', tenantData.id);
+                console.log('✅ [FAST] Tenant carregado:', tenantData.name, 'ID:', tenantData.id);
                 setTenant(tenantData);
                 
-                // Carregar subscription em background (não bloqueia redirecionamento)
+                // Carregar subscription em background
                 fetch(`/next_api/subscriptions?tenant_id=${tenantData.id}`)
                   .then((response) => response.ok ? response.json() : null)
                   .then((result) => {
@@ -340,20 +340,14 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
                     }
                   })
                   .catch((err) => {
-                    console.warn('⚠️ [SIMPLE] Subscription não carregada (não crítico):', err);
+                    console.warn('⚠️ [FAST] Subscription não carregada (não crítico):', err);
                   });
               } else {
-                console.warn('⚠️ [SIMPLE] Tenant não encontrado, mas continuando login');
-                // Não definir tenant - deixar null para que o sistema funcione mesmo assim
-                setTenant(null);
+                console.warn('⚠️ [FAST] Tenant não encontrado após tentativas');
               }
             })
             .catch((error) => {
-              console.error('❌ [SIMPLE] Erro ao carregar tenant:', error);
-              setTenant(null);
-            })
-            .finally(() => {
-              setLoading(false);
+              console.error('❌ [FAST] Erro ao carregar tenant:', error);
             });
         } else if (event === 'SIGNED_OUT') {
           setSession(null);
