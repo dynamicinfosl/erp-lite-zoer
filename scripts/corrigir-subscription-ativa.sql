@@ -8,13 +8,13 @@ SELECT
   t.id as tenant_id,
   t.name as tenant_name,
   t.status as tenant_status,
+  t.trial_ends_at as tenant_trial_ends_at,
   s.id as subscription_id,
   s.status as subscription_status,
   s.plan_id,
   p.name as plan_name,
   s.current_period_end,
-  s.trial_end,
-  s.trial_ends_at
+  s.trial_end
 FROM tenants t
 LEFT JOIN subscriptions s ON t.id = s.tenant_id
 LEFT JOIN plans p ON s.plan_id = p.id
@@ -32,7 +32,6 @@ SET
   current_period_start = NOW(),
   current_period_end = '2025-12-31T23:59:59'::timestamp, -- SUBSTITUA A DATA
   trial_end = NULL,
-  trial_ends_at = NULL,
   updated_at = NOW()
 WHERE tenant_id = 'TENANT_ID_AQUI'; -- SUBSTITUA AQUI
 
@@ -44,7 +43,6 @@ WHERE tenant_id = 'TENANT_ID_AQUI'; -- SUBSTITUA AQUI
 --   current_period_start = NOW(),
 --   current_period_end = '2025-12-31T23:59:59'::timestamp,
 --   trial_end = NULL,
---   trial_ends_at = NULL,
 --   updated_at = NOW()
 -- WHERE tenant_id = 'TENANT_ID_AQUI';
 

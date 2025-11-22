@@ -74,7 +74,7 @@ SELECT
   p.name as plan_name,
   s.status,
   s.trial_end,
-  s.trial_ends_at,
+  t.trial_ends_at as tenant_trial_ends_at,
   s.current_period_start,
   s.current_period_end,
   s.created_at,
@@ -82,8 +82,8 @@ SELECT
   CASE 
     WHEN s.status = 'active' AND s.current_period_end IS NOT NULL 
       THEN s.current_period_end > NOW()
-    WHEN s.status = 'trial' AND (s.trial_end IS NOT NULL OR s.trial_ends_at IS NOT NULL)
-      THEN COALESCE(s.trial_end, s.trial_ends_at) > NOW()
+    WHEN s.status = 'trial' AND s.trial_end IS NOT NULL
+      THEN s.trial_end > NOW()
     ELSE false
   END as is_valid
 FROM subscriptions s
@@ -106,14 +106,13 @@ ORDER BY s.updated_at DESC;
 --   s.plan_id,
 --   p.name as plan_name,
 --   s.trial_end,
---   s.trial_ends_at,
 --   s.current_period_start,
 --   s.current_period_end,
 --   CASE 
 --     WHEN s.status = 'active' AND s.current_period_end IS NOT NULL 
 --       THEN s.current_period_end > NOW()
---     WHEN s.status = 'trial' AND (s.trial_end IS NOT NULL OR s.trial_ends_at IS NOT NULL)
---       THEN COALESCE(s.trial_end, s.trial_ends_at) > NOW()
+--     WHEN s.status = 'trial' AND s.trial_end IS NOT NULL
+--       THEN s.trial_end > NOW()
 --     ELSE false
 --   END as subscription_is_valid
 -- FROM tenants t

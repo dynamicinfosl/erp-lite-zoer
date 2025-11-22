@@ -19,7 +19,6 @@ INSERT INTO subscriptions (
   current_period_start,
   current_period_end,
   trial_end,
-  trial_ends_at,
   created_at,
   updated_at
 )
@@ -29,7 +28,6 @@ SELECT
   'active',
   NOW(),
   '2025-12-31T23:59:59'::timestamp, -- SUBSTITUA A DATA
-  NULL,
   NULL,
   NOW(),
   NOW()
