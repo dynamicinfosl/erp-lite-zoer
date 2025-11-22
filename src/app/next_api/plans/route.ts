@@ -11,13 +11,17 @@ const supabaseAdmin = supabaseUrl && supabaseServiceKey
 // Listar todos os planos disponíveis
 export async function GET(request: NextRequest) {
   try {
+    console.log('📋 GET /next_api/plans - Iniciando busca de planos...');
+    
     if (!supabaseAdmin) {
+      console.error('❌ Cliente Supabase não configurado');
       return NextResponse.json(
         { error: 'Cliente Supabase não configurado' },
         { status: 500 }
       );
     }
 
+    console.log('🔍 Buscando planos ativos na tabela plans...');
     const { data, error } = await supabaseAdmin
       .from('plans')
       .select('*')
@@ -25,19 +29,33 @@ export async function GET(request: NextRequest) {
       .order('price_monthly');
 
     if (error) {
-      console.error('Erro ao listar planos:', error);
+      console.error('❌ Erro ao listar planos:', error);
+      console.error('Detalhes do erro:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
       return NextResponse.json(
         { error: 'Erro ao listar planos: ' + error.message },
         { status: 400 }
       );
     }
 
-    return NextResponse.json({ success: true, data });
+    console.log(`✅ Planos encontrados: ${data?.length || 0}`);
+    if (data && data.length > 0) {
+      console.log('📦 Planos:', data.map(p => ({ id: p.id, name: p.name, slug: p.slug })));
+    } else {
+      console.warn('⚠️ Nenhum plano ativo encontrado na tabela plans!');
+      console.warn('💡 Execute o script criar-planos-basicos.sql no Supabase SQL Editor');
+    }
+
+    return NextResponse.json({ success: true, data: data || [] });
 
   } catch (error) {
-    console.error('Erro no handler de listagem:', error);
+    console.error('❌ Erro no handler de listagem:', error);
     return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+      { error: 'Erro interno do servidor: ' + (error instanceof Error ? error.message : String(error)) },
       { status: 500 }
     );
   }

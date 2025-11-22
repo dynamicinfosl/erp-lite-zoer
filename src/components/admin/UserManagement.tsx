@@ -124,10 +124,27 @@ export function UserManagement() {
     try {
       console.log('🔄 Carregando planos disponíveis...');
       const response = await fetch('/next_api/plans');
-      if (response.ok) {
-        const result = await response.json();
-        console.log('📦 Resposta da API de planos:', result);
-        if (result.success && result.data) {
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Erro HTTP ao buscar planos:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+        toast.error(`Erro ao carregar planos: ${response.status} ${response.statusText}`);
+        return;
+      }
+      
+      const result = await response.json();
+      console.log('📦 Resposta da API de planos:', result);
+      
+      if (result.success && result.data && Array.isArray(result.data)) {
+        if (result.data.length === 0) {
+          console.warn('⚠️ Nenhum plano ativo encontrado na tabela plans!');
+          console.warn('💡 Execute o script criar-planos-basicos.sql no Supabase SQL Editor');
+          toast.warning('Nenhum plano encontrado. Verifique o banco de dados.');
+        } else {
           const plans = result.data.map((plan: any) => ({
             id: plan.id,
             name: plan.name,
@@ -135,14 +152,14 @@ export function UserManagement() {
           }));
           console.log('✅ Planos carregados:', plans);
           setAvailablePlans(plans);
-        } else {
-          console.warn('⚠️ Nenhum plano encontrado na resposta');
         }
       } else {
-        console.error('❌ Erro ao buscar planos:', response.status, response.statusText);
+        console.warn('⚠️ Resposta inválida da API de planos:', result);
+        toast.warning('Resposta inválida ao carregar planos');
       }
     } catch (error) {
       console.error('❌ Erro ao carregar planos:', error);
+      toast.error('Erro ao carregar planos. Verifique o console para mais detalhes.');
     }
   };
 
