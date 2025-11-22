@@ -39,6 +39,8 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`🔍 [SUBSCRIPTIONS API] Buscando subscription para tenant: ${tenant_id}`);
+    console.log(`🔍 [SUBSCRIPTIONS API] Tipo do tenant_id:`, typeof tenant_id);
+    console.log(`🔍 [SUBSCRIPTIONS API] Tamanho do tenant_id:`, tenant_id?.length);
     
     try {
       // ✅ Buscar TODAS as subscriptions do tenant (pode haver múltiplas)
@@ -51,6 +53,14 @@ export async function GET(request: NextRequest) {
       
       console.log(`🔍 [SUBSCRIPTIONS API] Query executada. Erro:`, subError);
       console.log(`🔍 [SUBSCRIPTIONS API] Subscriptions encontradas:`, subscriptions?.length || 0);
+      if (subscriptions && subscriptions.length > 0) {
+        console.log(`🔍 [SUBSCRIPTIONS API] Primeira subscription:`, {
+          id: subscriptions[0].id,
+          tenant_id: subscriptions[0].tenant_id,
+          status: subscriptions[0].status,
+          plan_id: subscriptions[0].plan_id
+        });
+      }
 
       if (subError) {
         console.error('❌ [SUBSCRIPTIONS API] Erro ao buscar subscription:', subError);
