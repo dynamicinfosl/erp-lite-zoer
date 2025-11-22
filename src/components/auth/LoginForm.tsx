@@ -53,8 +53,11 @@ export function LoginForm({
         throw result.error;
       }
       
-      console.log('✅ Login bem-sucedido!');
-      onSuccess?.();
+      console.log('✅ Login bem-sucedido! Aguardando carregamento do tenant...');
+      // Não chamar onSuccess imediatamente - deixar o useEffect da página de login
+      // fazer o redirecionamento quando tenant estiver pronto
+      // Liberar o loading do botão, mas manter o estado de "aguardando" na página
+      setIsLoading(false);
       
     } catch (err: any) {
       console.error('❌ Erro no login:', err);
@@ -67,7 +70,6 @@ export function LoginForm({
       } else {
         setError('Erro ao fazer login. Tente novamente em alguns instantes.');
       }
-    } finally {
       setIsLoading(false);
     }
   };

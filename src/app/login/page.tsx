@@ -13,16 +13,17 @@ import { toast } from 'sonner';
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, loading } = useSimpleAuth();
+  const { user, tenant, loading } = useSimpleAuth();
 
-  // Redirecionar se já estiver logado (apenas quando autenticação estiver habilitada)
+  // Redirecionar se já estiver logado E tenant carregado (apenas quando autenticação estiver habilitada)
   useEffect(() => {
-    if (ENABLE_AUTH && !loading && user) {
+    if (ENABLE_AUTH && !loading && user && tenant) {
       // Verificar se há um parâmetro de redirecionamento
       const redirectTo = searchParams.get('redirect') || '/dashboard';
+      console.log('✅ Redirecionando para:', redirectTo);
       router.push(redirectTo);
     }
-  }, [user, loading, router, searchParams]);
+  }, [user, tenant, loading, router, searchParams]);
 
   // Mostrar mensagem de sucesso se veio do registro
   useEffect(() => {
