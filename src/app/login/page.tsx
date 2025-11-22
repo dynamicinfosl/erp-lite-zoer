@@ -15,17 +15,14 @@ function LoginPageContent() {
   const searchParams = useSearchParams();
   const { user, tenant, loading } = useSimpleAuth();
 
-  // ✅ VERSÃO SIMPLIFICADA: Redirecionar assim que usuário estiver logado (não espera tenant)
+  // ✅ REDIRECIONAMENTO IMEDIATO: Redirecionar assim que usuário estiver logado
   useEffect(() => {
     if (ENABLE_AUTH && !loading && user) {
-      // Aguardar um pouco para o tenant carregar, mas não bloquear se não carregar
-      const timer = setTimeout(() => {
-        const redirectTo = searchParams.get('redirect') || '/dashboard';
-        console.log('✅ [SIMPLE] Redirecionando para:', redirectTo);
-        router.push(redirectTo);
-      }, 1000); // Aguardar 1 segundo para tenant carregar
-      
-      return () => clearTimeout(timer);
+      console.log('✅ [LOGIN] Usuário logado, redirecionando imediatamente...');
+      const redirectTo = searchParams.get('redirect') || '/dashboard';
+      console.log('✅ [LOGIN] Redirecionando para:', redirectTo);
+      // Redirecionar imediatamente, sem esperar tenant
+      router.push(redirectTo);
     }
   }, [user, loading, router, searchParams]);
 

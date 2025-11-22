@@ -53,11 +53,15 @@ export function LoginForm({
         throw result.error;
       }
       
-      console.log('✅ Login bem-sucedido! Aguardando carregamento do tenant...');
-      // Não chamar onSuccess imediatamente - deixar o useEffect da página de login
-      // fazer o redirecionamento quando tenant estiver pronto
-      // Liberar o loading do botão, mas manter o estado de "aguardando" na página
+      console.log('✅ [LOGIN] Login bem-sucedido! Redirecionando...');
+      // Redirecionar imediatamente após login bem-sucedido
       setIsLoading(false);
+      // Pequeno delay para garantir que o estado do usuário foi atualizado
+      setTimeout(() => {
+        const redirectTo = new URLSearchParams(window.location.search).get('redirect') || '/dashboard';
+        console.log('✅ [LOGIN] Redirecionando para:', redirectTo);
+        window.location.href = redirectTo;
+      }, 500);
       
     } catch (err: any) {
       console.error('❌ Erro no login:', err);
