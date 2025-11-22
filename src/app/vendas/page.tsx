@@ -714,6 +714,7 @@ export default function VendasPage() {
     }
   };
 
+  // Renderizar componente
   return (
     <TenantPageWrapper>
       <div className="space-y-6">
