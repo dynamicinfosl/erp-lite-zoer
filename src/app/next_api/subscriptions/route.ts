@@ -42,11 +42,15 @@ export async function GET(request: NextRequest) {
     
     try {
       // ✅ Buscar TODAS as subscriptions do tenant (pode haver múltiplas)
+      // Usar .select('*') para garantir que pegamos todos os campos
       const { data: subscriptions, error: subError } = await supabaseAdmin
         .from('subscriptions')
         .select('*')
         .eq('tenant_id', tenant_id)
         .order('created_at', { ascending: false });
+      
+      console.log(`🔍 [SUBSCRIPTIONS API] Query executada. Erro:`, subError);
+      console.log(`🔍 [SUBSCRIPTIONS API] Subscriptions encontradas:`, subscriptions?.length || 0);
 
       if (subError) {
         console.error('❌ [SUBSCRIPTIONS API] Erro ao buscar subscription:', subError);
