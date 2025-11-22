@@ -305,7 +305,7 @@ export default function ReceiptPage() {
             font-weight: 600;
             color: #000;
           }
-
+          
           table {
             width: 100%;
             border-collapse: collapse;
