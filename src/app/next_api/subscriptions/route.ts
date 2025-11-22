@@ -31,19 +31,17 @@ export async function GET(request: NextRequest) {
     console.log(`🔍 Buscando subscription para tenant: ${tenant_id}`);
     
     try {
-      const { data, error } = await supabaseAdmin
+      // Buscar subscription primeiro sem o join com plans
+      const { data: subscription, error: subError } = await supabaseAdmin
         .from('subscriptions')
-        .select(`
-          *,
-          plan:plans(*)
-        `)
+        .select('*')
         .eq('tenant_id', tenant_id)
         .maybeSingle();
 
-      if (error) {
-        console.error('❌ Erro ao buscar subscription:', error);
+      if (subError) {
+        console.error('❌ Erro ao buscar subscription:', subError);
         // Se o erro for "not found", retornar null ao invés de erro
-        if (error.code === 'PGRST116' || error.message?.includes('0 rows')) {
+        if (subError.code === 'PGRST116' || subError.message?.includes('0 rows')) {
           console.log('⚠️ Nenhuma subscription encontrada para tenant:', tenant_id);
           return NextResponse.json({ 
             success: true, 
@@ -52,13 +50,13 @@ export async function GET(request: NextRequest) {
           });
         }
         return NextResponse.json(
-          { error: 'Erro ao buscar subscription: ' + error.message },
+          { error: 'Erro ao buscar subscription: ' + subError.message },
           { status: 400 }
         );
       }
 
       // Se não encontrou subscription, retornar null ao invés de erro
-      if (!data) {
+      if (!subscription) {
         console.log('⚠️ Nenhuma subscription encontrada para tenant:', tenant_id);
         return NextResponse.json({ 
           success: true, 
@@ -67,15 +65,39 @@ export async function GET(request: NextRequest) {
         });
       }
 
+      // Buscar plan separadamente se plan_id existir
+      let plan = null;
+      if (subscription.plan_id) {
+        try {
+          const { data: planData, error: planError } = await supabaseAdmin
+            .from('plans')
+            .select('*')
+            .eq('id', subscription.plan_id)
+            .maybeSingle();
+          
+          if (!planError && planData) {
+            plan = planData;
+          }
+        } catch (planErr) {
+          console.warn('⚠️ Erro ao buscar plan, continuando sem plan:', planErr);
+        }
+      }
+
+      // Montar resposta com subscription e plan
+      const responseData = {
+        ...subscription,
+        plan: plan
+      };
+
       console.log('✅ Subscription encontrada:', {
-        id: data.id,
-        status: data.status,
-        plan_id: data.plan_id,
-        plan_name: Array.isArray(data.plan) ? data.plan[0]?.name : data.plan?.name,
-        current_period_end: data.current_period_end
+        id: subscription.id,
+        status: subscription.status,
+        plan_id: subscription.plan_id,
+        plan_name: plan?.name,
+        current_period_end: subscription.current_period_end
       });
 
-      return NextResponse.json({ success: true, data });
+      return NextResponse.json({ success: true, data: responseData });
     } catch (queryError) {
       console.error('❌ Erro na query de subscription:', queryError);
       // Em caso de erro inesperado, retornar null ao invés de erro 500
