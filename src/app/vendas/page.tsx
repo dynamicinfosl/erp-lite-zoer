@@ -125,7 +125,11 @@ export default function VendasPage() {
   const loadVendas = useCallback(async () => {
     try {
       setLoading(true);
-      if (!tenant?.id) { setVendas([]); return; }
+      if (!tenant?.id) {
+        setVendas([]);
+        setLoading(false);
+        return;
+      }
 
       console.log('📦 Carregando vendas para o tenant:', tenant.id);
       
