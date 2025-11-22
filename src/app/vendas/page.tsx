@@ -707,19 +707,19 @@ export default function VendasPage() {
     <TenantPageWrapper>
       <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Lista de Vendas</h1>
-          <p className="text-muted-foreground">
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Lista de Vendas</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Visualize todas as vendas realizadas no sistema
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="px-3 py-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary" className="px-3 py-1 text-xs sm:text-sm">
             <ShoppingCart className="h-3 w-3 mr-1" />
             {vendas.length} vendas
           </Badge>
-          <Badge variant="outline" className="px-3 py-1">
+          <Badge variant="outline" className="px-3 py-1 text-xs sm:text-sm">
             <DollarSign className="h-3 w-3 mr-1" />
             {formatCurrency(stats.faturamento)}
           </Badge>
@@ -727,7 +727,7 @@ export default function VendasPage() {
       </div>
 
       {/* Quick Stats - JUGA */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
         <JugaKPICard
           title="Total de Vendas"
           value={`${stats.totalVendas}`}
@@ -944,8 +944,9 @@ export default function VendasPage() {
           {loading ? (
             <div className="text-center py-8 text-muted-foreground">Carregando vendas...</div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle">
+                <Table>
                 <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">

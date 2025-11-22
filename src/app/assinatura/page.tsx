@@ -159,12 +159,17 @@ export default function AssinaturaPage() {
   const getCurrentPlan = (): PlanId => {
     if (!subscription) return 'trial';
     
-    // Se status é trial, retornar trial
-    if (subscription.status === 'trial') return 'trial';
+    console.log('🔍 getCurrentPlan - subscription:', {
+      status: subscription.status,
+      plan_slug: subscription.plan?.slug,
+      plan_name: subscription.plan?.name,
+      current_period_end: subscription.current_period_end,
+      trial_end: subscription.trial_end
+    });
     
-    // Se status é active, usar o slug do plano
+    // Se status é active e tem plano, usar o slug do plano
     if (subscription.status === 'active' && subscription.plan?.slug) {
-      const slug = subscription.plan.slug;
+      const slug = subscription.plan.slug.toLowerCase();
       // Mapear slugs para PlanId
       const slugMap: Record<string, PlanId> = {
         'free': 'trial',
@@ -175,9 +180,18 @@ export default function AssinaturaPage() {
         'enterprise': 'enterprise'
       };
       
-      return slugMap[slug] || 'trial';
+      const mappedPlan = slugMap[slug] || 'trial';
+      console.log('✅ Plano mapeado:', slug, '->', mappedPlan);
+      return mappedPlan;
     }
     
+    // Se status é trial, retornar trial
+    if (subscription.status === 'trial') {
+      console.log('⚠️ Status é trial');
+      return 'trial';
+    }
+    
+    console.log('⚠️ Retornando trial como padrão');
     return 'trial';
   };
   
@@ -332,8 +346,18 @@ export default function AssinaturaPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           <JugaKPICard
           title="Plano Atual"
-          value={subscription?.plan?.name || currentInfo.name}
-          description={currentPlan === 'trial' ? 'Período de teste' : subscription?.plan?.name || currentInfo.price || ''}
+          value={
+            currentPlan === 'trial' 
+              ? currentInfo.name
+              : subscription?.plan?.name || currentInfo.name
+          }
+          description={
+            currentPlan === 'trial' 
+              ? `Período de teste${daysLeftInTrial > 0 ? ` - ${daysLeftInTrial} ${daysLeftInTrial === 1 ? 'dia' : 'dias'} restantes` : ' - Expirado'}`
+              : subscription?.plan?.price_monthly 
+                ? `${formatPrice(subscription.plan.price_monthly)}/mês`
+                : currentInfo.price || 'Plano ativo'
+          }
           color="primary"
           icon={<CurrentIcon className="h-5 w-5" />}
           trend="neutral"
@@ -342,7 +366,9 @@ export default function AssinaturaPage() {
               ? daysLeftInTrial > 0 
                 ? `${daysLeftInTrial} ${daysLeftInTrial === 1 ? 'dia' : 'dias'} restantes`
                 : 'Expirado'
-              : 'Ativo'
+              : subscription?.current_period_end
+                ? `Expira em ${new Date(subscription.current_period_end).toLocaleDateString('pt-BR')}`
+                : 'Ativo'
           }
           className={`min-h-[120px] sm:min-h-[140px] ${
             currentPlan === 'trial' && daysLeftInTrial <= 3 ? 'ring-2 ring-red-200' : ''
@@ -516,30 +542,64 @@ export default function AssinaturaPage() {
               </div>
             </div>
           ) : (currentPlan as string) !== 'trial' && subscription?.plan ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
-                <div className={`p-2 rounded-lg ${currentInfo.bgColor}`}>
-                  <CreditCard className={`h-5 w-5 ${currentInfo.color}`} />
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className={`p-2 rounded-lg ${currentInfo.bgColor}`}>
+                    <CreditCard className={`h-5 w-5 ${currentInfo.color}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Plano</p>
+                    <p className="text-lg font-bold">{subscription.plan.name}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Valor Mensal</p>
-                  <p className="text-lg font-bold">{formatPrice(subscription.plan.price_monthly)}/mês</p>
+                <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className={`p-2 rounded-lg ${currentInfo.bgColor}`}>
+                    <CreditCard className={`h-5 w-5 ${currentInfo.color}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Valor Mensal</p>
+                    <p className="text-lg font-bold">{formatPrice(subscription.plan.price_monthly)}/mês</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900">
+                    <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Data de Expiração</p>
+                    <p className="text-lg font-bold">
+                      {subscription.current_period_end 
+                        ? new Date(subscription.current_period_end).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })
+                        : 'N/A'
+                      }
+                    </p>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
-                <div className="p-2 rounded-lg bg-blue-100">
-                  <Calendar className="h-5 w-5 text-blue-600" />
+              {subscription.current_period_end && (
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-blue-900 dark:text-blue-100">
+                        Seu plano está ativo até {new Date(subscription.current_period_end).toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: 'long',
+                          year: 'numeric'
+                        })}
+                      </p>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                        A renovação será automática na data de expiração.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Próxima Cobrança</p>
-                  <p className="text-sm font-semibold">
-                    {subscription.current_period_end 
-                      ? new Date(subscription.current_period_end).toLocaleDateString('pt-BR')
-                      : 'N/A'
-                    }
-                  </p>
-                </div>
-              </div>
+              )}
             </div>
           ) : null}
 

@@ -517,10 +517,10 @@ export default function ClientesPage() {
     <TenantPageWrapper>
       <div className="space-y-6">
       {/* Header com Título */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-heading">Clientes</h1>
-          <p className="text-muted-foreground">
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-heading">Clientes</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Gerencie seus clientes e informações de contato
           </p>
         </div>
@@ -534,7 +534,7 @@ export default function ClientesPage() {
       </div>
 
       {/* Cards de Estatísticas */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
         <JugaKPICard
           title="Total Clientes"
           value={customerStats.total.toLocaleString('pt-BR')}
@@ -837,8 +837,9 @@ export default function ClientesPage() {
           {loading ? (
             <div className="text-center py-8">Carregando clientes...</div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle">
+                <Table>
                 <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
@@ -916,8 +917,9 @@ export default function ClientesPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-              </TableBody>
+                </TableBody>
               </Table>
+              </div>
             </div>
           )}
 
