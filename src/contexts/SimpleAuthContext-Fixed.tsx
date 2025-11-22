@@ -177,9 +177,46 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
           const tenantData = await loadRealTenant(session.user.id);
           console.log('🏢 Tenant carregado:', tenantData);
           setTenant(tenantData);
+          
+          // Carregar subscription após carregar tenant
+          if (tenantData?.id) {
+            const response = await fetch(`/next_api/subscriptions?tenant_id=${tenantData.id}`);
+            if (response.ok) {
+              const result = await response.json();
+              if (result.success && result.data) {
+                const subData = result.data;
+                const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
+                
+                const subscriptionData: SubscriptionData = {
+                  id: subData.id,
+                  status: subData.status || 'trial',
+                  trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
+                  current_period_end: subData.current_period_end || undefined,
+                  plan: {
+                    id: plan?.id || 'trial',
+                    name: plan?.name || 'Trial',
+                    slug: plan?.slug || 'trial',
+                    price_monthly: plan?.price_monthly || 0,
+                    price_yearly: plan?.price_yearly || 0,
+                    features: plan?.features || {},
+                    limits: plan?.limits || {
+                      max_users: 1,
+                      max_customers: 100,
+                      max_products: 100,
+                      max_sales_per_month: 1000,
+                    },
+                  },
+                };
+                
+                console.log('✅ Subscription carregada:', subscriptionData);
+                setSubscription(subscriptionData);
+              }
+            }
+          }
         } else {
           console.log('👤 Nenhum usuário logado');
           setTenant(null);
+          setSubscription(null);
         }
       } catch (error) {
         console.error('❌ Erro na autenticação:', error);
@@ -220,6 +257,43 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
           const tenantData = await loadRealTenant(session.user.id);
           console.log('🏢 Tenant carregado após login:', tenantData);
           setTenant(tenantData);
+          
+          // Carregar subscription após carregar tenant
+          if (tenantData?.id) {
+            const response = await fetch(`/next_api/subscriptions?tenant_id=${tenantData.id}`);
+            if (response.ok) {
+              const result = await response.json();
+              if (result.success && result.data) {
+                const subData = result.data;
+                const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
+                
+                const subscriptionData: SubscriptionData = {
+                  id: subData.id,
+                  status: subData.status || 'trial',
+                  trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
+                  current_period_end: subData.current_period_end || undefined,
+                  plan: {
+                    id: plan?.id || 'trial',
+                    name: plan?.name || 'Trial',
+                    slug: plan?.slug || 'trial',
+                    price_monthly: plan?.price_monthly || 0,
+                    price_yearly: plan?.price_yearly || 0,
+                    features: plan?.features || {},
+                    limits: plan?.limits || {
+                      max_users: 1,
+                      max_customers: 100,
+                      max_products: 100,
+                      max_sales_per_month: 1000,
+                    },
+                  },
+                };
+                
+                console.log('✅ Subscription carregada após login:', subscriptionData);
+                setSubscription(subscriptionData);
+              }
+            }
+          }
+          
           setLoading(false);
         } else if (event === 'SIGNED_OUT') {
           setSession(null);
@@ -327,6 +401,11 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         const tenantData = await loadRealTenant(user.id);
         console.log('🏢 Tenant atualizado:', tenantData);
         setTenant(tenantData);
+        
+        // Atualizar subscription também
+        if (tenantData?.id) {
+          await refreshSubscription();
+        }
       } catch (error) {
         console.error('❌ Erro ao atualizar tenant:', error);
       }
@@ -334,26 +413,115 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshSubscription = async () => {
-    // Implementação simplificada
-    setSubscription({
-      id: '00000000-0000-0000-0000-000000000000',
-      plan: {
-        id: 'trial',
-        name: 'Trial',
-        slug: 'trial',
-        price_monthly: 0,
-        price_yearly: 0,
-        features: {},
-        limits: {
-          max_users: 1,
-          max_customers: 100,
-          max_products: 100,
-          max_sales_per_month: 1000,
+    if (!tenant?.id) {
+      console.log('⚠️ Sem tenant, não é possível buscar subscription');
+      return;
+    }
+
+    try {
+      console.log('🔄 Buscando subscription para tenant:', tenant.id);
+      
+      // Buscar subscription do banco
+      const response = await fetch(`/next_api/subscriptions?tenant_id=${tenant.id}`);
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          const subData = result.data;
+          const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
+          
+          const subscriptionData: SubscriptionData = {
+            id: subData.id,
+            status: subData.status || 'trial',
+            trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
+            current_period_end: subData.current_period_end || undefined,
+            plan: {
+              id: plan?.id || 'trial',
+              name: plan?.name || 'Trial',
+              slug: plan?.slug || 'trial',
+              price_monthly: plan?.price_monthly || 0,
+              price_yearly: plan?.price_yearly || 0,
+              features: plan?.features || {},
+              limits: plan?.limits || {
+                max_users: 1,
+                max_customers: 100,
+                max_products: 100,
+                max_sales_per_month: 1000,
+              },
+            },
+          };
+          
+          console.log('✅ Subscription atualizada:', subscriptionData);
+          setSubscription(subscriptionData);
+        } else {
+          console.log('⚠️ Nenhuma subscription encontrada, usando padrão');
+          // Se não encontrou, criar subscription padrão
+          setSubscription({
+            id: '00000000-0000-0000-0000-000000000000',
+            plan: {
+              id: 'trial',
+              name: 'Trial',
+              slug: 'trial',
+              price_monthly: 0,
+              price_yearly: 0,
+              features: {},
+              limits: {
+                max_users: 1,
+                max_customers: 100,
+                max_products: 100,
+                max_sales_per_month: 1000,
+              },
+            },
+            status: 'trial',
+            trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          });
+        }
+      } else {
+        console.log('⚠️ Erro ao buscar subscription, usando padrão');
+        // Em caso de erro, usar subscription padrão
+        setSubscription({
+          id: '00000000-0000-0000-0000-000000000000',
+          plan: {
+            id: 'trial',
+            name: 'Trial',
+            slug: 'trial',
+            price_monthly: 0,
+            price_yearly: 0,
+            features: {},
+            limits: {
+              max_users: 1,
+              max_customers: 100,
+              max_products: 100,
+              max_sales_per_month: 1000,
+            },
+          },
+          status: 'trial',
+          trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+      }
+    } catch (error) {
+      console.error('❌ Erro ao atualizar subscription:', error);
+      // Em caso de erro, usar subscription padrão
+      setSubscription({
+        id: '00000000-0000-0000-0000-000000000000',
+        plan: {
+          id: 'trial',
+          name: 'Trial',
+          slug: 'trial',
+          price_monthly: 0,
+          price_yearly: 0,
+          features: {},
+          limits: {
+            max_users: 1,
+            max_customers: 100,
+            max_products: 100,
+            max_sales_per_month: 1000,
+          },
         },
-      },
-      status: 'trial',
-      trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    });
+        status: 'trial',
+        trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+    }
   };
 
   const value: AuthContextType = {

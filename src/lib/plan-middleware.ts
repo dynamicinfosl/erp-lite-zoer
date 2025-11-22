@@ -155,6 +155,8 @@ export async function checkFeatureAccess(
       .select(`
         status,
         trial_ends_at,
+        trial_end,
+        current_period_end,
         plan:plans(features)
       `)
       .eq('tenant_id', tenantId)
@@ -164,15 +166,26 @@ export async function checkFeatureAccess(
       return { hasAccess: false, reason: 'Plano não encontrado' };
     }
 
+    const now = new Date();
+
     // Verificar se trial expirou
-    if (subscription.status === 'trial' && subscription.trial_ends_at) {
-      const trialEnd = new Date(subscription.trial_ends_at);
-      if (trialEnd < new Date()) {
+    const trialEndDate = subscription.trial_ends_at || subscription.trial_end;
+    if (subscription.status === 'trial' && trialEndDate) {
+      const trialEnd = new Date(trialEndDate);
+      if (trialEnd < now) {
         return { hasAccess: false, reason: 'Trial expirado' };
       }
     }
 
-    // Verificar se plano está ativo
+    // Verificar se plano ativo expirou
+    if (subscription.status === 'active' && subscription.current_period_end) {
+      const periodEnd = new Date(subscription.current_period_end);
+      if (periodEnd < now) {
+        return { hasAccess: false, reason: 'Plano expirado' };
+      }
+    }
+
+    // Verificar se plano está inativo
     if (subscription.status !== 'trial' && subscription.status !== 'active') {
       return { hasAccess: false, reason: 'Plano inativo' };
     }

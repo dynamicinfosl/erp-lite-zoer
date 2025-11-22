@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
         plan:plans(*)
       `)
       .eq('tenant_id', tenant_id)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Erro ao buscar subscription:', error);
@@ -43,6 +43,15 @@ export async function GET(request: NextRequest) {
         { error: 'Erro ao buscar subscription: ' + error.message },
         { status: 400 }
       );
+    }
+
+    // Se não encontrou subscription, retornar null ao invés de erro
+    if (!data) {
+      return NextResponse.json({ 
+        success: true, 
+        data: null,
+        message: 'Nenhuma subscription encontrada para este tenant'
+      });
     }
 
     return NextResponse.json({ success: true, data });

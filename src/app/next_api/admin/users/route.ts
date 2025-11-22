@@ -9,12 +9,22 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 export async function GET(_request: NextRequest) {
   try {
 
-    const [profilesResult, tenantsResult, membershipsResult] = await Promise.all([
+    const [profilesResult, tenantsResult, membershipsResult, subscriptionsResult] = await Promise.all([
       supabaseAdmin.from('user_profiles').select('*'),
       supabaseAdmin.from('tenants').select('*'),
       supabaseAdmin.from('user_memberships').select('*').then(result => {
         if (result.error) {
           console.warn('⚠️ Tabela user_memberships não existe ou sem permissão:', result.error.message)
+          return { data: [], error: null }
+        }
+        return result
+      }),
+      supabaseAdmin.from('subscriptions').select(`
+        *,
+        plan:plans(id, name, slug)
+      `).then(result => {
+        if (result.error) {
+          console.warn('⚠️ Tabela subscriptions não existe ou sem permissão:', result.error.message)
           return { data: [], error: null }
         }
         return result
@@ -33,6 +43,7 @@ export async function GET(_request: NextRequest) {
     const profiles = profilesResult.data || []
     const tenants = tenantsResult.data || []
     const memberships = membershipsResult.data || []
+    const subscriptions = subscriptionsResult.data || []
 
     let mappedUsers: any[] = []
 
@@ -40,6 +51,9 @@ export async function GET(_request: NextRequest) {
       mappedUsers = memberships.map((membership: any, index: number) => {
         const profile = profiles.find((p: any) => p.id === membership.user_id)
         const tenant = tenants.find((t: any) => t.id === membership.tenant_id)
+        const subscription = subscriptions.find((s: any) => s.tenant_id === membership.tenant_id)
+        const plan = subscription?.plan && (Array.isArray(subscription.plan) ? subscription.plan[0] : subscription.plan)
+        
         return {
           user_id: membership.user_id || `membership-${index}`,
           user_email: profile?.email || 'Desconhecido',
@@ -54,24 +68,41 @@ export async function GET(_request: NextRequest) {
           tenant_phone: tenant?.phone,
           tenant_document: tenant?.document,
           approval_status: profile?.status || 'pending',
+          // Dados de subscription
+          subscription_status: subscription?.status || null,
+          subscription_trial_ends_at: subscription?.trial_end || null,
+          subscription_current_period_end: subscription?.current_period_end || null,
+          subscription_plan_name: plan?.name || null,
+          subscription_plan_slug: plan?.slug || null,
         }
       })
     } else {
-      mappedUsers = tenants.map((tenant: any, index: number) => ({
-        user_id: `tenant-${tenant.id}-${index}`,
-        user_email: tenant.email || 'Desconhecido',
-        user_created_at: tenant.created_at,
-        user_last_login: '-',
-        tenant_id: tenant.id,
-        tenant_name: tenant.name || 'Sem empresa',
-        tenant_status: tenant.status || 'trial',
-        role: 'admin',
-        is_active: true,
-        tenant_email: tenant.email,
-        tenant_phone: tenant.phone,
-        tenant_document: tenant.document,
-        approval_status: 'pending',
-      }))
+      mappedUsers = tenants.map((tenant: any, index: number) => {
+        const subscription = subscriptions.find((s: any) => s.tenant_id === tenant.id)
+        const plan = subscription?.plan && (Array.isArray(subscription.plan) ? subscription.plan[0] : subscription.plan)
+        
+        return {
+          user_id: `tenant-${tenant.id}-${index}`,
+          user_email: tenant.email || 'Desconhecido',
+          user_created_at: tenant.created_at,
+          user_last_login: '-',
+          tenant_id: tenant.id,
+          tenant_name: tenant.name || 'Sem empresa',
+          tenant_status: tenant.status || 'trial',
+          role: 'admin',
+          is_active: true,
+          tenant_email: tenant.email,
+          tenant_phone: tenant.phone,
+          tenant_document: tenant.document,
+          approval_status: 'pending',
+          // Dados de subscription
+          subscription_status: subscription?.status || null,
+          subscription_trial_ends_at: subscription?.trial_end || null,
+          subscription_current_period_end: subscription?.current_period_end || null,
+          subscription_plan_name: plan?.name || null,
+          subscription_plan_slug: plan?.slug || null,
+        }
+      })
     }
 
     // dedup por user_id

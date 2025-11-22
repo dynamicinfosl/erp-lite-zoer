@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,16 +10,65 @@ import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 
 export default function TrialExpiradoPage() {
   const router = useRouter();
-  const { user, tenant } = useSimpleAuth();
+  const { user, tenant, refreshSubscription } = useSimpleAuth();
+  const [checking, setChecking] = useState(false);
 
-  // Redirecionar para assinatura após 5 segundos
+  // Verificar periodicamente se o plano foi ativado
+  useEffect(() => {
+    if (!tenant?.id) return;
+
+    const checkSubscription = async () => {
+      try {
+        setChecking(true);
+        // Forçar refresh da subscription
+        await refreshSubscription();
+        
+        // Buscar subscription atualizada
+        const response = await fetch(`/next_api/subscriptions?tenant_id=${tenant.id}`);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data) {
+            const subData = result.data;
+            const now = new Date();
+            
+            // Verificar se plano está ativo e não expirado
+            const isActive = subData.status === 'active';
+            const periodEnd = subData.current_period_end ? new Date(subData.current_period_end) : null;
+            const isNotExpired = !periodEnd || periodEnd > now;
+            
+            if (isActive && isNotExpired) {
+              // Plano foi ativado! Redirecionar para dashboard
+              router.push('/dashboard');
+              return;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar subscription:', error);
+      } finally {
+        setChecking(false);
+      }
+    };
+
+    // Verificar imediatamente
+    checkSubscription();
+    
+    // Verificar a cada 10 segundos
+    const interval = setInterval(checkSubscription, 10000);
+
+    return () => clearInterval(interval);
+  }, [tenant?.id, router, refreshSubscription]);
+
+  // Redirecionar para assinatura após 5 segundos (se não foi ativado)
   useEffect(() => {
     const timer = setTimeout(() => {
-      router.push('/assinatura');
+      if (!checking) {
+        router.push('/assinatura');
+      }
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [router]);
+  }, [router, checking]);
 
   const handleUpgrade = () => {
     router.push('/assinatura');
@@ -97,6 +146,18 @@ export default function TrialExpiradoPage() {
                 <Crown className="h-5 w-5 mr-2" />
                 Escolher Plano Agora
                 <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={async () => {
+                  setChecking(true);
+                  await refreshSubscription();
+                  window.location.reload();
+                }}
+                disabled={checking}
+                className="flex-1 h-12 text-base"
+              >
+                {checking ? 'Verificando...' : 'Verificar Novamente'}
               </Button>
               <Button 
                 variant="outline" 

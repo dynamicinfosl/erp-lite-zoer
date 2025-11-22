@@ -30,18 +30,28 @@ async function createProductHandler(request: NextRequest) {
     // Resolver tenant_id quando ausente ou inválido
     const ZERO_UUID = '00000000-0000-0000-0000-000000000000';
     
-    // ✅ VALIDAÇÃO DE TRIAL EXPIRADO
+    // ✅ VALIDAÇÃO DE PLANO/SUBSCRIPTION (verificar subscription ao invés de apenas tenant)
     if (tenant_id && tenant_id !== ZERO_UUID) {
-      const { data: tenant, error: tenantError } = await supabaseAdmin
-        .from('tenants')
-        .select('trial_ends_at, status')
-        .eq('id', tenant_id)
-        .single();
+      // Buscar subscription para verificar status real do plano
+      const { data: subscription, error: subError } = await supabaseAdmin
+        .from('subscriptions')
+        .select(`
+          status,
+          trial_end,
+          trial_ends_at,
+          current_period_end
+        `)
+        .eq('tenant_id', tenant_id)
+        .maybeSingle();
 
-      if (!tenantError && tenant) {
-        if (tenant.status === 'trial' && tenant.trial_ends_at) {
-          const trialEnd = new Date(tenant.trial_ends_at);
-          if (trialEnd < new Date()) {
+      const now = new Date();
+
+      if (!subError && subscription) {
+        // Verificar se trial expirou
+        const trialEndDate = subscription.trial_end || subscription.trial_ends_at;
+        if (subscription.status === 'trial' && trialEndDate) {
+          const trialEnd = new Date(trialEndDate);
+          if (trialEnd < now) {
             return NextResponse.json(
               { 
                 error: 'Período de teste expirado. Faça upgrade do seu plano para continuar.',
@@ -49,6 +59,53 @@ async function createProductHandler(request: NextRequest) {
               },
               { status: 403 }
             );
+          }
+        }
+
+        // Verificar se plano ativo expirou
+        if (subscription.status === 'active' && subscription.current_period_end) {
+          const periodEnd = new Date(subscription.current_period_end);
+          if (periodEnd < now) {
+            return NextResponse.json(
+              { 
+                error: 'Plano expirado. Entre em contato com o suporte para renovar.',
+                trialExpired: true 
+              },
+              { status: 403 }
+            );
+          }
+        }
+
+        // Verificar se plano está inativo
+        if (subscription.status !== 'trial' && subscription.status !== 'active') {
+          return NextResponse.json(
+            { 
+              error: 'Plano inativo. Entre em contato com o suporte.',
+              trialExpired: true 
+            },
+            { status: 403 }
+          );
+        }
+      } else {
+        // Se não tem subscription, verificar tenant como fallback (compatibilidade)
+        const { data: tenant, error: tenantError } = await supabaseAdmin
+          .from('tenants')
+          .select('trial_ends_at, status')
+          .eq('id', tenant_id)
+          .maybeSingle();
+
+        if (!tenantError && tenant) {
+          if (tenant.status === 'trial' && tenant.trial_ends_at) {
+            const trialEnd = new Date(tenant.trial_ends_at);
+            if (trialEnd < now) {
+              return NextResponse.json(
+                { 
+                  error: 'Período de teste expirado. Faça upgrade do seu plano para continuar.',
+                  trialExpired: true 
+                },
+                { status: 403 }
+              );
+            }
           }
         }
       }

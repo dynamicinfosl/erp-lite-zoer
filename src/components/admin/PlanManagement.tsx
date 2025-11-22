@@ -255,11 +255,11 @@ export function PlanManagement() {
 
   if (loading) {
     return (
-      <Card>
+      <Card className="bg-gray-900 border-gray-700">
         <CardContent className="p-6">
           <div className="flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600 mr-2" />
-            <span>Carregando planos...</span>
+            <span className="text-white">Carregando planos...</span>
           </div>
         </CardContent>
       </Card>
@@ -269,19 +269,19 @@ export function PlanManagement() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <Card>
+      <Card className="bg-gray-900 border-gray-700">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-white">
               <CreditCard className="h-5 w-5" />
               Planos de Assinatura
             </CardTitle>
             <div className="flex gap-2">
-              <Button onClick={loadPlans} variant="outline" size="sm">
+              <Button onClick={loadPlans} variant="outline" size="sm" className="border-gray-700 text-gray-300 hover:bg-gray-800">
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Atualizar
               </Button>
-              <Button onClick={handleCreatePlan}>
+              <Button onClick={handleCreatePlan} className="juga-gradient text-white">
                 <Plus className="h-4 w-4 mr-2" />
                 Novo Plano
               </Button>
@@ -291,78 +291,81 @@ export function PlanManagement() {
 
         <CardContent>
           {plans.length === 0 ? (
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
+            <Alert className="bg-yellow-500/10 border-yellow-500/30">
+              <AlertTriangle className="h-4 w-4 text-yellow-400" />
+              <AlertDescription className="text-yellow-300">
                 Nenhum plano encontrado. Clique em "Novo Plano" para criar o primeiro.
               </AlertDescription>
             </Alert>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Preço</TableHead>
-                  <TableHead>Ciclo</TableHead>
-                  <TableHead>Usuários</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {plans.map((plan) => (
-                  <TableRow key={plan.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{plan.name}</div>
-                        <div className="text-sm text-gray-500">{plan.description}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4 text-green-600" />
-                        <span className="font-medium">R$ {plan.price.toFixed(2)}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{getBillingCycleBadge(plan.billing_cycle)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        <span>{plan.max_users === -1 ? 'Ilimitado' : plan.max_users}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(plan.is_active)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditPlan(plan)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => togglePlanStatus(plan)}
-                          className={plan.is_active ? 'text-red-600' : 'text-green-600'}
-                        >
-                          {plan.is_active ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeletePlan(plan.id)}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-gray-700 hover:bg-gray-800/50">
+                    <TableHead className="text-gray-300">Nome</TableHead>
+                    <TableHead className="text-gray-300">Preço</TableHead>
+                    <TableHead className="text-gray-300">Ciclo</TableHead>
+                    <TableHead className="text-gray-300">Usuários</TableHead>
+                    <TableHead className="text-gray-300">Status</TableHead>
+                    <TableHead className="text-gray-300">Ações</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {plans.map((plan) => (
+                    <TableRow key={plan.id} className="border-gray-700 hover:bg-gray-800/50">
+                      <TableCell className="text-white">
+                        <div>
+                          <div className="font-medium">{plan.name}</div>
+                          <div className="text-sm text-gray-400">{plan.description}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-white">
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-4 w-4 text-green-400" />
+                          <span className="font-medium">R$ {plan.price.toFixed(2)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{getBillingCycleBadge(plan.billing_cycle)}</TableCell>
+                      <TableCell className="text-white">
+                        <div className="flex items-center gap-1">
+                          <Users className="h-3 w-3 text-gray-400" />
+                          <span>{plan.max_users === -1 ? 'Ilimitado' : plan.max_users}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(plan.is_active)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditPlan(plan)}
+                            className="text-gray-300 hover:text-white hover:bg-gray-800"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => togglePlanStatus(plan)}
+                            className={plan.is_active ? 'text-red-400 hover:text-red-300 hover:bg-gray-800' : 'text-green-400 hover:text-green-300 hover:bg-gray-800'}
+                          >
+                            {plan.is_active ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeletePlan(plan.id)}
+                            className="text-red-400 hover:text-red-300 hover:bg-gray-800"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -403,7 +406,7 @@ export function PlanManagement() {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Ex: Básico"
-                    className="bg-white border border-gray-200 text-gray-900"
+                    className="bg-gray-800 border-gray-700 text-white placeholder-gray-400"
                   />
                 </div>
                 <div>
@@ -415,7 +418,7 @@ export function PlanManagement() {
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
                     placeholder="79.90"
-                    className="bg-white border border-gray-200 text-gray-900"
+                    className="bg-gray-800 border-gray-700 text-white placeholder-gray-400"
                   />
                 </div>
               </div>
@@ -455,7 +458,7 @@ export function PlanManagement() {
                     type="number"
                     value={formData.max_users}
                     onChange={(e) => setFormData({ ...formData, max_users: parseInt(e.target.value) || 1 })}
-                    className="bg-white border border-gray-200 text-gray-900"
+                    className="bg-gray-800 border-gray-700 text-white placeholder-gray-400"
                   />
                 </div>
                 <div>
@@ -465,7 +468,7 @@ export function PlanManagement() {
                     type="number"
                     value={formData.max_products}
                     onChange={(e) => setFormData({ ...formData, max_products: parseInt(e.target.value) || 100 })}
-                    className="bg-white border border-gray-200 text-gray-900"
+                    className="bg-gray-800 border-gray-700 text-white placeholder-gray-400"
                   />
                 </div>
                 <div>
@@ -475,7 +478,7 @@ export function PlanManagement() {
                     type="number"
                     value={formData.max_customers}
                     onChange={(e) => setFormData({ ...formData, max_customers: parseInt(e.target.value) || 1000 })}
-                    className="bg-white border border-gray-200 text-gray-900"
+                    className="bg-gray-800 border-gray-700 text-white placeholder-gray-400"
                   />
                 </div>
               </div>

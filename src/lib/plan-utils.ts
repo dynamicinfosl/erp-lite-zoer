@@ -34,6 +34,8 @@ export async function validatePlanLimits(
       .select(`
         status,
         trial_end,
+        trial_ends_at,
+        current_period_end,
         plan:plans(limits)
       `)
       .eq('tenant_id', tenantId)
@@ -49,10 +51,13 @@ export async function validatePlanLimits(
       return { canProceed: true };
     }
 
-    // Verificar se trial expirou
-    if (subscription.status === 'trial' && subscription.trial_end) {
-      const trialEnd = new Date(subscription.trial_end);
-      if (trialEnd < new Date()) {
+    const now = new Date();
+
+    // Verificar se trial expirou (verificar ambos os campos para compatibilidade)
+    const trialEndDate = subscription.trial_end || subscription.trial_ends_at;
+    if (subscription.status === 'trial' && trialEndDate) {
+      const trialEnd = new Date(trialEndDate);
+      if (trialEnd < now) {
         return { 
           canProceed: false, 
           reason: 'Período de teste expirado. Faça upgrade do seu plano.',
@@ -61,7 +66,19 @@ export async function validatePlanLimits(
       }
     }
 
-    // Verificar se plano está ativo
+    // Verificar se plano ativo expirou (current_period_end)
+    if (subscription.status === 'active' && subscription.current_period_end) {
+      const periodEnd = new Date(subscription.current_period_end);
+      if (periodEnd < now) {
+        return { 
+          canProceed: false, 
+          reason: 'Plano expirado. Entre em contato com o suporte para renovar.',
+          trialExpired: true 
+        };
+      }
+    }
+
+    // Verificar se plano está inativo
     if (subscription.status !== 'trial' && subscription.status !== 'active') {
       return { 
         canProceed: false, 

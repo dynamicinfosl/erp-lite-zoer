@@ -117,20 +117,35 @@ export function usePlanLimits(): PlanLimitsHook {
     loadUsageData();
   }, [tenant?.id, loadUsageData]);
 
-  // Verificar se trial expirou
-  const isTrialExpired = Boolean(currentSubscription?.status === 'trial' && 
+  // Verificar se trial ou plano ativo expirou
+  const now = new Date();
+  const isTrialExpired = Boolean(
+    currentSubscription?.status === 'trial' && 
     currentSubscription?.trial_ends_at && 
-    new Date(currentSubscription.trial_ends_at) < new Date());
+    new Date(currentSubscription.trial_ends_at) < now
+  );
+  
+  const isActivePlanExpired = Boolean(
+    currentSubscription?.status === 'active' && 
+    currentSubscription?.current_period_end && 
+    new Date(currentSubscription.current_period_end) < now
+  );
+  
+  const isPlanExpired = isTrialExpired || isActivePlanExpired;
 
-  // Calcular dias restantes no trial
+  // Calcular dias restantes no trial ou plano ativo
   const daysLeftInTrial = currentSubscription?.trial_ends_at 
-    ? Math.max(0, Math.floor((new Date(currentSubscription.trial_ends_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+    ? Math.max(0, Math.ceil((new Date(currentSubscription.trial_ends_at).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+    : 0;
+  
+  const daysLeftInPlan = currentSubscription?.current_period_end
+    ? Math.max(0, Math.ceil((new Date(currentSubscription.current_period_end).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
     : 0;
 
   // Verificar se pode criar um item
   const canCreate = (type: 'customer' | 'product' | 'user'): boolean => {
     if (!currentSubscription?.plan?.limits) return true; // Permitir se não há limites
-    if (isTrialExpired) return false;
+    if (isPlanExpired) return false;
 
     const limits = currentSubscription.plan.limits;
     
@@ -181,8 +196,8 @@ export function usePlanLimits(): PlanLimitsHook {
     limits: currentSubscription?.plan?.limits || null,
     loading,
     error,
-    isTrialExpired,
-    daysLeftInTrial,
+    isTrialExpired: isPlanExpired, // Retornar isPlanExpired para manter compatibilidade
+    daysLeftInTrial: daysLeftInTrial || daysLeftInPlan,
     canCreate,
     getUsagePercentage,
     refreshData: loadUsageData,
