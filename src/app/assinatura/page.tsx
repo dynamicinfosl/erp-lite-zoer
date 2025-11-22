@@ -164,7 +164,7 @@ export default function AssinaturaPage() {
       plan_slug: subscription.plan?.slug,
       plan_name: subscription.plan?.name,
       current_period_end: subscription.current_period_end,
-      trial_end: subscription.trial_end
+      trial_ends_at: subscription.trial_ends_at
     });
     
     // Se status é active e tem plano, usar o slug do plano
