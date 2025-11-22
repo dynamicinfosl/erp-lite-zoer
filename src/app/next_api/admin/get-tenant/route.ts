@@ -12,12 +12,14 @@ const supabaseAdmin = supabaseUrl && supabaseServiceKey
 export async function GET(request: NextRequest) {
   try {
     if (!supabaseAdmin) {
+      console.error('❌ [API] Cliente Supabase não configurado');
       return NextResponse.json(
         { 
           success: false, 
+          data: null,
           error: 'Cliente Supabase não configurado' 
         },
-        { status: 500 }
+        { status: 200 }
       );
     }
 
@@ -51,9 +53,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { 
           success: false, 
+          data: null,
           error: 'Erro ao buscar membership: ' + membershipError.message 
         },
-        { status: 400 }
+        { status: 200 }
       );
     }
 
@@ -62,9 +65,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { 
           success: false, 
+          data: null,
           error: 'Nenhum membership ativo encontrado para este usuário' 
         },
-        { status: 404 }
+        { status: 200 }
       );
     }
 
@@ -83,9 +87,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { 
           success: false, 
+          data: null,
           error: 'Erro ao buscar tenant: ' + tenantError.message 
         },
-        { status: 400 }
+        { status: 200 }
       );
     }
 
@@ -94,9 +99,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { 
           success: false, 
+          data: null,
           error: 'Tenant não encontrado' 
         },
-        { status: 404 }
+        { status: 200 }
       );
     }
 
@@ -109,12 +115,14 @@ export async function GET(request: NextRequest) {
 
   } catch (error: any) {
     console.error('❌ [API] Erro no handler:', error);
+    // Sempre retornar sucesso com data null, nunca erro 500
     return NextResponse.json(
       { 
         success: false, 
+        data: null,
         error: 'Erro interno: ' + (error?.message || 'Erro desconhecido') 
       },
-      { status: 500 }
+      { status: 200 }
     );
   }
 }
