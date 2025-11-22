@@ -352,43 +352,103 @@ export async function POST(request: NextRequest) {
       ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dias
       : null;
 
-    const { data, error } = await supabaseAdmin
+    const currentPeriodStart = new Date().toISOString();
+    const currentPeriodEnd = status === 'active' 
+      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dias
+      : null;
+
+    console.log('📝 [POST] Dados para inserção:', {
+      tenant_id,
+      plan_id,
+      status,
+      trial_end: trialEndsAt,
+      current_period_start: currentPeriodStart,
+      current_period_end: currentPeriodEnd
+    });
+
+    // Primeiro inserir sem o join para evitar problemas
+    const { data: insertedData, error: insertError } = await supabaseAdmin
       .from('subscriptions')
       .insert({
         tenant_id,
         plan_id,
         status,
-        // coluna correta no schema base
         trial_end: trialEndsAt,
-        current_period_start: new Date().toISOString(),
-        current_period_end: status === 'active' 
-          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dias
-          : null,
+        current_period_start: currentPeriodStart,
+        current_period_end: currentPeriodEnd,
       })
-      .select(`
-        *,
-        plan:plans(*)
-      `)
+      .select('*')
       .single();
 
-    if (error) {
-      console.error('Erro ao criar subscription:', error);
+    if (insertError) {
+      console.error('❌ [POST] Erro ao inserir subscription:', insertError);
+      console.error('❌ [POST] Detalhes do erro:', {
+        code: insertError.code,
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint
+      });
       return NextResponse.json(
-        { error: 'Erro ao criar subscription: ' + error.message },
+        { 
+          error: 'Erro ao criar subscription: ' + insertError.message,
+          details: insertError.details,
+          code: insertError.code
+        },
         { status: 400 }
       );
     }
 
+    if (!insertedData) {
+      console.error('❌ [POST] Subscription inserida mas sem dados retornados');
+      return NextResponse.json(
+        { error: 'Subscription criada mas não foi possível recuperar os dados' },
+        { status: 500 }
+      );
+    }
+
+    console.log('✅ [POST] Subscription criada com sucesso:', insertedData.id);
+
+    // Buscar plan separadamente
+    let plan = null;
+    if (insertedData.plan_id) {
+      try {
+        const { data: planData, error: planError } = await supabaseAdmin
+          .from('plans')
+          .select('*')
+          .eq('id', insertedData.plan_id)
+          .maybeSingle();
+        
+        if (!planError && planData) {
+          plan = planData;
+          console.log('✅ [POST] Plan encontrado:', plan.name);
+        } else {
+          console.warn('⚠️ [POST] Erro ao buscar plan:', planError?.message);
+        }
+      } catch (planErr: any) {
+        console.warn('⚠️ [POST] Erro ao buscar plan, continuando sem plan:', planErr?.message || planErr);
+      }
+    }
+
+    // Montar resposta com subscription e plan
+    const responseData = {
+      ...insertedData,
+      plan: plan
+    };
+
     return NextResponse.json({ 
       success: true, 
       message: 'Subscription criada com sucesso',
-      data 
+      data: responseData
     });
 
-  } catch (error) {
-    console.error('Erro no handler de criação:', error);
+  } catch (error: any) {
+    console.error('❌ [POST] Erro inesperado no handler de criação:', error);
+    console.error('❌ [POST] Stack trace:', error?.stack);
     return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+      { 
+        error: 'Erro interno do servidor: ' + (error?.message || 'Erro desconhecido'),
+        type: error?.name || 'UnknownError'
+      },
       { status: 500 }
     );
   }
