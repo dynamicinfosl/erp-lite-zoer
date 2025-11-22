@@ -245,35 +245,54 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    let { tenant_id, plan_id, status = 'trial' } = body as { tenant_id?: string; plan_id?: string; status?: 'trial' | 'active' };
+    let { tenant_id, plan_id, status = 'trial' } = body as { tenant_id?: string; plan_id?: string | null; status?: 'trial' | 'active' };
 
-    if (!tenant_id || !plan_id) {
+    if (!tenant_id) {
+      console.error('❌ [POST] Tenant ID é obrigatório');
       return NextResponse.json(
-        { error: 'Tenant ID e Plan ID são obrigatórios' },
+        { error: 'Tenant ID é obrigatório' },
         { status: 400 }
       );
     }
 
-    // Se não veio plan_id, escolher o plano 'free' ativo, senão o mais barato ativo
+    console.log(`🔍 [POST] Criando subscription para tenant: ${tenant_id}, plan_id: ${plan_id || 'null'}, status: ${status}`);
+
+    // ✅ Se não veio plan_id, escolher automaticamente um plano
     if (!plan_id) {
-      const { data: freePlan } = await supabaseAdmin
+      console.log('🔍 [POST] Plan ID não fornecido, buscando plano padrão...');
+      
+      // Tentar buscar plano 'trial' ou 'free' primeiro
+      const { data: trialPlan } = await supabaseAdmin
         .from('plans')
         .select('id')
-        .eq('slug', 'free')
+        .or('slug.eq.trial,slug.eq.free')
         .eq('is_active', true)
-        .single();
+        .limit(1)
+        .maybeSingle();
 
-      if (freePlan?.id) {
-        plan_id = freePlan.id;
+      if (trialPlan?.id) {
+        plan_id = trialPlan.id;
+        console.log('✅ [POST] Plano trial/free encontrado:', plan_id);
       } else {
+        // Se não encontrou trial/free, buscar o mais barato
         const { data: cheapest } = await supabaseAdmin
           .from('plans')
           .select('id')
           .eq('is_active', true)
           .order('price_monthly', { ascending: true })
           .limit(1)
-          .single();
-        plan_id = cheapest?.id ?? plan_id;
+          .maybeSingle();
+        
+        if (cheapest?.id) {
+          plan_id = cheapest.id;
+          console.log('✅ [POST] Plano mais barato encontrado:', plan_id);
+        } else {
+          console.error('❌ [POST] Nenhum plano ativo encontrado no banco');
+          return NextResponse.json(
+            { error: 'Nenhum plano ativo encontrado. Configure planos no sistema primeiro.' },
+            { status: 400 }
+          );
+        }
       }
     } else {
       // Validar o plano informado
@@ -282,8 +301,10 @@ export async function POST(request: NextRequest) {
         .select('id')
         .eq('id', plan_id)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
+        
       if (planError || !plan) {
+        console.error('❌ [POST] Plano não encontrado ou inativo:', plan_id, planError);
         return NextResponse.json(
           { error: 'Plano não encontrado ou inativo' },
           { status: 400 }
@@ -292,17 +313,38 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar se já existe subscription para este tenant
-    const { data: existingSub, error: existingError } = await supabaseAdmin
+    const { data: existingSubs, error: existingError } = await supabaseAdmin
       .from('subscriptions')
-      .select('id')
-      .eq('tenant_id', tenant_id)
-      .single();
+      .select('id, status')
+      .eq('tenant_id', tenant_id);
 
-    if (existingSub) {
-      return NextResponse.json(
-        { error: 'Tenant já possui uma subscription ativa' },
-        { status: 400 }
-      );
+    if (existingError && existingError.code !== 'PGRST116') {
+      console.error('❌ [POST] Erro ao verificar subscription existente:', existingError);
+      // Continuar mesmo com erro, pois pode ser que a tabela não exista ainda
+    }
+
+    if (existingSubs && existingSubs.length > 0) {
+      // Se já existe subscription ativa, retornar ela ao invés de criar nova
+      const activeSub = existingSubs.find(s => s.status === 'active') || existingSubs[0];
+      console.log('⚠️ [POST] Tenant já possui subscription, retornando existente:', activeSub.id);
+      
+      // Buscar subscription completa
+      const { data: fullSub } = await supabaseAdmin
+        .from('subscriptions')
+        .select(`
+          *,
+          plan:plans(*)
+        `)
+        .eq('id', activeSub.id)
+        .maybeSingle();
+      
+      if (fullSub) {
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Subscription já existe',
+          data: fullSub 
+        });
+      }
     }
 
     // Criar subscription
