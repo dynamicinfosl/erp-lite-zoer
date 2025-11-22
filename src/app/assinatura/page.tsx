@@ -313,10 +313,10 @@ export default function AssinaturaPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-[400px] bg-juga-surface">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Carregando informações do plano...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-juga-primary mx-auto mb-4" />
+          <p className="text-body">Carregando informações do plano...</p>
         </div>
       </div>
     );
@@ -324,11 +324,11 @@ export default function AssinaturaPage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-[400px] bg-juga-surface">
         <div className="text-center">
-          <AlertCircle className="h-8 w-8 text-red-600 mx-auto mb-4" />
-          <p className="text-red-600 mb-4">Erro ao carregar dados do plano</p>
-          <Button onClick={refreshData} variant="outline" className="px-4 py-2 sm:px-5 sm:py-2.5">
+          <AlertCircle className="h-8 w-8 text-juga-error mx-auto mb-4" />
+          <p className="text-juga-error mb-4">Erro ao carregar dados do plano</p>
+          <Button onClick={refreshData} variant="outline" className="px-4 py-2 sm:px-5 sm:py-2.5 bg-juga-surface-elevated border-juga-border text-heading hover:bg-juga-surface-card">
             Tentar Novamente
           </Button>
         </div>
@@ -337,7 +337,7 @@ export default function AssinaturaPage() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6 bg-juga-surface min-h-screen">
       {/* Header - Responsivo */}
       <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div className="space-y-1">
@@ -353,12 +353,12 @@ export default function AssinaturaPage() {
               await refreshSubscription();
               await refreshData();
             }}
-            className="text-xs"
+            className="text-xs bg-juga-surface-elevated border-juga-border text-heading hover:bg-juga-surface-card"
           >
             <RefreshCw className="h-3 w-3 mr-1" />
             Atualizar
           </Button>
-          <Badge variant="secondary" className="px-3 py-1">
+          <Badge variant="secondary" className="px-3 py-1 bg-juga-surface-elevated border-juga-border text-heading">
             <CurrentIcon className="h-3 w-3" />
             {currentInfo.name}
           </Badge>
@@ -600,31 +600,31 @@ export default function AssinaturaPage() {
           ) : (currentPlan as string) !== 'trial' && subscription?.plan ? (
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex items-center gap-3 p-4 bg-juga-surface-elevated border border-juga-border rounded-lg">
                   <div className={`p-2 rounded-lg ${currentInfo.bgColor}`}>
                     <CreditCard className={`h-5 w-5 ${currentInfo.color}`} />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Plano</p>
-                    <p className="text-lg font-bold">{subscription.plan.name}</p>
+                    <p className="text-sm font-medium text-caption">Plano</p>
+                    <p className="text-lg font-bold text-heading">{subscription.plan.name}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex items-center gap-3 p-4 bg-juga-surface-elevated border border-juga-border rounded-lg">
                   <div className={`p-2 rounded-lg ${currentInfo.bgColor}`}>
                     <CreditCard className={`h-5 w-5 ${currentInfo.color}`} />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Valor Mensal</p>
-                    <p className="text-lg font-bold">{formatPrice(subscription.plan.price_monthly)}/mês</p>
+                    <p className="text-sm font-medium text-caption">Valor Mensal</p>
+                    <p className="text-lg font-bold text-heading">{formatPrice(subscription.plan.price_monthly)}/mês</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900">
-                    <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <div className="flex items-center gap-3 p-4 bg-juga-surface-elevated border border-juga-border rounded-lg">
+                  <div className="p-2 rounded-lg bg-juga-primary/10">
+                    <Calendar className="h-5 w-5 text-juga-primary" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Data de Expiração</p>
-                    <p className="text-lg font-bold">
+                    <p className="text-sm font-medium text-caption">Data de Expiração</p>
+                    <p className="text-lg font-bold text-heading">
                       {subscription.current_period_end 
                         ? new Date(subscription.current_period_end).toLocaleDateString('pt-BR', {
                             day: '2-digit',
@@ -638,18 +638,18 @@ export default function AssinaturaPage() {
                 </div>
               </div>
               {subscription.current_period_end && (
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="p-4 bg-juga-primary/10 border border-juga-primary/20 rounded-lg">
                   <div className="flex items-start gap-3">
-                    <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                    <Calendar className="h-5 w-5 text-juga-primary mt-0.5" />
                     <div>
-                      <p className="font-medium text-blue-900 dark:text-blue-100">
+                      <p className="font-medium text-heading">
                         Seu plano está ativo até {new Date(subscription.current_period_end).toLocaleDateString('pt-BR', {
                           day: '2-digit',
                           month: 'long',
                           year: 'numeric'
                         })}
                       </p>
-                      <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                      <p className="text-sm text-body mt-1">
                         A renovação será automática na data de expiração.
                       </p>
                     </div>
@@ -687,7 +687,7 @@ export default function AssinaturaPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-heading">Escolha seu Plano</h2>
-          <Badge variant="outline">3 planos disponíveis</Badge>
+          <Badge variant="outline" className="bg-juga-surface-elevated border-juga-border text-heading">3 planos disponíveis</Badge>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {plans.map((plan) => (
@@ -695,39 +695,39 @@ export default function AssinaturaPage() {
               key={plan.id} 
               className={`relative transition-all juga-card hover:shadow-lg flex flex-col ${
                 plan.popular 
-                  ? 'border-blue-500 shadow-lg scale-105' 
-                  : 'hover:border-gray-300'
+                  ? 'border-juga-primary shadow-lg scale-105 ring-2 ring-juga-primary/20' 
+                  : 'hover:border-juga-primary/50'
               }`}
             >
               {plan.popular && (
                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-blue-600 hover:bg-blue-700">Mais Popular</Badge>
+                  <Badge className="juga-gradient text-white">Mais Popular</Badge>
                 </div>
               )}
 
               <CardHeader className="text-center pb-4">
                 <div className="mx-auto mb-4">
                   {plan.id === 'basic' && (
-                    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    <div className="w-12 h-12 rounded-full bg-juga-success/20 flex items-center justify-center">
+                      <CheckCircle className="h-6 w-6 text-juga-success" />
                     </div>
                   )}
                   {plan.id === 'pro' && (
-                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                      <Crown className="h-6 w-6 text-blue-600" />
+                    <div className="w-12 h-12 rounded-full bg-juga-primary/20 flex items-center justify-center">
+                      <Crown className="h-6 w-6 text-juga-primary" />
                     </div>
                   )}
                   {plan.id === 'enterprise' && (
-                    <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
-                      <Shield className="h-6 w-6 text-purple-600" />
+                    <div className="w-12 h-12 rounded-full bg-juga-accent/20 flex items-center justify-center">
+                      <Shield className="h-6 w-6 text-juga-accent" />
                     </div>
                   )}
                 </div>
-                <CardTitle className="text-xl">{plan.name}</CardTitle>
-                <CardDescription className="mt-2">{plan.description}</CardDescription>
+                <CardTitle className="text-xl text-heading">{plan.name}</CardTitle>
+                <CardDescription className="mt-2 text-body">{plan.description}</CardDescription>
                 <div className="py-4">
-                  <span className="text-4xl font-bold">R$ {plan.price.toFixed(2)}</span>
-                  <span className="text-muted-foreground text-sm">/mês</span>
+                  <span className="text-4xl font-bold text-heading">R$ {plan.price.toFixed(2)}</span>
+                  <span className="text-caption text-sm">/mês</span>
                 </div>
               </CardHeader>
 
@@ -735,8 +735,8 @@ export default function AssinaturaPage() {
                 <ul className="space-y-3 flex-1">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span>{feature}</span>
+                      <CheckCircle className="h-4 w-4 text-juga-success mt-0.5 flex-shrink-0" />
+                      <span className="text-body">{feature}</span>
                     </li>
                   ))}
                 </ul>
@@ -745,10 +745,10 @@ export default function AssinaturaPage() {
                   <Button 
                     className={`w-full px-4 py-2.5 sm:px-5 sm:py-3 transition-all duration-200 ${
                       currentPlan === plan.id 
-                        ? 'bg-gray-100 text-gray-600 border-gray-200 cursor-not-allowed' 
+                        ? 'bg-juga-surface-elevated text-body border-juga-border cursor-not-allowed' 
                         : plan.popular 
                         ? 'juga-gradient text-white hover:shadow-lg hover:scale-105' 
-                        : 'bg-white text-sky-600 border-sky-600 hover:bg-sky-50 hover:border-sky-700'
+                        : 'bg-juga-surface-elevated text-juga-primary border-juga-primary hover:bg-juga-primary/10 hover:border-juga-primary'
                     }`}
                     variant={currentPlan === plan.id ? 'outline' : plan.popular ? 'default' : 'outline'} 
                     disabled={currentPlan === plan.id || isProcessing}
@@ -788,17 +788,17 @@ export default function AssinaturaPage() {
           <CardDescription>Configure seu método de pagamento preferido</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+          <div className="flex items-center justify-between p-4 border border-juga-border rounded-lg bg-juga-surface-elevated hover:bg-juga-surface-card transition-colors">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-8 bg-blue-600 rounded text-white text-xs font-bold flex items-center justify-center">
+              <div className="w-12 h-8 juga-gradient rounded text-white text-xs font-bold flex items-center justify-center">
                 VISA
               </div>
               <div>
-                <p className="font-medium">**** **** **** 4242</p>
-                <p className="text-sm text-muted-foreground">Expira 12/2025</p>
+                <p className="font-medium text-heading">**** **** **** 4242</p>
+                <p className="text-sm text-caption">Expira 12/2025</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" className="px-3 py-2">
+            <Button variant="outline" size="sm" className="px-3 py-2 bg-juga-surface-elevated border-juga-border text-heading hover:bg-juga-surface-card">
               Atualizar
             </Button>
           </div>
@@ -813,7 +813,7 @@ export default function AssinaturaPage() {
               <CardTitle className="text-heading">Histórico de Faturas</CardTitle>
               <CardDescription className="text-sm">Suas faturas mais recentes</CardDescription>
             </div>
-            <Badge variant="outline">3 faturas</Badge>
+            <Badge variant="outline" className="bg-juga-surface-elevated border-juga-border text-heading">3 faturas</Badge>
           </div>
         </CardHeader>
         <CardContent>
@@ -825,30 +825,30 @@ export default function AssinaturaPage() {
             ].map((invoice) => (
               <div 
                 key={invoice.invoice} 
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-between p-4 border border-juga-border rounded-lg bg-juga-surface-elevated hover:bg-juga-surface-card transition-colors"
               >
                 <div className="flex items-center gap-4">
                   <div className="text-center">
-                    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    <div className="w-12 h-12 rounded-full bg-juga-success/20 flex items-center justify-center">
+                      <CheckCircle className="h-6 w-6 text-juga-success" />
                     </div>
                   </div>
                   <div>
-                    <p className="font-medium">{invoice.invoice}</p>
+                    <p className="font-medium text-heading">{invoice.invoice}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <Calendar className="h-3 w-3 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">{invoice.date}</p>
+                      <Calendar className="h-3 w-3 text-caption" />
+                      <p className="text-sm text-caption">{invoice.date}</p>
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 mb-1">
+                    <Badge variant="outline" className="text-juga-success border-juga-success/30 bg-juga-success/10 mb-1">
                       {invoice.status}
                     </Badge>
-                    <p className="font-semibold text-lg">{invoice.amount}</p>
+                    <p className="font-semibold text-lg text-heading">{invoice.amount}</p>
                   </div>
-                  <Button variant="ghost" size="sm" className="gap-2 px-2.5 py-1.5">
+                  <Button variant="ghost" size="sm" className="gap-2 px-2.5 py-1.5 text-body hover:bg-juga-surface-card">
                     <Download className="h-4 w-4" />
                     Download
                   </Button>
