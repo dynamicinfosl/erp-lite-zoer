@@ -237,31 +237,41 @@ export default function VendasPage() {
   };
 
   const getStatusBadge = (status: Sale['status']) => {
-    const statusMap = {
-      'pendente': { label: 'Pendente', variant: 'outline' as const },
-      'paga': { label: 'Paga', variant: 'default' as const },
-      'cancelada': { label: 'Cancelada', variant: 'destructive' as const }
+    const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
+      'pendente': { label: 'Pendente', variant: 'outline' },
+      'paga': { label: 'Paga', variant: 'default' },
+      'cancelada': { label: 'Cancelada', variant: 'destructive' }
     };
     
+    // Fallback para valores não mapeados ou undefined
+    const statusData = status && statusMap[status] 
+      ? statusMap[status] 
+      : { label: status || 'Desconhecido', variant: 'secondary' as const };
+    
     return (
-      <Badge variant={statusMap[status].variant}>
-        {statusMap[status].label}
+      <Badge variant={statusData.variant}>
+        {statusData.label}
       </Badge>
     );
   };
 
   const getFormaPagamentoBadge = (forma: Sale['forma_pagamento']) => {
-    const formaMap = {
-      'dinheiro': { label: 'Dinheiro', variant: 'secondary' as const },
-      'cartao_debito': { label: 'Cartão Débito', variant: 'outline' as const },
-      'cartao_credito': { label: 'Cartão Crédito', variant: 'outline' as const },
-      'pix': { label: 'PIX', variant: 'default' as const },
-      'boleto': { label: 'Boleto', variant: 'secondary' as const }
+    const formaMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
+      'dinheiro': { label: 'Dinheiro', variant: 'secondary' },
+      'cartao_debito': { label: 'Cartão Débito', variant: 'outline' },
+      'cartao_credito': { label: 'Cartão Crédito', variant: 'outline' },
+      'pix': { label: 'PIX', variant: 'default' },
+      'boleto': { label: 'Boleto', variant: 'secondary' }
     };
     
+    // Fallback para valores não mapeados ou undefined
+    const formaData = forma && formaMap[forma] 
+      ? formaMap[forma] 
+      : { label: forma || 'Não informado', variant: 'secondary' as const };
+    
     return (
-      <Badge variant={formaMap[forma].variant}>
-        {formaMap[forma].label}
+      <Badge variant={formaData.variant}>
+        {formaData.label}
       </Badge>
     );
   };

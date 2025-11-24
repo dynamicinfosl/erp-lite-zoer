@@ -58,6 +58,12 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   const loadRealTenant = useCallback(async (userId: string): Promise<Tenant> => {
     console.log('🔍 [SIMPLE] Buscando tenant para usuário:', userId);
     
+    // ✅ Garantir que só executa no cliente
+    if (typeof window === 'undefined') {
+      console.log('⏭️ [SIMPLE] Skip - SSR context');
+      return createDefaultTenant(userId);
+    }
+    
     // ✅ VERSÃO ULTRA SIMPLIFICADA: Usar API route com timeout curto
     try {
       const controller = new AbortController();
@@ -141,6 +147,12 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
 
   // Carregar sessão inicial - VERSÃO OTIMIZADA
   useEffect(() => {
+    // ✅ Garantir que só executa no cliente
+    if (typeof window === 'undefined') {
+      console.log('⏭️ [SIMPLE] Skip auth init - SSR context');
+      return;
+    }
+    
     console.log('🔄 Iniciando autenticação...');
     
     let isInitialized = false;
