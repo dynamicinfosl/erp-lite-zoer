@@ -187,3 +187,136 @@
 }
 
 html { font-size: var(--font-size); scroll-behavior: smooth; }
+
+/* Melhorar visibilidade do menu em telas mobile */
+@media (max-width: 640px) {
+  /* Sidebar mobile - aumentar contraste e legibilidade */
+  [data-sidebar="sidebar"][data-mobile="true"] {
+    --sidebar-foreground: #ffffff !important;
+  }
+  
+  /* Textos do menu no mobile */
+  [data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="menu-button"],
+  [data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="menu-sub-button"],
+  [data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="group-label"] {
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Ícones do menu no mobile */
+  [data-sidebar="sidebar"][data-mobile="true"] svg {
+    color: #ffffff !important;
+    opacity: 1 !important;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+  }
+
+  /* Hover e estados ativos no mobile */
+  [data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="menu-button"]:hover,
+  [data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="menu-button"][data-active="true"] {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    color: #ffffff !important;
+  }
+
+  /* Submenu no mobile */
+  [data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="menu-sub"] {
+    border-left-color: rgba(255, 255, 255, 0.3) !important;
+  }
+
+  /* Labels de grupo no mobile */
+  [data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="group-label"] {
+    color: rgba(255, 255, 255, 0.85) !important;
+    font-weight: 700 !important;
+    font-size: 0.8rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Header do sidebar no mobile */
+  [data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="header"] * {
+    color: #ffffff !important;
+    font-weight: 600 !important;
+  }
+
+  /* Footer do sidebar no mobile */
+  [data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="footer"] * {
+    color: #ffffff !important;
+  }
+
+  /* Badges e indicadores no mobile */
+  [data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="menu-badge"] {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    font-weight: 700 !important;
+  }
+
+  /* Melhorar contraste do fundo do sidebar mobile */
+  [data-sidebar="sidebar"][data-mobile="true"] {
+    background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%) !important;
+  }
+
+  .dark [data-sidebar="sidebar"][data-mobile="true"] {
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  [data-mobile="true"][data-sidebar="sidebar"] {
+    --sidebar-foreground: #ffffff;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-ring: rgba(255,255,255,0.5);
+  }
+
+  [data-mobile="true"] [data-sidebar="group-label"],
+  [data-mobile="true"] [data-sidebar="menu-button"],
+  [data-mobile="true"] [data-sidebar="menu-sub-button"] {
+    font-size: 0.95rem !important;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 1) !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  [data-mobile="true"] [data-sidebar="menu-button"] svg,
+  [data-mobile="true"] [data-sidebar="menu-sub-button"] svg {
+    color: rgba(255, 255, 255, 0.95) !important;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+  }
+}
+
+/* Melhorar visibilidade do menu no modo escuro para desktop */
+.dark [data-sidebar="sidebar"] {
+  /* Textos do menu no modo escuro */
+  --sidebar-foreground: rgba(255, 255, 255, 1);
+}
+
+.dark [data-sidebar="sidebar"] [data-sidebar="menu-button"],
+.dark [data-sidebar="sidebar"] [data-sidebar="menu-sub-button"] {
+  color: rgba(255, 255, 255, 1) !important;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.dark [data-sidebar="sidebar"] [data-sidebar="group-label"] {
+  color: rgba(255, 255, 255, 1) !important;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.dark [data-sidebar="sidebar"] [data-sidebar="menu-button"] svg,
+.dark [data-sidebar="sidebar"] [data-sidebar="menu-sub-button"] svg {
+  color: rgba(255, 255, 255, 0.95) !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+/* Estados hover e active no modo escuro */
+.dark [data-sidebar="sidebar"] [data-sidebar="menu-button"]:hover,
+.dark [data-sidebar="sidebar"] [data-sidebar="menu-button"][data-active="true"] {
+  color: rgba(255, 255, 255, 1) !important;
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.dark [data-sidebar="sidebar"] [data-sidebar="menu-button"]:hover svg,
+.dark [data-sidebar="sidebar"] [data-sidebar="menu-button"][data-active="true"] svg {
+  color: rgba(255, 255, 255, 1) !important;
+}

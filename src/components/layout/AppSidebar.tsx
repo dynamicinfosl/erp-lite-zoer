@@ -126,8 +126,8 @@ function SidebarContentInternal() {
             <Store className="h-5 w-5" />
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-sm font-semibold tracking-wide">JUGA</span>
-            <span className="text-xs text-white/60">ERP v1.0.0</span>
+            <span className="text-sm font-semibold tracking-wide text-white">JUGA</span>
+            <span className="text-xs text-white/60 dark:text-white font-medium">ERP v1.0.0</span>
           </div>
         </div>
       </SidebarHeader>
@@ -135,7 +135,7 @@ function SidebarContentInternal() {
       <SidebarContent className="flex-1 px-3 py-5">
         {filteredGroups.map(group => (
           <SidebarGroup key={group.title} className="space-y-3">
-            <SidebarGroupLabel className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/60 px-3">
+            <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-[0.25em] text-white/60 dark:text-white px-3">
               {group.title}
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -145,11 +145,11 @@ function SidebarContentInternal() {
                     <SidebarMenuButton
                       asChild
                       isActive={pathname === item.url}
-                      className="group h-9 rounded-xl px-3 text-sm text-white/80 transition data-[active=true]:bg-white/20 data-[active=true]:text-white hover:bg-white/15"
+                      className="group h-9 rounded-xl px-3 text-sm text-white/80 dark:text-white transition data-[active=true]:bg-white/20 data-[active=true]:text-white hover:bg-white/15"
                     >
                       <Link href={item.url}>
-                        <item.icon className="h-4 w-4 text-white/60 transition group-data-[active=true]:text-white group-hover:text-white" />
-                        <span className="truncate font-medium">{item.title}</span>
+                        <item.icon className="h-4 w-4 text-white/60 dark:text-white/90 transition group-data-[active=true]:text-white group-hover:text-white" />
+                        <span className="truncate font-semibold dark:font-semibold">{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -164,10 +164,10 @@ function SidebarContentInternal() {
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex flex-col min-w-0">
-              <span className="text-xs font-semibold text-white truncate">
+              <span className="text-xs font-semibold text-white dark:text-white truncate">
                 {user?.email || mockUserProfile.email}
               </span>
-              <span className="text-xs text-white/60 capitalize">
+              <span className="text-xs text-white/60 dark:text-white font-medium capitalize">
                 {displayName}
               </span>
             </div>
@@ -185,7 +185,7 @@ function SidebarContentInternal() {
                 }
               }
             }}
-            className="w-full justify-center gap-2 rounded-xl border border-white/30 bg-white/10 text-xs text-white hover:bg-white/20"
+            className="w-full justify-center gap-2 rounded-xl border border-white/30 dark:border-white/50 bg-white/10 dark:bg-white/20 text-xs text-white dark:text-white hover:bg-white/20 dark:hover:bg-white/30"
           >
             <LogOut className="h-3 w-3" />
             Finalizar sessão
@@ -206,11 +206,11 @@ const DynamicSidebarContent = dynamic(() => Promise.resolve(SidebarContentIntern
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
             <Store className="h-5 w-5" />
           </div>
-          <span className="text-sm font-semibold">JUGA</span>
+          <span className="text-sm font-semibold text-white">JUGA</span>
         </div>
       </SidebarHeader>
       <div className="flex h-full items-center justify-center">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white dark:border-white"></div>
       </div>
     </Sidebar>
   )
