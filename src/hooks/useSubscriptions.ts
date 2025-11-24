@@ -42,7 +42,22 @@ export function useSubscriptions() {
       setError(null);
 
       const response = await fetch(`/next_api/subscriptions?user_id=${user.id}`);
-      const result = await response.json();
+      
+      // Verificar content-type antes de fazer parse
+      const contentType = response.headers.get('content-type') || '';
+      let result: any;
+      if (contentType.includes('application/json')) {
+        try {
+          result = await response.json();
+        } catch (parseError) {
+          console.error('❌ Erro ao parsear JSON:', parseError);
+          throw new Error('Resposta inválida do servidor (não é JSON)');
+        }
+      } else {
+        const text = await response.text();
+        console.error('❌ Resposta não é JSON:', text.substring(0, 100));
+        throw new Error('Resposta inválida do servidor');
+      }
 
       if (!response.ok) {
         throw new Error(result.error || 'Erro ao buscar assinaturas');
@@ -77,7 +92,21 @@ export function useSubscriptions() {
         }),
       });
 
-      const result = await response.json();
+      // Verificar content-type antes de fazer parse
+      const contentType = response.headers.get('content-type') || '';
+      let result: any;
+      if (contentType.includes('application/json')) {
+        try {
+          result = await response.json();
+        } catch (parseError) {
+          console.error('❌ Erro ao parsear JSON:', parseError);
+          throw new Error('Resposta inválida do servidor (não é JSON)');
+        }
+      } else {
+        const text = await response.text();
+        console.error('❌ Resposta não é JSON:', text.substring(0, 100));
+        throw new Error('Resposta inválida do servidor');
+      }
 
       if (!response.ok) {
         throw new Error(result.error || 'Erro ao criar assinatura');
@@ -112,7 +141,21 @@ export function useSubscriptions() {
         }),
       });
 
-      const result = await response.json();
+      // Verificar content-type antes de fazer parse
+      const contentType = response.headers.get('content-type') || '';
+      let result: any;
+      if (contentType.includes('application/json')) {
+        try {
+          result = await response.json();
+        } catch (parseError) {
+          console.error('❌ Erro ao parsear JSON:', parseError);
+          throw new Error('Resposta inválida do servidor (não é JSON)');
+        }
+      } else {
+        const text = await response.text();
+        console.error('❌ Resposta não é JSON:', text.substring(0, 100));
+        throw new Error('Resposta inválida do servidor');
+      }
 
       if (!response.ok) {
         throw new Error(result.error || 'Erro ao atualizar assinatura');
@@ -140,7 +183,21 @@ export function useSubscriptions() {
         method: 'DELETE',
       });
 
-      const result = await response.json();
+      // Verificar content-type antes de fazer parse
+      const contentType = response.headers.get('content-type') || '';
+      let result: any;
+      if (contentType.includes('application/json')) {
+        try {
+          result = await response.json();
+        } catch (parseError) {
+          console.error('❌ Erro ao parsear JSON:', parseError);
+          throw new Error('Resposta inválida do servidor (não é JSON)');
+        }
+      } else {
+        const text = await response.text();
+        console.error('❌ Resposta não é JSON:', text.substring(0, 100));
+        throw new Error('Resposta inválida do servidor');
+      }
 
       if (!response.ok) {
         throw new Error(result.error || 'Erro ao cancelar assinatura');

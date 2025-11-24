@@ -140,7 +140,21 @@ export default function VendasPage() {
         throw new Error(`Erro ao carregar vendas: ${res.status}`);
       }
       
-      const json = await res.json();
+      // Verificar content-type antes de fazer parse
+      const contentType = res.headers.get('content-type') || '';
+      let json: any;
+      if (contentType.includes('application/json')) {
+        try {
+          json = await res.json();
+        } catch (parseError) {
+          console.error('❌ Erro ao parsear JSON:', parseError);
+          throw new Error('Resposta inválida do servidor (não é JSON)');
+        }
+      } else {
+        const text = await res.text();
+        console.error('❌ Resposta não é JSON:', text.substring(0, 100));
+        throw new Error('Resposta inválida do servidor');
+      }
       console.log('📥 Resposta da API:', json);
       
       // A API pode retornar data, rows ou um array direto

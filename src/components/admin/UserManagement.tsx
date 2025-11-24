@@ -86,18 +86,35 @@ export function UserManagement() {
       if (!response.ok) {
         let errorMessage = `Falha ao carregar usuários (${response.status})`;
         try {
-          const err = await response.json();
-          errorMessage = err?.error || errorMessage;
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const err = await response.json();
+            errorMessage = err?.error || errorMessage;
+          } else {
+            const text = await response.text();
+            errorMessage = text || errorMessage;
+          }
         } catch {
-          // Se não conseguir parsear JSON, usar mensagem padrão
+          // Se não conseguir parsear, usar mensagem padrão
         }
         throw new Error(errorMessage);
       }
 
-      const json = await response.json().catch((parseError) => {
-        console.error('❌ Erro ao parsear resposta JSON:', parseError);
+      // Verificar content-type antes de fazer parse
+      const contentType = response.headers.get('content-type') || '';
+      let json: any;
+      if (contentType.includes('application/json')) {
+        try {
+          json = await response.json();
+        } catch (parseError) {
+          console.error('❌ Erro ao parsear JSON:', parseError);
+          throw new Error('Resposta inválida do servidor (não é JSON)');
+        }
+      } else {
+        const text = await response.text();
+        console.error('❌ Resposta não é JSON:', text.substring(0, 100));
         throw new Error('Resposta inválida do servidor');
-      });
+      }
 
       const data = (json?.data || []) as TenantUser[];
       setUsers(data);
