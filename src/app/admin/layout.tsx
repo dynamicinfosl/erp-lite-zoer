@@ -32,7 +32,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       <SidebarInset className="w-full">
         <div className="lg:hidden sticky top-0 z-30 flex items-center gap-2 border-b border-border bg-background/90 px-4 py-3 backdrop-blur">
           <SidebarTrigger className="text-foreground" />
-          <span className="text-sm font-semibold text-foreground">Menu do Super Admin</span>
         </div>
         <main className="flex-1 overflow-auto min-h-screen w-full">
           <div className="w-full h-full p-4 sm:p-6">

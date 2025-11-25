@@ -451,9 +451,9 @@ export function UserManagement() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full min-w-0">
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <Card 
           className={`cursor-pointer transition-all duration-200 hover:shadow-lg bg-gray-900 border-gray-700 ${
             activeFilter === null ? 'ring-2 ring-blue-500 bg-blue-500/10' : 'hover:bg-gray-800/50'
@@ -569,8 +569,8 @@ export function UserManagement() {
 
       {/* Indicador de Filtro Ativo */}
       {activeFilter && (
-        <div className="flex items-center justify-between bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+          <div className="flex flex-wrap items-center gap-2 text-center sm:text-left">
             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
             <span className="text-sm text-blue-300">
               Filtro ativo: {activeFilter === 'all' ? 'Todos' : 
@@ -588,7 +588,7 @@ export function UserManagement() {
             variant="outline"
             size="sm"
             onClick={clearFilters}
-            className="text-blue-300 border-blue-300 hover:bg-blue-500/20"
+            className="w-full sm:w-auto text-blue-300 border-blue-300 hover:bg-blue-500/20"
           >
             Limpar Filtro
           </Button>
@@ -598,12 +598,12 @@ export function UserManagement() {
       {/* Tabela de Usuários */}
       <Card className="bg-gray-900 border-gray-700">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="flex items-center gap-2 text-white">
               <Users className="h-5 w-5" />
               Gerenciar Clientes
             </CardTitle>
-            <Button onClick={loadUsers} variant="outline" size="sm" className="border-gray-700 text-gray-300 hover:bg-gray-800">
+            <Button onClick={loadUsers} variant="outline" size="sm" className="w-full sm:w-auto border-gray-700 text-gray-300 hover:bg-gray-800">
               <RefreshCw className="h-4 w-4 mr-2" />
               Atualizar
             </Button>
@@ -632,19 +632,19 @@ export function UserManagement() {
             </Alert>
           ) : (
             <div className="overflow-x-auto max-h-[62vh] overflow-y-auto rounded-md">
-              <Table className="text-sm w-full table-fixed">
+              <Table className="text-xs sm:text-sm w-full min-w-[1000px]">
                 <TableHeader className="sticky top-0 z-10 bg-gray-800/90 backdrop-blur supports-[backdrop-filter]:bg-gray-800/60 border-gray-700">
                   <TableRow className="border-gray-700">
-                    <TableHead className="text-gray-300">Email</TableHead>
-                    <TableHead className="text-gray-300">Empresa</TableHead>
-                    <TableHead className="text-gray-300">Responsável</TableHead>
-                    <TableHead className="text-gray-300">Status</TableHead>
-                    <TableHead className="text-gray-300">Plano</TableHead>
-                    <TableHead className="text-gray-300">Expiração</TableHead>
-                    <TableHead className="text-gray-300">Aprovação</TableHead>
-                    <TableHead className="text-gray-300">Cadastro</TableHead>
-                    <TableHead className="text-gray-300">Último Login</TableHead>
-                    <TableHead className="text-gray-300">Ações</TableHead>
+                    <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Email</TableHead>
+                    <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Empresa</TableHead>
+                    <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Responsável</TableHead>
+                    <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Status</TableHead>
+                    <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Plano</TableHead>
+                    <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Expiração</TableHead>
+                    <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Aprovação</TableHead>
+                    <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Cadastro</TableHead>
+                    <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Último Login</TableHead>
+                    <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

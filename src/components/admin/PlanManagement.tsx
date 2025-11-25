@@ -12,6 +12,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   CreditCard,
   Plus,
   Edit,
@@ -26,6 +34,7 @@ import {
   Database,
   Star,
   CheckCircle,
+  Menu,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -271,20 +280,57 @@ export function PlanManagement() {
       {/* Header */}
       <Card className="bg-gray-900 border-gray-700">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="flex items-center gap-2 text-white">
               <CreditCard className="h-5 w-5" />
               Planos de Assinatura
             </CardTitle>
-            <div className="flex gap-2">
-              <Button onClick={loadPlans} variant="outline" size="sm" className="border-gray-700 text-gray-300 hover:bg-gray-800">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Atualizar
-              </Button>
-              <Button onClick={handleCreatePlan} className="juga-gradient text-white">
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Plano
-              </Button>
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex gap-2">
+                <Button onClick={loadPlans} variant="outline" size="sm" className="border-gray-700 text-gray-300 hover:bg-gray-800">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Atualizar
+                </Button>
+                <Button onClick={handleCreatePlan} className="juga-gradient text-white">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Plano
+                </Button>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="sm:hidden border-gray-700 text-gray-300 hover:bg-gray-800"
+                  >
+                    <Menu className="h-4 w-4" />
+                    <span className="sr-only">Abrir ações rápidas</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-48 border-gray-700 bg-gray-900 text-white"
+                >
+                  <DropdownMenuLabel className="text-xs text-gray-300">
+                    Ações rápidas
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-gray-700" />
+                  <DropdownMenuItem
+                    className="hover:bg-gray-800 focus:bg-gray-800"
+                    onSelect={() => loadPlans()}
+                  >
+                    <RefreshCw className="h-4 w-4 text-gray-300" />
+                    Atualizar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="hover:bg-gray-800 focus:bg-gray-800"
+                    onSelect={() => handleCreatePlan()}
+                  >
+                    <Plus className="h-4 w-4 text-gray-300" />
+                    Novo Plano
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </CardHeader>

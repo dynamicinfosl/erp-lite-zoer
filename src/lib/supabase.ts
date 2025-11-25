@@ -39,9 +39,9 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
       } catch (error: any) {
         // Tratamento específico para erros de rede
         if (error.name === 'AbortError') {
-          console.error('⏱️ Timeout ao conectar com Supabase')
+          console.warn('⏱️ Timeout ao conectar com Supabase')
         } else if (error.message?.includes('Failed to fetch') || error.message?.includes('ERR_INTERNET_DISCONNECTED')) {
-          console.error('📡 Erro de conexão: Verifique sua conexão com a internet')
+          console.warn('📡 Erro de conexão: Verifique sua conexão com a internet')
         } else {
           console.error('❌ Erro ao fazer requisição:', error.message)
         }
