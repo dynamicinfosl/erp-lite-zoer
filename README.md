@@ -231,6 +231,18 @@ npm run confirm-email    # Confirma email de usuário
 4. **Ative a autenticação por email**
 5. **Configure as variáveis de ambiente**
 
+### **Integração com Nota Fiscal (NFe)**
+
+- O sistema já possui camadas de configuração e serviços para se conectar a um provedor externo de emissão de notas.
+- Configure as variáveis no `.env.local`:
+  - `NFE_API_ENABLED`
+  - `NFE_API_BASE_URL`
+  - `NFE_API_KEY`
+  - `NFE_API_TIMEOUT`
+  - `NFE_API_ENVIRONMENT`
+- Utilize o endpoint interno `POST /next_api/nfe` para enviar uma venda para emissão. Enquanto a integração estiver desabilitada, as solicitações serão enfileiradas para reprocessamento futuro.
+- Consulte `docs/NFE-INTEGRATION.md` para detalhes do fluxo e próximos passos.
+
 ### **Primeiro Usuário Administrador**
 
 ```bash

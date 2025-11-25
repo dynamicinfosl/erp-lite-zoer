@@ -267,3 +267,5 @@ export interface SalesReport {
   payment_methods: Array<{ method: string; count: number; amount: number }>;
   top_products: Array<{ product_name: string; quantity: number; amount: number }>;
 }
+
+export * from './nfe';
