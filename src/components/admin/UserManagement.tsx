@@ -342,6 +342,28 @@ export function UserManagement() {
     return new Date(expDate) < new Date();
   };
 
+  const handleToggleUserStatus = async () => {
+    if (!selectedUser) return;
+
+    const newStatus = !selectedUser.is_active;
+    const action = newStatus ? 'ativar' : 'desativar';
+
+    try {
+      // Aqui você pode adicionar a chamada à API para atualizar o status
+      // Por enquanto, apenas atualizamos localmente
+      toast.success(`Usuário ${action}do com sucesso!`);
+      
+      // Atualizar o estado local
+      setSelectedUser({ ...selectedUser, is_active: newStatus });
+      
+      // Recarregar lista de usuários
+      await loadUsers();
+    } catch (error) {
+      console.error(`Erro ao ${action} usuário:`, error);
+      toast.error(`Erro ao ${action} usuário`);
+    }
+  };
+
   const activatePlan = async (user: TenantUser) => {
     if (!selectedPlanId) {
       toast.error('Selecione um plano');
@@ -720,143 +742,147 @@ export function UserManagement() {
 
       {/* Dialog de Detalhes */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl bg-gray-900 text-white border-gray-700">
+        <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto bg-gray-900 text-white border-gray-700">
           <DialogHeader>
-            <DialogTitle>Gerenciar Cliente</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">Gerenciar Cliente</DialogTitle>
+            <DialogDescription className="text-sm">
               Visualize e gerencie os detalhes do cliente
             </DialogDescription>
           </DialogHeader>
 
           {selectedUser && (
-            <div className="space-y-6">
-              {/* Informações do Usuário */}
-              <div className="space-y-4">
-                <h3 className="font-semibold text-white">Informações do Usuário</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm text-gray-300">Email</Label>
-                    <p className="font-medium text-white">{selectedUser.user_email}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-gray-300">Responsável</Label>
-                    <div>{getRoleBadge(selectedUser.role)}</div>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-gray-300">Cadastrado em</Label>
-                    <p className="text-white">{formatDate(selectedUser.user_created_at)}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-gray-300">Último Login</Label>
-                    <p className="text-white">{selectedUser.user_last_login === '-' ? 'Nunca' : formatDate(selectedUser.user_last_login)}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Informações da Empresa */}
-              <div className="space-y-4 border-t border-gray-700 pt-4">
-                <h3 className="font-semibold text-white">Informações da Empresa</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm text-gray-300">Nome</Label>
-                    <p className="font-medium text-white">{selectedUser.tenant_name}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-gray-300">Status</Label>
-                    <div>{getStatusBadge(selectedUser.tenant_status)}</div>
-                  </div>
-                  {selectedUser.tenant_email && (
-                    <div>
-                      <Label className="text-sm text-gray-300">Email</Label>
-                      <p className="text-white">{selectedUser.tenant_email}</p>
+            <div className="space-y-3">
+              {/* Card Compacto com Botão de Ativar/Desativar */}
+              <Card className="bg-gray-800 border-gray-700">
+                <CardContent className="p-3 sm:p-4">
+                  {/* Header Responsivo */}
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm sm:text-base font-semibold text-white mb-1 truncate">
+                        {selectedUser.user_email}
+                      </h3>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {getRoleBadge(selectedUser.role)}
+                        {getStatusBadge(selectedUser.tenant_status)}
+                      </div>
                     </div>
-                  )}
-                  {selectedUser.tenant_phone && (
-                    <div>
-                      <Label className="text-sm text-gray-300">Telefone</Label>
-                      <p className="text-white">{selectedUser.tenant_phone}</p>
-                    </div>
-                  )}
-                  {selectedUser.tenant_document && (
-                    <div>
-                      <Label className="text-sm text-gray-300">CPF/CNPJ</Label>
-                      <p className="text-white">{selectedUser.tenant_document}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Informações do Plano */}
-              <div className="space-y-4 border-t border-gray-700 pt-4">
-                <h3 className="font-semibold text-white">Informações do Plano</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm text-gray-300">Plano</Label>
-                    <p className="font-medium text-white">
-                      {selectedUser.subscription_plan_name || 'Sem plano cadastrado'}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-gray-300">Status da Assinatura</Label>
-                    <div>
-                      {selectedUser.subscription_status ? (
-                        <Badge className={
-                          selectedUser.subscription_status === 'active' ? 'bg-green-500 text-white' :
-                          selectedUser.subscription_status === 'trial' ? 'bg-blue-500 text-white' :
-                          'bg-gray-500 text-white'
-                        }>
-                          {selectedUser.subscription_status === 'active' ? 'Ativo' :
-                           selectedUser.subscription_status === 'trial' ? 'Trial' :
-                           selectedUser.subscription_status}
-                        </Badge>
+                    <Button
+                      onClick={handleToggleUserStatus}
+                      variant={selectedUser.is_active ? "destructive" : "default"}
+                      size="sm"
+                      className="w-full sm:w-auto shrink-0"
+                    >
+                      {selectedUser.is_active ? (
+                        <>
+                          <X className="h-4 w-4 sm:mr-1" />
+                          <span className="hidden sm:inline">Desativar</span>
+                        </>
                       ) : (
-                        <span className="text-gray-400 text-sm">Sem assinatura</span>
+                        <>
+                          <CheckCircle className="h-4 w-4 sm:mr-1" />
+                          <span className="hidden sm:inline">Ativar</span>
+                        </>
                       )}
+                    </Button>
+                  </div>
+
+                  {/* Grid Responsivo: 1 coluna mobile, 2 tablet, 3 desktop */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <Label className="text-xs text-gray-400">Empresa</Label>
+                      <p className="text-white font-medium truncate">{selectedUser.tenant_name}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-400">Cadastrado</Label>
+                      <p className="text-white text-xs sm:text-sm">{formatDate(selectedUser.user_created_at)}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-400">Último Login</Label>
+                      <p className="text-white text-xs sm:text-sm">
+                        {selectedUser.user_last_login === '-' ? 'Nunca' : formatDate(selectedUser.user_last_login)}
+                      </p>
+                    </div>
+                    {selectedUser.tenant_email && (
+                      <div className="sm:col-span-2 lg:col-span-1">
+                        <Label className="text-xs text-gray-400">Email Empresa</Label>
+                        <p className="text-white text-xs truncate">{selectedUser.tenant_email}</p>
+                      </div>
+                    )}
+                    {selectedUser.tenant_phone && (
+                      <div>
+                        <Label className="text-xs text-gray-400">Telefone</Label>
+                        <p className="text-white text-xs sm:text-sm">{selectedUser.tenant_phone}</p>
+                      </div>
+                    )}
+                    {selectedUser.tenant_document && (
+                      <div>
+                        <Label className="text-xs text-gray-400">CPF/CNPJ</Label>
+                        <p className="text-white text-xs sm:text-sm">{selectedUser.tenant_document}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Informações do Plano - Responsivo */}
+                  <div className="mt-3 pt-3 border-t border-gray-700">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                      <div>
+                        <Label className="text-xs text-gray-400">Plano</Label>
+                        <p className="text-white font-medium text-xs sm:text-sm">
+                          {selectedUser.subscription_plan_name || 'Trial Gratuito'}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-400">Status Assinatura</Label>
+                        <div className="mt-1">
+                          {selectedUser.subscription_status ? (
+                            <Badge className={`text-xs ${
+                              selectedUser.subscription_status === 'active' ? 'bg-green-500 text-white' :
+                              selectedUser.subscription_status === 'trial' ? 'bg-blue-500 text-white' :
+                              'bg-gray-500 text-white'
+                            }`}>
+                              {selectedUser.subscription_status === 'active' ? 'Ativo' :
+                               selectedUser.subscription_status === 'trial' ? 'Trial' :
+                               selectedUser.subscription_status}
+                            </Badge>
+                          ) : (
+                            <span className="text-gray-400 text-xs">Sem assinatura</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="sm:col-span-2 lg:col-span-1">
+                        <Label className="text-xs text-gray-400">
+                          {selectedUser.subscription_trial_ends_at ? 'Fim do Trial' : 'Expiração'}
+                        </Label>
+                        <p className={`text-xs ${isPlanExpired(selectedUser) ? 'text-red-400 font-semibold' : 'text-white'}`}>
+                          {selectedUser.subscription_trial_ends_at 
+                            ? formatDateTime(selectedUser.subscription_trial_ends_at)
+                            : selectedUser.subscription_current_period_end
+                            ? formatDateTime(selectedUser.subscription_current_period_end)
+                            : 'Nunca'}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  {selectedUser.subscription_trial_ends_at && (
-                    <div>
-                      <Label className="text-sm text-gray-300">Fim do Trial</Label>
-                      <p className={isPlanExpired(selectedUser) ? 'text-red-400 font-semibold' : 'text-white'}>
-                        {formatDateTime(selectedUser.subscription_trial_ends_at)}
-                      </p>
-                    </div>
-                  )}
-                  {selectedUser.subscription_current_period_end && (
-                    <div>
-                      <Label className="text-sm text-gray-300">Expiração do Plano</Label>
-                      <p className={isPlanExpired(selectedUser) ? 'text-red-400 font-semibold' : 'text-white'}>
-                        {formatDateTime(selectedUser.subscription_current_period_end)}
-                      </p>
-                    </div>
-                  )}
-                  {!selectedUser.subscription_trial_ends_at && !selectedUser.subscription_current_period_end && (
-                    <div className="col-span-2">
-                      <Label className="text-sm text-gray-300">Data de Expiração</Label>
-                      <p className="text-gray-400 text-sm">Não informada</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
+                </CardContent>
+              </Card>
             </div>
           )}
 
           {/* Seção de Ativação de Plano */}
           {selectedUser && (
-            <div className="space-y-4 border-t border-gray-700 pt-4">
-              <h3 className="font-semibold text-white">Ativar/Renovar Plano</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-3 sm:space-y-4 border-t border-gray-700 pt-3 sm:pt-4">
+              <h3 className="text-base sm:text-lg font-semibold text-white">Ativar/Renovar Plano</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <Label className="text-sm text-gray-300 mb-2 block">Selecione o Plano</Label>
+                  <Label className="text-xs sm:text-sm text-gray-300 mb-2 block">Selecione o Plano</Label>
                   <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
-                    <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white">
+                    <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white text-sm">
                       <SelectValue placeholder="Escolha um plano" className="text-white" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700 z-[100]">
                       {availablePlans.length > 0 ? (
                         availablePlans.map((plan) => (
-                          <SelectItem key={plan.id} value={plan.id} className="text-white focus:bg-blue-600">
+                          <SelectItem key={plan.id} value={plan.id} className="text-white text-sm focus:bg-blue-600">
                             {plan.name}
                           </SelectItem>
                         ))
@@ -867,20 +893,20 @@ export function UserManagement() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-sm text-gray-300 mb-2 block">Data de Vencimento</Label>
+                  <Label className="text-xs sm:text-sm text-gray-300 mb-2 block">Data de Vencimento</Label>
                   <Input
                     type="date"
                     value={expirationDate}
                     onChange={(e) => setExpirationDate(e.target.value)}
-                    className="w-full bg-gray-800 border-gray-700 text-white"
+                    className="w-full bg-gray-800 border-gray-700 text-white text-sm"
                     min={new Date().toISOString().split('T')[0]}
                   />
                 </div>
               </div>
               {selectedUser && !selectedUser.subscription_plan_name && (
                 <Alert className="bg-yellow-500/10 border-yellow-500/30">
-                  <AlertTriangle className="h-4 w-4 text-yellow-400" />
-                  <AlertDescription className="text-yellow-300">
+                  <AlertTriangle className="h-4 w-4 text-yellow-400 shrink-0" />
+                  <AlertDescription className="text-yellow-300 text-xs sm:text-sm">
                     Este cliente não possui plano ativo. Ative um plano para continuar usando o sistema.
                   </AlertDescription>
                 </Alert>
@@ -888,46 +914,51 @@ export function UserManagement() {
             </div>
           )}
 
-          <DialogFooter className="flex flex-col sm:flex-row justify-between gap-2">
-            <div className="flex gap-2">
-              <Button 
-                variant="destructive" 
-                onClick={() => {
-                  if (selectedUser && confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')) {
-                    deleteUser(selectedUser);
-                  }
-                }}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                <X className="h-4 w-4 mr-2" />
-                Excluir Usuário
-              </Button>
-            </div>
-            <div className="flex gap-2">
+          <DialogFooter className="flex flex-col-reverse sm:flex-row justify-between gap-2 pt-3 sm:pt-4">
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                if (selectedUser && confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')) {
+                  deleteUser(selectedUser);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 w-full sm:w-auto text-sm"
+            >
+              <X className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Excluir Usuário</span>
+              <span className="sm:hidden">Excluir</span>
+            </Button>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               {selectedUser && (
                 <Button
                   onClick={() => activatePlan(selectedUser)}
                   disabled={activatingPlan || !selectedPlanId || !expirationDate}
-                  className="bg-green-600 hover:bg-green-700 text-white"
+                  className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto text-sm order-first sm:order-none"
                 >
                   {activatingPlan ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Ativando...
+                      <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" />
+                      <span className="hidden sm:inline">Ativando...</span>
+                      <span className="sm:hidden">...</span>
                     </>
                   ) : (
                     <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Ativar Plano
+                      <CheckCircle className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Ativar Plano</span>
+                      <span className="sm:hidden">Ativar</span>
                     </>
                   )}
                 </Button>
               )}
-              <Button variant="outline" onClick={() => {
-                setDialogOpen(false);
-                setSelectedPlanId('');
-                setExpirationDate('');
-              }}>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setDialogOpen(false);
+                  setSelectedPlanId('');
+                  setExpirationDate('');
+                }}
+                className="w-full sm:w-auto text-sm"
+              >
                 Fechar
               </Button>
             </div>

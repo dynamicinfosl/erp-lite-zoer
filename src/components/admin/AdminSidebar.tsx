@@ -72,7 +72,7 @@ export function AdminSidebar() {
   };
 
   return (
-    <Sidebar className="hidden lg:flex w-60 flex-col juga-sidebar-gradient text-white">
+    <Sidebar className="flex w-60 flex-col juga-sidebar-gradient text-white">
       <SidebarHeader className="px-4 py-5 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">

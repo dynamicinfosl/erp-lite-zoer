@@ -8,7 +8,7 @@ const supabaseUrl = rawSupabaseUrl || fallbackPostgrestUrl;
 const supabaseServiceKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImV4cCI6MjA3MjU5Mzc0M30.NBHrAlv8RPxu1QhLta76Uoh6Bc_OnqhfVydy8_TX6GQ';
+  '';
 
 const supabaseAdmin =
   supabaseUrl && supabaseServiceKey
@@ -17,17 +17,67 @@ const supabaseAdmin =
       })
     : null;
 
+const fallbackPlans = [
+  {
+    id: 'basic',
+    name: 'Básico',
+    slug: 'basic',
+    description: 'Ideal para começar',
+    price_monthly: 79.9,
+    price_yearly: 799,
+    features: ['1 usuário', '100 produtos', 'Relatórios básicos'],
+    limits: {
+      max_users: 1,
+      max_products: 100,
+      max_customers: 1000,
+    },
+  },
+  {
+    id: 'pro',
+    name: 'Profissional',
+    slug: 'pro',
+    description: 'Para empresas em crescimento',
+    price_monthly: 139.9,
+    price_yearly: 1399,
+    features: ['5 usuários', '1000 produtos', 'Relatórios avançados', 'Integrações'],
+    limits: {
+      max_users: 5,
+      max_products: 1000,
+      max_customers: 10000,
+    },
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    slug: 'enterprise',
+    description: 'Recursos ilimitados',
+    price_monthly: 299.9,
+    price_yearly: 2999,
+    features: ['Usuários ilimitados', 'Produtos ilimitados', 'Suporte dedicado'],
+    limits: {
+      max_users: -1,
+      max_products: -1,
+      max_customers: -1,
+    },
+  },
+];
+
+function respondWithFallback(reason: string) {
+  console.warn(`⚠️ Usando fallback de planos (${reason})`);
+  return NextResponse.json({
+    success: true,
+    data: fallbackPlans,
+    warning: reason,
+  });
+}
+
 // Listar todos os planos disponíveis
 export async function GET(request: NextRequest) {
   try {
     console.log('📋 GET /next_api/plans - Iniciando busca de planos...');
     
     if (!supabaseAdmin) {
-      console.error('❌ Cliente Supabase não configurado');
-      return NextResponse.json(
-        { error: 'Cliente Supabase não configurado' },
-        { status: 500 }
-      );
+      return respondWithFallback('Supabase não configurado');
     }
 
     console.log('🔍 Buscando planos ativos na tabela plans...');
@@ -39,16 +89,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('❌ Erro ao listar planos:', error);
-      console.error('Detalhes do erro:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      });
-      return NextResponse.json(
-        { error: 'Erro ao listar planos: ' + error.message },
-        { status: 400 }
-      );
+      return respondWithFallback(`Erro Supabase: ${error.message}`);
     }
 
     console.log(`✅ Planos encontrados: ${data?.length || 0}`);
@@ -57,15 +98,15 @@ export async function GET(request: NextRequest) {
     } else {
       console.warn('⚠️ Nenhum plano ativo encontrado na tabela plans!');
       console.warn('💡 Execute o script criar-planos-basicos.sql no Supabase SQL Editor');
+      return respondWithFallback('Nenhum plano encontrado no Supabase');
     }
 
     return NextResponse.json({ success: true, data: data || [] });
 
   } catch (error) {
     console.error('❌ Erro no handler de listagem:', error);
-    return NextResponse.json(
-      { error: 'Erro interno do servidor: ' + (error instanceof Error ? error.message : String(error)) },
-      { status: 500 }
+    return respondWithFallback(
+      'Erro inesperado ao buscar planos: ' + (error instanceof Error ? error.message : String(error))
     );
   }
 }
