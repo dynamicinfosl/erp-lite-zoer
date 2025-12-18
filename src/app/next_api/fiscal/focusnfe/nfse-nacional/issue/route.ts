@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     const { data: integration, error: integrationError } = await supabaseAdmin
       .from('fiscal_integrations')
-      .select('environment, api_token, enabled')
+      .select('environment, api_token, enabled, focus_empresa_id')
       .eq('tenant_id', tenant_id)
       .eq('provider', 'focusnfe')
       .maybeSingle();
@@ -52,7 +52,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (!integration || !integration.enabled) {
-      return NextResponse.json({ error: 'Integração FocusNFe não configurada ou desabilitada para este tenant' }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Integração FocusNFe não configurada ou desabilitada para este tenant',
+        details: 'Configure a integração na página de Configuração Fiscal antes de emitir documentos'
+      }, { status: 400 });
+    }
+
+    // Validação: Verificar se empresa foi provisionada
+    if (!integration.focus_empresa_id) {
+      return NextResponse.json({ 
+        error: 'Empresa não provisionada na FocusNFe',
+        details: 'É necessário provisionar a empresa na FocusNFe antes de emitir documentos. Acesse a página de Configuração Fiscal e clique em "Provisionar Empresa"'
+      }, { status: 400 });
     }
 
     const environment = (integration.environment as Environment) || 'homologacao';

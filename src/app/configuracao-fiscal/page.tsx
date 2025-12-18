@@ -19,7 +19,13 @@ import {
   Building2,
   Key,
   Shield,
-  Calendar
+  Calendar,
+  Receipt,
+  Download,
+  RefreshCw,
+  Eye,
+  Search,
+  Filter
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -57,6 +63,23 @@ interface FiscalCertificate {
   updated_at?: string;
 }
 
+interface FiscalDocument {
+  id: string;
+  tenant_id: string;
+  provider: string;
+  doc_type: 'nfe' | 'nfce' | 'nfse' | 'nfse_nacional';
+  ref: string;
+  status: string;
+  payload?: any;
+  xml_path?: string;
+  pdf_path?: string;
+  numero?: string;
+  serie?: string;
+  chave?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function ConfiguracaoFiscalPage() {
   const { user, tenant: authTenant, loading: authLoading } = useSimpleAuth();
   const [loading, setLoading] = useState(true);
@@ -68,6 +91,11 @@ export default function ConfiguracaoFiscalPage() {
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<FiscalDocument[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [documentsFilter, setDocumentsFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [refreshingDoc, setRefreshingDoc] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     api_token: '',
@@ -318,6 +346,66 @@ export default function ConfiguracaoFiscalPage() {
     }
   };
 
+  const loadDocuments = useCallback(async () => {
+    if (!authTenant && !user) return;
+
+    const fallbackTenantId = user?.id || '00000000-0000-0000-0000-000000000000';
+    const tenantId = authTenant?.id || fallbackTenantId;
+    
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(tenantId)) return;
+
+    try {
+      setDocumentsLoading(true);
+      const url = `/next_api/fiscal/focusnfe/documents?tenant_id=${tenantId}${documentsFilter !== 'all' ? `&doc_type=${documentsFilter}` : ''}`;
+      const response = await fetch(url);
+      
+      if (response.ok) {
+        const result = await response.json();
+        setDocuments(result.data || []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar documentos:', error);
+      toast.error('Erro ao carregar documentos fiscais');
+    } finally {
+      setDocumentsLoading(false);
+    }
+  }, [authTenant, user, documentsFilter]);
+
+  const handleRefreshDocument = async (documentId: string, ref: string) => {
+    try {
+      setRefreshingDoc(documentId);
+      const response = await fetch(`/next_api/fiscal/focusnfe/status?fiscal_document_id=${documentId}&completa=1`);
+      const result = await response.json();
+      
+      if (response.ok) {
+        toast.success('Status atualizado com sucesso!');
+        await loadDocuments();
+      } else {
+        toast.error(result.error || 'Erro ao consultar status');
+      }
+    } catch (error) {
+      console.error('Erro ao consultar status:', error);
+      toast.error('Erro ao consultar status do documento');
+    } finally {
+      setRefreshingDoc(null);
+    }
+  };
+
+  const handleDownloadFile = (url: string, filename: string) => {
+    if (!url) {
+      toast.error('Arquivo não disponível');
+      return;
+    }
+    
+    // Abrir em nova aba para download
+    window.open(url, '_blank');
+  };
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
+
   // Auto-esconder mensagem de sucesso após 5 segundos
   useEffect(() => {
     if (showSuccessMessage) {
@@ -395,10 +483,11 @@ export default function ConfiguracaoFiscalPage() {
       )}
 
       <Tabs defaultValue="integracao" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="integracao">Integração</TabsTrigger>
           <TabsTrigger value="certificado">Certificado</TabsTrigger>
           <TabsTrigger value="status">Status</TabsTrigger>
+          <TabsTrigger value="documentos">Documentos</TabsTrigger>
         </TabsList>
 
         {/* ABA: INTEGRAÇÃO */}
@@ -818,6 +907,178 @@ export default function ConfiguracaoFiscalPage() {
                   )}
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ABA: DOCUMENTOS */}
+        <TabsContent value="documentos" className="space-y-6">
+          <Card className="border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                <Receipt className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+                Documentos Fiscais
+              </CardTitle>
+              <CardDescription>
+                Liste, consulte status e faça download dos documentos fiscais emitidos
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Filtros e Busca */}
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por ref, número, chave..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <select
+                  value={documentsFilter}
+                  onChange={(e) => setDocumentsFilter(e.target.value)}
+                  className="flex h-10 w-full md:w-[200px] rounded-md border border-input bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 px-3 py-2 text-sm"
+                >
+                  <option value="all">Todos os tipos</option>
+                  <option value="nfe">NFe</option>
+                  <option value="nfce">NFCe</option>
+                  <option value="nfse">NFSe</option>
+                  <option value="nfse_nacional">NFSe Nacional</option>
+                </select>
+                <Button
+                  onClick={loadDocuments}
+                  disabled={documentsLoading}
+                  variant="outline"
+                >
+                  {documentsLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+
+              {/* Tabela de Documentos */}
+              {documentsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : documents.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Receipt className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Nenhum documento fiscal encontrado</p>
+                </div>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-sm font-semibold">Tipo</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold">Ref</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold">Número</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold">Chave</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold">Data</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {documents
+                          .filter((doc) => {
+                            if (!searchTerm) return true;
+                            const search = searchTerm.toLowerCase();
+                            return (
+                              doc.ref?.toLowerCase().includes(search) ||
+                              doc.numero?.toLowerCase().includes(search) ||
+                              doc.chave?.toLowerCase().includes(search)
+                            );
+                          })
+                          .map((doc) => (
+                            <tr key={doc.id} className="border-t hover:bg-muted/50">
+                              <td className="px-4 py-3">
+                                <Badge variant="outline" className="uppercase">
+                                  {doc.doc_type}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-3 text-sm font-mono text-xs">
+                                {doc.ref}
+                              </td>
+                              <td className="px-4 py-3">
+                                <Badge
+                                  className={
+                                    doc.status === 'autorizado' || doc.status === 'processado'
+                                      ? 'bg-green-600'
+                                      : doc.status === 'cancelado' || doc.status === 'erro'
+                                      ? 'bg-red-600'
+                                      : doc.status === 'submitted'
+                                      ? 'bg-yellow-600'
+                                      : 'bg-gray-600'
+                                  }
+                                >
+                                  {doc.status || 'Pendente'}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {doc.numero || '-'}
+                              </td>
+                              <td className="px-4 py-3 text-sm font-mono text-xs">
+                                {doc.chave ? (
+                                  <span className="truncate block max-w-[200px]" title={doc.chave}>
+                                    {doc.chave}
+                                  </span>
+                                ) : (
+                                  '-'
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-muted-foreground">
+                                {new Date(doc.created_at).toLocaleDateString('pt-BR')}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleRefreshDocument(doc.id, doc.ref)}
+                                    disabled={refreshingDoc === doc.id}
+                                    title="Consultar status"
+                                  >
+                                    {refreshingDoc === doc.id ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <RefreshCw className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                  {doc.xml_path && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleDownloadFile(doc.xml_path!, `doc_${doc.ref}.xml`)}
+                                      title="Download XML"
+                                    >
+                                      <Download className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                  {doc.pdf_path && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleDownloadFile(doc.pdf_path!, `doc_${doc.ref}.pdf`)}
+                                      title="Download PDF"
+                                    >
+                                      <FileText className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
