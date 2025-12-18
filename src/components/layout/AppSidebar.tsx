@@ -39,6 +39,7 @@ import {
   CreditCard,
   Building2,
   RotateCcw,
+  FileText,
 } from 'lucide-react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { ENABLE_AUTH } from '@/constants/auth';
@@ -89,6 +90,7 @@ const menuGroups = [
       { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Relatórios', url: '/relatorios', icon: BarChart3, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Perfil da Empresa', url: '/perfil-empresa', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Configuração Fiscal', url: '/configuracao-fiscal', icon: FileText, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Perfil do Usuário', url: '/perfil-usuario', icon: UserCog, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Assinatura', url: '/assinatura', icon: CreditCard, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Configurações', url: '/configuracoes', icon: Settings, roles: ['admin', 'vendedor', 'financeiro'] },

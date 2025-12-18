@@ -4,14 +4,16 @@ import crypto from 'crypto';
 
 export const runtime = 'nodejs';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Supabase env vars não configuradas (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)');
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Supabase env vars não configuradas (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)');
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey);
 }
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 const BUCKET = 'fiscal-certificates';
 
@@ -43,6 +45,17 @@ function encryptPassword(password: string) {
 
 export async function GET(request: NextRequest) {
   try {
+    let supabaseAdmin;
+    try {
+      supabaseAdmin = getSupabaseClient();
+    } catch (envError: any) {
+      console.error('Erro ao configurar Supabase:', envError);
+      return NextResponse.json({ 
+        error: 'Configuração do servidor incompleta', 
+        details: envError?.message || 'Variáveis de ambiente do Supabase não configuradas' 
+      }, { status: 500 });
+    }
+
     const { searchParams } = new URL(request.url);
     const tenant_id = searchParams.get('tenant_id');
 
@@ -62,17 +75,33 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
 
     if (error) {
+      console.error('Erro ao buscar certificado:', error);
       return NextResponse.json({ error: 'Erro ao buscar certificado', details: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data: data || null });
   } catch (error: any) {
-    return NextResponse.json({ error: 'Erro interno do servidor', details: error?.message }, { status: 500 });
+    console.error('Erro interno na rota GET certificate:', error);
+    return NextResponse.json({ 
+      error: 'Erro interno do servidor', 
+      details: error?.message || 'Erro desconhecido' 
+    }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    let supabaseAdmin;
+    try {
+      supabaseAdmin = getSupabaseClient();
+    } catch (envError: any) {
+      console.error('Erro ao configurar Supabase:', envError);
+      return NextResponse.json({ 
+        error: 'Configuração do servidor incompleta', 
+        details: envError?.message || 'Variáveis de ambiente do Supabase não configuradas' 
+      }, { status: 500 });
+    }
+    
     const form = await request.formData();
     const tenant_id = String(form.get('tenant_id') || '');
     const password = String(form.get('password') || '');

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "node scripts/dev-with-browser.js",
     "dev:debug": "NODE_OPTIONS='--inspect' next dev",
     "build": "next build",
     "start": "next start --port 22278",
@@ -18,7 +18,8 @@
     "db-manager": "node scripts/db-manager.js",
     "quick-fix": "node scripts/quick-fix.js",
     "supabase-admin": "node scripts/supabase-admin.js",
-    "apply-unique": "node scripts/apply-unique-constraints.js"
+    "apply-unique": "node scripts/apply-unique-constraints.js",
+    "create-env": "node scripts/create-env-local.js"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
