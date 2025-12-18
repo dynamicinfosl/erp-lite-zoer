@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co'
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error('Supabase env vars não configuradas (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)')
+}
+
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
 export async function POST(request: NextRequest) {
@@ -31,6 +36,25 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Normalizar plan_id para UUID (aceitar slug como entrada)
+    let finalPlanId = plan_id
+    if (plan_id && !plan_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      const { data: planData, error: planError } = await supabaseAdmin
+        .from('plans')
+        .select('id')
+        .eq('slug', plan_id)
+        .single()
+
+      if (planError || !planData?.id) {
+        return NextResponse.json(
+          { error: `Plano inválido: ${plan_id}` },
+          { status: 400 }
+        )
+      }
+
+      finalPlanId = planData.id
+    }
+
     // Buscar subscription existente
     const { data: existingSub, error: subError } = await supabaseAdmin
       .from('subscriptions')
@@ -52,7 +76,7 @@ export async function POST(request: NextRequest) {
         current_period_end: periodEnd.toISOString(),
         trial_end: null,
         updated_at: now.toISOString(),
-        plan_id: plan_id
+        plan_id: finalPlanId
       }
 
       const { data: updatedSub, error: updateError } = await supabaseAdmin
@@ -108,20 +132,6 @@ export async function POST(request: NextRequest) {
       })
     } else {
       // Criar nova subscription
-      // Buscar plan_id real se foi passado slug
-      let finalPlanId = plan_id
-      if (plan_id && !plan_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-        const { data: planData } = await supabaseAdmin
-          .from('plans')
-          .select('id')
-          .eq('slug', plan_id)
-          .single()
-        
-        if (planData) {
-          finalPlanId = planData.id
-        }
-      }
-
       const { data: newSub, error: createError } = await supabaseAdmin
         .from('subscriptions')
         .insert({

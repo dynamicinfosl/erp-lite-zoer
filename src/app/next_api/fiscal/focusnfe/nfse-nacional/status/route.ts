@@ -1,0 +1,127 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+export const runtime = 'nodejs';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error('Supabase env vars não configuradas (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)');
+}
+
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+type Environment = 'homologacao' | 'producao';
+
+function getBaseUrl(environment: Environment): string {
+  return environment === 'producao' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const fiscal_document_id = searchParams.get('fiscal_document_id');
+    const completa = searchParams.get('completa');
+
+    if (!fiscal_document_id || !isUuid(fiscal_document_id)) {
+      return NextResponse.json({ error: 'fiscal_document_id inválido' }, { status: 400 });
+    }
+
+    const { data: fiscalDoc, error: docError } = await supabaseAdmin
+      .from('fiscal_documents')
+      .select('id, tenant_id, doc_type, ref, status')
+      .eq('id', fiscal_document_id)
+      .single();
+
+    if (docError || !fiscalDoc) {
+      return NextResponse.json({ error: 'Documento fiscal não encontrado', details: docError?.message }, { status: 404 });
+    }
+
+    if (fiscalDoc.doc_type !== 'nfse_nacional') {
+      return NextResponse.json({ error: 'doc_type do registro não é nfse_nacional' }, { status: 400 });
+    }
+
+    const { data: integration, error: integrationError } = await supabaseAdmin
+      .from('fiscal_integrations')
+      .select('environment, api_token, enabled')
+      .eq('tenant_id', fiscalDoc.tenant_id)
+      .eq('provider', 'focusnfe')
+      .maybeSingle();
+
+    if (integrationError) {
+      return NextResponse.json({ error: 'Erro ao buscar integração', details: integrationError.message }, { status: 400 });
+    }
+
+    if (!integration || !integration.enabled) {
+      return NextResponse.json({ error: 'Integração FocusNFe não configurada ou desabilitada para este tenant' }, { status: 400 });
+    }
+
+    const environment = (integration.environment as Environment) || 'homologacao';
+    const baseUrl = getBaseUrl(environment);
+
+    const url = `${baseUrl}/v2/nfsen/${encodeURIComponent(fiscalDoc.ref)}${completa ? `?completa=${encodeURIComponent(completa)}` : ''}`;
+    const token = integration.api_token;
+
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${token}:`).toString('base64')}`,
+      },
+    });
+
+    const http_status = resp.status;
+    const text = await resp.text();
+
+    let body: any = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = { raw: text };
+    }
+
+    let nextStatus = fiscalDoc.status;
+    if (resp.ok) {
+      const providerStatus = body?.status;
+      if (typeof providerStatus === 'string' && providerStatus.trim()) {
+        nextStatus = providerStatus;
+      }
+
+      await supabaseAdmin
+        .from('fiscal_documents')
+        .update({
+          status: nextStatus,
+          provider_response: {
+            http_status,
+            body,
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', fiscal_document_id);
+
+      return NextResponse.json({ success: true, data: { ...fiscalDoc, status: nextStatus }, http_status, provider_response: body });
+    }
+
+    await supabaseAdmin
+      .from('fiscal_documents')
+      .update({
+        provider_response: {
+          http_status,
+          body,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', fiscal_document_id);
+
+    return NextResponse.json(
+      { error: 'Erro ao consultar NFSe Nacional na FocusNFe', http_status, provider_error: body, data: fiscalDoc },
+      { status: 400 }
+    );
+  } catch (error: any) {
+    return NextResponse.json({ error: 'Erro interno do servidor', details: error?.message }, { status: 500 });
+  }
+}
