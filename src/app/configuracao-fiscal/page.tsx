@@ -28,6 +28,13 @@ import {
   Filter
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface FiscalIntegration {
   id?: string;
@@ -80,6 +87,17 @@ interface FiscalDocument {
   updated_at: string;
 }
 
+interface FiscalDocumentEvent {
+  id: string;
+  fiscal_document_id: string;
+  tenant_id: string;
+  event_type: string;
+  event_status: string;
+  event_data?: any;
+  provider_response?: any;
+  created_at: string;
+}
+
 export default function ConfiguracaoFiscalPage() {
   const { user, tenant: authTenant, loading: authLoading } = useSimpleAuth();
   const [loading, setLoading] = useState(true);
@@ -96,6 +114,9 @@ export default function ConfiguracaoFiscalPage() {
   const [documentsFilter, setDocumentsFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [refreshingDoc, setRefreshingDoc] = useState<string | null>(null);
+  const [selectedDocForEvents, setSelectedDocForEvents] = useState<string | null>(null);
+  const [docEvents, setDocEvents] = useState<FiscalDocumentEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     api_token: '',
@@ -400,6 +421,30 @@ export default function ConfiguracaoFiscalPage() {
     
     // Abrir em nova aba para download
     window.open(url, '_blank');
+  };
+
+  const loadDocumentEvents = useCallback(async (documentId: string) => {
+    try {
+      setEventsLoading(true);
+      const response = await fetch(`/next_api/fiscal/focusnfe/events?fiscal_document_id=${documentId}`);
+      
+      if (response.ok) {
+        const result = await response.json();
+        setDocEvents(result.data || []);
+      } else {
+        toast.error('Erro ao carregar histórico de eventos');
+      }
+    } catch (error) {
+      console.error('Erro ao carregar eventos:', error);
+      toast.error('Erro ao carregar histórico de eventos');
+    } finally {
+      setEventsLoading(false);
+    }
+  }, []);
+
+  const handleViewEvents = (documentId: string) => {
+    setSelectedDocForEvents(documentId);
+    loadDocumentEvents(documentId);
   };
 
   useEffect(() => {
@@ -1040,6 +1085,14 @@ export default function ConfiguracaoFiscalPage() {
                                   <Button
                                     size="sm"
                                     variant="outline"
+                                    onClick={() => handleViewEvents(doc.id)}
+                                    title="Ver histórico de eventos"
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
                                     onClick={() => handleRefreshDocument(doc.id, doc.ref)}
                                     disabled={refreshingDoc === doc.id}
                                     title="Consultar status"
@@ -1083,6 +1136,70 @@ export default function ConfiguracaoFiscalPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Modal de Histórico de Eventos */}
+      <Dialog open={selectedDocForEvents !== null} onOpenChange={(open) => !open && setSelectedDocForEvents(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Histórico de Eventos</DialogTitle>
+            <DialogDescription>
+              Eventos e notificações recebidas para este documento fiscal
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto pr-4">
+            {eventsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : docEvents.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhum evento registrado para este documento</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {docEvents.map((event) => (
+                  <Card key={event.id} className="border-l-4 border-l-blue-500">
+                    <CardContent className="pt-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            className={
+                              event.event_status === 'autorizado' || event.event_status === 'processado'
+                                ? 'bg-green-600'
+                                : event.event_status === 'cancelado' || event.event_status === 'erro'
+                                ? 'bg-red-600'
+                                : 'bg-yellow-600'
+                            }
+                          >
+                            {event.event_status || 'N/A'}
+                          </Badge>
+                          <Badge variant="outline">{event.event_type}</Badge>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(event.created_at).toLocaleString('pt-BR')}
+                        </span>
+                      </div>
+                      {event.provider_response && (
+                        <div className="mt-3">
+                          <details className="cursor-pointer">
+                            <summary className="text-sm font-medium text-muted-foreground hover:text-foreground">
+                              Ver detalhes do evento
+                            </summary>
+                            <pre className="mt-2 p-3 bg-muted rounded text-xs overflow-x-auto">
+                              {JSON.stringify(event.provider_response, null, 2)}
+                            </pre>
+                          </details>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

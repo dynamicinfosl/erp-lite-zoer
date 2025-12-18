@@ -114,6 +114,19 @@ export async function GET(request: NextRequest) {
 
       await supabaseAdmin.from('fiscal_documents').update(patch).eq('id', fiscal_document_id);
 
+      // Salvar evento no histórico
+      await supabaseAdmin
+        .from('fiscal_document_events')
+        .insert({
+          fiscal_document_id,
+          tenant_id: fiscalDoc.tenant_id,
+          event_type: 'status_check',
+          event_status: nextStatus,
+          event_data: { manual_check: true },
+          provider_response: body,
+          created_at: new Date().toISOString(),
+        });
+
       return NextResponse.json({ success: true, data: { ...fiscalDoc, status: nextStatus }, http_status, provider_response: body });
     }
 
