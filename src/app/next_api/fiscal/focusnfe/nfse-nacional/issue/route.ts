@@ -59,11 +59,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Validação: Verificar se empresa foi provisionada
+    // TEMPORÁRIO: Permitir emissão mesmo sem focus_empresa_id (enquanto investigamos endpoint)
     if (!integration.focus_empresa_id) {
-      return NextResponse.json({ 
-        error: 'Empresa não provisionada na FocusNFe',
-        details: 'É necessário provisionar a empresa na FocusNFe antes de emitir documentos. Acesse a página de Configuração Fiscal e clique em "Provisionar Empresa"'
-      }, { status: 400 });
+      console.warn('⚠️ Emitindo NFSe Nacional sem focus_empresa_id - empresa pode não estar provisionada na FocusNFe');
+      console.warn('⚠️ Certifique-se de que o certificado foi enviado manualmente no painel da FocusNFe');
     }
 
     const environment = (integration.environment as Environment) || 'homologacao';
