@@ -12,7 +12,8 @@ import {
   Calendar,
   User,
   CreditCard,
-  DollarSign
+  DollarSign,
+  FileText
 } from 'lucide-react';
 
 interface SaleConfirmationModalProps {
@@ -20,6 +21,7 @@ interface SaleConfirmationModalProps {
   onClose: () => void;
   onNewSale: () => void;
   onPrintReceipt: () => void;
+  onEmitirNota?: () => void;
   saleData: {
     numero: string;
     cliente: string;
@@ -39,7 +41,8 @@ export function SaleConfirmationModal({
   isOpen, 
   onClose, 
   onNewSale, 
-  onPrintReceipt, 
+  onPrintReceipt,
+  onEmitirNota,
   saleData 
 }: SaleConfirmationModalProps) {
   if (!isOpen) return null;
@@ -172,6 +175,16 @@ export function SaleConfirmationModal({
               <Printer className="h-5 w-5 mr-2" />
               Imprimir Cupom
             </Button>
+            
+            {onEmitirNota && (
+              <Button
+                onClick={onEmitirNota}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 text-base"
+              >
+                <FileText className="h-5 w-5 mr-2" />
+                Emitir Nota Fiscal
+              </Button>
+            )}
             
             <Button
               onClick={onNewSale}

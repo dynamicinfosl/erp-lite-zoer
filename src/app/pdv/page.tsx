@@ -739,6 +739,13 @@ export default function PDVPage() {
     setShowConfirmationModal(false);
   };
 
+  const handleEmitirNota = () => {
+    if (lastSaleData?.id) {
+      router.push(`/emitir-nota?sale_id=${lastSaleData.id}`);
+      setShowConfirmationModal(false);
+    }
+  };
+
   // Se estiver na seção de pagamento, mostrar apenas ela
   if (currentSection === 'payment') {
     return (
@@ -1382,6 +1389,7 @@ export default function PDVPage() {
         onClose={handleCloseConfirmation}
         onNewSale={handleNewSale}
         onPrintReceipt={handlePrintReceipt}
+        onEmitirNota={handleEmitirNota}
         saleData={lastSaleData}
       />
       </div>
