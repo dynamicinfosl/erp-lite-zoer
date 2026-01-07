@@ -22,12 +22,35 @@ setTimeout(() => {
 
 // Passa os sinais de interrupção para o processo Next.js
 process.on('SIGINT', () => {
-  nextDev.kill('SIGINT');
+  try {
+    nextDev.kill('SIGINT');
+  } catch (error) {
+    // Ignorar erros de kill no Windows (EPERM)
+    if (error.code !== 'EPERM') {
+      console.error('Erro ao encerrar processo:', error);
+    }
+  }
   process.exit();
 });
 
 process.on('SIGTERM', () => {
-  nextDev.kill('SIGTERM');
+  try {
+    nextDev.kill('SIGTERM');
+  } catch (error) {
+    // Ignorar erros de kill no Windows (EPERM)
+    if (error.code !== 'EPERM') {
+      console.error('Erro ao encerrar processo:', error);
+    }
+  }
   process.exit();
 });
+
+// Tratar erros não capturados do processo filho
+nextDev.on('error', (error) => {
+  // Ignorar erros EPERM no Windows
+  if (error.code === 'EPERM') {
+    return;
+  }
+  console.error('Erro no processo Next.js:', error);
+});;
 

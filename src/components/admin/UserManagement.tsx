@@ -266,6 +266,76 @@ export function UserManagement() {
   };
 
 
+  const approveUser = async (user: TenantUser) => {
+    if (!user.user_id || user.user_id.startsWith('tenant-') || user.user_id.startsWith('membership-')) {
+      toast.error('Não é possível aprovar este tipo de usuário');
+      return;
+    }
+
+    try {
+      console.log('✅ Aprovando usuário:', user.user_id);
+      
+      const response = await fetch('/next_api/admin/users', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: user.user_id,
+          status: 'approved',
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Erro ao aprovar usuário');
+      }
+
+      toast.success('Usuário aprovado com sucesso! O usuário precisa fazer logout e login novamente para acessar o sistema.');
+      setDialogOpen(false);
+      await loadUsers();
+    } catch (error: any) {
+      console.error('❌ Erro ao aprovar usuário:', error);
+      toast.error(error.message || 'Erro ao aprovar usuário');
+    }
+  };
+
+  const rejectUser = async (user: TenantUser, reason?: string) => {
+    if (!user.user_id || user.user_id.startsWith('tenant-') || user.user_id.startsWith('membership-')) {
+      toast.error('Não é possível rejeitar este tipo de usuário');
+      return;
+    }
+
+    try {
+      console.log('❌ Rejeitando usuário:', user.user_id, reason);
+      
+      const response = await fetch('/next_api/admin/users', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: user.user_id,
+          status: 'rejected',
+          rejection_reason: reason || null,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Erro ao rejeitar usuário');
+      }
+
+      toast.success('Usuário rejeitado com sucesso!');
+      await loadUsers();
+    } catch (error: any) {
+      console.error('❌ Erro ao rejeitar usuário:', error);
+      toast.error(error.message || 'Erro ao rejeitar usuário');
+    }
+  };
+
   const deleteUser = async (user: TenantUser) => {
     if (!user) {
       console.error('❌ Usuário não selecionado');
@@ -900,6 +970,42 @@ export function UserManagement() {
                       )}
                     </Button>
                   </div>
+
+                  {/* Status de Aprovação */}
+                  {selectedUser.approval_status && (
+                    <div className="mb-3 pb-3 border-b border-gray-700">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-gray-400">Status de Aprovação</Label>
+                        {getApprovalStatusBadge(selectedUser.approval_status)}
+                      </div>
+                      {selectedUser.approval_status === 'pending' && (
+                        <div className="mt-2 flex gap-2">
+                          <Button
+                            onClick={() => approveUser(selectedUser)}
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                          >
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Aprovar
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              const reason = window.prompt('Motivo da rejeição (opcional):');
+                              if (reason !== null) {
+                                rejectUser(selectedUser, reason || undefined);
+                              }
+                            }}
+                            size="sm"
+                            variant="destructive"
+                            className="bg-red-600 hover:bg-red-700 text-white text-xs"
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            Rejeitar
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Grid Responsivo: 1 coluna mobile, 2 tablet, 3 desktop */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">

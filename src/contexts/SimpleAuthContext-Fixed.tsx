@@ -212,60 +212,119 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         if (session?.user && mounted) {
           console.log('👤 Usuário encontrado, carregando dados em background...');
           
-          // Carregar tenant de forma assíncrona
-          loadRealTenant(session.user.id)
-            .then((tenantData) => {
-              if (mounted && tenantData) {
-                console.log('🏢 Tenant carregado:', tenantData);
-                setTenant(tenantData);
-                
-                // Carregar subscription após carregar tenant
-                if (tenantData?.id) {
-                  fetch(`/next_api/subscriptions?tenant_id=${tenantData.id}`)
-                    .then((response) => {
-                      if (response.ok) {
-                        return response.json();
-                      }
-                      return null;
-                    })
-                    .then((result) => {
-                      if (mounted && result?.success && result.data) {
-                        const subData = result.data;
-                        const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
-                        
-                        const subscriptionData: SubscriptionData = {
-                          id: subData.id,
-                          status: subData.status || 'trial',
-                          trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
-                          current_period_end: subData.current_period_end || undefined,
-                          plan: {
-                            id: plan?.id || 'trial',
-                            name: plan?.name || 'Trial',
-                            slug: plan?.slug || 'trial',
-                            price_monthly: plan?.price_monthly || 0,
-                            price_yearly: plan?.price_yearly || 0,
-                            features: plan?.features || {},
-                            limits: plan?.limits || {
-                              max_users: 1,
-                              max_customers: 100,
-                              max_products: 100,
-                              max_sales_per_month: 1000,
-                            },
-                          },
-                        };
-                        
-                        console.log('✅ Subscription carregada:', subscriptionData);
-                        setSubscription(subscriptionData);
-                      }
-                    })
-                    .catch((err) => {
-                      console.error('⚠️ Erro ao carregar subscription:', err);
-                    });
-                }
+          // Verificar status de aprovação do usuário
+          fetch(`/next_api/user-profiles?user_id=${session.user.id}`)
+            .then((response) => {
+              if (response.ok) {
+                return response.json();
               }
+              return null;
+            })
+            .then((profileResult) => {
+              // Verificar status de aprovação apenas se o perfil existir
+              if (mounted && profileResult?.data?.profile) {
+                const profile = profileResult.data.profile;
+                
+                // Determinar status de aprovação baseado em is_active
+                // is_active = true → aprovado
+                // is_active = false → rejeitado/inativo
+                // is_active = null/undefined → pendente
+                let approvalStatus = 'pending';
+                if (profile.is_active === true) {
+                  approvalStatus = 'approved';
+                } else if (profile.is_active === false) {
+                  approvalStatus = 'rejected';
+                }
+                
+                console.log('📋 Status de aprovação:', approvalStatus, { 
+                  is_active: profile.is_active
+                });
+                
+                // Se o usuário foi rejeitado (is_active = false), bloquear acesso
+                if (approvalStatus === 'rejected') {
+                  console.warn('❌ Usuário rejeitado ou inativo');
+                  
+                  // Fazer logout e redirecionar para página de aprovação pendente
+                  if (mounted) {
+                    supabase.auth.signOut().then(() => {
+                      if (typeof window !== 'undefined') {
+                        window.location.href = '/aprovacao-pendente?status=rejected';
+                      }
+                    });
+                  }
+                  return;
+                }
+                
+                // Se está pendente, permitir acesso temporário
+                if (approvalStatus === 'pending') {
+                  console.log('⏳ Usuário pendente de aprovação, mas permitindo acesso temporário');
+                  // Não bloquear, apenas logar
+                }
+              } else {
+                // Se não há perfil, permitir acesso (será criado automaticamente)
+                console.log('📝 Perfil não encontrado, permitindo acesso (será criado automaticamente)');
+              }
+              
+              // Se aprovado ou não há perfil, continuar carregando tenant
+              // Carregar tenant de forma assíncrona
+              loadRealTenant(session.user.id)
+                .then((tenantData) => {
+                  if (mounted && tenantData) {
+                    console.log('🏢 Tenant carregado:', tenantData);
+                    setTenant(tenantData);
+                    
+                    // Carregar subscription após carregar tenant
+                    if (tenantData?.id) {
+                      fetch(`/next_api/subscriptions?tenant_id=${tenantData.id}`)
+                        .then((response) => {
+                          if (response.ok) {
+                            return response.json();
+                          }
+                          return null;
+                        })
+                        .then((result) => {
+                          if (mounted && result?.success && result.data) {
+                            const subData = result.data;
+                            const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
+                            
+                            const subscriptionData: SubscriptionData = {
+                              id: subData.id,
+                              status: subData.status || 'trial',
+                              trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
+                              current_period_end: subData.current_period_end || undefined,
+                              plan: {
+                                id: plan?.id || 'trial',
+                                name: plan?.name || 'Trial',
+                                slug: plan?.slug || 'trial',
+                                price_monthly: plan?.price_monthly || 0,
+                                price_yearly: plan?.price_yearly || 0,
+                                features: plan?.features || {},
+                                limits: plan?.limits || {
+                                  max_users: 1,
+                                  max_customers: 100,
+                                  max_products: 100,
+                                  max_sales_per_month: 1000,
+                                },
+                              },
+                            };
+                            
+                            console.log('✅ Subscription carregada:', subscriptionData);
+                            setSubscription(subscriptionData);
+                          }
+                        })
+                        .catch((err) => {
+                          console.error('⚠️ Erro ao carregar subscription:', err);
+                        });
+                    }
+                  }
+                })
+                .catch((err) => {
+                  console.error('⚠️ Erro ao carregar tenant:', err);
+                });
             })
             .catch((err) => {
-              console.error('⚠️ Erro ao carregar tenant:', err);
+              console.error('⚠️ Erro ao verificar aprovação:', err);
+              // Em caso de erro, permitir acesso (não bloquear)
             });
         } else if (mounted) {
           console.log('👤 Nenhum usuário logado');

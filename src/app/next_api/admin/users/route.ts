@@ -71,7 +71,7 @@ export async function GET(_request: NextRequest) {
           tenant_email: tenant?.email,
           tenant_phone: tenant?.phone,
           tenant_document: tenant?.document,
-          approval_status: profile?.status || 'pending',
+          approval_status: profile?.is_active === true ? 'approved' : profile?.is_active === false ? 'rejected' : 'pending',
           // Dados de subscription
           subscription_status: subscription?.status || null,
           subscription_trial_ends_at: subscription?.trial_end || null,
@@ -278,3 +278,211 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
+// PATCH - aprovar/rejeitar usuário
+export async function PATCH(request: NextRequest) {
+  try {
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+
+    const body = await request.json();
+    const { user_id, status, rejection_reason } = body;
+
+    if (!user_id) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'user_id é obrigatório' 
+        },
+        { 
+          status: 400,
+          headers 
+        }
+      );
+    }
+
+    if (!status || !['approved', 'rejected', 'pending'].includes(status)) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'status deve ser: approved, rejected ou pending' 
+        },
+        { 
+          status: 400,
+          headers 
+        }
+      );
+    }
+
+    console.log('✅ Iniciando atualização de aprovação:', { user_id, status, rejection_reason });
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    
+    // Verificar se user_id é um UUID válido
+    if (!uuidRegex.test(user_id)) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'user_id deve ser um UUID válido' 
+        },
+        { 
+          status: 400,
+          headers 
+        }
+      );
+    }
+
+    // Buscar o perfil do usuário
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', user_id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('❌ Erro ao buscar perfil:', profileError);
+      return NextResponse.json(
+        { 
+          success: false,
+          error: `Erro ao buscar perfil: ${profileError.message}` 
+        },
+        { 
+          status: 500,
+          headers 
+        }
+      );
+    }
+
+    if (!profile) {
+      // Se não existe perfil, criar um novo
+      // Usar apenas colunas que existem na tabela: is_active
+      const newProfile: any = {
+        user_id: user_id,
+        name: 'Usuário', // Nome padrão, será atualizado depois
+        is_active: status === 'approved',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: createdProfile, error: createError } = await supabaseAdmin
+        .from('user_profiles')
+        .insert(newProfile)
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('❌ Erro ao criar perfil:', createError);
+        return NextResponse.json(
+          { 
+            success: false,
+            error: `Erro ao criar perfil: ${createError.message}` 
+          },
+          { 
+            status: 500,
+            headers 
+          }
+        );
+      }
+
+      console.log('✅ Perfil criado e aprovado:', createdProfile);
+      return NextResponse.json(
+        { 
+          success: true,
+          message: `Usuário ${status === 'approved' ? 'aprovado' : status === 'rejected' ? 'rejeitado' : 'pendente'} com sucesso`,
+          data: createdProfile
+        },
+        { 
+          headers 
+        }
+      );
+    }
+
+    // Atualizar perfil existente
+    // Usar apenas colunas que existem na tabela: is_active
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (status === 'approved') {
+      updateData.is_active = true;
+    } else if (status === 'rejected') {
+      updateData.is_active = false;
+    }
+    // Para 'pending', não alteramos is_active (mantém o valor atual)
+
+    const { data: updatedProfile, error: updateError } = await supabaseAdmin
+      .from('user_profiles')
+      .update(updateData)
+      .eq('user_id', user_id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('❌ Erro ao atualizar perfil:', updateError);
+      return NextResponse.json(
+        { 
+          success: false,
+          error: `Erro ao atualizar perfil: ${updateError.message}` 
+        },
+        { 
+          status: 500,
+          headers 
+        }
+      );
+    }
+
+    console.log('✅ Status de aprovação atualizado:', updatedProfile);
+
+    // Se foi aprovado, também atualizar o tenant para 'trial' se estiver 'pending_approval'
+    if (status === 'approved') {
+      // Buscar tenant relacionado ao usuário
+      const { data: membership } = await supabaseAdmin
+        .from('user_memberships')
+        .select('tenant_id')
+        .eq('user_id', user_id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (membership?.tenant_id) {
+        const { error: tenantUpdateError } = await supabaseAdmin
+          .from('tenants')
+          .update({ 
+            status: 'trial',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', membership.tenant_id);
+
+        if (tenantUpdateError) {
+          console.warn('⚠️ Erro ao atualizar status do tenant:', tenantUpdateError);
+        } else {
+          console.log('✅ Status do tenant atualizado para trial');
+        }
+      }
+    }
+
+    return NextResponse.json(
+      { 
+        success: true,
+        message: `Usuário ${status === 'approved' ? 'aprovado' : status === 'rejected' ? 'rejeitado' : 'pendente'} com sucesso`,
+        data: updatedProfile
+      },
+      { 
+        headers 
+      }
+    );
+  } catch (error: any) {
+    console.error('❌ Erro ao atualizar aprovação:', error);
+    return NextResponse.json(
+      { 
+        success: false,
+        error: error.message || 'Erro interno ao atualizar aprovação'
+      },
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
+    );
+  }
+}
