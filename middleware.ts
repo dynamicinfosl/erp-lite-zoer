@@ -15,8 +15,12 @@ const adminRoutes = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // Ignorar completamente a rota de cupom
-  if (pathname.startsWith('/cupom/')) {
+  // IMPORTANTE: Ignorar todas as rotas de API (não devem passar pelo middleware)
+  // Isso evita que o middleware retorne HTML quando a API espera JSON
+  if (pathname.startsWith('/api/') || 
+      pathname.startsWith('/next_api/') || 
+      pathname.startsWith('/_next/') ||
+      pathname.startsWith('/cupom/')) {
     return NextResponse.next();
   }
   

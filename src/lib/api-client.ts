@@ -1,4 +1,5 @@
 import { AUTH_CODE } from '@/constants/auth';
+import { safeFetch } from './fetch-safe';
 
 interface ApiResponse<T = any> {
   success: boolean;
@@ -20,7 +21,7 @@ let refreshPromise: Promise<boolean> | null = null;
 
 async function refreshToken(): Promise<boolean> {
   try {
-    const response = await fetch('/next_api/auth/refresh', {
+    const response = await safeFetch('/next_api/auth/refresh', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -29,7 +30,13 @@ async function refreshToken(): Promise<boolean> {
 
     if (!response.ok) {
       try {
-        const errorResult = await response.json();
+        const text = await response.text();
+        // Verificar se é HTML
+        if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+          console.error('❌ Token refresh retornou HTML:', text.substring(0, 200));
+          return false;
+        }
+        const errorResult = JSON.parse(text);
         console.error('Token refresh failed:', errorResult.errorMessage || 'Unknown error');
       } catch (parseError) {
         console.error('Token refresh failed: Invalid response format');
@@ -37,7 +44,14 @@ async function refreshToken(): Promise<boolean> {
       return false;
     }
 
-    const result: ApiResponse = await response.json();
+    const text = await response.text();
+    // Verificar se é HTML
+    if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+      console.error('❌ Token refresh retornou HTML:', text.substring(0, 200));
+      return false;
+    }
+    
+    const result: ApiResponse = JSON.parse(text);
     
     if (result.success) {
       return true;
@@ -64,7 +78,7 @@ async function apiRequest<T = any>(
   isRetry = false
 ): Promise<T> {
   try {
-    const response = await fetch(`/next_api${endpoint}`, {
+    const response = await safeFetch(`/next_api${endpoint}`, {
       headers: {
         'Content-Type': 'application/json',
         ...options?.headers,
@@ -84,23 +98,40 @@ async function apiRequest<T = any>(
     // Parsing seguro do corpo, lidando com respostas não-JSON e corpo vazio
     const contentType = response.headers.get('content-type') || '';
     let result: ApiResponse<T> | null = null;
+    
+    // IMPORTANTE: Ler o texto primeiro para verificar se é HTML
+    const text = await response.text();
+    
+    // Verificar se a resposta é HTML (erro comum quando a rota não existe)
+    if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+      console.error('❌ API retornou HTML em vez de JSON:', {
+        endpoint,
+        status: response.status,
+        contentType,
+        preview: text.substring(0, 300)
+      });
+      throw new ApiError(
+        response.status || 500,
+        'O servidor retornou HTML em vez de JSON. A rota de API pode não existir ou estar com erro.',
+        'HTML_RESPONSE'
+      );
+    }
+    
     if (contentType.includes('application/json')) {
       try {
-        result = await response.json();
-      } catch {
+        result = JSON.parse(text);
+      } catch (parseError) {
+        console.error('❌ Erro ao parsear JSON:', parseError);
+        console.error('❌ Texto recebido:', text.substring(0, 500));
         // JSON inválido
         result = { success: response.ok, errorMessage: 'Invalid JSON response' } as ApiResponse<T>;
       }
     } else {
-      try {
-        const text = await response.text();
-        if (text && text.trim().length > 0) {
-          result = { success: response.ok, errorMessage: text } as ApiResponse<T>;
-        } else {
-          // Sem corpo (ex.: 204 No Content)
-          result = { success: response.ok } as ApiResponse<T>;
-        }
-      } catch {
+      // Não é JSON, mas também não é HTML (já verificamos acima)
+      if (text && text.trim().length > 0) {
+        result = { success: response.ok, errorMessage: text } as ApiResponse<T>;
+      } else {
+        // Sem corpo (ex.: 204 No Content)
         result = { success: response.ok } as ApiResponse<T>;
       }
     }

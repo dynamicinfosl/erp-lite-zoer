@@ -103,17 +103,45 @@ export function UserManagement() {
       // Verificar content-type antes de fazer parse
       const contentType = response.headers.get('content-type') || '';
       let json: any;
+      
       if (contentType.includes('application/json')) {
         try {
-          json = await response.json();
-        } catch (parseError) {
-          console.error('❌ Erro ao parsear JSON:', parseError);
-          throw new Error('Resposta inválida do servidor (não é JSON)');
+          // Ler o texto primeiro para verificar se é JSON válido
+          const text = await response.text();
+          
+          // Verificar se começa com HTML (erro comum)
+          if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+            console.error('❌ Resposta é HTML em vez de JSON:', text.substring(0, 200));
+            throw new Error('O servidor retornou HTML em vez de JSON. Verifique se a rota de API existe.');
+          }
+          
+          // Tentar fazer parse do JSON
+          try {
+            json = JSON.parse(text);
+          } catch (parseError) {
+            console.error('❌ Erro ao parsear JSON:', parseError);
+            console.error('❌ Texto recebido:', text.substring(0, 500));
+            throw new Error('Resposta inválida do servidor (JSON malformado)');
+          }
+        } catch (parseError: any) {
+          // Se já é um erro que lançamos, re-lançar
+          if (parseError.message.includes('HTML') || parseError.message.includes('JSON malformado')) {
+            throw parseError;
+          }
+          console.error('❌ Erro ao processar resposta:', parseError);
+          throw new Error('Erro ao processar resposta do servidor');
         }
       } else {
         const text = await response.text();
-        console.error('❌ Resposta não é JSON:', text.substring(0, 100));
-        throw new Error('Resposta inválida do servidor');
+        console.error('❌ Resposta não é JSON. Content-Type:', contentType);
+        console.error('❌ Preview da resposta:', text.substring(0, 200));
+        
+        // Se for HTML, dar mensagem mais clara
+        if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+          throw new Error('O servidor retornou uma página HTML. A rota de API pode não existir ou estar retornando erro.');
+        }
+        
+        throw new Error('Resposta inválida do servidor (esperado JSON)');
       }
 
       const data = (json?.data || []) as TenantUser[];

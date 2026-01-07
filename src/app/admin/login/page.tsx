@@ -42,21 +42,48 @@ export default function AdminLoginPage() {
     setError(null);
 
     try {
+      // Normalizar credenciais (remover espaços e converter para minúsculas)
+      const normalizedUsername = formData.username.trim().toLowerCase();
+      const normalizedPassword = formData.password.trim();
+      const expectedUsername = ADMIN_CREDENTIALS.username.toLowerCase();
+      
       // Verificar credenciais
-      if (formData.username === ADMIN_CREDENTIALS.username && 
-          formData.password === ADMIN_CREDENTIALS.password) {
+      if (normalizedUsername === expectedUsername && 
+          normalizedPassword === ADMIN_CREDENTIALS.password) {
         
         // Salvar autenticação no sessionStorage
         sessionStorage.setItem('adminAuthenticated', 'true');
-        sessionStorage.setItem('adminUser', formData.username);
+        sessionStorage.setItem('adminUser', ADMIN_CREDENTIALS.username);
         
-        // Redirecionar para página admin
-        router.push('/admin');
+        // Log para debug
+        console.log('✅ Login admin bem-sucedido');
+        console.log('SessionStorage adminAuthenticated:', sessionStorage.getItem('adminAuthenticated'));
+        
+        // Aguardar um pouco para garantir que o sessionStorage foi salvo
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Tentar redirecionar com router.push primeiro
+        try {
+          router.push('/admin');
+          // Se router.push não funcionar, usar window.location como fallback
+          setTimeout(() => {
+            if (window.location.pathname !== '/admin') {
+              window.location.href = '/admin';
+            }
+          }, 500);
+        } catch (redirectError) {
+          console.error('Erro no router.push, usando window.location:', redirectError);
+          window.location.href = '/admin';
+        }
       } else {
-        setError('Credenciais inválidas');
+        console.log('❌ Credenciais inválidas');
+        console.log('Username recebido:', normalizedUsername);
+        console.log('Password recebido:', normalizedPassword ? '***' : 'vazio');
+        setError('Credenciais inválidas. Verifique usuário e senha.');
       }
     } catch (err) {
-      setError('Erro ao fazer login');
+      console.error('Erro ao fazer login:', err);
+      setError('Erro ao fazer login. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -148,6 +175,17 @@ export default function AdminLoginPage() {
         <div className="mt-6 text-center text-xs text-gray-500">
           <p>Status: ✅ Página funcionando</p>
           <p>Rota: /admin/login</p>
+          <button
+            onClick={() => {
+              console.log('🔍 Debug SessionStorage:');
+              console.log('  - adminAuthenticated:', sessionStorage.getItem('adminAuthenticated'));
+              console.log('  - adminUser:', sessionStorage.getItem('adminUser'));
+              alert(`SessionStorage:\nadminAuthenticated: ${sessionStorage.getItem('adminAuthenticated')}\nadminUser: ${sessionStorage.getItem('adminUser')}`);
+            }}
+            className="mt-2 text-blue-400 hover:text-blue-300 underline text-xs"
+          >
+            🔍 Verificar SessionStorage
+          </button>
         </div>
       </div>
     </div>

@@ -58,26 +58,57 @@ export function AdminProtection({ children }: AdminProtectionProps) {
         // Verificar autenticação via sessionStorage (apenas no cliente)
         if (typeof window !== 'undefined') {
           const adminAuth = sessionStorage.getItem('adminAuthenticated');
-          if (adminAuth === 'true') {
+          const adminUser = sessionStorage.getItem('adminUser');
+          
+          // Log para debug
+          console.log('🔍 Verificando autenticação admin:');
+          console.log('  - adminAuthenticated:', adminAuth);
+          console.log('  - adminUser:', adminUser);
+          console.log('  - pathname:', pathname);
+          console.log('  - Tipo de adminAuth:', typeof adminAuth);
+          console.log('  - adminAuth === "true":', adminAuth === 'true');
+          
+          // Verificar se adminAuth é exatamente 'true' (string)
+          if (adminAuth === 'true' || adminAuth === true) {
+            console.log('✅ Autenticação admin confirmada via sessionStorage');
             setIsAdmin(true);
             setIsCheckingAuth(false);
             return;
+          } else {
+            console.log('⚠️ SessionStorage não contém adminAuthenticated=true');
+            console.log('  - Valor atual:', JSON.stringify(adminAuth));
           }
         }
         
         // Verificar via user object
         const adminStatus = checkIsAdmin(user);
+        console.log('🔍 Verificando via user object:', adminStatus);
         setIsAdmin(adminStatus);
       } catch (error) {
-        console.error('Erro ao verificar autenticação admin:', error);
+        console.error('❌ Erro ao verificar autenticação admin:', error);
         setIsAdmin(false);
       } finally {
         setIsCheckingAuth(false);
       }
     };
 
+    // Verificar imediatamente
     checkAdminAuth();
-  }, [user, pathname]);
+    
+    // Verificar novamente após um pequeno delay (para casos onde o sessionStorage foi salvo logo após a navegação)
+    const timeoutId = setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        const adminAuth = sessionStorage.getItem('adminAuthenticated');
+        if (adminAuth === 'true' && !isAdmin) {
+          console.log('✅ Autenticação admin confirmada após delay');
+          setIsAdmin(true);
+          setIsCheckingAuth(false);
+        }
+      }
+    }, 200);
+
+    return () => clearTimeout(timeoutId);
+  }, [user, pathname, isAdmin]);
 
   // Mostrar loading enquanto verifica autenticação
   if (isCheckingAuth) {

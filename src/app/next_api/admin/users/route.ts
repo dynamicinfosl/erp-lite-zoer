@@ -8,6 +8,10 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
 export async function GET(_request: NextRequest) {
   try {
+    // Garantir que sempre retornamos JSON, mesmo em caso de erro
+    const headers = {
+      'Content-Type': 'application/json',
+    };
 
     const [profilesResult, tenantsResult, membershipsResult, subscriptionsResult] = await Promise.all([
       supabaseAdmin.from('user_profiles').select('*'),
@@ -111,10 +115,23 @@ export async function GET(_request: NextRequest) {
       return acc
     }, [])
 
-    return NextResponse.json({ data: unique })
+    return NextResponse.json({ data: unique }, { headers })
   } catch (error: any) {
     console.error('Erro ao listar usuários admin:', error)
-    return NextResponse.json({ error: error.message || 'Erro interno' }, { status: 500 })
+    // Sempre retornar JSON, mesmo em caso de erro
+    return NextResponse.json(
+      { 
+        success: false,
+        error: error.message || 'Erro interno',
+        data: []
+      }, 
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
+    )
   }
 }
 

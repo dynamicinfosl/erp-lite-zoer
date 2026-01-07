@@ -1,38 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+// Headers JSON padrão
+const jsonHeaders = {
+  'Content-Type': 'application/json',
+};
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Supabase env vars não configuradas (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)')
+// Função para obter o cliente Supabase (com fallback)
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co'
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10'
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return null;
+  }
+  
+  return createClient(supabaseUrl, supabaseServiceKey)
 }
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
 export async function POST(request: NextRequest) {
   try {
+    // Verificar se o Supabase está configurado
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Supabase não configurado. Configure NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY' 
+        },
+        { status: 500, headers: jsonHeaders }
+      );
+    }
+    
     const body = await request.json()
     const { tenant_id, days, plan_id, expiration_date } = body
 
     if (!tenant_id) {
       return NextResponse.json(
-        { error: 'tenant_id é obrigatório' },
-        { status: 400 }
+        { success: false, error: 'tenant_id é obrigatório' },
+        { status: 400, headers: jsonHeaders }
       )
     }
 
     if (!plan_id) {
       return NextResponse.json(
-        { error: 'plan_id é obrigatório' },
-        { status: 400 }
+        { success: false, error: 'plan_id é obrigatório' },
+        { status: 400, headers: jsonHeaders }
       )
     }
 
     if (!expiration_date && !days) {
       return NextResponse.json(
-        { error: 'expiration_date ou days é obrigatório' },
-        { status: 400 }
+        { success: false, error: 'expiration_date ou days é obrigatório' },
+        { status: 400, headers: jsonHeaders }
       )
     }
 
@@ -47,8 +67,8 @@ export async function POST(request: NextRequest) {
 
       if (planError || !planData?.id) {
         return NextResponse.json(
-          { error: `Plano inválido: ${plan_id}` },
-          { status: 400 }
+          { success: false, error: `Plano inválido: ${plan_id}` },
+          { status: 400, headers: jsonHeaders }
         )
       }
 
@@ -92,8 +112,8 @@ export async function POST(request: NextRequest) {
       if (updateError) {
         console.error('Erro ao atualizar subscription:', updateError)
         return NextResponse.json(
-          { error: 'Erro ao atualizar subscription: ' + updateError.message },
-          { status: 400 }
+          { success: false, error: 'Erro ao atualizar subscription: ' + updateError.message },
+          { status: 400, headers: jsonHeaders }
         )
       }
 
@@ -129,7 +149,7 @@ export async function POST(request: NextRequest) {
         message: `Plano ativado até ${periodEnd.toLocaleDateString('pt-BR')} (${daysDiff} dias)`,
         data: updatedSub,
         requiresRefresh: true // Indicar que o cliente precisa recarregar
-      })
+      }, { headers: jsonHeaders })
     } else {
       // Criar nova subscription
       const { data: newSub, error: createError } = await supabaseAdmin
@@ -151,8 +171,8 @@ export async function POST(request: NextRequest) {
       if (createError) {
         console.error('Erro ao criar subscription:', createError)
         return NextResponse.json(
-          { error: 'Erro ao criar subscription: ' + createError.message },
-          { status: 400 }
+          { success: false, error: 'Erro ao criar subscription: ' + createError.message },
+          { status: 400, headers: jsonHeaders }
         )
       }
 
@@ -188,14 +208,36 @@ export async function POST(request: NextRequest) {
         message: `Plano criado e ativado até ${periodEnd.toLocaleDateString('pt-BR')} (${daysDiff} dias)`,
         data: newSub,
         requiresRefresh: true // Indicar que o cliente precisa recarregar
-      })
+      }, { headers: jsonHeaders })
     }
   } catch (error: any) {
     console.error('Erro no handler de ativação de plano:', error)
-    return NextResponse.json(
-      { error: 'Erro interno do servidor: ' + error.message },
-      { status: 500 }
-    )
+    
+    // Garantir que sempre retornamos JSON, mesmo em caso de erro inesperado
+    try {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Erro interno do servidor: ' + (error?.message || 'Erro desconhecido')
+        },
+        { 
+          status: 500,
+          headers: jsonHeaders
+        }
+      );
+    } catch (jsonError) {
+      // Se até mesmo o NextResponse.json falhar, criar resposta manual
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Erro crítico no servidor'
+        }),
+        {
+          status: 500,
+          headers: jsonHeaders
+        }
+      );
+    }
   }
 }
 
