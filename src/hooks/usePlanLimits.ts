@@ -119,6 +119,16 @@ export function usePlanLimits(): PlanLimitsHook {
 
   // Verificar se trial ou plano ativo expirou
   const now = new Date();
+  
+  // Log detalhado para debug
+  console.log('🔍 [usePlanLimits] Verificando expiração:', {
+    status: currentSubscription?.status,
+    trial_ends_at: currentSubscription?.trial_ends_at,
+    current_period_end: currentSubscription?.current_period_end,
+    now: now.toISOString(),
+    tenant_id: tenant?.id
+  });
+  
   const isTrialExpired = Boolean(
     currentSubscription?.status === 'trial' && 
     currentSubscription?.trial_ends_at && 
@@ -130,6 +140,12 @@ export function usePlanLimits(): PlanLimitsHook {
     currentSubscription?.current_period_end && 
     new Date(currentSubscription.current_period_end) < now
   );
+  
+  console.log('📊 [usePlanLimits] Resultado da verificação:', {
+    isTrialExpired,
+    isActivePlanExpired,
+    isPlanExpired: isTrialExpired || isActivePlanExpired
+  });
   
   const isPlanExpired = isTrialExpired || isActivePlanExpired;
 

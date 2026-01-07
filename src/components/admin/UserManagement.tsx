@@ -560,6 +560,26 @@ export function UserManagement() {
       return;
     }
 
+    // Validar se a data não está no passado
+    const selectedDate = new Date(expirationDate + 'T23:59:59');
+    const now = new Date();
+    
+    if (selectedDate <= now) {
+      toast.error('⚠️ A data de vencimento deve ser uma data FUTURA! A data selecionada já passou.');
+      return;
+    }
+
+    // Calcular dias até expiração
+    const daysUntilExpiration = Math.ceil((selectedDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    console.log('📅 Validando data de expiração:', {
+      expirationDate,
+      selectedDate: selectedDate.toISOString(),
+      now: now.toISOString(),
+      daysUntilExpiration,
+      isValid: selectedDate > now
+    });
+
     try {
       setActivatingPlan(true);
       const response = await fetch('/next_api/admin/activate-plan', {
@@ -595,9 +615,9 @@ export function UserManagement() {
       setSelectedPlanId('');
       setExpirationDate('');
       
-      // Notificar o cliente para recarregar a página (se estiver logado)
-      toast.info('Plano ativado! O cliente precisa recarregar a página para ver as mudanças', {
-        duration: 5000,
+      // Notificar o cliente para fazer logout e login novamente
+      toast.success('Plano ativado! IMPORTANTE: O cliente deve fazer LOGOUT e LOGIN novamente para que as mudanças sejam aplicadas.', {
+        duration: 10000,
       });
     } catch (error: any) {
       console.error('Erro ao ativar plano:', error);
@@ -607,11 +627,12 @@ export function UserManagement() {
     }
   };
 
-  // Quando abrir o modal, definir data padrão (30 dias a partir de hoje) e carregar planos
+  // Quando abrir o modal, definir data padrão (1 ano a partir de hoje) e carregar planos
   useEffect(() => {
     if (dialogOpen && selectedUser) {
       const defaultDate = new Date();
-      defaultDate.setDate(defaultDate.getDate() + 30);
+      // Definir 1 ano como padrão (365 dias)
+      defaultDate.setDate(defaultDate.getDate() + 365);
       setExpirationDate(defaultDate.toISOString().split('T')[0]);
       
       // Garantir que os planos estão carregados
@@ -1114,14 +1135,28 @@ export function UserManagement() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs sm:text-sm text-gray-300 mb-2 block">Data de Vencimento</Label>
+                  <Label className="text-xs sm:text-sm text-gray-300 mb-2 block">
+                    Data de Vencimento
+                    <span className="text-yellow-500 ml-2">(Padrão: 1 ano)</span>
+                  </Label>
                   <Input
                     type="date"
                     value={expirationDate}
-                    onChange={(e) => setExpirationDate(e.target.value)}
+                    onChange={(e) => {
+                      const selectedDate = new Date(e.target.value + 'T23:59:59');
+                      const now = new Date();
+                      if (selectedDate <= now) {
+                        toast.error('⚠️ Selecione uma data FUTURA!');
+                      } else {
+                        setExpirationDate(e.target.value);
+                      }
+                    }}
                     className="w-full bg-gray-800 border-gray-700 text-white text-sm"
-                    min={new Date().toISOString().split('T')[0]}
+                    min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
                   />
+                  <p className="text-xs text-gray-400 mt-1">
+                    ⚠️ ATENÇÃO: A data deve ser FUTURA (depois de hoje)
+                  </p>
                 </div>
               </div>
               {selectedUser && !selectedUser.subscription_plan_name && (

@@ -11,33 +11,46 @@ interface TrialProtectionProps {
 
 export function TrialProtection({ children }: TrialProtectionProps) {
   const router = useRouter();
-  const { tenant } = useSimpleAuth();
+  const { tenant, subscription } = useSimpleAuth();
   const { isTrialExpired, loading } = usePlanLimits();
   const [isChecking, setIsChecking] = useState(true);
   const hasRedirected = useRef(false);
 
   useEffect(() => {
+    console.log('🛡️ [TrialProtection] Verificando acesso:', {
+      tenant_id: tenant?.id,
+      isTrialExpired,
+      loading,
+      subscription_status: subscription?.status,
+      subscription_current_period_end: subscription?.current_period_end,
+      subscription_trial_ends_at: subscription?.trial_ends_at
+    });
+
     // Se não tem tenant, não verificar trial - permitir acesso
     if (!tenant?.id) {
+      console.log('✅ [TrialProtection] Sem tenant, permitindo acesso');
       setIsChecking(false);
       return;
     }
 
     // Aguardar carregamento dos dados do plano
     if (loading) {
+      console.log('⏳ [TrialProtection] Aguardando carregamento...');
       return;
     }
 
     // Se trial expirou e ainda não redirecionou, redirecionar
     if (isTrialExpired && !hasRedirected.current) {
+      console.warn('❌ [TrialProtection] Trial expirado, redirecionando...');
       hasRedirected.current = true;
       router.push('/trial-expirado');
       return;
     }
 
     // Se chegou até aqui, trial está válido
+    console.log('✅ [TrialProtection] Trial válido, permitindo acesso');
     setIsChecking(false);
-  }, [isTrialExpired, loading, tenant?.id, router]);
+  }, [isTrialExpired, loading, tenant?.id, subscription, router]);
 
   // Mostrar loading enquanto verifica (apenas se tem tenant)
   if (tenant?.id && (isChecking || loading)) {

@@ -275,7 +275,17 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
                     
                     // Carregar subscription após carregar tenant
                     if (tenantData?.id) {
-                      fetch(`/next_api/subscriptions?tenant_id=${tenantData.id}`)
+                      // ✅ ADICIONAR CACHE BUSTING para forçar busca atualizada
+                      const cacheBuster = `_=${Date.now()}`;
+                      console.log(`🔄 Buscando subscription atualizada para tenant: ${tenantData.id}`);
+                      
+                      fetch(`/next_api/subscriptions?tenant_id=${tenantData.id}&${cacheBuster}`, {
+                        cache: 'no-store', // Desabilitar cache HTTP
+                        headers: {
+                          'Cache-Control': 'no-cache, no-store, must-revalidate',
+                          'Pragma': 'no-cache'
+                        }
+                      })
                         .then((response) => {
                           if (response.ok) {
                             return response.json();
@@ -286,6 +296,15 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
                           if (mounted && result?.success && result.data) {
                             const subData = result.data;
                             const plan = Array.isArray(subData.plan) ? subData.plan[0] : subData.plan;
+                            
+                            console.log('📦 [INIT] Subscription recebida do banco:', {
+                              id: subData.id,
+                              status: subData.status,
+                              current_period_end: subData.current_period_end,
+                              trial_end: subData.trial_end,
+                              trial_ends_at: subData.trial_ends_at,
+                              plan_name: plan?.name
+                            });
                             
                             const subscriptionData: SubscriptionData = {
                               id: subData.id,
@@ -308,7 +327,11 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
                               },
                             };
                             
-                            console.log('✅ Subscription carregada:', subscriptionData);
+                            console.log('✅ Subscription carregada e configurada:', {
+                              status: subscriptionData.status,
+                              current_period_end: subscriptionData.current_period_end,
+                              trial_ends_at: subscriptionData.trial_ends_at
+                            });
                             setSubscription(subscriptionData);
                           }
                         })
@@ -546,8 +569,15 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('🔄 Buscando subscription para tenant:', tenant.id);
       
-      // Buscar subscription do banco
-      const response = await fetch(`/next_api/subscriptions?tenant_id=${tenant.id}`);
+      // Buscar subscription do banco com cache busting
+      const cacheBuster = `_=${Date.now()}`;
+      const response = await fetch(`/next_api/subscriptions?tenant_id=${tenant.id}&${cacheBuster}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
       
       if (response.ok) {
         const result = await response.json();

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Clock, Crown, ArrowRight, CheckCircle } from 'lucide-react';
+import { AlertCircle, Clock, Crown, ArrowRight, CheckCircle, RefreshCw } from 'lucide-react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 
 export default function TrialExpiradoPage() {
@@ -20,13 +20,17 @@ export default function TrialExpiradoPage() {
     const checkSubscription = async () => {
       try {
         setChecking(true);
+        console.log('🔄 Verificando status do plano...');
+        
         // Forçar refresh da subscription
         await refreshSubscription();
         
-        // Buscar subscription atualizada
-        const response = await fetch(`/next_api/subscriptions?tenant_id=${tenant.id}`);
+        // Buscar subscription atualizada diretamente do banco (cache bust)
+        const response = await fetch(`/next_api/subscriptions?tenant_id=${tenant.id}&_=${Date.now()}`);
         if (response.ok) {
           const result = await response.json();
+          console.log('📦 Subscription:', result.data);
+          
           if (result.success && result.data) {
             const subData = result.data;
             const now = new Date();
@@ -36,8 +40,16 @@ export default function TrialExpiradoPage() {
             const periodEnd = subData.current_period_end ? new Date(subData.current_period_end) : null;
             const isNotExpired = !periodEnd || periodEnd > now;
             
+            console.log('📋 Status:', { 
+              isActive, 
+              periodEnd: periodEnd?.toISOString(), 
+              isNotExpired,
+              now: now.toISOString()
+            });
+            
             if (isActive && isNotExpired) {
               // Plano foi ativado! Redirecionar para dashboard
+              console.log('✅ Plano ativado! Redirecionando...');
               router.push('/dashboard');
               return;
             }
@@ -74,6 +86,16 @@ export default function TrialExpiradoPage() {
     router.push('/assinatura');
   };
 
+  const handleLogout = () => {
+    if (typeof window !== 'undefined') {
+      // Limpar todos os dados do localStorage e sessionStorage
+      localStorage.clear();
+      sessionStorage.clear();
+      // Redirecionar para login
+      window.location.href = '/login';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
       <div className="w-full max-w-2xl space-y-6">
@@ -83,20 +105,15 @@ export default function TrialExpiradoPage() {
             <AlertCircle className="h-8 w-8 text-red-600" />
           </div>
           <h1 className="text-3xl font-bold text-heading">Período de Teste Expirado</h1>
-          <p className="text-body text-lg">
-            Seu período gratuito de 7 dias chegou ao fim
-          </p>
+          <p className="text-body">Seu período de teste chegou ao fim. Continue aproveitando todos os recursos!</p>
         </div>
 
         {/* Card Principal */}
-        <Card className="juga-card border-red-200 bg-gradient-to-br from-red-50 to-orange-50">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl text-red-800 flex items-center justify-center gap-2">
-              <Clock className="h-6 w-6" />
-              Acesso Restrito
-            </CardTitle>
-            <CardDescription className="text-red-700 text-base">
-              Para continuar usando o sistema, escolha um dos nossos planos
+        <Card className="shadow-lg">
+          <CardHeader className="text-center pb-4">
+            <CardTitle className="text-2xl text-heading">Escolha um Plano</CardTitle>
+            <CardDescription className="text-base">
+              Mantenha o acesso completo ao sistema escolhendo um de nossos planos
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -137,6 +154,18 @@ export default function TrialExpiradoPage() {
               </div>
             </div>
 
+            {/* Instruções para renovação */}
+            <Alert className="bg-blue-50 border-blue-200">
+              <AlertDescription className="text-blue-800">
+                <p className="font-semibold mb-2">✅ Já renovou seu plano?</p>
+                <ol className="list-decimal list-inside space-y-1 text-sm">
+                  <li>Clique em "Fazer Logout" abaixo</li>
+                  <li>Faça login novamente</li>
+                  <li>Seu plano renovado será ativado automaticamente</li>
+                </ol>
+              </AlertDescription>
+            </Alert>
+
             {/* Botões de Ação */}
             <div className="flex flex-col sm:flex-row gap-3">
               <Button 
@@ -157,14 +186,28 @@ export default function TrialExpiradoPage() {
                 disabled={checking}
                 className="flex-1 h-12 text-base"
               >
-                {checking ? 'Verificando...' : 'Verificar Novamente'}
+                {checking ? (
+                  <>
+                    <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
+                    Verificando...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-5 w-5 mr-2" />
+                    Verificar Novamente
+                  </>
+                )}
               </Button>
+            </div>
+
+            {/* Botão de Logout */}
+            <div className="pt-4 border-t border-gray-200">
               <Button 
-                variant="outline" 
-                onClick={() => router.push('/')}
-                className="flex-1 h-12 text-base"
+                onClick={handleLogout}
+                variant="ghost"
+                className="w-full"
               >
-                Voltar ao Início
+                Fazer Logout e Entrar Novamente
               </Button>
             </div>
 
@@ -186,8 +229,3 @@ export default function TrialExpiradoPage() {
     </div>
   );
 }
-
-
-
-
-
