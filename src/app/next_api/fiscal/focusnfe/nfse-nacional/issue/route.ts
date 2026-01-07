@@ -4,14 +4,22 @@ import { randomUUID } from 'crypto';
 
 export const runtime = 'nodejs';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Headers JSON padrão
+const jsonHeaders = {
+  'Content-Type': 'application/json',
+};
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Supabase env vars não configuradas (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)');
+// Função para obter o cliente Supabase (com fallback)
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10';
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return null;
+  }
+  
+  return createClient(supabaseUrl, supabaseServiceKey);
 }
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 type Environment = 'homologacao' | 'producao';
 
@@ -25,6 +33,14 @@ function isUuid(value: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Supabase não configurado. Configure NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY' },
+        { status: 500, headers: jsonHeaders }
+      );
+    }
+    
     const body = await request.json();
     const { tenant_id, payload, ref } = body as {
       tenant_id?: string;
@@ -33,11 +49,11 @@ export async function POST(request: NextRequest) {
     };
 
     if (!tenant_id || !isUuid(tenant_id)) {
-      return NextResponse.json({ error: 'tenant_id inválido' }, { status: 400 });
+      return NextResponse.json({ error: 'tenant_id inválido' }, { status: 400, headers: jsonHeaders });
     }
 
     if (!payload) {
-      return NextResponse.json({ error: 'payload é obrigatório' }, { status: 400 });
+      return NextResponse.json({ error: 'payload é obrigatório' }, { status: 400, headers: jsonHeaders });
     }
 
     const { data: integration, error: integrationError } = await supabaseAdmin
@@ -48,14 +64,14 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (integrationError) {
-      return NextResponse.json({ error: 'Erro ao buscar integração', details: integrationError.message }, { status: 400 });
+      return NextResponse.json({ error: 'Erro ao buscar integração', details: integrationError.message }, { status: 400, headers: jsonHeaders });
     }
 
     if (!integration || !integration.enabled) {
       return NextResponse.json({ 
         error: 'Integração FocusNFe não configurada ou desabilitada para este tenant',
         details: 'Configure a integração na página de Configuração Fiscal antes de emitir documentos'
-      }, { status: 400 });
+      }, { status: 400, headers: jsonHeaders });
     }
 
     // Validação: Verificar se empresa foi provisionada
@@ -86,7 +102,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError || !fiscalDoc) {
-      return NextResponse.json({ error: 'Erro ao criar fiscal_document', details: insertError?.message }, { status: 400 });
+      return NextResponse.json({ error: 'Erro ao criar fiscal_document', details: insertError?.message }, { status: 400, headers: jsonHeaders });
     }
 
     const url = `${baseUrl}/v2/nfsen?ref=${encodeURIComponent(finalRef)}`;
@@ -136,7 +152,7 @@ export async function POST(request: NextRequest) {
             fiscal_document_id: fiscalDoc.id,
             ref: finalRef,
           },
-          { status: 400 }
+          { status: 400, headers: jsonHeaders }
         );
       }
 
@@ -146,7 +162,7 @@ export async function POST(request: NextRequest) {
         ref: finalRef,
         http_status: responseStatus,
         provider_response: responseBody,
-      });
+      }, { headers: jsonHeaders });
     } catch (err: any) {
       await supabaseAdmin
         .from('fiscal_documents')
@@ -163,10 +179,10 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json(
         { error: 'Falha ao comunicar com FocusNFe', details: err?.message || String(err), fiscal_document_id: fiscalDoc.id },
-        { status: 500 }
+        { status: 500, headers: jsonHeaders }
       );
     }
   } catch (error: any) {
-    return NextResponse.json({ error: 'Erro interno do servidor', details: error?.message }, { status: 500 });
+      return NextResponse.json({ error: 'Erro interno do servidor', details: error?.message }, { status: 500, headers: jsonHeaders });
   }
 }

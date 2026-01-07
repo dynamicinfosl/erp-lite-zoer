@@ -69,7 +69,7 @@ export function AdminProtection({ children }: AdminProtectionProps) {
           console.log('  - adminAuth === "true":', adminAuth === 'true');
           
           // Verificar se adminAuth é exatamente 'true' (string)
-          if (adminAuth === 'true' || adminAuth === true) {
+          if (adminAuth === 'true') {
             console.log('✅ Autenticação admin confirmada via sessionStorage');
             setIsAdmin(true);
             setIsCheckingAuth(false);

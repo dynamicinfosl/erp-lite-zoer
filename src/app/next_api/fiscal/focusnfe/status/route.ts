@@ -3,14 +3,22 @@ import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Headers JSON padrão
+const jsonHeaders = {
+  'Content-Type': 'application/json',
+};
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Supabase env vars não configuradas (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)');
+// Função para obter o cliente Supabase (com fallback)
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10';
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return null;
+  }
+  
+  return createClient(supabaseUrl, supabaseServiceKey);
 }
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 type Environment = 'homologacao' | 'producao';
 
@@ -26,8 +34,12 @@ function isUuid(value: string): boolean {
 
 export async function GET(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
     if (!supabaseAdmin) {
-      return NextResponse.json({ error: 'Cliente Supabase não configurado' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Supabase não configurado. Configure NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY' },
+        { status: 500, headers: jsonHeaders }
+      );
     }
 
     const { searchParams } = new URL(request.url);
@@ -35,7 +47,7 @@ export async function GET(request: NextRequest) {
     const completa = searchParams.get('completa');
 
     if (!fiscal_document_id || !isUuid(fiscal_document_id)) {
-      return NextResponse.json({ error: 'fiscal_document_id inválido' }, { status: 400 });
+      return NextResponse.json({ error: 'fiscal_document_id inválido' }, { status: 400, headers: jsonHeaders });
     }
 
     const { data: fiscalDoc, error: docError } = await supabaseAdmin
@@ -45,7 +57,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (docError || !fiscalDoc) {
-      return NextResponse.json({ error: 'Documento fiscal não encontrado', details: docError?.message }, { status: 404 });
+      return NextResponse.json({ error: 'Documento fiscal não encontrado', details: docError?.message }, { status: 404, headers: jsonHeaders });
     }
 
     const { data: integration, error: integrationError } = await supabaseAdmin
@@ -56,11 +68,11 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
 
     if (integrationError) {
-      return NextResponse.json({ error: 'Erro ao buscar integração', details: integrationError.message }, { status: 400 });
+      return NextResponse.json({ error: 'Erro ao buscar integração', details: integrationError.message }, { status: 400, headers: jsonHeaders });
     }
 
     if (!integration || !integration.enabled) {
-      return NextResponse.json({ error: 'Integração FocusNFe não configurada ou desabilitada para este tenant' }, { status: 400 });
+      return NextResponse.json({ error: 'Integração FocusNFe não configurada ou desabilitada para este tenant' }, { status: 400, headers: jsonHeaders });
     }
 
     const environment = (integration.environment as Environment) || 'homologacao';
@@ -127,7 +139,7 @@ export async function GET(request: NextRequest) {
           created_at: new Date().toISOString(),
         });
 
-      return NextResponse.json({ success: true, data: { ...fiscalDoc, status: nextStatus }, http_status, provider_response: body });
+      return NextResponse.json({ success: true, data: { ...fiscalDoc, status: nextStatus }, http_status, provider_response: body }, { headers: jsonHeaders });
     }
 
     await supabaseAdmin
@@ -143,9 +155,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       { error: 'Erro ao consultar documento na FocusNFe', http_status, provider_error: body, data: fiscalDoc },
-      { status: 400 }
+      { status: 400, headers: jsonHeaders }
     );
   } catch (error: any) {
-    return NextResponse.json({ error: 'Erro interno do servidor', details: error?.message }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno do servidor', details: error?.message }, { status: 500, headers: jsonHeaders });
   }
 }

@@ -4,14 +4,17 @@ import crypto from 'crypto';
 
 export const runtime = 'nodejs';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Supabase env vars não configuradas (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)');
+// Função para obter o cliente Supabase (com fallback)
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10';
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return null;
+  }
+  
+  return createClient(supabaseUrl, supabaseServiceKey);
 }
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 const BUCKET = 'fiscal-certificates';
 
@@ -54,12 +57,24 @@ async function fetchJsonOrText(resp: Response) {
 }
 
 export async function POST(request: NextRequest) {
+  const jsonHeaders = {
+    'Content-Type': 'application/json',
+  };
+  
   try {
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Supabase não configurado. Configure NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY' },
+        { status: 500, headers: jsonHeaders }
+      );
+    }
+    
     const body = await request.json();
     const { tenant_id } = body as { tenant_id?: string };
 
     if (!tenant_id || !isUuid(tenant_id)) {
-      return NextResponse.json({ error: 'tenant_id inválido' }, { status: 400 });
+      return NextResponse.json({ error: 'tenant_id inválido' }, { status: 400, headers: jsonHeaders });
     }
 
     const { data: tenant, error: tenantError } = await supabaseAdmin
@@ -69,12 +84,12 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (tenantError || !tenant) {
-      return NextResponse.json({ error: 'Tenant não encontrado', details: tenantError?.message }, { status: 404 });
+      return NextResponse.json({ error: 'Tenant não encontrado', details: tenantError?.message }, { status: 404, headers: jsonHeaders });
     }
 
     const cnpj = String(tenant.document || '').replace(/\D/g, '');
     if (cnpj.length !== 14) {
-      return NextResponse.json({ error: 'Tenant sem CNPJ válido (tenants.document)' }, { status: 400 });
+      return NextResponse.json({ error: 'Tenant sem CNPJ válido (tenants.document)' }, { status: 400, headers: jsonHeaders });
     }
 
     const { data: integration, error: integrationError } = await supabaseAdmin
@@ -85,11 +100,11 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (integrationError) {
-      return NextResponse.json({ error: 'Erro ao buscar integração', details: integrationError.message }, { status: 400 });
+      return NextResponse.json({ error: 'Erro ao buscar integração', details: integrationError.message }, { status: 400, headers: jsonHeaders });
     }
 
     if (!integration || !integration.enabled) {
-      return NextResponse.json({ error: 'Integração FocusNFe não configurada ou desabilitada' }, { status: 400 });
+      return NextResponse.json({ error: 'Integração FocusNFe não configurada ou desabilitada' }, { status: 400, headers: jsonHeaders });
     }
 
     const { data: cert, error: certError } = await supabaseAdmin
@@ -102,11 +117,11 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (certError) {
-      return NextResponse.json({ error: 'Erro ao buscar certificado', details: certError.message }, { status: 400 });
+      return NextResponse.json({ error: 'Erro ao buscar certificado', details: certError.message }, { status: 400, headers: jsonHeaders });
     }
 
     if (!cert?.storage_path) {
-      return NextResponse.json({ error: 'Nenhum certificado enviado para este tenant' }, { status: 400 });
+      return NextResponse.json({ error: 'Nenhum certificado enviado para este tenant' }, { status: 400, headers: jsonHeaders });
     }
 
     const password = decryptPassword({
@@ -117,7 +132,7 @@ export async function POST(request: NextRequest) {
 
     const downloadRes = await supabaseAdmin.storage.from(BUCKET).download(cert.storage_path);
     if (downloadRes.error) {
-      return NextResponse.json({ error: 'Erro ao baixar certificado do Storage', details: downloadRes.error.message }, { status: 400 });
+      return NextResponse.json({ error: 'Erro ao baixar certificado do Storage', details: downloadRes.error.message }, { status: 400, headers: jsonHeaders });
     }
 
     const arrayBuffer = await downloadRes.data.arrayBuffer();
@@ -180,7 +195,7 @@ export async function POST(request: NextRequest) {
           http_status,
           provider_error: providerBody,
         },
-        { status: 400 }
+        { status: 400, headers: jsonHeaders }
       );
     }
 
@@ -211,8 +226,8 @@ export async function POST(request: NextRequest) {
         certificado_cnpj: providerBody?.certificado_cnpj,
       },
       provider_response: providerBody,
-    });
+    }, { headers: jsonHeaders });
   } catch (error: any) {
-    return NextResponse.json({ error: 'Erro interno do servidor', details: error?.message }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno do servidor', details: error?.message }, { status: 500, headers: jsonHeaders });
   }
 }

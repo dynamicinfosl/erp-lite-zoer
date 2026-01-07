@@ -190,12 +190,29 @@ export function UserManagement() {
           console.warn('💡 Execute o script criar-planos-basicos.sql no Supabase SQL Editor');
           toast.warning('Nenhum plano encontrado. Verifique o banco de dados.');
         } else {
-          const plans = result.data.map((plan: any) => ({
-            id: plan.id,
-            name: plan.name,
-            slug: plan.slug
-          }));
-          console.log('✅ Planos carregados:', plans);
+          // Mapear planos e remover duplicatas (por nome ou slug)
+          const plansMap = new Map<string, { id: string; name: string; slug: string }>();
+          
+          result.data.forEach((plan: any) => {
+            const key = (plan.name?.toLowerCase() || plan.slug?.toLowerCase() || plan.id).trim();
+            // Se já existe um plano com o mesmo nome, manter apenas o primeiro
+            if (!plansMap.has(key)) {
+              plansMap.set(key, {
+                id: plan.id,
+                name: plan.name,
+                slug: plan.slug
+              });
+            } else {
+              console.warn(`⚠️ Plano duplicado ignorado: ${plan.name} (ID: ${plan.id})`);
+            }
+          });
+          
+          // Converter para array e ordenar por nome
+          const plans = Array.from(plansMap.values()).sort((a, b) => 
+            a.name.localeCompare(b.name, 'pt-BR')
+          );
+          
+          console.log('✅ Planos carregados (sem duplicatas):', plans);
           setAvailablePlans(plans);
         }
       } else {
