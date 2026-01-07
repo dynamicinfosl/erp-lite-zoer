@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { TenantPageWrapper } from '@/components/layout/PageWrapper';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +19,7 @@ export default function DiagnosticoFiscalPage() {
   const [loading, setLoading] = useState(false);
   const [diagnostico, setDiagnostico] = useState<any>(null);
 
-  const executarDiagnostico = async () => {
+  const executarDiagnostico = useCallback(async () => {
     if (!tenant?.id) {
       return;
     }
@@ -99,13 +99,13 @@ export default function DiagnosticoFiscalPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenant?.id, tenant?.name, user?.id, user?.email]);
 
   useEffect(() => {
     if (tenant?.id) {
       executarDiagnostico();
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, executarDiagnostico]);
 
   if (authLoading) {
     return (

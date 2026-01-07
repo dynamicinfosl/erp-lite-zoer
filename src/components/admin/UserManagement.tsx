@@ -160,12 +160,7 @@ export function UserManagement() {
     }
   }, []);
 
-  useEffect(() => {
-    loadUsers();
-    loadPlans();
-  }, [loadUsers]);
-
-  const loadPlans = async () => {
+  const loadPlans = useCallback(async () => {
     try {
       console.log('🔄 Carregando planos disponíveis...');
       const response = await fetch('/next_api/plans');
@@ -223,7 +218,12 @@ export function UserManagement() {
       console.error('❌ Erro ao carregar planos:', error);
       toast.error('Erro ao carregar planos. Verifique o console para mais detalhes.');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadUsers();
+    loadPlans();
+  }, [loadUsers, loadPlans]);
 
   useEffect(() => {
     let filtered = users.filter(user =>
@@ -480,7 +480,7 @@ export function UserManagement() {
         loadPlans();
       }
     }
-  }, [dialogOpen, selectedUser]);
+  }, [dialogOpen, selectedUser, availablePlans.length, loadPlans]);
 
   if (loading) {
     return (

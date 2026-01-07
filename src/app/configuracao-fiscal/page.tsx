@@ -222,7 +222,7 @@ export default function ConfiguracaoFiscalPage() {
     } finally {
       setLoading(false);
     }
-  }, [authTenant, user?.id]);
+  }, [authTenant, user]);
 
   useEffect(() => {
     if (authLoading) return;

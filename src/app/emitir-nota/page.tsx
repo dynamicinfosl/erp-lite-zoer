@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { TenantPageWrapper } from '@/components/layout/PageWrapper';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -167,7 +167,7 @@ export default function EmitirNotaPage() {
     };
   };
 
-  const checkConfiguration = async () => {
+  const checkConfiguration = useCallback(async () => {
     if (!tenant?.id) return;
 
     try {
@@ -181,13 +181,13 @@ export default function EmitirNotaPage() {
     } finally {
       setCheckingConfig(false);
     }
-  };
+  }, [tenant?.id]);
 
   useEffect(() => {
     if (tenant?.id) {
       checkConfiguration();
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, checkConfiguration]);
 
   const handleEmitirNota = async () => {
     // Validações
