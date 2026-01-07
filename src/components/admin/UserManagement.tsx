@@ -63,6 +63,7 @@ export function UserManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [activatingPlan, setActivatingPlan] = useState(false);
+  const [deletingUser, setDeletingUser] = useState(false);
   const [activationDays, setActivationDays] = useState(30);
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [expirationDate, setExpirationDate] = useState<string>('');
@@ -266,19 +267,88 @@ export function UserManagement() {
 
 
   const deleteUser = async (user: TenantUser) => {
+    if (!user) {
+      console.error('❌ Usuário não selecionado');
+      toast.error('Nenhum usuário selecionado');
+      return;
+    }
+
     try {
-      console.log('🗑️ Iniciando exclusão do usuário:', user.user_id);
+      console.log('🗑️ Iniciando exclusão do usuário:', {
+        user_id: user.user_id,
+        tenant_id: user.tenant_id,
+        user_email: user.user_email,
+        tenant_name: user.tenant_name
+      });
       
-      // TODO: Implementar endpoint de exclusão de usuários via API
-      // Por enquanto, apenas mostrar mensagem
-      toast.info('Funcionalidade de exclusão será implementada em breve via API');
+      setDeletingUser(true);
+      
+      // Construir URL com parâmetros
+      const params = new URLSearchParams();
+      let hasParams = false;
+      
+      if (user.user_id && !user.user_id.startsWith('tenant-') && !user.user_id.startsWith('membership-')) {
+        params.append('user_id', user.user_id);
+        hasParams = true;
+        console.log('✅ Adicionado user_id:', user.user_id);
+      }
+      
+      if (user.tenant_id) {
+        params.append('tenant_id', user.tenant_id);
+        hasParams = true;
+        console.log('✅ Adicionado tenant_id:', user.tenant_id);
+      }
+
+      if (!hasParams) {
+        throw new Error('Nenhum parâmetro válido para exclusão. Verifique user_id e tenant_id.');
+      }
+
+      const url = `/next_api/admin/users?${params.toString()}`;
+      console.log('📡 Chamando API:', url);
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('📥 Resposta recebida:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
+      // Verificar se a resposta é JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('❌ Resposta não é JSON:', text.substring(0, 500));
+        throw new Error('Resposta inválida do servidor (esperado JSON)');
+      }
+
+      const result = await response.json();
+      console.log('📦 Resultado:', result);
+
+      if (!response.ok || !result.success) {
+        const errorMsg = result.error || 'Erro ao excluir usuário';
+        console.error('❌ Erro na resposta:', errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      console.log('✅ Usuário excluído com sucesso!');
+      toast.success('Usuário excluído com sucesso!');
       setDialogOpen(false);
+      setSelectedUser(null);
       
-      // Removido código antigo que usava supabase diretamente
-      // A exclusão será implementada via endpoint /next_api/admin/users no futuro
-    } catch (error) {
-      console.error('❌ Erro ao excluir usuário:', error);
-      toast.error('Erro ao excluir usuário');
+      // Recarregar lista de usuários
+      await loadUsers();
+    } catch (error: any) {
+      console.error('❌ Erro completo ao excluir usuário:', error);
+      const errorMessage = error.message || 'Erro desconhecido ao excluir usuário';
+      toast.error(errorMessage);
+    } finally {
+      setDeletingUser(false);
     }
   };
 
@@ -962,16 +1032,55 @@ export function UserManagement() {
           <DialogFooter className="flex flex-col-reverse sm:flex-row justify-between gap-2 pt-3 sm:pt-4">
             <Button 
               variant="destructive" 
-              onClick={() => {
-                if (selectedUser && confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')) {
-                  deleteUser(selectedUser);
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🔴 Botão de excluir clicado!', { selectedUser, deletingUser });
+                
+                if (!selectedUser) {
+                  console.error('❌ Nenhum usuário selecionado');
+                  toast.error('Nenhum usuário selecionado');
+                  return;
+                }
+                
+                if (deletingUser) {
+                  console.warn('⚠️ Exclusão já em andamento');
+                  return;
+                }
+                
+                const confirmed = window.confirm(
+                  `Tem certeza que deseja excluir o usuário "${selectedUser.user_email}" (${selectedUser.tenant_name})?\n\nEsta ação não pode ser desfeita.`
+                );
+                
+                console.log('📋 Confirmação:', confirmed);
+                
+                if (confirmed) {
+                  console.log('✅ Confirmação recebida, excluindo usuário...');
+                  deleteUser(selectedUser).catch((error) => {
+                    console.error('❌ Erro ao executar deleteUser:', error);
+                    toast.error('Erro ao excluir usuário: ' + (error.message || 'Erro desconhecido'));
+                  });
+                } else {
+                  console.log('❌ Exclusão cancelada pelo usuário');
                 }
               }}
-              className="bg-red-600 hover:bg-red-700 w-full sm:w-auto text-sm"
+              disabled={deletingUser || !selectedUser}
+              className="bg-red-600 hover:bg-red-700 w-full sm:w-auto text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <X className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Excluir Usuário</span>
-              <span className="sm:hidden">Excluir</span>
+              {deletingUser ? (
+                <>
+                  <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" />
+                  <span className="hidden sm:inline">Excluindo...</span>
+                  <span className="sm:hidden">...</span>
+                </>
+              ) : (
+                <>
+                  <X className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Excluir Usuário</span>
+                  <span className="sm:hidden">Excluir</span>
+                </>
+              )}
             </Button>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               {selectedUser && (

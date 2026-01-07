@@ -135,4 +135,146 @@ export async function GET(_request: NextRequest) {
   }
 }
 
+// DELETE - excluir usuário (soft delete)
+export async function DELETE(request: NextRequest) {
+  try {
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('user_id');
+    const tenantId = searchParams.get('tenant_id');
+
+    if (!userId && !tenantId) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'user_id ou tenant_id é obrigatório' 
+        },
+        { 
+          status: 400,
+          headers 
+        }
+      );
+    }
+
+    console.log('🗑️ Iniciando exclusão de usuário:', { userId, tenantId });
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let profileSuccess = false;
+    let tenantSuccess = false;
+    let membershipSuccess = false;
+
+    // Se temos user_id, tentar excluir o perfil do usuário
+    if (userId && !userId.startsWith('tenant-') && !userId.startsWith('membership-')) {
+      // Verificar se é um UUID válido (user_profile.id)
+      if (uuidRegex.test(userId)) {
+        // Soft delete no user_profile
+        const { error: profileError, data: profileData } = await supabaseAdmin
+          .from('user_profiles')
+          .update({ 
+            is_active: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', userId)
+          .select();
+
+        if (profileError) {
+          console.error('❌ Erro ao desativar perfil:', profileError);
+        } else {
+          console.log('✅ Perfil desativado:', userId, profileData);
+          profileSuccess = true;
+        }
+      } else {
+        console.warn('⚠️ user_id não é um UUID válido:', userId);
+      }
+    }
+
+    // Se temos tenant_id, desativar o tenant e suas associações
+    if (tenantId) {
+      if (uuidRegex.test(tenantId)) {
+        // Desativar tenant
+        const { error: tenantError, data: tenantData } = await supabaseAdmin
+          .from('tenants')
+          .update({ 
+            status: 'suspended',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', tenantId)
+          .select();
+
+        if (tenantError) {
+          console.error('❌ Erro ao suspender tenant:', tenantError);
+        } else {
+          console.log('✅ Tenant suspenso:', tenantId, tenantData);
+          tenantSuccess = true;
+        }
+
+        // Desativar memberships relacionadas
+        const { error: membershipError, data: membershipData } = await supabaseAdmin
+          .from('user_memberships')
+          .update({ 
+            is_active: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('tenant_id', tenantId)
+          .select();
+
+        if (membershipError) {
+          console.warn('⚠️ Erro ao desativar memberships:', membershipError);
+          // Não é crítico, pode não existir a tabela
+        } else {
+          console.log('✅ Memberships desativadas para tenant:', tenantId, membershipData);
+          membershipSuccess = true;
+        }
+      } else {
+        console.warn('⚠️ tenant_id não é um UUID válido:', tenantId);
+      }
+    }
+
+    // Verificar se pelo menos uma operação foi bem-sucedida
+    if (!profileSuccess && !tenantSuccess) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Nenhuma operação de exclusão foi realizada. Verifique se os IDs são válidos.'
+        },
+        { 
+          status: 400,
+          headers 
+        }
+      );
+    }
+
+    return NextResponse.json(
+      { 
+        success: true,
+        message: 'Usuário excluído com sucesso',
+        details: {
+          profile_deactivated: profileSuccess,
+          tenant_suspended: tenantSuccess,
+          memberships_deactivated: membershipSuccess
+        }
+      },
+      { 
+        headers 
+      }
+    );
+  } catch (error: any) {
+    console.error('❌ Erro ao excluir usuário:', error);
+    return NextResponse.json(
+      { 
+        success: false,
+        error: error.message || 'Erro interno ao excluir usuário'
+      },
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
+    );
+  }
+}
 
