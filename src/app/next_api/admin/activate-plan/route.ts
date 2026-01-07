@@ -88,6 +88,14 @@ export async function POST(request: NextRequest) {
       ? new Date(expiration_date + 'T23:59:59') // Adicionar hora final do dia
       : new Date(now.getTime() + (days || 30) * 24 * 60 * 60 * 1000)
 
+    console.log('📅 [ACTIVATE-PLAN] Calculando data de expiração:', {
+      expiration_date_input: expiration_date,
+      periodEnd_calculated: periodEnd.toISOString(),
+      now: now.toISOString(),
+      tenant_id,
+      plan_id: finalPlanId
+    });
+
     if (existingSub) {
       // Atualizar subscription existente
       const updateData: any = {
@@ -98,6 +106,11 @@ export async function POST(request: NextRequest) {
         updated_at: now.toISOString(),
         plan_id: finalPlanId
       }
+
+      console.log('🔄 [ACTIVATE-PLAN] Atualizando subscription no banco:', {
+        subscription_id: existingSub.id,
+        updateData
+      });
 
       const { data: updatedSub, error: updateError } = await supabaseAdmin
         .from('subscriptions')
@@ -110,12 +123,24 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (updateError) {
-        console.error('Erro ao atualizar subscription:', updateError)
+        console.error('❌ [ACTIVATE-PLAN] Erro ao atualizar subscription:', {
+          error: updateError,
+          message: updateError.message,
+          code: updateError.code,
+          details: updateError.details
+        });
         return NextResponse.json(
           { success: false, error: 'Erro ao atualizar subscription: ' + updateError.message },
           { status: 400, headers: jsonHeaders }
         )
       }
+
+      console.log('✅ [ACTIVATE-PLAN] Subscription atualizada no banco:', {
+        id: updatedSub?.id,
+        status: updatedSub?.status,
+        current_period_end: updatedSub?.current_period_end,
+        plan_id: updatedSub?.plan_id
+      });
 
       // Atualizar status do tenant também
       const { error: tenantUpdateError } = await supabaseAdmin

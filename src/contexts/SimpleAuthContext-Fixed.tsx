@@ -102,18 +102,72 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // ✅ FALLBACK SIMPLES: Query direta sem joins complexos
+    // ✅ FALLBACK SIMPLES: Query direta priorizando tenant com subscription válida
     try {
-      const { data: membership, error: memError } = await supabase
+      console.log('🔍 Buscando tenant com subscription válida para user:', userId);
+      
+      // Primeiro: buscar TODOS os memberships ativos
+      const { data: memberships, error: memError } = await supabase
         .from('user_memberships')
-        .select('tenant_id')
+        .select('tenant_id, created_at')
         .eq('user_id', userId)
         .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: false });
 
-      if (!memError && membership?.tenant_id) {
+      if (!memError && memberships && memberships.length > 0) {
+        console.log(`📋 Encontrados ${memberships.length} tenant(s) para o usuário`);
+        
+        // Se houver múltiplos tenants, verificar qual tem subscription válida
+        if (memberships.length > 1) {
+          console.warn(`⚠️ ATENÇÃO: Usuário tem ${memberships.length} tenants! Priorizando o com subscription válida...`);
+          
+          // Buscar subscriptions para cada tenant
+          for (const mem of memberships) {
+            const { data: subscription } = await supabase
+              .from('subscriptions')
+              .select('id, status, current_period_end, trial_end')
+              .eq('tenant_id', mem.tenant_id)
+              .maybeSingle();
+            
+            if (subscription) {
+              const now = new Date();
+              const isValid = (
+                (subscription.status === 'active' && subscription.current_period_end && new Date(subscription.current_period_end) > now) ||
+                (subscription.status === 'trial' && subscription.trial_end && new Date(subscription.trial_end) > now)
+              );
+              
+              if (isValid) {
+                console.log(`✅ Tenant com subscription válida encontrado: ${mem.tenant_id}`);
+                const { data: tenant } = await supabase
+                  .from('tenants')
+                  .select('id, name, status, email, phone, document, address, city, state, zip_code')
+                  .eq('id', mem.tenant_id)
+                  .maybeSingle();
+                
+                if (tenant) {
+                  console.log('✅ [PRIORITY] Usando tenant com subscription válida:', tenant.name);
+                  return {
+                    id: tenant.id,
+                    name: tenant.name || 'Meu Negócio',
+                    status: tenant.status || 'trial',
+                    email: tenant.email,
+                    phone: tenant.phone,
+                    document: tenant.document,
+                    address: tenant.address,
+                    city: tenant.city,
+                    state: tenant.state,
+                    zip_code: tenant.zip_code,
+                  };
+                }
+              }
+            }
+          }
+          
+          console.warn('⚠️ Nenhum tenant com subscription válida, usando o mais recente');
+        }
+        
+        // Usar o primeiro (mais recente) se não houver subscription válida
+        const membership = memberships[0];
         const { data: tenant, error: tenantError } = await supabase
           .from('tenants')
           .select('id, name, status, email, phone, document, address, city, state, zip_code')
@@ -661,18 +715,23 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
               setSubscription(subscriptionData);
               return;
             } else {
+              const errorMessage = createResult?.error || createResult?.message || 'Erro desconhecido ao criar subscription';
               console.error('❌ Erro ao criar subscription:', {
                 status: createResponse.status,
                 statusText: createResponse.statusText,
-                result: createResult
+                result: createResult,
+                error: errorMessage
               });
               // Não lançar erro, apenas logar - o sistema pode funcionar sem subscription
             }
           } catch (createError: any) {
-            console.error('❌ Erro ao tentar criar subscription:', {
-              message: createError?.message,
-              stack: createError?.stack
-            });
+            const errorDetails = {
+              message: createError?.message || 'Erro desconhecido',
+              name: createError?.name || 'Error',
+              stack: createError?.stack,
+              toString: createError?.toString?.() || String(createError)
+            };
+            console.error('❌ Erro ao tentar criar subscription:', errorDetails);
             // Não lançar erro, apenas logar - o sistema pode funcionar sem subscription
           }
           

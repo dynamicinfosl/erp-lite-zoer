@@ -52,11 +52,50 @@ export async function GET(_request: NextRequest) {
     let mappedUsers: any[] = []
 
     if (memberships.length > 0) {
-      mappedUsers = memberships.map((membership: any, index: number) => {
-        const profile = profiles.find((p: any) => p.id === membership.user_id)
-        const tenant = tenants.find((t: any) => t.id === membership.tenant_id)
-        const subscription = subscriptions.find((s: any) => s.tenant_id === membership.tenant_id)
-        const plan = subscription?.plan && (Array.isArray(subscription.plan) ? subscription.plan[0] : subscription.plan)
+      // ✅ NOVO: Filtrar duplicados - manter apenas 1 tenant por user_id
+      // Priorizar tenant com subscription válida
+      const userTenantMap = new Map<string, any>();
+      
+      memberships.forEach((membership: any) => {
+        const userId = membership.user_id;
+        const subscription = subscriptions.find((s: any) => s.tenant_id === membership.tenant_id);
+        
+        // Verificar se subscription é válida
+        const now = new Date();
+        const isValidSubscription = subscription && (
+          (subscription.status === 'active' && subscription.current_period_end && new Date(subscription.current_period_end) > now) ||
+          (subscription.status === 'trial' && subscription.trial_end && new Date(subscription.trial_end) > now)
+        );
+        
+        const existing = userTenantMap.get(userId);
+        
+        // Se não existe ou a nova é mais recente/válida, substituir
+        if (!existing) {
+          userTenantMap.set(userId, { membership, subscription, isValid: isValidSubscription });
+        } else if (isValidSubscription && !existing.isValid) {
+          // Priorizar subscription válida
+          console.log(`✅ [ADMIN] Priorizando tenant com subscription válida para user ${userId}`);
+          userTenantMap.set(userId, { membership, subscription, isValid: isValidSubscription });
+        } else if (!existing.isValid && !isValidSubscription) {
+          // Se nenhum é válido, usar o mais recente
+          const existingDate = new Date(existing.membership.created_at);
+          const newDate = new Date(membership.created_at);
+          if (newDate > existingDate) {
+            userTenantMap.set(userId, { membership, subscription, isValid: isValidSubscription });
+          }
+        }
+      });
+      
+      console.log(`📊 [ADMIN] Total memberships: ${memberships.length}, Após filtrar duplicados: ${userTenantMap.size}`);
+      
+      // Mapear usuários únicos
+      mappedUsers = Array.from(userTenantMap.values()).map((item: any, index: number) => {
+        const membership = item.membership;
+        const subscription = item.subscription;
+        
+        const profile = profiles.find((p: any) => p.id === membership.user_id);
+        const tenant = tenants.find((t: any) => t.id === membership.tenant_id);
+        const plan = subscription?.plan && (Array.isArray(subscription.plan) ? subscription.plan[0] : subscription.plan);
         
         return {
           user_id: membership.user_id || `membership-${index}`,
@@ -78,8 +117,8 @@ export async function GET(_request: NextRequest) {
           subscription_current_period_end: subscription?.current_period_end || null,
           subscription_plan_name: plan?.name || null,
           subscription_plan_slug: plan?.slug || null,
-        }
-      })
+        };
+      });
     } else {
       mappedUsers = tenants.map((tenant: any, index: number) => {
         const subscription = subscriptions.find((s: any) => s.tenant_id === tenant.id)
