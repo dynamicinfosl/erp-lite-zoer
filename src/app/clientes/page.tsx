@@ -1,13 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { JugaKPICard, JugaProgressCard } from '@/components/dashboard/JugaComponents';
 import { 
   Dialog, 
   DialogContent, 
@@ -47,23 +44,11 @@ import {
   Edit,
   Eye,
   Phone,
-  Mail,
-  UserPlus,
-  TrendingUp,
-  Building,
-  UserCheck,
-  Activity,
-  User,
-  CreditCard,
-  MapPin,
-  CheckCircle,
-  AlertCircle
+  Mail
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
 import * as XLSX from 'xlsx';
-import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
-import { TenantPageWrapper } from '@/components/layout/PageWrapper';
 
 interface Customer {
   id: string;
@@ -87,13 +72,11 @@ interface ColumnVisibility {
 }
 
 export default function ClientesPage() {
-  const { tenant } = useSimpleAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showDetailsDialog, setShowDetailsDialog] = useState<null | Customer>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showImportPreview, setShowImportPreview] = useState(false);
   const [importFileName, setImportFileName] = useState('');
@@ -138,140 +121,29 @@ export default function ClientesPage() {
     document: '',
     city: '',
     type: 'PF' as 'PF' | 'PJ',
-    status: 'active' as 'active' | 'inactive',
   });
 
-  // Estados para validação
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Funções de máscara
-  const formatPhone = (value: string) => {
-    if (!value || typeof value !== 'string') return '';
-    const numbers = value.replace(/\D/g, '');
-    if (numbers.length <= 2) return numbers;
-    if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
-    if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
-    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
-  };
-
-  const formatCPF = (value: string) => {
-    if (!value || typeof value !== 'string') return '';
-    const numbers = value.replace(/\D/g, '');
-    if (numbers.length <= 3) return numbers;
-    if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
-    if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
-    return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
-  };
-
-  const formatCNPJ = (value: string) => {
-    if (!value || typeof value !== 'string') return '';
-    const numbers = value.replace(/\D/g, '');
-    if (numbers.length <= 2) return numbers;
-    if (numbers.length <= 5) return `${numbers.slice(0, 2)}.${numbers.slice(2)}`;
-    if (numbers.length <= 8) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5)}`;
-    if (numbers.length <= 12) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8)}`;
-    return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8, 12)}-${numbers.slice(12, 14)}`;
-  };
-
-  const formatDocument = (value: string, type: 'PF' | 'PJ') => {
-    if (!value || typeof value !== 'string') return '';
-    return type === 'PF' ? formatCPF(value) : formatCNPJ(value);
-  };
-
-  // Função de validação
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-
-    if (!newCustomer.name.trim()) {
-      errors.name = 'Nome é obrigatório';
-    }
-
-    if (newCustomer.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newCustomer.email)) {
-      errors.email = 'E-mail inválido';
-    }
-
-    if (newCustomer.phone && !/^\(\d{2}\)\s\d{4,5}-\d{4}$/.test(newCustomer.phone)) {
-      errors.phone = 'Telefone deve estar no formato (11) 99999-9999';
-    }
-
-    if (newCustomer.document) {
-      if (newCustomer.type === 'PF' && !/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(newCustomer.document)) {
-        errors.document = 'CPF deve estar no formato 000.000.000-00';
-      } else if (newCustomer.type === 'PJ' && !/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(newCustomer.document)) {
-        errors.document = 'CNPJ deve estar no formato 00.000.000/0000-00';
-      }
-    }
-
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  // Limpar documento quando tipo mudar
+  // Carregar clientes
   useEffect(() => {
-    setNewCustomer(prev => ({ ...prev, document: '' }));
-  }, [newCustomer.type]);
+    loadCustomers();
+  }, []);
 
-  const loadCustomers = useCallback(async () => {
+  const loadCustomers = async () => {
     try {
       setLoading(true);
-      
-      // Sempre usar tenant do contexto, nunca fallback
-      if (!tenant?.id) {
-        console.log('⚠️ Nenhum tenant disponível, aguardando...');
-        setCustomers([]);
-        setLoading(false);
-        return;
-      }
-      
-      const url = `/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}`;
-      console.log('🔍 Debug - Carregando clientes para tenant:', tenant.id);
-      
-      // ✅ CORREÇÃO: Adicionar timeout para evitar loading infinito
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos timeout
-      
-      const response = await fetch(url, { 
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        const txt = await response.text();
-        throw new Error('Erro ao carregar clientes: ' + txt);
-      }
+      const response = await fetch('/next_api/customers');
+      if (!response.ok) throw new Error('Erro ao carregar clientes');
       
       const data = await response.json();
       const rows = Array.isArray(data?.data) ? data.data : (data?.rows || data || []);
-      console.log('🔍 Debug - Clientes carregados:', rows.length, 'clientes');
       setCustomers(rows);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
-      
-      // ✅ CORREÇÃO: Se for timeout ou erro de rede, mostrar lista vazia em vez de erro
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.log('⏰ Timeout ao carregar clientes, mostrando lista vazia');
-        setCustomers([]);
-      } else {
-        toast.error('Erro ao carregar clientes');
-        setCustomers([]); // Garantir que sempre para o loading
-      }
+      toast.error('Erro ao carregar clientes');
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id]);
-
-  // Carregar clientes quando houver tenant (fallback para ID neutro)
-  useEffect(() => {
-    const fetchNow = async () => {
-      await loadCustomers();
-    };
-    fetchNow();
-  }, [tenant?.id, loadCustomers]);
+  };
 
   // Filtrar clientes
   const filteredCustomers = Array.isArray(customers) ? customers.filter(customer => {
@@ -296,114 +168,24 @@ export default function ClientesPage() {
     return matchesSearch && matchesAdvanced;
   }) : [];
 
-  // Excluir cliente
-  const handleDeleteCustomer = async (id: string, name?: string) => {
-    const confirmed = window.confirm(`Tem certeza que deseja excluir ${name ? name : 'este cliente'}?`);
-    if (!confirmed) return;
-    try {
-      const res = await fetch(`/next_api/customers?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const txt = await res.text();
-        console.error('DELETE /next_api/customers falhou', res.status, txt);
-        throw new Error(txt || 'Falha ao excluir');
-      }
-      // Remoção otimista da UI
-      setCustomers(prev => prev.filter(c => c.id !== id));
-      toast.success('Cliente excluído com sucesso');
-      // Revalida em background
-      loadCustomers();
-    } catch (err: any) {
-      console.error('Erro ao excluir cliente:', err);
-      toast.error('Erro ao excluir cliente: ' + (err?.message || ''));
-    }
-  };
-
   // Adicionar cliente
   const handleAddCustomer = async () => {
-    // Limpar erros anteriores
-    setValidationErrors({});
-    
-    // Validar formulário
-    if (!validateForm()) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    
-    if (!tenant?.id) {
-      toast.error('Não foi possível identificar sua empresa. Atualize a página e tente novamente.');
-      console.warn('🚫 Tentativa de cadastrar cliente sem tenant carregado.');
-      setIsSubmitting(false);
-      return;
-    }
-
     try {
-      const tenantId = tenant.id;
-      console.log('🔍 Debug - Tenant ID:', tenantId, 'Tenant object:', tenant);
-      
       const response = await fetch('/next_api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenant_id: tenantId,
-          ...newCustomer,
-        })
+        body: JSON.stringify(newCustomer)
       });
 
       if (!response.ok) throw new Error('Erro ao adicionar cliente');
 
       await loadCustomers();
       setShowAddDialog(false);
-      setNewCustomer({ name: '', email: '', phone: '', document: '', city: '', type: 'PF', status: 'active' });
-      setValidationErrors({});
+      setNewCustomer({ name: '', email: '', phone: '', document: '', city: '', type: 'PF' });
       toast.success('Cliente adicionado com sucesso!');
     } catch (error) {
       console.error('Erro ao adicionar cliente:', error);
       toast.error('Erro ao adicionar cliente');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Abrir modal para edição
-  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
-  const openEdit = (customer: Customer) => {
-    setNewCustomer({
-      name: customer.name || '',
-      email: customer.email || '',
-      phone: formatPhone(customer.phone || ''),
-      document: customer.document || '',
-      city: customer.city || '',
-      type: (customer.type || 'PF') as 'PF' | 'PJ',
-      status: (customer.status || 'active') as 'active' | 'inactive',
-    });
-    setValidationErrors({});
-    setEditingCustomerId(customer.id);
-    setShowAddDialog(true);
-  };
-
-  // Salvar edição
-  const handleSaveEdit = async () => {
-    if (!editingCustomerId) return;
-    if (!validateForm()) return;
-    setIsSubmitting(true);
-    try {
-      const res = await fetch(`/next_api/customers?id=${encodeURIComponent(editingCustomerId)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCustomer),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      toast.success('Cliente atualizado com sucesso');
-      setShowAddDialog(false);
-      setEditingCustomerId(null);
-      setNewCustomer({ name: '', email: '', phone: '', document: '', city: '', type: 'PF', status: 'active' });
-      await loadCustomers();
-    } catch (err) {
-      console.error(err);
-      toast.error('Erro ao atualizar cliente');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -468,22 +250,26 @@ export default function ClientesPage() {
     }
   };
 
+  const formatDocument = (doc: string, type: 'PF' | 'PJ') => {
+    if (type === 'PF') {
+      return doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    } else {
+      return doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+    }
+  };
 
+  const formatPhone = (phone: string) => {
+    return phone.replace(/(\d{2})(\d{4,5})(\d{4})/, '($1) $2-$3');
+  };
 
   // Botão de diagnóstico: cria um cliente simples para validar a rota
   const testCreateCustomer = async () => {
     try {
-      if (!tenant?.id) {
-        toast.error('Tenant ainda não carregado. Aguarde alguns segundos e tente novamente.');
-        console.warn('🚫 Teste API cancelado: tenant indisponível.');
-        return;
-      }
-
       console.log('🧪 Teste API: criando cliente de teste...');
       const res = await fetch('/next_api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenant_id: tenant.id, name: 'Cliente Teste API', email: 'teste@example.com' })
+        body: JSON.stringify({ name: 'Cliente Teste API', email: 'teste@example.com' })
       });
       const text = await res.text();
       console.log('🧪 Teste API status:', res.status, 'body:', text);
@@ -499,275 +285,175 @@ export default function ClientesPage() {
     }
   };
 
-  // Calcular estatísticas dos clientes
-  const customerStats = {
-    total: Array.isArray(customers) ? customers.length : 0,
-    active: Array.isArray(customers) ? customers.filter(c => c.status === 'active').length : 0,
-    inactive: Array.isArray(customers) ? customers.filter(c => c.status === 'inactive').length : 0,
-    pf: Array.isArray(customers) ? customers.filter(c => c.type === 'PF').length : 0,
-    pj: Array.isArray(customers) ? customers.filter(c => c.type === 'PJ').length : 0,
-    newThisMonth: Array.isArray(customers) ? customers.filter(c => {
-      const created = new Date(c.created_at);
-      const now = new Date();
-      return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
-    }).length : 0
+  const handleRegisterSelected = async (rows: any[]) => {
+    try {
+      setIsRegistering(true);
+      let success = 0, fail = 0;
+      const errors: string[] = [];
+      
+      for (const row of rows) {
+        try {
+          const res = await fetch('/next_api/customers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(row)
+          });
+          
+          if (res.ok) {
+            success++;
+          } else {
+            fail++;
+            errors.push(`Linha ${row.rowIndex}: ${res.statusText}`);
+          }
+        } catch (err: any) {
+          fail++;
+          errors.push(`Linha ${row.rowIndex}: ${err.message}`);
+        }
+      }
+      
+      if (success > 0) {
+        toast.success(`${success} clientes importados com sucesso`);
+        await loadCustomers();
+      }
+      
+      if (fail > 0) {
+        toast.error(`${fail} clientes falharam na importação`);
+        console.error('Erros de importação:', errors);
+      }
+      
+      setShowImportPreview(false);
+    } catch (error: any) {
+      console.error('Erro na importação:', error);
+      toast.error('Erro na importação: ' + error.message);
+    } finally {
+      setIsRegistering(false);
+    }
   };
 
   return (
-    <TenantPageWrapper>
-      <div className="-m-4 sm:-m-6 p-4 sm:p-6 rounded-2xl bg-gradient-to-b from-slate-50 via-white to-white dark:from-slate-950 dark:via-slate-950 dark:to-slate-950 space-y-6">
-      {/* Header com Título */}
-      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-heading">Clientes</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Gerencie seus clientes e informações de contato
-          </p>
-        </div>
-        <Button 
-          className="juga-gradient text-white"
-          onClick={() => setShowAddDialog(true)}
-        >
-          <UserPlus className="h-4 w-4 mr-2" />
-          Adicionar Cliente
-        </Button>
-      </div>
-
-      {/* Cards de Estatísticas */}
-      <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-        <JugaKPICard
-          title="Total Clientes"
-          value={customerStats.total.toLocaleString('pt-BR')}
-          description="Clientes cadastrados"
-          icon={<Users className="h-4 w-4" />}
-          color="primary"
-          compact
-          className="min-h-[92px]"
-        />
-        
-        <JugaKPICard
-          title="Clientes Ativos"
-          value={customerStats.active.toLocaleString('pt-BR')}
-          description="Status ativo"
-          icon={<UserCheck className="h-4 w-4" />}
-          color="success"
-          trend="up"
-          trendValue="+12%"
-          compact
-          className="min-h-[92px]"
-        />
-        
-        <JugaKPICard
-          title="Pessoa Física"
-          value={customerStats.pf.toLocaleString('pt-BR')}
-          description="Clientes PF"
-          icon={<Users className="h-4 w-4" />}
-          color="accent"
-          compact
-          className="min-h-[92px]"
-        />
-        
-        <JugaKPICard
-          title="Pessoa Jurídica"
-          value={customerStats.pj.toLocaleString('pt-BR')}
-          description="Clientes PJ"
-          icon={<Building className="h-4 w-4" />}
-          color="warning"
-          compact
-          className="min-h-[92px]"
-        />
-        
-        <JugaKPICard
-          title="Novos Este Mês"
-          value={customerStats.newThisMonth.toLocaleString('pt-BR')}
-          description="Cadastros recentes"
-          icon={<TrendingUp className="h-4 w-4" />}
-          color="success"
-          trend="up"
-          trendValue="+8%"
-          compact
-          className="min-h-[92px]"
-        />
-        
-        <JugaKPICard
-          title="Taxa Ativação"
-          value={`${customerStats.total > 0 ? Math.round((customerStats.active / customerStats.total) * 100) : 0}%`}
-          description="Clientes ativos"
-          icon={<Activity className="h-4 w-4" />}
-          color="primary"
-          compact
-          className="min-h-[92px]"
-        />
-      </div>
-
-      {/* Progress Cards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <JugaProgressCard
-          title="Distribuição por Tipo"
-          description="PF vs PJ"
-          progress={customerStats.total > 0 ? Math.round((customerStats.pf / customerStats.total) * 100) : 0}
-          total={customerStats.total}
-          current={customerStats.pf}
-          color="accent"
-        />
-        
-        <JugaProgressCard
-          title="Status dos Clientes"
-          description="Ativos vs Inativos"
-          progress={customerStats.total > 0 ? Math.round((customerStats.active / customerStats.total) * 100) : 0}
-          total={customerStats.total}
-          current={customerStats.active}
-          color="success"
-        />
-        
-        <JugaProgressCard
-          title="Crescimento Mensal"
-          description="Novos clientes"
-          progress={customerStats.total > 0 ? Math.round((customerStats.newThisMonth / customerStats.total) * 100) : 0}
-          total={customerStats.total}
-          current={customerStats.newThisMonth}
-          color="primary"
-        />
-      </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <Card className="border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-white">
+        <CardContent className="pt-6 pb-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-blue-900">Clientes</h1>
+              <p className="text-sm text-blue-900/70">
+                Gerencie seus clientes e informações de contato
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge className="px-3 py-1 bg-blue-600 text-white">
+                <Users className="h-3 w-3 mr-1" />
+                {customers.length} clientes
+              </Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Toolbar */}
-      <Card className="juga-card bg-white/80 dark:bg-slate-900/60 backdrop-blur supports-[backdrop-filter]:bg-white/70">
+      <Card className="border-blue-100">
         <CardContent className="pt-6">
           <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
             {/* Lado esquerdo - Botões de ação */}
             <div className="flex items-center gap-2">
               <Button 
-                variant="outline" 
-                onClick={testCreateCustomer} 
-                title="Diagnóstico: testar POST /next_api/customers"
-                className="border-slate-200 bg-white/70 hover:bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200"
+                className="juga-gradient text-white"
+                onClick={() => setShowAddDialog(true)}
               >
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Cliente
+              </Button>
+
+              <Button variant="outline" onClick={testCreateCustomer} title="Diagnóstico: testar POST /next_api/customers">
                 Teste API
               </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    className="border-slate-200 bg-white/70 hover:bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200"
-                  >
+                  <Button variant="outline" className="border-blue-200 hover:bg-blue-50">
                     <MoreHorizontal className="h-4 w-4 mr-2" />
                     Mais Ações
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-52 z-50 bg-white border border-gray-200 shadow-xl rounded-lg">
-                  <DropdownMenuLabel className="px-3 py-2 text-sm font-semibold text-gray-900 bg-gray-50 border-b border-gray-100">
-                    <MoreHorizontal className="h-4 w-4 inline mr-2" />
-                    Ações
-                  </DropdownMenuLabel>
-                  
-                  <div className="py-1">
-                    <DropdownMenuItem 
-                      onClick={() => setShowImportDialog(true)} 
-                      className="cursor-pointer px-3 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 flex items-center"
-                    >
-                      <Upload className="h-4 w-4 mr-3 text-gray-400" />
-                      Importar Clientes
-                    </DropdownMenuItem>
-                    
-                    <DropdownMenuItem className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center">
-                      <Download className="h-4 w-4 mr-3 text-gray-400" />
-                      Exportar Lista
-                    </DropdownMenuItem>
-                  </div>
-                  
-                  <div className="border-t border-gray-100 pt-1">
-                    <DropdownMenuItem className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center">
-                      <Trash2 className="h-4 w-4 mr-3 text-red-400" />
-                      Excluir Selecionados
-                    </DropdownMenuItem>
-                  </div>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setShowImportDialog(true)} className="cursor-pointer">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importar Clientes
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar Lista
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-red-600">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir Selecionados
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    className="border-slate-200 bg-white/70 hover:bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200"
-                  >
+                  <Button variant="outline" className="border-blue-200 hover:bg-blue-50">
                     <Settings2 className="h-4 w-4 mr-2" />
                     Colunas
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-64 z-50 bg-white border border-gray-200 shadow-xl rounded-lg">
-                  <DropdownMenuLabel className="px-3 py-2 text-sm font-semibold text-gray-900 bg-gray-50 border-b border-gray-100">
-                    <Settings2 className="h-4 w-4 inline mr-2" />
-                    Mostrar Colunas
-                  </DropdownMenuLabel>
-                  
-                  <div className="py-1">
-                    <DropdownMenuCheckboxItem
-                      checked={columnVisibility.type}
-                      onCheckedChange={(checked) => 
-                        setColumnVisibility(prev => ({ ...prev, type: checked || false }))
-                      }
-                      className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center"
-                    >
-                      <User className="h-4 w-4 mr-3 text-gray-400" />
-                      Tipo de Pessoa
-                    </DropdownMenuCheckboxItem>
-                    
-                    <DropdownMenuCheckboxItem
-                      checked={columnVisibility.phone}
-                      onCheckedChange={(checked) => 
-                        setColumnVisibility(prev => ({ ...prev, phone: checked || false }))
-                      }
-                      className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center"
-                    >
-                      <Phone className="h-4 w-4 mr-3 text-gray-400" />
-                      Telefone
-                    </DropdownMenuCheckboxItem>
-                    
-                    <DropdownMenuCheckboxItem
-                      checked={columnVisibility.document}
-                      onCheckedChange={(checked) => 
-                        setColumnVisibility(prev => ({ ...prev, document: checked || false }))
-                      }
-                      className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center"
-                    >
-                      <CreditCard className="h-4 w-4 mr-3 text-gray-400" />
-                      CPF/CNPJ
-                    </DropdownMenuCheckboxItem>
-                    
-                    <DropdownMenuCheckboxItem
-                      checked={columnVisibility.email}
-                      onCheckedChange={(checked) => 
-                        setColumnVisibility(prev => ({ ...prev, email: checked || false }))
-                      }
-                      className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center"
-                    >
-                      <Mail className="h-4 w-4 mr-3 text-gray-400" />
-                      E-mail
-                    </DropdownMenuCheckboxItem>
-                    
-                    <DropdownMenuCheckboxItem
-                      checked={columnVisibility.city}
-                      onCheckedChange={(checked) => 
-                        setColumnVisibility(prev => ({ ...prev, city: checked || false }))
-                      }
-                      className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center"
-                    >
-                      <MapPin className="h-4 w-4 mr-3 text-gray-400" />
-                      Cidade
-                    </DropdownMenuCheckboxItem>
-                    
-                    <DropdownMenuCheckboxItem
-                      checked={columnVisibility.status}
-                      onCheckedChange={(checked) => 
-                        setColumnVisibility(prev => ({ ...prev, status: checked || false }))
-                      }
-                      className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center"
-                    >
-                      <CheckCircle className="h-4 w-4 mr-3 text-gray-400" />
-                      Status
-                    </DropdownMenuCheckboxItem>
-                  </div>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>Mostrar Colunas</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.type}
+                    onCheckedChange={(checked) => 
+                      setColumnVisibility(prev => ({ ...prev, type: checked || false }))
+                    }
+                  >
+                    Tipo de Pessoa
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.phone}
+                    onCheckedChange={(checked) => 
+                      setColumnVisibility(prev => ({ ...prev, phone: checked || false }))
+                    }
+                  >
+                    Telefone
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.document}
+                    onCheckedChange={(checked) => 
+                      setColumnVisibility(prev => ({ ...prev, document: checked || false }))
+                    }
+                  >
+                    CPF/CNPJ
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.email}
+                    onCheckedChange={(checked) => 
+                      setColumnVisibility(prev => ({ ...prev, email: checked || false }))
+                    }
+                  >
+                    E-mail
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.city}
+                    onCheckedChange={(checked) => 
+                      setColumnVisibility(prev => ({ ...prev, city: checked || false }))
+                    }
+                  >
+                    Cidade
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.status}
+                    onCheckedChange={(checked) => 
+                      setColumnVisibility(prev => ({ ...prev, status: checked || false }))
+                    }
+                  >
+                    Status
+                  </DropdownMenuCheckboxItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -780,13 +466,12 @@ export default function ClientesPage() {
                   placeholder="Buscar clientes..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-80 bg-white/70 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700"
+                  className="pl-10 w-80"
                 />
               </div>
               <Button 
                 variant="outline" 
                 onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-                className="border-slate-200 bg-white/70 hover:bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200"
               >
                 <Filter className="h-4 w-4 mr-2" />
                 Busca Avançada
@@ -796,56 +481,41 @@ export default function ClientesPage() {
 
           {/* Busca Avançada */}
           {showAdvancedSearch && (
-            <div className="mt-4 p-4 bg-slate-50/80 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="mt-4 p-4 bg-blue-50/40 rounded-lg border border-blue-100">
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <Input
                   placeholder="Telefone..."
                   value={advancedFilters.phone}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, phone: e.target.value }))}
-                  className="bg-white/70 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700"
                 />
                 <Input
                   placeholder="E-mail..."
                   value={advancedFilters.email}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, email: e.target.value }))}
-                  className="bg-white/70 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700"
                 />
                 <Input
                   placeholder="Cidade..."
                   value={advancedFilters.city}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, city: e.target.value }))}
-                  className="bg-white/70 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700"
                 />
-                <Select
-                  value={advancedFilters.type || 'all'}
-                  onValueChange={(value) =>
-                    setAdvancedFilters(prev => ({ ...prev, type: value === 'all' ? '' : value }))
-                  }
+                <select 
+                  className="px-3 py-2 border rounded-md"
+                  value={advancedFilters.type}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, type: e.target.value }))}
                 >
-                  <SelectTrigger className="bg-white/70 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700">
-                    <SelectValue placeholder="Todos os tipos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os tipos</SelectItem>
-                    <SelectItem value="PF">Pessoa Física</SelectItem>
-                    <SelectItem value="PJ">Pessoa Jurídica</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={advancedFilters.status || 'all'}
-                  onValueChange={(value) =>
-                    setAdvancedFilters(prev => ({ ...prev, status: value === 'all' ? '' : value }))
-                  }
+                  <option value="">Todos os tipos</option>
+                  <option value="PF">Pessoa Física</option>
+                  <option value="PJ">Pessoa Jurídica</option>
+                </select>
+                <select 
+                  className="px-3 py-2 border rounded-md"
+                  value={advancedFilters.status}
+                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))}
                 >
-                  <SelectTrigger className="bg-white/70 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700">
-                    <SelectValue placeholder="Todos os status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os status</SelectItem>
-                    <SelectItem value="active">Ativo</SelectItem>
-                    <SelectItem value="inactive">Inativo</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <option value="">Todos os status</option>
+                  <option value="active">Ativo</option>
+                  <option value="inactive">Inativo</option>
+                </select>
               </div>
             </div>
           )}
@@ -853,9 +523,9 @@ export default function ClientesPage() {
       </Card>
 
       {/* Tabela */}
-      <Card className="juga-card overflow-hidden">
+      <Card className="border-blue-100">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-heading">
+          <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
             Lista de Clientes ({filteredCustomers.length})
           </CardTitle>
@@ -864,46 +534,38 @@ export default function ClientesPage() {
           {loading ? (
             <div className="text-center py-8">Carregando clientes...</div>
           ) : (
-            <div className="overflow-x-auto -mx-4 sm:mx-0">
-              <div className="inline-block min-w-full align-middle">
-                <Table>
-                <TableHeader>
-                <TableRow className="bg-slate-50/80 dark:bg-slate-900/40">
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Nome</TableHead>
-                  {columnVisibility.type && <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Tipo</TableHead>}
-                  {columnVisibility.document && <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">CPF/CNPJ</TableHead>}
-                  {columnVisibility.phone && <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Telefone</TableHead>}
-                  {columnVisibility.email && <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">E-mail</TableHead>}
-                  {columnVisibility.city && <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Cidade</TableHead>}
-                  {columnVisibility.status && <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Status</TableHead>}
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Ações</TableHead>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  {columnVisibility.type && <TableHead>Tipo</TableHead>}
+                  {columnVisibility.document && <TableHead>CPF/CNPJ</TableHead>}
+                  {columnVisibility.phone && <TableHead>Telefone</TableHead>}
+                  {columnVisibility.email && <TableHead>E-mail</TableHead>}
+                  {columnVisibility.city && <TableHead>Cidade</TableHead>}
+                  {columnVisibility.status && <TableHead>Status</TableHead>}
+                  <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors">
+                  <TableRow key={customer.id}>
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     {columnVisibility.type && (
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={customer.type === 'PF'
-                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-200 dark:border-indigo-900'
-                            : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900'
-                          }
-                        >
+                        <Badge variant={customer.type === 'PF' ? 'default' : 'secondary'}>
                           {customer.type === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica'}
                         </Badge>
                       </TableCell>
                     )}
                     {columnVisibility.document && (
-                      <TableCell>{formatDocument(customer.document || '', customer.type || 'PF')}</TableCell>
+                      <TableCell>{formatDocument(customer.document, customer.type)}</TableCell>
                     )}
                     {columnVisibility.phone && (
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Phone className="h-3 w-3 text-gray-400" />
-                          {formatPhone(customer.phone || '')}
+                          {formatPhone(customer.phone)}
                         </div>
                       </TableCell>
                     )}
@@ -918,50 +580,39 @@ export default function ClientesPage() {
                     {columnVisibility.city && <TableCell>{customer.city}</TableCell>}
                     {columnVisibility.status && (
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={customer.status === 'active'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-200 dark:border-emerald-900'
-                            : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-900/40 dark:text-slate-200 dark:border-slate-700'
-                          }
-                        >
+                        <Badge variant={customer.status === 'active' ? 'default' : 'secondary'}>
                           {customer.status === 'active' ? 'Ativo' : 'Inativo'}
                         </Badge>
                       </TableCell>
                     )}
                     <TableCell>
-                      <div className="flex items-center justify-start gap-2">
-                        <Button 
-                          variant="outline"
-                          size="sm" 
-                          onClick={() => setShowDetailsDialog(customer)}
-                          className="border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:bg-slate-800/40"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="outline"
-                          size="sm" 
-                          onClick={() => openEdit(customer)}
-                          className="border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:bg-slate-800/40"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="destructive" 
-                          size="sm" 
-                          onClick={() => handleDeleteCustomer(customer.id, customer.name)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Ver Detalhes
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
-                </TableBody>
-              </Table>
-              </div>
-            </div>
+              </TableBody>
+            </Table>
           )}
 
           {filteredCustomers.length === 0 && !loading && (
@@ -972,237 +623,85 @@ export default function ClientesPage() {
         </CardContent>
       </Card>
 
-      {/* Dialog Adicionar/Editar Cliente */}
-      <Dialog open={showAddDialog} onOpenChange={(open) => { 
-        if (!open) { 
-          setShowAddDialog(false); 
-          setEditingCustomerId(null); 
-          setValidationErrors({}); 
-          setNewCustomer({ name: '', email: '', phone: '', document: '', city: '', type: 'PF', status: 'active' });
-        } else { 
-          setShowAddDialog(true); 
-        } 
-      }}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
-          <div className="relative">
-            {/* Header com gradiente */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-t-lg">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
-                  <UserPlus className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <DialogTitle className="text-xl font-bold text-white">{editingCustomerId ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</DialogTitle>
-                  <DialogDescription className="text-blue-100 mt-1">
-                    {editingCustomerId ? 'Atualize as informações do cliente.' : 'Preencha as informações do cliente abaixo. Os campos marcados com * são obrigatórios.'}
-                  </DialogDescription>
-                </div>
+      {/* Dialog Adicionar Cliente */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Adicionar Novo Cliente</DialogTitle>
+            <DialogDescription>
+              Preencha as informações do cliente abaixo
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="name">Nome *</label>
+              <Input
+                id="name"
+                value={newCustomer.name}
+                onChange={(e) => setNewCustomer(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Nome do cliente"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label htmlFor="type">Tipo</label>
+                <select 
+                  className="px-3 py-2 border rounded-md"
+                  value={newCustomer.type}
+                  onChange={(e) => setNewCustomer(prev => ({ ...prev, type: e.target.value as 'PF' | 'PJ' }))}
+                >
+                  <option value="PF">Pessoa Física</option>
+                  <option value="PJ">Pessoa Jurídica</option>
+                </select>
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="document">CPF/CNPJ</label>
+                <Input
+                  id="document"
+                  value={newCustomer.document}
+                  onChange={(e) => setNewCustomer(prev => ({ ...prev, document: e.target.value }))}
+                  placeholder="000.000.000-00"
+                />
               </div>
             </div>
-            
-            {/* Conteúdo principal */}
-            <div className="p-6 bg-slate-800/50 backdrop-blur-sm">
-              <div className="grid gap-6">
-                {/* Seção: Identificação */}
-                <div className="space-y-6">
-                  <div className="flex items-center gap-2 pb-3 border-b border-slate-700">
-                    <div className="p-2 bg-blue-500/20 rounded-lg">
-                      <User className="h-4 w-4 text-blue-400" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wide">Identificação</h3>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                      Nome Completo
-                      <span className="text-red-400">*</span>
-                    </Label>
-                    <Input
-                      id="name"
-                      value={newCustomer.name}
-                      onChange={(e) => setNewCustomer(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="Digite o nome completo do cliente"
-                      className={`h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 text-base ${validationErrors.name ? 'border-red-400 focus:border-red-400' : ''}`}
-                    />
-                    {validationErrors.name && (
-                      <p className="text-sm text-red-400 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        {validationErrors.name}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="type" className="text-sm font-semibold text-slate-200">Tipo de Cliente</Label>
-                      <Select 
-                        value={newCustomer.type}
-                        onValueChange={(value) => setNewCustomer(prev => ({ ...prev, type: value as 'PF' | 'PJ' }))}
-                      >
-                        <SelectTrigger className="h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white text-base">
-                          <SelectValue placeholder="Selecione o tipo" />
-                        </SelectTrigger>
-                        <SelectContent className="z-50 bg-white text-slate-900 border border-slate-200 shadow-xl dark:bg-slate-900 dark:text-white dark:border-slate-700">
-                          <SelectItem value="PF" className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">Pessoa Física</SelectItem>
-                          <SelectItem value="PJ" className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">Pessoa Jurídica</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="document" className="text-sm font-semibold text-slate-200">
-                        {newCustomer.type === 'PF' ? 'CPF' : 'CNPJ'}
-                      </Label>
-                      <Input
-                        id="document"
-                        value={newCustomer.document}
-                        onChange={(e) => {
-                          const formatted = formatDocument(e.target.value, newCustomer.type);
-                          setNewCustomer(prev => ({ ...prev, document: formatted }));
-                        }}
-                        placeholder={newCustomer.type === 'PF' ? '000.000.000-00' : '00.000.000/0000-00'}
-                        className={`h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 text-base ${validationErrors.document ? 'border-red-400 focus:border-red-400' : ''}`}
-                      />
-                      {validationErrors.document && (
-                        <p className="text-sm text-red-400 flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          {validationErrors.document}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Seção: Contato */}
-                <div className="space-y-6">
-                  <div className="flex items-center gap-2 pb-3 border-b border-slate-700">
-                    <div className="p-2 bg-blue-500/20 rounded-lg">
-                      <Mail className="h-4 w-4 text-blue-400" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wide">Contato</h3>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-semibold text-slate-200">E-mail</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={newCustomer.email}
-                      onChange={(e) => setNewCustomer(prev => ({ ...prev, email: e.target.value }))}
-                      placeholder="email@exemplo.com"
-                      className={`h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 text-base ${validationErrors.email ? 'border-red-400 focus:border-red-400' : ''}`}
-                    />
-                    {validationErrors.email && (
-                      <p className="text-sm text-red-400 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        {validationErrors.email}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="text-sm font-semibold text-slate-200">Telefone</Label>
-                      <Input
-                        id="phone"
-                        value={newCustomer.phone}
-                        onChange={(e) => {
-                          const formatted = formatPhone(e.target.value);
-                          setNewCustomer(prev => ({ ...prev, phone: formatted }));
-                        }}
-                        placeholder="(11) 99999-9999"
-                        className={`h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 text-base ${validationErrors.phone ? 'border-red-400 focus:border-red-400' : ''}`}
-                      />
-                      {validationErrors.phone && (
-                        <p className="text-sm text-red-400 flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          {validationErrors.phone}
-                        </p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="city" className="text-sm font-semibold text-slate-200">Cidade</Label>
-                      <Input
-                        id="city"
-                        value={newCustomer.city}
-                        onChange={(e) => setNewCustomer(prev => ({ ...prev, city: e.target.value }))}
-                        placeholder="São Paulo"
-                        className="h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400 text-base"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Seção: Status */}
-                <div className="space-y-6">
-                  <div className="flex items-center gap-2 pb-3 border-b border-slate-700">
-                    <div className="p-2 bg-blue-500/20 rounded-lg">
-                      <CheckCircle className="h-4 w-4 text-blue-400" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wide">Status</h3>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="status" className="text-sm font-semibold text-slate-200">Status do Cliente</Label>
-                    <Select 
-                      value={newCustomer.status}
-                      onValueChange={(value) => setNewCustomer(prev => ({ ...prev, status: value as 'active' | 'inactive' }))}
-                    >
-                      <SelectTrigger className="h-12 bg-slate-700/60 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white text-base">
-                        <SelectValue placeholder="Selecione o status" />
-                      </SelectTrigger>
-                      <SelectContent className="z-50 bg-white text-slate-900 border border-slate-200 shadow-xl dark:bg-slate-900 dark:text-white dark:border-slate-700">
-                        <SelectItem value="active" className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">Ativo</SelectItem>
-                        <SelectItem value="inactive" className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">Inativo</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+            <div className="grid gap-2">
+              <label htmlFor="email">E-mail</label>
+              <Input
+                id="email"
+                type="email"
+                value={newCustomer.email}
+                onChange={(e) => setNewCustomer(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="email@exemplo.com"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label htmlFor="phone">Telefone</label>
+                <Input
+                  id="phone"
+                  value={newCustomer.phone}
+                  onChange={(e) => setNewCustomer(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="(11) 99999-9999"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="city">Cidade</label>
+                <Input
+                  id="city"
+                  value={newCustomer.city}
+                  onChange={(e) => setNewCustomer(prev => ({ ...prev, city: e.target.value }))}
+                  placeholder="São Paulo"
+                />
               </div>
             </div>
           </div>
-            {/* Rodapé com gradiente */}
-            <div className="bg-gradient-to-r from-slate-800 to-slate-700 p-6 rounded-b-lg border-t border-slate-600/50">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button 
-                  variant="outline" 
-                  onClick={() => { setShowAddDialog(false); setEditingCustomerId(null); }}
-                  className="w-full sm:w-auto border-slate-500 bg-slate-700/50 hover:bg-slate-600 text-slate-200 hover:text-white h-11 font-medium transition-all duration-200 hover:shadow-md"
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  onClick={editingCustomerId ? handleSaveEdit : handleAddCustomer} 
-                  disabled={isSubmitting}
-                  className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white h-11 font-medium disabled:opacity-50 transition-all duration-200 hover:shadow-lg"
-                >
-                  {isSubmitting ? (editingCustomerId ? 'Salvando...' : 'Adicionando...') : (editingCustomerId ? 'Salvar Alterações' : 'Adicionar Cliente')}
-                </Button>
-              </div>
-            </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog Detalhes do Cliente */}
-      <Dialog open={!!showDetailsDialog} onOpenChange={(open) => !open && setShowDetailsDialog(null)}>
-        <DialogContent className="text-slate-900">
-          <DialogHeader>
-            <DialogTitle className="text-slate-900">Detalhes do Cliente</DialogTitle>
-            <DialogDescription className="text-slate-600">Informações básicas do cliente selecionado</DialogDescription>
-          </DialogHeader>
-          {showDetailsDialog && (
-            <div className="space-y-2">
-              <div><span className="font-medium">Nome:</span> {showDetailsDialog.name}</div>
-              <div><span className="font-medium">Tipo:</span> {showDetailsDialog.type}</div>
-              <div><span className="font-medium">Documento:</span> {showDetailsDialog.document}</div>
-              <div><span className="font-medium">Telefone:</span> {formatPhone(showDetailsDialog.phone || '')}</div>
-              <div><span className="font-medium">E-mail:</span> {showDetailsDialog.email}</div>
-              <div><span className="font-medium">Cidade:</span> {showDetailsDialog.city}</div>
-              <div><span className="font-medium">Status:</span> {showDetailsDialog.status === 'active' ? 'Ativo' : 'Inativo'}</div>
-              <div className="text-xs text-slate-500"><span className="font-medium">Criado em:</span> {new Date(showDetailsDialog.created_at).toLocaleString('pt-BR')}</div>
-            </div>
-          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDetailsDialog(null)}>Fechar</Button>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAddCustomer} className="bg-emerald-600 hover:bg-emerald-700">
+              Adicionar Cliente
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1239,17 +738,10 @@ export default function ClientesPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setShowImportDialog(false)}
-              className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
-            >
+            <Button variant="outline" onClick={() => setShowImportDialog(false)}>
               Cancelar
             </Button>
-            <Button 
-              className="bg-emerald-600 hover:bg-emerald-700 text-white" 
-              onClick={() => document.getElementById('file')?.click()}
-            >
+            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => document.getElementById('file')?.click()}>
               Selecionar Arquivo
             </Button>
           </DialogFooter>
@@ -1262,54 +754,13 @@ export default function ClientesPage() {
         onClose={() => setShowImportPreview(false)}
         onConfirm={async () => {
           // Importação direta simples
-          try {
-            setIsRegistering(true);
-            let success = 0, fail = 0;
-            if (!tenant?.id) {
-              toast.error('Tenant não identificado. Feche e reabra a tela após alguns segundos.');
-              console.warn('🚫 Importação cancelada: tenant indefinido.');
-              return;
-            }
-
-            for (const row of importRows) {
-              try {
-                const response = await fetch('/next_api/customers', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    tenant_id: tenant.id,
-                    name: row.nome || '',
-                    email: row.email || '',
-                    phone: row.telefone || '',
-                    document: row.documento || '',
-                    city: row.cidade || '',
-                    type: row.tipo || 'PF',
-                  })
-                });
-                if (response.ok) success++;
-                else fail++;
-              } catch (err) {
-                fail++;
-              }
-            }
-            toast.success(`Importação concluída: ${success} sucessos, ${fail} falhas`);
-            setShowImportPreview(false);
-            await loadCustomers();
-          } finally {
-            setIsRegistering(false);
-          }
+          await handleRegisterSelected(importRows);
         }}
         onRegister={async (selected) => {
           try {
             setIsRegistering(true);
             let success = 0, fail = 0;
             const errors: string[] = [];
-            if (!tenant?.id) {
-              toast.error('Tenant não identificado. Feche e reabra a tela após alguns segundos.');
-              console.warn('🚫 Cadastro selecionado cancelado: tenant indefinido.');
-              return;
-            }
-
             for (const row of selected) {
               const obj: any = Array.isArray(row)
                 ? (() => {
@@ -1336,7 +787,6 @@ export default function ClientesPage() {
                 return '';
               };
               const customerData = {
-                tenant_id: tenant.id,
                 name: pick(['nome', 'name', 'fantasia']),
                 email: pick(['email', 'e mail']),
                 phone: pick(['telefone', 'celular', 'phone']),
@@ -1347,7 +797,7 @@ export default function ClientesPage() {
                 state: (pick(['estado', 'uf']).slice(0,2).toUpperCase() || null) as any,
                 zipcode: pick(['cep', 'zip']).replace(/\D/g, ''),
                 notes: pick(['observacoes', 'observacoes adicionais', 'notes']),
-                status: 'active',
+                is_active: true,
               } as any;
 
               if (!customerData.name) { fail++; errors.push('Nome ausente'); continue; }
@@ -1384,7 +834,6 @@ export default function ClientesPage() {
         errors={importErrors}
         isRegistering={isRegistering}
       />
-      </div>
-    </TenantPageWrapper>
+    </div>
   );
 }

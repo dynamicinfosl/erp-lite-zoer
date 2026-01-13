@@ -148,6 +148,7 @@ async function createSaleHandler(request: NextRequest) {
       user_id: user_id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
       sale_type: sale_type || null, // ✅ Usar NULL como padrão
       sale_number: saleNumber,
+      customer_id: customer_id || null,
       customer_name: customer_name || body.customer_name || 'Cliente Avulso',
       total_amount: parseFloat(finalTotal),
       final_amount: parseFloat(finalTotal),
@@ -275,7 +276,12 @@ async function listSalesHandler(request: NextRequest) {
     const sale_source = searchParams.get('sale_source');
     const tzParam = searchParams.get('tz'); // minutos de offset do fuso (ex: -180 para BRT)
 
-    console.log(`💰 GET /sales - tenant_id: ${tenant_id}, today: ${today}, sale_source: ${sale_source}`);
+    console.log(`💰 [SALES API] GET /sales INICIADO`);
+    console.log(`💰 [SALES API] tenant_id: ${tenant_id}`);
+    console.log(`💰 [SALES API] today: ${today}`);
+    console.log(`💰 [SALES API] sale_source: ${sale_source}`);
+    console.log(`💰 [SALES API] tz: ${tzParam}`);
+    console.log(`💰 [SALES API] URL completa: ${request.url}`);
 
     // Buscar apenas as vendas (sem JOIN para evitar erro de relacionamento)
     let query = supabaseAdmin
@@ -298,32 +304,60 @@ async function listSalesHandler(request: NextRequest) {
 
     // Se solicitado apenas vendas de hoje
     if (today === 'true') {
-      // Ajuste de fuso horário: o frontend envia o offset em minutos (Date.getTimezoneOffset()*-1)
+      console.log('🗓️ [SALES API] Filtrando vendas de hoje...');
+      
+      // Offset do fuso do cliente em minutos (Brasil = -180, ou seja, UTC-3)
       const clientOffsetMin = Number.isFinite(Number(tzParam)) ? parseInt(tzParam as string, 10) : 0;
-      // Janela do dia no fuso do cliente convertida para UTC
-      const startLocal = new Date();
-      startLocal.setHours(0, 0, 0, 0);
-      const endLocal = new Date();
-      endLocal.setHours(23, 59, 59, 999);
-      const startUtc = new Date(startLocal.getTime() - clientOffsetMin * 60000);
-      const endUtc = new Date(endLocal.getTime() - clientOffsetMin * 60000);
+      console.log('🕐 [SALES API] Client offset (minutos):', clientOffsetMin);
+      
+      // Pegar a hora atual no fuso do cliente
+      const nowUtc = new Date();
+      const nowClientTime = new Date(nowUtc.getTime() + clientOffsetMin * 60000);
+      
+      console.log('🕐 [SALES API] Hora atual UTC:', nowUtc.toISOString());
+      console.log('🕐 [SALES API] Hora atual no cliente:', nowClientTime.toISOString());
+      
+      // Meia-noite de hoje no fuso do cliente
+      const midnightClient = new Date(Date.UTC(
+        nowClientTime.getUTCFullYear(),
+        nowClientTime.getUTCMonth(),
+        nowClientTime.getUTCDate(),
+        0, 0, 0, 0
+      ));
+      
+      // Converter de volta para UTC (subtraindo o offset)
+      const startUtc = new Date(midnightClient.getTime() - clientOffsetMin * 60000);
+      const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+      console.log('📅 [SALES API] Janela de busca:');
+      console.log('   Meia-noite cliente (hora local):', midnightClient.toISOString());
+      console.log('   Start UTC (00:00 cliente):', startUtc.toISOString());
+      console.log('   End UTC (23:59 cliente):', endUtc.toISOString());
 
       query = query
         .gte('created_at', startUtc.toISOString())
         .lte('created_at', endUtc.toISOString());
     }
 
+    console.log('🔄 [SALES API] Executando query no banco...');
     let { data, error } = await query.order('created_at', { ascending: false });
 
+    console.log('📊 [SALES API] Query executada!');
+    console.log('📊 [SALES API] Erro:', error ? JSON.stringify(error) : 'null');
+    console.log('📊 [SALES API] Dados recebidos:', data ? `${data.length} registros` : 'null');
+
     if (error) {
-      console.error('❌ Erro ao listar vendas:', error);
+      console.error('❌ [SALES API] Erro ao listar vendas:', error);
       return NextResponse.json(
         { error: 'Erro ao listar vendas: ' + error.message },
         { status: 500 }
       );
     }
 
-    console.log(`✅ Vendas encontradas: ${data?.length || 0} para tenant: ${tenant_id}`);
+    console.log(`✅ [SALES API] Vendas encontradas: ${data?.length || 0} para tenant: ${tenant_id}`);
+    if (data && data.length > 0) {
+      console.log('📋 [SALES API] Primeira venda encontrada:', JSON.stringify(data[0], null, 2));
+    }
     
     // Buscar itens de venda para cada venda
     if (data && data.length > 0) {
@@ -380,9 +414,12 @@ async function listSalesHandler(request: NextRequest) {
     }
     
     // Retornar no formato esperado pelo frontend
+    console.log('✅ [SALES API] Preparando resposta...');
     if (today === 'true') {
+      console.log(`✅ [SALES API] Retornando ${data?.length || 0} vendas no formato 'sales'`);
       return NextResponse.json({ success: true, sales: data });
     } else {
+      console.log(`✅ [SALES API] Retornando ${data?.length || 0} vendas no formato 'data'`);
       return NextResponse.json({ success: true, data: data });
     }
 

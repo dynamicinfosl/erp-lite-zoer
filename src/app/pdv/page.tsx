@@ -13,6 +13,14 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/co
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { OverlaySelect } from '@/components/ui/overlay-select';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -77,6 +85,7 @@ import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { TenantPageWrapper } from '@/components/layout/PageWrapper';
 import { PaymentSection } from '@/components/pdv/PaymentSection';
 import { SaleConfirmationModal } from '@/components/pdv/SaleConfirmationModal';
+import { DeliveryQuickModal } from '@/components/pdv/DeliveryQuickModal';
 
 interface MenuItem {
   icon: React.ElementType;
@@ -115,6 +124,11 @@ export default function PDVPage() {
   const [cart, setCart] = useState<PDVItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<PDVItem | null>(null);
   const [customerName, setCustomerName] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -178,6 +192,7 @@ export default function PDVPage() {
   const [currentSection, setCurrentSection] = useState<'pdv' | 'payment'>('pdv');
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [lastSaleData, setLastSaleData] = useState<any>(null);
+  const [deliveryQuickOpen, setDeliveryQuickOpen] = useState(false);
   
   const addSelectedToCart = useCallback(() => {
     if (!selectedProduct) return;
@@ -238,72 +253,82 @@ export default function PDVPage() {
     loadProducts();
   }, [tenant?.id]);
 
-  // Carregar vendas do dia
-  useEffect(() => {
-    const loadTodaySales = async () => {
-      try {
-        if (!tenant?.id) {
-          console.warn('⚠️ Tenant não disponível para carregar vendas');
-          setTodaySales([]);
-          return;
-        }
-        
-        console.log('🔄 Carregando vendas do dia para tenant:', tenant.id);
-        
-        // Primeiro tenta carregar do localStorage para feedback imediato
-        loadTodaySalesLocal();
+  // Função para recarregar vendas do dia
+  const reloadTodaySales = useCallback(async () => {
+    try {
+      if (!tenant?.id) {
+        console.warn('⚠️ Tenant não disponível para carregar vendas');
+        setTodaySales([]);
+        return;
+      }
+      
+      console.log('🔄 [PDV] Carregando vendas do dia para tenant:', tenant.id);
+      console.log('🔍 [PDV] Tipo do tenant.id:', typeof tenant.id);
+      console.log('🔍 [PDV] Valor exato do tenant.id:', JSON.stringify(tenant.id));
+      
+      // Primeiro tenta carregar do localStorage para feedback imediato
+      loadTodaySalesLocal();
 
-        // Timeout de 3 segundos para a requisição
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+      try {
+        const tz = -new Date().getTimezoneOffset();
+        const url = `/next_api/sales?today=true&tenant_id=${encodeURIComponent(tenant.id)}&tz=${tz}`;
+        console.log('🔍 [PDV] URL completa da requisição:', url);
+        console.log('🔍 [PDV] Timezone offset:', tz);
+        console.log('🔍 [PDV] Data/hora atual:', new Date().toISOString());
         
-        try {
-          const tz = -new Date().getTimezoneOffset();
-          const response = await fetch(`/next_api/sales?today=true&tenant_id=${encodeURIComponent(tenant.id)}&tz=${tz}`, {
-            signal: controller.signal
-          });
+        console.log('📤 [PDV] Iniciando requisição fetch...');
+        const response = await fetch(url);
+        console.log('📥 [PDV] Resposta recebida!');
+        
+        console.log('📥 [PDV] Status da resposta:', response.status, response.statusText);
+        console.log('📥 [PDV] Headers da resposta:', Object.fromEntries(response.headers.entries()));
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📊 [PDV] Dados brutos recebidos:', JSON.stringify(data, null, 2));
+          const sales = data.sales || data.data || [];
           
-          clearTimeout(timeoutId);
+          console.log('✅ [PDV] Vendas encontradas no response:', sales.length);
+          if (sales.length > 0) {
+            console.log('📋 [PDV] Primeira venda completa:', JSON.stringify(sales[0], null, 2));
+          } else {
+            console.warn('⚠️ [PDV] Array de vendas está vazio!');
+            console.log('🔍 [PDV] Conteúdo completo da resposta:', data);
+          }
           
-          if (response.ok) {
-            const data = await response.json();
-            const sales = data.sales || data.data || [];
-            
-            console.log('✅ Vendas carregadas:', sales.length);
-            
-            // Converter para formato local
-            const localSales: Sale[] = sales.map((sale: any) => ({
-              id: sale.id,
-              numero: sale.sale_number || sale.numero || `#${sale.id}`,
-              cliente: sale.customer_name || sale.cliente || 'Cliente não informado',
-              total: parseFloat(sale.total_amount || sale.final_amount || sale.total || 0),
-              forma_pagamento: sale.payment_method || sale.forma_pagamento || 'dinheiro',
-              data_venda: sale.created_at || sale.sold_at || sale.data_venda,
-              status: sale.status === 'completed' ? 'paga' : (sale.status || 'paga'),
-            }));
-            
-            setTodaySales(localSales);
-            saveTodaySalesLocal(localSales);
-          } else {
-            console.log('⚠️ Erro ao carregar vendas:', response.status, '- usando array vazio');
-            // Mantém dados locais, mas não elimina
-          }
-        } catch (fetchError: any) {
-          if (fetchError.name === 'AbortError') {
-            console.log('⏰ Timeout ao carregar vendas, usando array vazio');
-          } else {
-            console.log('⚠️ Erro na requisição de vendas:', fetchError.message);
-          }
-          // Mantém dados locais
+          // Converter para formato local
+          const localSales: Sale[] = sales.map((sale: any) => ({
+            id: sale.id,
+            numero: sale.sale_number || sale.numero || `#${sale.id}`,
+            cliente: sale.customer_name || sale.cliente || 'Cliente não informado',
+            total: parseFloat(sale.total_amount || sale.final_amount || sale.total || 0),
+            forma_pagamento: sale.payment_method || sale.forma_pagamento || 'dinheiro',
+            data_venda: sale.created_at || sale.sold_at || sale.data_venda,
+            status: sale.status === 'completed' ? 'paga' : (sale.status || 'paga'),
+          }));
+          
+          console.log('✅ Vendas convertidas:', localSales.length);
+          setTodaySales(localSales);
+          saveTodaySalesLocal(localSales);
+        } else {
+          const errorText = await response.text();
+          console.error('❌ Erro ao carregar vendas:', response.status, errorText);
+          // Mantém dados locais, mas não elimina
         }
-      } catch (error) {
-        console.log('⚠️ Erro ao carregar vendas do dia:', error);
+      } catch (fetchError: any) {
+        console.error('❌ Erro na requisição de vendas:', fetchError);
         // Mantém dados locais
       }
-    };
-
-    loadTodaySales();
+    } catch (error) {
+      console.error('❌ Erro ao carregar vendas do dia:', error);
+      // Mantém dados locais
+    }
   }, [tenant?.id, loadTodaySalesLocal, saveTodaySalesLocal]);
+
+  // Carregar vendas do dia
+  useEffect(() => {
+    reloadTodaySales();
+  }, [reloadTodaySales]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -395,6 +420,7 @@ export default function PDVPage() {
     setCart([]);
     setSelectedProduct(null);
     setCustomerName('');
+    setSelectedCustomerId(null);
   }, []);
 
   const startNewSale = useCallback(() => {
@@ -455,6 +481,7 @@ export default function PDVPage() {
         user_id: user?.id || '00000000-0000-0000-0000-000000000000',
         sale_type: null,
         sale_source: 'pdv', // Marcar como venda do PDV
+        customer_id: selectedCustomerId,
         customer_name: customerName || 'Cliente Avulso',
         total_amount: total,
         total: total,
@@ -535,29 +562,9 @@ export default function PDVPage() {
       });
       
       // Recarregar vendas do dia para garantir sincronização
-      setTimeout(async () => {
-        try {
-          const tz = -new Date().getTimezoneOffset();
-          const response = await fetch(`/next_api/sales?today=true&tenant_id=${encodeURIComponent(tenant?.id || '')}&tz=${tz}`);
-          if (response.ok) {
-            const data = await response.json();
-            const sales = data.data || [];
-            const localSales: Sale[] = sales.map((sale: any) => ({
-              id: sale.id,
-              numero: sale.sale_number,
-              cliente: sale.customer_name,
-              total: parseFloat(sale.total_amount || sale.final_amount || 0),
-              forma_pagamento: sale.payment_method,
-              data_venda: sale.created_at,
-              status: sale.status === 'completed' ? 'paga' : (sale.status || 'paga'),
-            }));
-            setTodaySales(localSales);
-            console.log('🔄 Histórico de vendas atualizado:', localSales.length);
-          }
-        } catch (error) {
-          console.error('❌ Erro ao recarregar vendas:', error);
-        }
-      }, 1000);
+      setTimeout(() => {
+        reloadTodaySales();
+      }, 1500);
       
       // Mostrar mensagem de sucesso com detalhes do pagamento
       if (paymentData?.paymentMethod === 'dinheiro' && paymentData?.change > 0) {
@@ -580,6 +587,8 @@ export default function PDVPage() {
       // Preparar dados para o modal de confirmação
       const confirmationData = {
         id: localSaleData.id, // Adicionar ID para impressão do cupom
+        tenant_id: tenant.id,
+        customer_id: selectedCustomerId,
         numero: localSaleData.numero,
         cliente: localSaleData.cliente,
         total: localSaleData.total,
@@ -602,7 +611,49 @@ export default function PDVPage() {
       console.error('Erro ao finalizar venda:', error);
       toast.error(`Erro ao salvar venda: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
-  }, [total, customerName, paymentMethod, cart, calculateItemTotal, saveTodaySalesLocal, tenant, user?.id]);
+  }, [total, customerName, paymentMethod, cart, calculateItemTotal, saveTodaySalesLocal, tenant, user?.id, selectedCustomerId, reloadTodaySales]);
+
+  const loadCustomers = useCallback(async () => {
+    if (!tenant?.id) {
+      setCustomers([]);
+      return;
+    }
+    try {
+      setCustomersLoading(true);
+      const res = await fetch(`/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}`);
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `HTTP ${res.status}`);
+      }
+      const json = await res.json();
+      const rows = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
+      setCustomers(Array.isArray(rows) ? rows : []);
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao carregar clientes');
+      setCustomers([]);
+    } finally {
+      setCustomersLoading(false);
+    }
+  }, [tenant?.id]);
+
+  const openCustomerPicker = useCallback(() => {
+    setCustomerPickerOpen(true);
+    setCustomerSearch('');
+    loadCustomers();
+  }, [loadCustomers]);
+
+  const selectCustomer = useCallback((c: any) => {
+    setSelectedCustomerId(Number(c.id));
+    setCustomerName(c.name || '');
+    setCustomerPickerOpen(false);
+    toast.success(`Cliente selecionado: ${c.name}`);
+  }, []);
+
+  const clearCustomer = useCallback(() => {
+    setSelectedCustomerId(null);
+    setCustomerName('');
+  }, []);
 
   // Funções para operações do PDV
   const handleSangria = useCallback(() => {
@@ -721,6 +772,8 @@ export default function PDVPage() {
       const cupomUrl = `/cupom/${lastSaleData.id}`;
       window.open(cupomUrl, '_blank');
     }
+    // Limpar carrinho e fechar modal
+    clearCart();
     setShowConfirmationModal(false);
   };
 
@@ -730,6 +783,8 @@ export default function PDVPage() {
       const a4Url = `/vendas/${lastSaleData.id}/a4`;
       window.open(a4Url, '_blank');
     }
+    // Limpar carrinho e fechar modal
+    clearCart();
     setShowConfirmationModal(false);
   };
 
@@ -753,15 +808,31 @@ export default function PDVPage() {
   };
 
   const handleCloseConfirmation = () => {
+    // Limpar carrinho completamente quando fechar o modal após venda confirmada
+    clearCart();
     setShowConfirmationModal(false);
+    setPaymentMethod('dinheiro');
+    setSearchTerm('');
+    toast.success('Carrinho limpo. Pronto para nova venda!');
   };
 
   const handleEmitirNota = () => {
     if (lastSaleData?.id) {
       router.push(`/emitir-nota?sale_id=${lastSaleData.id}`);
+      // Limpar carrinho e fechar modal
+      clearCart();
       setShowConfirmationModal(false);
     }
   };
+
+  // Limpar carrinho automaticamente quando o modal fechar por qualquer motivo
+  useEffect(() => {
+    if (!showConfirmationModal && lastSaleData) {
+      // Modal foi fechado e havia uma venda confirmada - limpar carrinho
+      clearCart();
+      setPaymentMethod('dinheiro');
+    }
+  }, [showConfirmationModal, lastSaleData, clearCart]);
 
   // Se estiver na seção de pagamento, mostrar apenas ela
   if (currentSection === 'payment') {
@@ -871,7 +942,19 @@ export default function PDVPage() {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => setShowHistoryDialog(true)}
+                onClick={() => setDeliveryQuickOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <Truck className="h-4 w-4" />
+                <span className="hidden sm:inline">Entregas</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  setShowHistoryDialog(true);
+                  reloadTodaySales();
+                }}
                 className="flex items-center gap-2"
               >
                 <History className="h-4 w-4" />
@@ -1129,6 +1212,27 @@ export default function PDVPage() {
                           onChange={(e) => setCustomerName(e.target.value)}
                           className="h-10 border-none bg-transparent focus-visible:ring-2 focus-visible:ring-primary/40"
                         />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={openCustomerPicker}
+                          className="shrink-0"
+                        >
+                          Selecionar
+                        </Button>
+                        {selectedCustomerId && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearCustomer}
+                            className="shrink-0 text-muted-foreground"
+                            title="Limpar cliente selecionado"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
 
                       <Separator />
@@ -1291,6 +1395,75 @@ export default function PDVPage() {
         </div>
       )}
 
+      {/* Seletor de Cliente */}
+      <Dialog open={customerPickerOpen} onOpenChange={setCustomerPickerOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Selecionar Cliente</DialogTitle>
+            <DialogDescription>
+              Escolha um cliente cadastrado (necessário para entregas usando o endereço do cliente).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              placeholder="Buscar por nome, telefone, documento..."
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+            />
+            <Button variant="outline" onClick={loadCustomers} disabled={customersLoading} className="gap-2">
+              <RefreshCw className={`h-4 w-4 ${customersLoading ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
+          </div>
+
+          <div className="max-h-[60vh] overflow-y-auto rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Telefone</TableHead>
+                  <TableHead>Endereço</TableHead>
+                  <TableHead className="text-right">Ação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {!customersLoading &&
+                  (Array.isArray(customers) ? customers : [])
+                    .filter((c) => {
+                      const s = customerSearch.trim().toLowerCase();
+                      if (!s) return true;
+                      return `${c.name || ''} ${c.phone || ''} ${c.document || ''}`
+                        .toLowerCase()
+                        .includes(s);
+                    })
+                    .map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium">{c.name}</TableCell>
+                        <TableCell>{c.phone || '—'}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {[c.address, c.neighborhood, c.city, c.state, c.zipcode].filter(Boolean).join(' - ') || '—'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" onClick={() => selectCustomer(c)}>
+                            Selecionar
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+              </TableBody>
+            </Table>
+
+            {customersLoading && (
+              <div className="text-center py-8 text-muted-foreground">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100 mx-auto mb-3" />
+                <p>Carregando clientes...</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Diálogo de Operações de Caixa */}
       {showCaixaDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -1420,6 +1593,12 @@ export default function PDVPage() {
         onPrintA4={handlePrintA4}
         onEmitirNota={handleEmitirNota}
         saleData={lastSaleData}
+      />
+
+      <DeliveryQuickModal
+        open={deliveryQuickOpen}
+        onOpenChange={setDeliveryQuickOpen}
+        tenantId={tenant?.id || null}
       />
       </div>
     </TenantPageWrapper>

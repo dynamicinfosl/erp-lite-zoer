@@ -15,8 +15,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Search, DollarSign, TrendingUp, TrendingDown, Calendar, CreditCard, Receipt, ArrowRight } from 'lucide-react';
 import { FinancialTransaction } from '@/types';
+import { api } from '@/lib/api-client';
 import { toast } from 'sonner';
-import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
+import { ENABLE_AUTH } from '@/constants/auth';
+import { mockFinancialTransactions } from '@/lib/mock-data';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 
 interface FinancialRecord {
@@ -30,9 +32,40 @@ interface FinancialRecord {
   status: 'pendente' | 'pago'
 }
 
+const mockFinancialRecords: FinancialRecord[] = [
+  {
+    id: '1',
+    type: 'receita',
+    description: 'Venda PDV 2541',
+    amount: 259.9,
+    userId: '5f34ff91-dc0f-4fe2-a5c7-6e8f9a6fdc01',
+    category: 'Venda',
+    date: '2025-09-24',
+    status: 'pago',
+  },
+  {
+    id: '2',
+    type: 'despesa',
+    description: 'Pagamento fornecedor',
+    amount: 1299.0,
+    userId: '5f34ff91-dc0f-4fe2-a5c7-6e8f9a6fdc01',
+    category: 'Fornecedores',
+    date: '2025-09-23',
+    status: 'pendente',
+  },
+  {
+    id: '3',
+    type: 'receita',
+    description: 'Venda online 8891',
+    amount: 899.9,
+    userId: '5f34ff91-dc0f-4fe2-a5c7-6e8f9a6fdc01',
+    category: 'E-commerce',
+    date: '2025-09-22',
+    status: 'pago',
+  },
+]
 
 export default function FinanceiroPage() {
-  const { tenant } = useSimpleAuth();
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,24 +86,37 @@ export default function FinanceiroPage() {
     try {
       setLoading(true);
 
-      if (!tenant?.id) { 
-        setTransactions([]); 
-        return; 
+      if (ENABLE_AUTH) {
+        const data = await api.get<FinancialTransaction[]>('/financial-transactions');
+        setTransactions(data);
+      } else {
+        setTransactions(
+          mockFinancialRecords.map((record) => ({
+            id: Number(record.id),
+            transaction_type: record.type,
+            description: record.description,
+            amount: record.amount,
+            user_id: Number(record.userId) || 0,
+            category: record.category,
+            created_at: record.date,
+            status: record.status,
+            notes: '',
+            payment_method: '',
+            updated_at: record.date,
+            due_date: record.date,
+            paid_date: record.status === 'pago' ? record.date : undefined,
+          })),
+        );
       }
-
-      const res = await fetch(`/next_api/financial-transactions?tenant_id=${encodeURIComponent(tenant.id)}`);
-      if (!res.ok) throw new Error('Erro ao carregar transações');
-      const json = await res.json();
-      const data = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
-      setTransactions(data);
     } catch (error) {
       console.error('Erro ao carregar transações:', error);
-      toast.error('Erro ao carregar transações');
-      setTransactions([]);
+      if (ENABLE_AUTH) {
+        toast.error('Erro ao carregar transações');
+      }
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id]);
+  }, []);
 
   useEffect(() => {
     fetchTransactions();
@@ -90,18 +136,16 @@ export default function FinanceiroPage() {
         amount: parseFloat(formData.amount),
         due_date: formData.due_date || new Date().toISOString().split('T')[0],
         paid_date: formData.status === 'pago' ? new Date().toISOString().split('T')[0] : null,
-        tenant_id: tenant?.id
       };
 
-      const res = await fetch(`/next_api/financial-transactions`, {
-        method: editingTransaction ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(transactionData)
-      });
+      if (editingTransaction) {
+        await api.put(`/financial-transactions?id=${editingTransaction.id}`, transactionData);
+        toast.success('Transação atualizada com sucesso');
+      } else {
+        await api.post('/financial-transactions', transactionData);
+        toast.success('Transação criada com sucesso');
+      }
 
-      if (!res.ok) throw new Error('Erro ao salvar transação');
-
-      toast.success(editingTransaction ? 'Transação atualizada com sucesso' : 'Transação criada com sucesso');
       setShowDialog(false);
       setEditingTransaction(null);
       resetForm();
@@ -131,14 +175,7 @@ export default function FinanceiroPage() {
     if (!confirm('Tem certeza que deseja excluir esta transação?')) return;
 
     try {
-      const res = await fetch(`/next_api/financial-transactions`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, tenant_id: tenant?.id })
-      });
-
-      if (!res.ok) throw new Error('Erro ao excluir transação');
-
+      await api.delete(`/financial-transactions?id=${id}`);
       toast.success('Transação excluída com sucesso');
       fetchTransactions();
     } catch (error) {
@@ -666,9 +703,8 @@ function TransactionTable({
 
   return (
     <ScrollArea className="max-h-[420px]">
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
+      <Table>
+        <TableHeader>
           <TableRow>
             <TableHead>Data</TableHead>
             <TableHead>Descrição</TableHead>
@@ -743,8 +779,7 @@ function TransactionTable({
             </TableRow>
           ))}
         </TableBody>
-        </Table>
-      </div>
+      </Table>
     </ScrollArea>
   );
 }
