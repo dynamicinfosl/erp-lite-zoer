@@ -8,13 +8,25 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 type ManifestStatus = 'aberta' | 'finalizada' | 'cancelada';
 
-function genManifestNumber() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `ENT-${y}${m}${day}-${rand}`;
+async function genManifestNumber(tenantId: string): Promise<string> {
+  try {
+    // Contar quantos romaneios já existem para este tenant
+    const { count } = await supabaseAdmin
+      .from('delivery_manifests')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId);
+    
+    const nextNumber = (count || 0) + 1;
+    return `Entrega ${nextNumber}`;
+  } catch (e) {
+    // Fallback se houver erro
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return `ENT-${y}${m}${day}-${rand}`;
+  }
 }
 
 // GET - listar romaneios
@@ -64,12 +76,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - criar romaneio (1 aberto por entregador)
+// POST - criar romaneio (sem obrigatoriedade de entregador)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const tenant_id = body.tenant_id;
-    const driver_id = body.driver_id;
+    const driver_id = body.driver_id || null; // Opcional agora
     const delivery_ids: Array<number> | undefined = Array.isArray(body.delivery_ids) ? body.delivery_ids : undefined;
 
     if (!tenant_id) {
@@ -78,30 +90,15 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (!driver_id) {
+
+    if (!delivery_ids || delivery_ids.length === 0) {
       return NextResponse.json(
-        { success: false, errorMessage: 'driver_id é obrigatório' },
+        { success: false, errorMessage: 'Selecione pelo menos uma entrega para criar o romaneio' },
         { status: 400 }
       );
     }
 
-    // Verificar se já existe romaneio aberto para esse driver (regra de negócio)
-    const { data: openExisting } = await supabaseAdmin
-      .from('delivery_manifests')
-      .select('id, status')
-      .eq('tenant_id', tenant_id)
-      .eq('driver_id', driver_id)
-      .eq('status', 'aberta')
-      .limit(1);
-
-    if (Array.isArray(openExisting) && openExisting.length > 0) {
-      return NextResponse.json(
-        { success: false, errorMessage: 'Já existe um romaneio aberto para este entregador. Finalize-o antes de criar um novo.' },
-        { status: 400 }
-      );
-    }
-
-    const manifest_number = genManifestNumber();
+    const manifest_number = await genManifestNumber(tenant_id);
 
     const { data: created, error: createError } = await supabaseAdmin
       .from('delivery_manifests')
@@ -145,20 +142,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Vincular entregas pendentes ao romaneio e marcar como em_rota
-    let deliveriesQuery = supabaseAdmin
-      .from('deliveries')
-      .update({ manifest_id: created.id, status: 'em_rota', updated_at: new Date().toISOString() })
-      .eq('tenant_id', tenant_id)
-      .eq('driver_id', driver_id)
-      .eq('status', 'aguardando')
-      .is('manifest_id', null);
-
-    if (delivery_ids && delivery_ids.length > 0) {
-      deliveriesQuery = deliveriesQuery.in('id', delivery_ids);
+    // Vincular entregas selecionadas ao romaneio e marcar como em_rota
+    const updateData: any = {
+      manifest_id: created.id,
+      status: 'em_rota',
+      updated_at: new Date().toISOString()
+    };
+    
+    // Se driver_id foi fornecido, atualizar também nas entregas
+    if (driver_id) {
+      updateData.driver_id = driver_id;
     }
 
-    const { error: linkError } = await deliveriesQuery;
+    const { error: linkError } = await supabaseAdmin
+      .from('deliveries')
+      .update(updateData)
+      .in('id', delivery_ids)
+      .eq('tenant_id', tenant_id)
+      .is('manifest_id', null);
+
     if (linkError) {
       console.error('Erro ao vincular entregas ao romaneio:', linkError);
       // Não falhar totalmente: retorna o romaneio criado.
@@ -217,7 +219,9 @@ export async function PUT(request: NextRequest) {
     if (body.notes !== undefined) update.notes = body.notes;
     if (nextStatus) update.status = nextStatus;
     if (nextStatus === 'finalizada') update.finalized_at = new Date().toISOString();
-    if (body.driver_id !== undefined) update.driver_id = body.driver_id;
+    if (body.driver_id !== undefined) {
+      update.driver_id = body.driver_id === null ? null : Number(body.driver_id);
+    }
 
     const { data: updated, error } = await supabaseAdmin
       .from('delivery_manifests')
@@ -265,14 +269,22 @@ export async function PUT(request: NextRequest) {
 
         // Depois, vincular apenas as entregas especificadas
         if (body.delivery_ids.length > 0) {
+          const updateData: any = {
+            manifest_id: id,
+            status: 'em_rota',
+            updated_at: new Date().toISOString()
+          };
+          
+          // Atualizar driver_id apenas se fornecido ou se já existir no romaneio
+          if (body.driver_id !== undefined) {
+            updateData.driver_id = body.driver_id;
+          } else if (existing.driver_id) {
+            updateData.driver_id = existing.driver_id;
+          }
+          
           const { error: linkError } = await supabaseAdmin
             .from('deliveries')
-            .update({ 
-              manifest_id: id,
-              driver_id: body.driver_id || existing.driver_id,
-              status: 'em_rota',
-              updated_at: new Date().toISOString()
-            })
+            .update(updateData)
             .in('id', body.delivery_ids)
             .eq('tenant_id', existing.tenant_id);
           

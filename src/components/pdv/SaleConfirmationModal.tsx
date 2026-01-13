@@ -193,13 +193,6 @@ export function SaleConfirmationModal({
       return;
     }
 
-    if (!selectedDriverId) {
-      toast.error('Selecione um entregador para vincular a entrega', {
-        duration: 3000,
-      });
-      return;
-    }
-
     try {
       setSavingDelivery(true);
       const res = await fetch('/next_api/deliveries', {
@@ -209,9 +202,11 @@ export function SaleConfirmationModal({
           tenant_id: saleData.tenant_id,
           sale_id: saleData.id,
           customer_id: saleData.customer_id,
-          driver_id: Number(selectedDriverId),
+          driver_id: selectedDriverId ? Number(selectedDriverId) : null,
           status: 'aguardando',
-          notes: `Vinculada no PDV para entregador: ${selectedDriverName || selectedDriverId}`,
+          notes: selectedDriverId
+            ? `Vinculada no PDV para entregador: ${selectedDriverName || selectedDriverId}`
+            : 'Marcada como entrega no PDV (sem entregador)',
         }),
       });
       
@@ -227,8 +222,6 @@ export function SaleConfirmationModal({
             errorMessage = 'O cliente selecionado não possui endereço cadastrado. Por favor, cadastre o endereço do cliente antes de marcar como entrega.';
           } else if (errorMessage.includes('customer_id')) {
             errorMessage = 'Cliente inválido. Verifique se o cliente está cadastrado corretamente.';
-          } else if (errorMessage.includes('driver_id')) {
-            errorMessage = 'Entregador inválido. Verifique se o entregador está ativo.';
           }
         } catch {
           const text = await res.text().catch(() => '');
@@ -239,7 +232,7 @@ export function SaleConfirmationModal({
 
       const result = await res.json();
       toast.success('Venda marcada para entrega com sucesso!', {
-        description: `Entregador: ${selectedDriverName || selectedDriverId}`,
+        description: selectedDriverId ? `Entregador: ${selectedDriverName || selectedDriverId}` : 'Sem entregador',
         duration: 4000,
       });
     } catch (e) {
@@ -358,7 +351,7 @@ export function SaleConfirmationModal({
               <div className="flex-1">
                 <h3 className="font-semibold text-gray-800 text-sm">Entrega</h3>
                 <p className="text-[10px] text-gray-500">
-                  Marque se essa venda deve entrar no romaneio do entregador.
+                  Marque para que essa venda apareça na lista de entregas e possa entrar em um romaneio.
                 </p>
               </div>
               <label className="flex items-center gap-1.5 text-xs font-medium whitespace-nowrap">
@@ -384,12 +377,15 @@ export function SaleConfirmationModal({
                   )}
                 </div>
                 <div className="space-y-1.5">
-                  <span className="text-xs font-medium text-gray-700 block">Entregador</span>
+                  <span className="text-xs font-medium text-gray-700 block">Entregador (opcional)</span>
                   <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
                     <SelectTrigger className="w-full h-8 text-xs">
-                      <SelectValue placeholder={driversLoading ? 'Carregando...' : drivers.length === 0 ? 'Nenhum entregador cadastrado' : 'Selecione um entregador'} />
+                      <SelectValue placeholder={driversLoading ? 'Carregando...' : drivers.length === 0 ? 'Nenhum entregador cadastrado' : 'Selecione um entregador (opcional)'} />
                     </SelectTrigger>
                     <SelectContent className="z-[10000] max-h-[200px] overflow-y-auto">
+                      <SelectItem value="" className="text-xs">
+                        Sem entregador
+                      </SelectItem>
                       {drivers.length === 0 && !driversLoading ? (
                         <div className="px-2 py-1.5 text-xs text-gray-400 text-center">
                           Nenhum entregador cadastrado

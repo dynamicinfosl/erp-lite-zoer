@@ -64,31 +64,19 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       return createDefaultTenant(userId);
     }
     
-    // ✅ VERSÃO ULTRA SIMPLIFICADA: Usar API route com timeout curto
-    let controller: AbortController | null = null;
-    let timeoutId: NodeJS.Timeout | null = null;
-    let isAborted = false;
-    
+    // ✅ Buscar via API route, mas SEM AbortController (evita AbortError no navegador)
+    // Em vez de abortar a request, fazemos timeout por Promise.race e ignoramos a resposta tardia.
     try {
-      controller = new AbortController();
-      timeoutId = setTimeout(() => {
-        if (!isAborted) {
-          isAborted = true;
-          controller?.abort();
-        }
-      }, 5000); // 5s timeout
-      
-      const response = await fetch(`/next_api/admin/get-tenant?user_id=${userId}`, {
-        signal: controller.signal
-      });
-      
-      // Limpar timeout se a requisição completou com sucesso
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-      
-      if (response.ok) {
+      const url = `/next_api/admin/get-tenant?user_id=${encodeURIComponent(userId)}`;
+      const timeoutMs = 5000;
+      const response = await Promise.race([
+        fetch(url),
+        new Promise<Response>((resolve) => {
+          setTimeout(() => resolve(null as any), timeoutMs);
+        }),
+      ]);
+
+      if (response && response.ok) {
         const result = await response.json();
         if (result.success && result.data) {
           const tenant = result.data;
@@ -108,30 +96,8 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (error: any) {
-      // Limpar timeout em caso de erro
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-      
-      // Tratar AbortError silenciosamente - não propagar
-      if (error?.name === 'AbortError' || error?.message?.includes('aborted') || error?.message?.includes('signal is aborted')) {
-        console.warn('⏰ [SIMPLE] Requisição abortada ao buscar tenant via API (esperado)');
-        // Não propagar o erro, apenas continuar com o fallback
-      } else {
-        console.error('⚠️ [SIMPLE] Erro ao buscar tenant via API:', error);
-      }
+      console.error('⚠️ [SIMPLE] Erro ao buscar tenant via API:', error);
       // Não propagar o erro - sempre continuar com fallback
-    } finally {
-      // Garantir limpeza do timeout
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-      // Garantir limpeza do controller
-      if (controller) {
-        controller = null;
-      }
     }
 
     // ✅ FALLBACK SIMPLES: Query direta priorizando tenant com subscription válida

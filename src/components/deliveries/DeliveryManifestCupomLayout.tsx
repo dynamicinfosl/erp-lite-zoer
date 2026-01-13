@@ -30,6 +30,9 @@ type Sale = {
   id: number;
   sale_number?: string;
   created_at?: string;
+  total_amount?: number | string | null;
+  final_amount?: number | string | null;
+  total?: number | string | null;
 };
 
 type SaleItem = {
@@ -94,6 +97,47 @@ export function DeliveryManifestCupomLayout({
       currency: 'BRL',
     }).format(value);
   };
+
+  const formatUnits = (q: number) => {
+    const n = Number(q) || 0;
+    const pretty = Number.isInteger(n) ? String(n) : n.toFixed(2).replace('.', ',');
+    return `${pretty} un`;
+  };
+
+  const consolidatedProducts = useMemo(() => {
+    const all = new Map<string, number>();
+    (deliveries || []).forEach((d) => {
+      const sid = Number(d.sale_id);
+      const its = itemsBySaleId.get(sid) || [];
+      its.forEach((it) => {
+        const name = it.product_name || 'Item sem nome';
+        all.set(name, (all.get(name) || 0) + Number(it.quantity || 0));
+      });
+    });
+    return Array.from(all.entries())
+      .map(([name, qty]) => ({ name, qty }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [deliveries, itemsBySaleId]);
+
+  const groupedWithTotals = useMemo(() => {
+    return grouped.map((g) => {
+      let total = 0;
+      let hasTotal = false;
+      for (const d of g.deliveries) {
+        const sid = Number(d.sale_id);
+        if (!Number.isFinite(sid)) continue;
+        const sale: any = salesById.get(sid);
+        if (!sale) continue;
+        const raw = sale.total_amount ?? sale.final_amount ?? sale.total;
+        const num = raw === null || raw === undefined ? NaN : Number(raw);
+        if (Number.isFinite(num)) {
+          hasTotal = true;
+          total += num;
+        }
+      }
+      return { ...g, total, hasTotal };
+    });
+  }, [grouped, salesById]);
 
   return (
     <div className="receipt-container">
@@ -215,87 +259,60 @@ export function DeliveryManifestCupomLayout({
           {manifest.manifest_number ? `#${manifest.manifest_number}` : `#${manifest.id.slice(0, 8)}`}
         </div>
         <div className="meta">{formatDateTime(manifest.created_at)}</div>
-        {driver ? (
-          <>
-            <div className="meta">
-              <strong>Entregador:</strong> {driver.name || 'Não informado'}
-            </div>
-            {(driver.vehicle_type || driver.vehicle_plate) ? (
-              <div className="meta">
-                <strong>Veículo:</strong> {[driver.vehicle_type, driver.vehicle_plate].filter(Boolean).join(' - ') || 'Não informado'}
-              </div>
-            ) : (
-              <div className="meta">
-                <strong>Veículo:</strong> Não informado
-              </div>
-            )}
-          </>
+        <div className="meta">
+          <strong>Entregador:</strong> {driver?.name ? driver.name : '—'}
+        </div>
+        <div className="meta">
+          <strong>Veículo:</strong>{' '}
+          {(driver?.vehicle_type || driver?.vehicle_plate)
+            ? [driver?.vehicle_type, driver?.vehicle_plate].filter(Boolean).join(' - ')
+            : '—'}
+        </div>
+      </div>
+
+      <div className="section">
+        <div className="section-title">CARREGAR NO VEÍCULO</div>
+        {consolidatedProducts.length === 0 ? (
+          <div className="meta" style={{ textAlign: 'center' }}>
+            Sem produtos
+          </div>
         ) : (
-          <>
-            <div className="meta">
-              <strong>Entregador:</strong> Não encontrado
-            </div>
-            <div className="meta">
-              <strong>Veículo:</strong> Não encontrado
-            </div>
-          </>
+          <div className="items">
+            {consolidatedProducts.map((it, i) => (
+              <div key={`${it.name}-${i}`} className="item">
+                <span>{it.name}</span>
+                <span>{formatUnits(it.qty)}</span>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
       <div className="section">
-        <div className="section-title">PARADAS</div>
-        {grouped.map((g, idx) => {
-          const rows: Array<{ label: string; qty: number }> = [];
-          g.deliveries.forEach((d) => {
-            const sid = Number(d.sale_id);
-            const its = itemsBySaleId.get(sid) || [];
-            its.forEach((it) => {
-              rows.push({ label: it.product_name || 'Item', qty: Number(it.quantity || 0) });
-            });
-          });
-
-          const consolidated = new Map<string, number>();
-          rows.forEach((r) => consolidated.set(r.label, (consolidated.get(r.label) || 0) + r.qty));
-          const itemsList = Array.from(consolidated.entries()).map(([label, qty]) => ({ label, qty }));
-
-          const saleNumbers = g.deliveries
-            .map((d) => {
-              const sid = Number(d.sale_id);
-              const sale = salesById.get(sid);
-              return sale?.sale_number ? `#${sale.sale_number}` : (d.sale_id ? `#${d.sale_id}` : '');
-            })
-            .filter(Boolean)
-            .join(', ');
-
-          return (
-            <div key={g.key} className="stop">
-              <div className="stop-customer">
-                {idx + 1}. {g.customer_name}
-              </div>
-              <div className="stop-address">{g.delivery_address}</div>
-              {saleNumbers && (
+        <div className="section-title">CLIENTES</div>
+        {groupedWithTotals.length === 0 ? (
+          <div className="meta" style={{ textAlign: 'center' }}>
+            Nenhum cliente
+          </div>
+        ) : (
+          <>
+            {groupedWithTotals.map((g, idx) => (
+              <div key={g.key} className="stop">
+                <div className="stop-customer">
+                  {idx + 1}. {g.customer_name}
+                </div>
                 <div className="stop-sale">
-                  <strong>Venda(s):</strong> {saleNumbers}
+                  <strong>Valor:</strong> {g.hasTotal ? formatCurrency(g.total) : '—'}
                 </div>
-              )}
-              {itemsList.length > 0 && (
-                <div className="items">
-                  {itemsList.map((it, i) => (
-                    <div key={`${it.label}-${i}`} className="item">
-                      <span>{it.label}</span>
-                      <span>Qtd: {formatQty(it.qty)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+              </div>
+            ))}
+          </>
+        )}
       </div>
 
       <div className="footer">
         <div className="divider"></div>
-        Total de paradas: {grouped.length}
+        Total de clientes: {grouped.length}
         <br />
         Gerado pelo JUGA
       </div>

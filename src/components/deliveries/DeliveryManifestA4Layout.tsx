@@ -30,6 +30,9 @@ type Sale = {
   id: number;
   sale_number?: string;
   created_at?: string;
+  total_amount?: number | string | null;
+  final_amount?: number | string | null;
+  total?: number | string | null;
 };
 
 type SaleItem = {
@@ -65,6 +68,16 @@ export function DeliveryManifestA4Layout(props: {
     return (Number(q) || 0).toFixed(2);
   };
 
+  const formatMoney = (v: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v) || 0);
+  };
+
+  const formatUnits = (q: number) => {
+    const n = Number(q) || 0;
+    const pretty = Number.isInteger(n) ? String(n) : n.toFixed(2).replace('.', ',');
+    return `${pretty} unidades`;
+  };
+
   const salesById = new Map();
   (sales || []).forEach((s) => salesById.set(Number(s.id), s));
 
@@ -76,6 +89,22 @@ export function DeliveryManifestA4Layout(props: {
     itemsBySaleId.set(sid, list);
   });
 
+  // Consolidar TODOS os produtos de TODAS as entregas
+  const allProducts = new Map<string, number>();
+  (deliveries || []).forEach((d) => {
+    const sid = Number(d.sale_id);
+    const items: SaleItem[] = itemsBySaleId.get(sid) || [];
+    items.forEach((it) => {
+      const productName = it.product_name || 'Item sem nome';
+      const currentQty = allProducts.get(productName) || 0;
+      allProducts.set(productName, currentQty + Number(it.quantity || 0));
+    });
+  });
+  const consolidatedProducts = Array.from(allProducts.entries())
+    .map(([name, qty]) => ({ name, qty }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  // Agrupar entregas por cliente/endereço para lista final
   const groupMap = new Map();
   (deliveries || []).forEach((d) => {
     const key = `${d.customer_name}||${d.delivery_address}`;
@@ -108,7 +137,7 @@ export function DeliveryManifestA4Layout(props: {
       { className: 'header' },
       React.createElement('p', { className: 'subtitle' }, formatDateTime(new Date().toISOString())),
       React.createElement('h1', { className: 'title' }, `${companyName} - Romaneio de Entrega`),
-      React.createElement('p', { className: 'subtitle' }, manifest.manifest_number ? `Entrega ${manifest.manifest_number}` : `Entrega ${manifest.id}`),
+      React.createElement('p', { className: 'subtitle' }, manifest.manifest_number ? `${manifest.manifest_number}` : `Entrega ${manifest.id}`),
       React.createElement(
         'div',
         { className: 'meta' },
@@ -150,86 +179,98 @@ export function DeliveryManifestA4Layout(props: {
         )
       )
     ),
+    // Seção: Carregar no veículo (produtos consolidados)
     React.createElement(
       'div',
       { className: 'section' },
-      React.createElement('div', { className: 'section-title' }, 'PARADAS (POR CLIENTE/ENDEREÇO)'),
-      grouped.map((g, idx) => {
-        const rows: Array<{ label: string; qty: number }> = [];
-        g.deliveries.forEach((d: any) => {
-          const sid = Number(d.sale_id);
-          const its: SaleItem[] = itemsBySaleId.get(sid) || [];
-          its.forEach((it: SaleItem) => {
-            rows.push({ label: it.product_name || 'Item', qty: Number(it.quantity || 0) });
-          });
-        });
-
-        const consolidated = new Map<string, number>();
-        rows.forEach((r) => consolidated.set(r.label, (consolidated.get(r.label) || 0) + r.qty));
-        const itemsList = Array.from(consolidated.entries()).map(([label, qty]) => ({ label, qty }));
-
-        return React.createElement(
-          'div',
-          { key: g.key, className: 'stop' },
+      React.createElement('div', { className: 'section-title' }, 'CARREGAR NO VEÍCULO'),
+      React.createElement(
+        'table',
+        null,
+        React.createElement(
+          'thead',
+          null,
           React.createElement(
-            'div',
-            { className: 'stop-header' },
-            React.createElement(
-              'div',
-              null,
-              React.createElement('div', { className: 'stop-customer' }, `${idx + 1}. ${g.customer_name}`),
-              React.createElement('div', { className: 'stop-address' }, g.delivery_address)
-            ),
-            React.createElement(
-              'div',
-              { style: { textAlign: 'right', fontSize: '9pt', color: '#333', fontWeight: 'bold' } },
-              g.deliveries
-                .map((d: Delivery) => {
-                  const sid = Number(d.sale_id);
-                  const sale = salesById.get(sid);
-                  return sale?.sale_number ? `Venda #${sale.sale_number}` : d.sale_id ? `Venda #${d.sale_id}` : '';
-                })
-                .filter(Boolean)
-                .join(' • ')
-            )
-          ),
-          React.createElement(
-            'table',
+            'tr',
             null,
-            React.createElement(
-              'thead',
-              null,
-              React.createElement(
+            React.createElement('th', { className: 'col-check' }, 'OK'),
+            React.createElement('th', null, 'Produto'),
+            React.createElement('th', { style: { width: '110px' } }, 'Quantidade')
+          )
+        ),
+        React.createElement(
+          'tbody',
+          null,
+          consolidatedProducts.length === 0
+            ? React.createElement(
                 'tr',
                 null,
-                React.createElement('th', { className: 'col-check' }, 'OK'),
-                React.createElement('th', null, 'Item'),
-                React.createElement('th', { style: { width: '70px' } }, 'Qtd')
+                React.createElement('td', { className: 'col-check' }, React.createElement('span', { className: 'checkbox' })),
+                React.createElement('td', { colSpan: 2 }, 'Sem produtos')
               )
-            ),
-            React.createElement(
-              'tbody',
-              null,
-              itemsList.length === 0
-                ? React.createElement(
-                    'tr',
-                    null,
-                    React.createElement('td', { className: 'col-check' }, React.createElement('span', { className: 'checkbox' })),
-                    React.createElement('td', { colSpan: 2 }, 'Sem itens (verifique a venda)')
-                  )
-                : itemsList.map((it, i) =>
-                    React.createElement(
-                      'tr',
-                      { key: `${it.label}-${i}` },
-                      React.createElement('td', { className: 'col-check' }, React.createElement('span', { className: 'checkbox' })),
-                      React.createElement('td', null, it.label),
-                      React.createElement('td', { style: { textAlign: 'right' } }, formatQty(it.qty))
-                    )
-                  )
-            )
+            : consolidatedProducts.map((it, i) =>
+                React.createElement(
+                  'tr',
+                  { key: `${it.name}-${i}` },
+                  React.createElement('td', { className: 'col-check' }, React.createElement('span', { className: 'checkbox' })),
+                  React.createElement('td', null, it.name),
+                  React.createElement('td', { style: { textAlign: 'right', fontWeight: 'bold' } }, formatUnits(it.qty))
+                )
+              )
+        )
+      )
+    ),
+    // Seção: Lista de clientes (somente quem vai receber + valor)
+    React.createElement(
+      'div',
+      { className: 'section', style: { marginTop: '20px' } },
+      React.createElement('div', { className: 'section-title' }, 'CLIENTES PARA ENTREGA'),
+      React.createElement(
+        'table',
+        null,
+        React.createElement(
+          'thead',
+          null,
+          React.createElement(
+            'tr',
+            null,
+            React.createElement('th', null, 'Cliente'),
+            React.createElement('th', { style: { width: '120px', textAlign: 'right' } }, 'Valor')
           )
-        );
-      })
+        ),
+        React.createElement(
+          'tbody',
+          null,
+          grouped.length === 0
+            ? React.createElement(
+                'tr',
+                null,
+                React.createElement('td', { colSpan: 2 }, 'Nenhum cliente no romaneio')
+              )
+            : grouped.map((g: any, idx: number) => {
+                let totalGroup = 0;
+                let hasAnyTotal = false;
+                for (const d of (g.deliveries || []) as Delivery[]) {
+                  const sid = Number((d as any).sale_id);
+                  if (!Number.isFinite(sid)) continue;
+                  const sale: any = salesById.get(sid);
+                  if (!sale) continue;
+                  const raw = sale.total_amount ?? sale.final_amount ?? sale.total;
+                  const num = raw === null || raw === undefined ? NaN : Number(raw);
+                  if (Number.isFinite(num)) {
+                    hasAnyTotal = true;
+                    totalGroup += num;
+                  }
+                }
+                return React.createElement(
+                  'tr',
+                  { key: g.key },
+                  React.createElement('td', null, `${idx + 1}. ${g.customer_name}`),
+                  React.createElement('td', { style: { textAlign: 'right', fontWeight: 'bold' } }, hasAnyTotal ? formatMoney(totalGroup) : '—')
+                );
+              })
+        )
+      )
     ),
     React.createElement('div', { className: 'footer' }, 'Gerado pelo JUGA • Use as caixinhas "OK" para conferência manual no carregamento.')
   );

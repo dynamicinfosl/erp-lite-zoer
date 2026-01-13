@@ -38,7 +38,7 @@ import { Label } from '@/components/ui/label';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import type { Delivery } from '@/types';
 import { toast } from 'sonner';
-import { Trash2, Edit, X } from 'lucide-react';
+import { Trash2, Edit, X, Plus } from 'lucide-react';
 
 export default function EntregasPage() {
   const { user, tenant } = useSimpleAuth();
@@ -57,6 +57,12 @@ export default function EntregasPage() {
   const [selectedManifest, setSelectedManifest] = useState<any>(null);
   const [selectedDeliveries, setSelectedDeliveries] = useState<number[]>([]);
   const [newDriverId, setNewDriverId] = useState<string>('');
+  
+  // Estados para criação de novo romaneio
+  const [showCreateManifestDialog, setShowCreateManifestDialog] = useState(false);
+  const [selectedDeliveriesForManifest, setSelectedDeliveriesForManifest] = useState<number[]>([]);
+  const [createManifestDriverId, setCreateManifestDriverId] = useState<string>('');
+  const [creatingManifest, setCreatingManifest] = useState(false);
   
   // Estados para edição de entrega individual
   const [showEditDeliveryDialog, setShowEditDeliveryDialog] = useState(false);
@@ -145,11 +151,64 @@ export default function EntregasPage() {
     return matchesSearch && matchesStatus;
   });
 
+  const isSelectableForManifest = useCallback((d: Delivery) => {
+    return d.status === 'aguardando' && !d.manifest_id;
+  }, []);
+
   const driverNameById = useMemo(() => {
     const m = new Map<number, string>();
     drivers.forEach((d) => m.set(d.id, d.name));
     return m;
   }, [drivers]);
+
+  const selectedSetForManifest = useMemo(() => new Set<number>(selectedDeliveriesForManifest), [selectedDeliveriesForManifest]);
+
+  const eligibleFilteredIds = useMemo(() => {
+    return filtered
+      .filter(isSelectableForManifest)
+      .map((d) => d.id);
+  }, [filtered, isSelectableForManifest]);
+
+  const allEligibleSelected = useMemo(() => {
+    if (eligibleFilteredIds.length === 0) return false;
+    return eligibleFilteredIds.every((id) => selectedSetForManifest.has(id));
+  }, [eligibleFilteredIds, selectedSetForManifest]);
+
+  const toggleSelectDeliveryForManifest = useCallback((deliveryId: number, next?: boolean) => {
+    setSelectedDeliveriesForManifest((prev) => {
+      const set = new Set<number>(prev);
+      const has = set.has(deliveryId);
+      const shouldAdd = typeof next === 'boolean' ? next : !has;
+      if (shouldAdd) set.add(deliveryId);
+      else set.delete(deliveryId);
+      return Array.from(set);
+    });
+  }, []);
+
+  const toggleSelectAllEligibleFiltered = useCallback(() => {
+    setSelectedDeliveriesForManifest((prev) => {
+      const set = new Set<number>(prev);
+      const ids = eligibleFilteredIds;
+      if (ids.length === 0) return prev;
+      const allSelected = ids.every((id) => set.has(id));
+      if (allSelected) {
+        ids.forEach((id) => set.delete(id));
+      } else {
+        ids.forEach((id) => set.add(id));
+      }
+      return Array.from(set);
+    });
+  }, [eligibleFilteredIds]);
+
+  const openCreateManifestFromSelection = useCallback(() => {
+    if (!tenant?.id) return;
+    if (selectedDeliveriesForManifest.length === 0) {
+      toast.error('Selecione pelo menos uma entrega na lista para gerar o romaneio');
+      return;
+    }
+    setCreateManifestDriverId('');
+    setShowCreateManifestDialog(true);
+  }, [selectedDeliveriesForManifest.length, tenant?.id]);
 
   const pendingByDriver = useMemo(() => {
     const map = new Map<number, Delivery[]>();
@@ -175,14 +234,89 @@ export default function EntregasPage() {
     return map;
   }, [safeDeliveries]);
 
+  const openCreateManifestDialog = () => {
+    const available = safeDeliveries.filter((d) => 
+      d.status === 'aguardando' && !d.manifest_id
+    );
+    if (available.length === 0) {
+      toast.error('Não há entregas disponíveis para criar romaneio');
+      return;
+    }
+    setSelectedDeliveriesForManifest([]);
+    setCreateManifestDriverId('');
+    setShowCreateManifestDialog(true);
+  };
+
+  const createManifest = async () => {
+    if (!tenant?.id) return;
+    if (selectedDeliveriesForManifest.length === 0) {
+      toast.error('Selecione pelo menos uma entrega');
+      return;
+    }
+    
+    try {
+      setCreatingManifest(true);
+      const res = await fetch('/next_api/delivery-manifests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          tenant_id: tenant.id, 
+          driver_id: createManifestDriverId || null,
+          delivery_ids: selectedDeliveriesForManifest 
+        }),
+      });
+      
+      if (!res.ok) {
+        let errorMessage = 'Erro ao criar romaneio';
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.errorMessage || errorData.error || errorMessage;
+        } catch {
+          const txt = await res.text();
+          errorMessage = txt || `HTTP ${res.status}`;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      const json = await res.json();
+      toast.success('Romaneio criado com sucesso');
+      setShowCreateManifestDialog(false);
+      setSelectedDeliveriesForManifest([]);
+      setCreateManifestDriverId('');
+      await loadDeliveries();
+      await loadManifests();
+    } catch (e: any) {
+      console.error('Erro ao criar romaneio:', e);
+      const errorMessage = e?.message || 'Erro ao criar romaneio';
+      toast.error(errorMessage);
+    } finally {
+      setCreatingManifest(false);
+    }
+  };
+
   const createManifestForDriver = async (driverId: number) => {
     if (!tenant?.id) return;
+    const driverDeliveries = safeDeliveries.filter((d) => 
+      d.status === 'aguardando' && 
+      d.driver_id === driverId && 
+      !d.manifest_id
+    ).map((d) => d.id);
+    
+    if (driverDeliveries.length === 0) {
+      toast.error('Não há entregas disponíveis para este entregador');
+      return;
+    }
+    
     try {
       setCreatingForDriver(driverId);
       const res = await fetch('/next_api/delivery-manifests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenant_id: tenant.id, driver_id: driverId }),
+        body: JSON.stringify({ 
+          tenant_id: tenant.id, 
+          driver_id: driverId,
+          delivery_ids: driverDeliveries 
+        }),
       });
       
       if (!res.ok) {
@@ -205,12 +339,7 @@ export default function EntregasPage() {
     } catch (e: any) {
       console.error('Erro ao criar romaneio:', e);
       const errorMessage = e?.message || 'Erro ao criar romaneio';
-      toast.error(errorMessage, {
-        duration: 6000,
-        description: errorMessage.includes('RLS') 
-          ? 'Execute o script SQL: scripts/fix-delivery-manifests-rls.sql' 
-          : undefined
-      });
+      toast.error(errorMessage);
     } finally {
       setCreatingForDriver(null);
     }
@@ -300,7 +429,7 @@ export default function EntregasPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          driver_id: Number(newDriverId),
+          driver_id: newDriverId ? Number(newDriverId) : null,
           delivery_ids: selectedDeliveries,
         }),
       });
@@ -494,6 +623,20 @@ export default function EntregasPage() {
         />
       </div>
 
+      {/* Botão criar novo romaneio */}
+      <Card className="juga-card">
+        <CardContent className="pt-6">
+          <Button 
+            onClick={openCreateManifestDialog}
+            className="juga-gradient text-white gap-2"
+            size="lg"
+          >
+            <Plus className="h-5 w-5" />
+            Criar Novo Romaneio
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Romaneios abertos */}
       <Card className="juga-card">
         <CardHeader className="pb-4">
@@ -502,7 +645,7 @@ export default function EntregasPage() {
             Romaneios Abertos
           </CardTitle>
           <CardDescription className="text-sm">
-            Um romaneio aberto por entregador. Finalize quando o entregador retornar.
+            Gerencie os romaneios de entrega. Finalize quando o entregador retornar.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -531,10 +674,10 @@ export default function EntregasPage() {
                   {manifests.map((m: any) => (
                     <TableRow key={m.id}>
                       <TableCell className="font-medium text-heading">
-                        {m.manifest_number || m.id}
+                        {m.manifest_number || `Entrega ${m.id.slice(0, 8)}`}
                       </TableCell>
                       <TableCell className="text-body">
-                        {driverNameById.get(Number(m.driver_id)) || `#${m.driver_id}`}
+                        {m.driver_id ? (driverNameById.get(Number(m.driver_id)) || `#${m.driver_id}`) : '—'}
                       </TableCell>
                       <TableCell className="text-body">
                         {deliveriesCountByManifest.get(String(m.id)) || 0}
@@ -616,7 +759,7 @@ export default function EntregasPage() {
           {Array.from(pendingByDriver.entries()).length === 0 ? (
             <div className="text-center py-6 text-muted-foreground">
               <p>Nenhuma entrega aguardando com entregador vinculado.</p>
-              <p className="text-xs mt-2">No PDV, finalize a venda e marque “É entrega” escolhendo o entregador.</p>
+              <p className="text-xs mt-2">No PDV, finalize a venda e marque “É entrega” (o entregador agora é opcional).</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -650,16 +793,44 @@ export default function EntregasPage() {
       {/* Lista de Entregas */}
       <Card className="juga-card">
         <CardHeader className="pb-4">
-          <CardTitle className="text-lg sm:text-xl text-heading">Lista de Entregas</CardTitle>
-          <CardDescription className="text-sm">
-            {filtered.length} {filtered.length === 1 ? 'entrega encontrada' : 'entregas encontradas'}
-          </CardDescription>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-lg sm:text-xl text-heading">Lista de Entregas</CardTitle>
+              <CardDescription className="text-sm">
+                {filtered.length} {filtered.length === 1 ? 'entrega encontrada' : 'entregas encontradas'}
+              </CardDescription>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <Button
+                variant="outline"
+                onClick={() => setSelectedDeliveriesForManifest([])}
+                disabled={selectedDeliveriesForManifest.length === 0}
+              >
+                Limpar seleção ({selectedDeliveriesForManifest.length})
+              </Button>
+              <Button
+                className="juga-gradient text-white gap-2"
+                onClick={openCreateManifestFromSelection}
+                disabled={selectedDeliveriesForManifest.length === 0}
+              >
+                <ClipboardList className="h-4 w-4" />
+                Gerar Romaneio ({selectedDeliveriesForManifest.length})
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={allEligibleSelected}
+                      onCheckedChange={() => toggleSelectAllEligibleFiltered()}
+                      aria-label="Selecionar entregas elegíveis"
+                    />
+                  </TableHead>
                   <TableHead>ID</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Endereço</TableHead>
@@ -673,6 +844,14 @@ export default function EntregasPage() {
               <TableBody>
                 {(!loading ? filtered : []).map((d) => (
                   <TableRow key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedSetForManifest.has(d.id)}
+                        disabled={!isSelectableForManifest(d)}
+                        onCheckedChange={(checked) => toggleSelectDeliveryForManifest(d.id, checked === true)}
+                        aria-label={`Selecionar entrega ${d.id}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-mono text-sm text-body">{d.id}</TableCell>
                     <TableCell className="font-medium text-heading">
                       {d.customer_name}
@@ -782,12 +961,13 @@ export default function EntregasPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="driver-select">Entregador</Label>
+              <Label htmlFor="driver-select">Entregador (opcional)</Label>
               <Select value={newDriverId} onValueChange={setNewDriverId}>
                 <SelectTrigger id="driver-select">
-                  <SelectValue placeholder="Selecione o entregador" />
+                  <SelectValue placeholder="Selecione o entregador (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="">Sem entregador</SelectItem>
                   {drivers.map((d) => (
                     <SelectItem key={d.id} value={String(d.id)}>
                       {d.name}
@@ -844,9 +1024,110 @@ export default function EntregasPage() {
             </Button>
             <Button
               onClick={confirmEditManifest}
-              disabled={editingManifest !== null || !newDriverId || selectedDeliveries.length === 0}
+              disabled={editingManifest !== null || selectedDeliveries.length === 0}
             >
               {editingManifest ? 'Salvando...' : 'Salvar Alterações'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Criação de Romaneio */}
+      <Dialog open={showCreateManifestDialog} onOpenChange={setShowCreateManifestDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Criar Novo Romaneio</DialogTitle>
+            <DialogDescription>
+              Selecione as entregas que deseja incluir no romaneio
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="manifest-driver-select">Entregador (opcional)</Label>
+              <Select value={createManifestDriverId} onValueChange={setCreateManifestDriverId}>
+                <SelectTrigger id="manifest-driver-select">
+                  <SelectValue placeholder="Selecione o entregador (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sem entregador</SelectItem>
+                  {drivers.map((d) => (
+                    <SelectItem key={d.id} value={String(d.id)}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <Label>Entregas Disponíveis ({selectedDeliveriesForManifest.length} selecionadas)</Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const available = safeDeliveries.filter((d) => 
+                      d.status === 'aguardando' && !d.manifest_id
+                    );
+                    if (selectedDeliveriesForManifest.length === available.length) {
+                      setSelectedDeliveriesForManifest([]);
+                    } else {
+                      setSelectedDeliveriesForManifest(available.map((d) => d.id));
+                    }
+                  }}
+                >
+                  {selectedDeliveriesForManifest.length === safeDeliveries.filter((d) => 
+                    d.status === 'aguardando' && !d.manifest_id
+                  ).length ? 'Desmarcar Todas' : 'Selecionar Todas'}
+                </Button>
+              </div>
+              <div className="border rounded-lg p-4 max-h-96 overflow-y-auto">
+                {safeDeliveries.filter((d) => d.status === 'aguardando' && !d.manifest_id).length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Nenhuma entrega disponível
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {safeDeliveries
+                      .filter((d) => d.status === 'aguardando' && !d.manifest_id)
+                      .map((d) => (
+                        <div key={d.id} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded">
+                          <Checkbox
+                            id={`manifest-delivery-${d.id}`}
+                            checked={selectedDeliveriesForManifest.includes(d.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedDeliveriesForManifest([...selectedDeliveriesForManifest, d.id]);
+                              } else {
+                                setSelectedDeliveriesForManifest(selectedDeliveriesForManifest.filter((id) => id !== d.id));
+                              }
+                            }}
+                          />
+                          <Label
+                            htmlFor={`manifest-delivery-${d.id}`}
+                            className="flex-1 cursor-pointer text-sm"
+                          >
+                            <div className="font-medium">{d.customer_name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {d.delivery_address}
+                              {d.driver_id && ` • Entregador: ${driverNameById.get(Number(d.driver_id)) || `#${d.driver_id}`}`}
+                            </div>
+                          </Label>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateManifestDialog(false)} disabled={creatingManifest}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={createManifest}
+              disabled={creatingManifest || selectedDeliveriesForManifest.length === 0}
+            >
+              {creatingManifest ? 'Criando...' : 'Criar Romaneio'}
             </Button>
           </DialogFooter>
         </DialogContent>
