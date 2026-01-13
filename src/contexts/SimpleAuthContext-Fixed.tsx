@@ -114,16 +114,23 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         timeoutId = null;
       }
       
-      if (error.name === 'AbortError' || error.message?.includes('aborted')) {
-        console.warn('⏰ [SIMPLE] Timeout ao buscar tenant via API (esperado)');
+      // Tratar AbortError silenciosamente - não propagar
+      if (error?.name === 'AbortError' || error?.message?.includes('aborted') || error?.message?.includes('signal is aborted')) {
+        console.warn('⏰ [SIMPLE] Requisição abortada ao buscar tenant via API (esperado)');
         // Não propagar o erro, apenas continuar com o fallback
       } else {
         console.error('⚠️ [SIMPLE] Erro ao buscar tenant via API:', error);
       }
+      // Não propagar o erro - sempre continuar com fallback
     } finally {
       // Garantir limpeza do timeout
       if (timeoutId) {
         clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      // Garantir limpeza do controller
+      if (controller) {
+        controller = null;
       }
     }
 
@@ -421,7 +428,12 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
                   }
                 })
                 .catch((err) => {
-                  console.error('⚠️ Erro ao carregar tenant:', err);
+                  // Ignorar erros de abort silenciosamente
+                  if (err?.name === 'AbortError' || err?.message?.includes('aborted') || err?.message?.includes('signal is aborted')) {
+                    console.warn('⏰ Requisição abortada ao carregar tenant (esperado)');
+                  } else {
+                    console.error('⚠️ Erro ao carregar tenant:', err);
+                  }
                 });
             })
             .catch((err) => {

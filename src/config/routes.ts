@@ -20,6 +20,7 @@ export const ROUTES = {
   SETTINGS: '/configuracoes',
   DELIVERIES: '/entregas',
   DRIVERS: '/entregadores',
+  BRANCHES: '/filiais',
   
   // Páginas especiais
   TRIAL_EXPIRED: '/trial-expirado',
@@ -39,6 +40,7 @@ export const PROTECTED_ROUTES = [
   ROUTES.SETTINGS,
   ROUTES.DELIVERIES,
   ROUTES.DRIVERS,
+  ROUTES.BRANCHES,
 ] as const;
 
 // Rotas públicas
