@@ -128,14 +128,14 @@
     background-color: var(--juga-surface-card);
     border-color: var(--juga-border);
     box-shadow: var(--juga-shadow-md);
-    @apply border rounded-lg p-6;
+    @apply border rounded-xl;
   }
 
   .juga-card-elevated {
     background-color: var(--juga-surface-card);
     border-color: var(--juga-border);
     box-shadow: var(--juga-shadow-lg);
-    @apply border rounded-lg p-6;
+    @apply border rounded-xl;
   }
 
   .juga-surface {

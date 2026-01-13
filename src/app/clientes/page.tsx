@@ -515,7 +515,7 @@ export default function ClientesPage() {
 
   return (
     <TenantPageWrapper>
-      <div className="space-y-6">
+      <div className="-m-4 sm:-m-6 p-4 sm:p-6 rounded-2xl bg-gradient-to-b from-slate-50 via-white to-white dark:from-slate-950 dark:via-slate-950 dark:to-slate-950 space-y-6">
       {/* Header com Título */}
       <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div className="space-y-1">
@@ -534,13 +534,15 @@ export default function ClientesPage() {
       </div>
 
       {/* Cards de Estatísticas */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
         <JugaKPICard
           title="Total Clientes"
           value={customerStats.total.toLocaleString('pt-BR')}
           description="Clientes cadastrados"
           icon={<Users className="h-4 w-4" />}
           color="primary"
+          compact
+          className="min-h-[92px]"
         />
         
         <JugaKPICard
@@ -551,6 +553,8 @@ export default function ClientesPage() {
           color="success"
           trend="up"
           trendValue="+12%"
+          compact
+          className="min-h-[92px]"
         />
         
         <JugaKPICard
@@ -559,6 +563,8 @@ export default function ClientesPage() {
           description="Clientes PF"
           icon={<Users className="h-4 w-4" />}
           color="accent"
+          compact
+          className="min-h-[92px]"
         />
         
         <JugaKPICard
@@ -567,6 +573,8 @@ export default function ClientesPage() {
           description="Clientes PJ"
           icon={<Building className="h-4 w-4" />}
           color="warning"
+          compact
+          className="min-h-[92px]"
         />
         
         <JugaKPICard
@@ -577,6 +585,8 @@ export default function ClientesPage() {
           color="success"
           trend="up"
           trendValue="+8%"
+          compact
+          className="min-h-[92px]"
         />
         
         <JugaKPICard
@@ -585,6 +595,8 @@ export default function ClientesPage() {
           description="Clientes ativos"
           icon={<Activity className="h-4 w-4" />}
           color="primary"
+          compact
+          className="min-h-[92px]"
         />
       </div>
 
@@ -619,7 +631,7 @@ export default function ClientesPage() {
       </div>
 
       {/* Toolbar */}
-      <Card className="juga-card">
+      <Card className="juga-card bg-white/80 dark:bg-slate-900/60 backdrop-blur supports-[backdrop-filter]:bg-white/70">
         <CardContent className="pt-6">
           <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
             {/* Lado esquerdo - Botões de ação */}
@@ -628,7 +640,7 @@ export default function ClientesPage() {
                 variant="outline" 
                 onClick={testCreateCustomer} 
                 title="Diagnóstico: testar POST /next_api/customers"
-                className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+                className="border-slate-200 bg-white/70 hover:bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200"
               >
                 Teste API
               </Button>
@@ -637,7 +649,7 @@ export default function ClientesPage() {
                 <DropdownMenuTrigger asChild>
                   <Button 
                     variant="outline" 
-                    className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+                    className="border-slate-200 bg-white/70 hover:bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200"
                   >
                     <MoreHorizontal className="h-4 w-4 mr-2" />
                     Mais Ações
@@ -677,7 +689,7 @@ export default function ClientesPage() {
                 <DropdownMenuTrigger asChild>
                   <Button 
                     variant="outline" 
-                    className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+                    className="border-slate-200 bg-white/70 hover:bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200"
                   >
                     <Settings2 className="h-4 w-4 mr-2" />
                     Colunas
@@ -768,13 +780,13 @@ export default function ClientesPage() {
                   placeholder="Buscar clientes..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-80"
+                  className="pl-10 w-80 bg-white/70 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700"
                 />
               </div>
               <Button 
                 variant="outline" 
                 onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-                className="border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+                className="border-slate-200 bg-white/70 hover:bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200"
               >
                 <Filter className="h-4 w-4 mr-2" />
                 Busca Avançada
@@ -784,41 +796,56 @@ export default function ClientesPage() {
 
           {/* Busca Avançada */}
           {showAdvancedSearch && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="mt-4 p-4 bg-slate-50/80 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-700">
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <Input
                   placeholder="Telefone..."
                   value={advancedFilters.phone}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, phone: e.target.value }))}
+                  className="bg-white/70 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700"
                 />
                 <Input
                   placeholder="E-mail..."
                   value={advancedFilters.email}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, email: e.target.value }))}
+                  className="bg-white/70 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700"
                 />
                 <Input
                   placeholder="Cidade..."
                   value={advancedFilters.city}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, city: e.target.value }))}
+                  className="bg-white/70 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700"
                 />
-                <select 
-                  className="px-3 py-2 border rounded-md"
-                  value={advancedFilters.type}
-                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, type: e.target.value }))}
+                <Select
+                  value={advancedFilters.type || 'all'}
+                  onValueChange={(value) =>
+                    setAdvancedFilters(prev => ({ ...prev, type: value === 'all' ? '' : value }))
+                  }
                 >
-                  <option value="">Todos os tipos</option>
-                  <option value="PF">Pessoa Física</option>
-                  <option value="PJ">Pessoa Jurídica</option>
-                </select>
-                <select 
-                  className="px-3 py-2 border rounded-md"
-                  value={advancedFilters.status}
-                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))}
+                  <SelectTrigger className="bg-white/70 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700">
+                    <SelectValue placeholder="Todos os tipos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os tipos</SelectItem>
+                    <SelectItem value="PF">Pessoa Física</SelectItem>
+                    <SelectItem value="PJ">Pessoa Jurídica</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={advancedFilters.status || 'all'}
+                  onValueChange={(value) =>
+                    setAdvancedFilters(prev => ({ ...prev, status: value === 'all' ? '' : value }))
+                  }
                 >
-                  <option value="">Todos os status</option>
-                  <option value="active">Ativo</option>
-                  <option value="inactive">Inativo</option>
-                </select>
+                  <SelectTrigger className="bg-white/70 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700">
+                    <SelectValue placeholder="Todos os status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os status</SelectItem>
+                    <SelectItem value="active">Ativo</SelectItem>
+                    <SelectItem value="inactive">Inativo</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}
@@ -826,7 +853,7 @@ export default function ClientesPage() {
       </Card>
 
       {/* Tabela */}
-      <Card className="juga-card">
+      <Card className="juga-card overflow-hidden">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-heading">
             <Users className="h-5 w-5" />
@@ -841,24 +868,30 @@ export default function ClientesPage() {
               <div className="inline-block min-w-full align-middle">
                 <Table>
                 <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  {columnVisibility.type && <TableHead>Tipo</TableHead>}
-                  {columnVisibility.document && <TableHead>CPF/CNPJ</TableHead>}
-                  {columnVisibility.phone && <TableHead>Telefone</TableHead>}
-                  {columnVisibility.email && <TableHead>E-mail</TableHead>}
-                  {columnVisibility.city && <TableHead>Cidade</TableHead>}
-                  {columnVisibility.status && <TableHead>Status</TableHead>}
-                  <TableHead>Ações</TableHead>
+                <TableRow className="bg-slate-50/80 dark:bg-slate-900/40">
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Nome</TableHead>
+                  {columnVisibility.type && <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Tipo</TableHead>}
+                  {columnVisibility.document && <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">CPF/CNPJ</TableHead>}
+                  {columnVisibility.phone && <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Telefone</TableHead>}
+                  {columnVisibility.email && <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">E-mail</TableHead>}
+                  {columnVisibility.city && <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Cidade</TableHead>}
+                  {columnVisibility.status && <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Status</TableHead>}
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
+                  <TableRow key={customer.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors">
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     {columnVisibility.type && (
                       <TableCell>
-                        <Badge variant={customer.type === 'PF' ? 'default' : 'secondary'}>
+                        <Badge
+                          variant="outline"
+                          className={customer.type === 'PF'
+                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-200 dark:border-indigo-900'
+                            : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900'
+                          }
+                        >
                           {customer.type === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica'}
                         </Badge>
                       </TableCell>
@@ -885,7 +918,13 @@ export default function ClientesPage() {
                     {columnVisibility.city && <TableCell>{customer.city}</TableCell>}
                     {columnVisibility.status && (
                       <TableCell>
-                        <Badge variant={customer.status === 'active' ? 'default' : 'secondary'}>
+                        <Badge
+                          variant="outline"
+                          className={customer.status === 'active'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-200 dark:border-emerald-900'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-900/40 dark:text-slate-200 dark:border-slate-700'
+                          }
+                        >
                           {customer.status === 'active' ? 'Ativo' : 'Inativo'}
                         </Badge>
                       </TableCell>
@@ -893,16 +932,18 @@ export default function ClientesPage() {
                     <TableCell>
                       <div className="flex items-center justify-start gap-2">
                         <Button 
-                          variant="outline" 
+                          variant="outline"
                           size="sm" 
                           onClick={() => setShowDetailsDialog(customer)}
+                          className="border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:bg-slate-800/40"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
                         <Button 
-                          variant="outline" 
+                          variant="outline"
                           size="sm" 
                           onClick={() => openEdit(customer)}
+                          className="border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:bg-slate-800/40"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
