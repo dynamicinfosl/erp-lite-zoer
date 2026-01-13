@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { SimpleAuthProvider } from "@/contexts/SimpleAuthContext-Fixed";
+import { BranchProvider } from "@/contexts/BranchContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Toaster } from "@/components/ui/toaster";
 import { SonnerProvider } from "@/components/SonnerProvider";
@@ -107,14 +108,16 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <SimpleAuthProvider>
-            <FetchInterceptorSetup />
-            <AppLayout>
-              {children}
-            </AppLayout>
-            <ErrorHandler />
-            <OfflineNotifier />
-            <Toaster />
-            <SonnerProvider />
+            <BranchProvider>
+              <FetchInterceptorSetup />
+              <AppLayout>
+                {children}
+              </AppLayout>
+              <ErrorHandler />
+              <OfflineNotifier />
+              <Toaster />
+              <SonnerProvider />
+            </BranchProvider>
           </SimpleAuthProvider>
         </ThemeProvider>
       </body>

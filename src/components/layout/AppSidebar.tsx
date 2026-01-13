@@ -48,6 +48,7 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { mockUserProfile } from '@/lib/mock-data';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { BranchSelector } from '@/components/branches/BranchSelector';
 import {
   Dialog,
   DialogContent,
@@ -100,6 +101,7 @@ const menuGroups = [
     items: [
       { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Relatórios', url: '/relatorios', icon: BarChart3, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Filiais', url: '/filiais', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Perfil da Empresa', url: '/perfil-empresa', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Configuração Fiscal', url: '/configuracao-fiscal', icon: FileText, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Perfil do Usuário', url: '/perfil-usuario', icon: UserCog, roles: ['admin', 'vendedor', 'financeiro'] },
@@ -219,6 +221,7 @@ function SidebarContentInternal() {
 
       <SidebarFooter className="px-4 py-5 border-t border-white/10">
         <div className="flex flex-col gap-4">
+          <BranchSelector />
           <div className="flex items-center justify-between">
             <div className="flex flex-col min-w-0">
               <span className="text-xs font-semibold text-white dark:text-white truncate">

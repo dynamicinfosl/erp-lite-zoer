@@ -31,6 +31,7 @@ import {
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { BranchSelector } from '@/components/branches/BranchSelector';
 
 const menuGroups = [
   {
@@ -46,6 +47,7 @@ const menuGroups = [
       { title: 'Financeiro', url: '/financeiro', icon: DollarSign },
       { title: 'Relatórios', url: '/relatorios', icon: BarChart3 },
       { title: 'Estoque', url: '/estoque', icon: Warehouse },
+      { title: 'Filiais', url: '/filiais', icon: Building2 },
     ],
   },
   {
@@ -122,6 +124,10 @@ export function MobileHeader() {
                   <span className="text-xs text-white/70 dark:text-white font-medium">ERP v1.0.0</span>
                 </div>
               </div>
+            </div>
+
+            <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+              <BranchSelector />
             </div>
 
             {/* Navigation */}

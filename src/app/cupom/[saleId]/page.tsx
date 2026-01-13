@@ -26,9 +26,13 @@ interface CompanyData {
   document: string;
   address: string;
   phone: string;
+  email?: string;
   city: string;
   state: string;
   zipcode: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
   seller_name?: string;
 }
 
@@ -74,13 +78,17 @@ export default function ReceiptPage() {
             const tenantData = tenantResult.data || tenantResult;
             
             setCompanyData({
-              name: tenantData.name || 'Sua Empresa',
+              name: tenantData.nome_fantasia || tenantData.name || 'Sua Empresa',
               document: tenantData.document || '',
               address: tenantData.address || '',
               phone: tenantData.phone || tenantData.corporate_phone || '',
+              email: tenantData.email || '',
               city: tenantData.city || '',
               state: tenantData.state || '',
               zipcode: tenantData.zip_code || '',
+              numero: tenantData.numero || '',
+              complemento: tenantData.complemento || '',
+              bairro: tenantData.bairro || '',
               seller_name: sale.seller_name || ''
             });
           } else {
@@ -91,6 +99,7 @@ export default function ReceiptPage() {
               document: '',
               address: '',
               phone: '',
+              email: '',
               city: '',
               state: '',
               zipcode: '',
@@ -104,6 +113,7 @@ export default function ReceiptPage() {
             document: '',
             address: '',
             phone: '',
+            email: '',
             city: '',
             state: '',
             zipcode: '',
@@ -146,6 +156,22 @@ export default function ReceiptPage() {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const buildCompanyAddress = (data: CompanyData) => {
+    const parts = [];
+    if (data.address) parts.push(data.address);
+    if (data.numero) parts.push(data.numero);
+    if (data.complemento) parts.push(data.complemento);
+    if (data.bairro) parts.push(data.bairro);
+    return parts.join(', ');
+  };
+
+  const buildCompanyCityState = (data: CompanyData) => {
+    const parts = [];
+    if (data.city) parts.push(data.city);
+    if (data.state) parts.push(data.state);
+    return parts.join(' - ');
   };
 
   if (loading) {
@@ -381,29 +407,29 @@ export default function ReceiptPage() {
 
       {/* Cupom */}
       <div className="receipt-container">
-        {/* Cabeçalho da Empresa - Usando configurações personalizáveis */}
+        {/* Cabeçalho da Empresa - Usando dados reais do perfil da empresa */}
         <div className="company-header">
           <div style={{ fontSize: `${couponSettings.fontSize + 2}px`, fontWeight: 'bold', marginBottom: '3px' }}>
-            {couponSettings.companyName.toUpperCase()}
+            {companyData.name.toUpperCase()}
           </div>
-          {couponSettings.showAddress && (
+          {couponSettings.showAddress && buildCompanyAddress(companyData) && (
             <div style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
-              {couponSettings.companyAddress}
+              {buildCompanyAddress(companyData)}
             </div>
           )}
-          {couponSettings.showAddress && (
+          {couponSettings.showAddress && buildCompanyCityState(companyData) && (
             <div style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
-              {couponSettings.companyCity}
+              {buildCompanyCityState(companyData)}
             </div>
           )}
-          {couponSettings.showPhone && (
+          {couponSettings.showPhone && companyData.phone && (
             <div style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
-              Tel: {couponSettings.companyPhone}
+              Tel: {companyData.phone}
             </div>
           )}
-          {couponSettings.showEmail && (
+          {couponSettings.showEmail && companyData.email && (
             <div style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
-              {couponSettings.companyEmail}
+              {companyData.email}
             </div>
           )}
         </div>
