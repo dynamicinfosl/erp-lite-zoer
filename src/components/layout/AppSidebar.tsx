@@ -71,7 +71,16 @@ const menuGroups = [
     items: [
       { title: 'Clientes', url: '/clientes', icon: Users, roles: ['admin', 'vendedor'] },
       { title: 'Produtos', url: '/produtos', icon: Package, roles: ['admin', 'vendedor'] },
-      { title: 'Vendas', url: '/vendas', icon: Receipt, roles: ['admin', 'vendedor'] },
+      { 
+        title: 'Vendas', 
+        url: '/vendas', 
+        icon: Receipt, 
+        roles: ['admin', 'vendedor'],
+        subItems: [
+          { title: 'Vendas de Balcão', url: '/vendas', icon: ShoppingCart },
+          { title: 'Vendas de Produtos', url: '/vendas-produtos', icon: Package },
+        ]
+      },
       { title: 'PDV', url: '/pdv', icon: ShoppingCart, roles: ['admin', 'vendedor'] },
     ],
   },
@@ -142,20 +151,64 @@ function SidebarContentInternal() {
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu className="space-y-1">
-                {group.items.map((item: any) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname === item.url}
-                      className="group h-9 rounded-xl px-3 text-sm text-white/80 dark:text-white transition data-[active=true]:bg-white/20 data-[active=true]:text-white hover:bg-white/15"
-                    >
-                      <Link href={item.url}>
-                        <item.icon className="h-4 w-4 text-white/60 dark:text-white/90 transition group-data-[active=true]:text-white group-hover:text-white" />
-                        <span className="truncate font-semibold dark:font-semibold">{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {group.items.map((item: any) => {
+                  // Se o item tem subitens, renderizar como collapsible
+                  if (item.subItems && item.subItems.length > 0) {
+                    const isActive = item.subItems.some((subItem: any) => pathname === subItem.url) || pathname === item.url;
+                    const isOpen = item.subItems.some((subItem: any) => pathname === subItem.url);
+                    
+                    return (
+                      <Collapsible key={item.title} defaultOpen={isOpen} asChild>
+                        <SidebarMenuItem>
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuButton
+                              isActive={isActive}
+                              className="group h-9 rounded-xl px-3 text-sm text-white/80 dark:text-white transition data-[active=true]:bg-white/20 data-[active=true]:text-white hover:bg-white/15 w-full"
+                            >
+                              <item.icon className="h-4 w-4 text-white/60 dark:text-white/90 transition group-data-[active=true]:text-white group-hover:text-white" />
+                              <span className="truncate font-semibold dark:font-semibold flex-1 text-left">{item.title}</span>
+                              <ChevronDown className="h-4 w-4 text-white/60 dark:text-white/90 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                            </SidebarMenuButton>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenu className="ml-4 mt-1 space-y-1">
+                              {item.subItems.map((subItem: any) => (
+                                <SidebarMenuItem key={subItem.title}>
+                                  <SidebarMenuButton
+                                    asChild
+                                    isActive={pathname === subItem.url}
+                                    className="group h-8 rounded-lg px-3 text-sm text-white/70 dark:text-white/80 transition data-[active=true]:bg-white/20 data-[active=true]:text-white hover:bg-white/10"
+                                  >
+                                    <Link href={subItem.url}>
+                                      <subItem.icon className="h-3.5 w-3.5 text-white/50 dark:text-white/70 transition group-data-[active=true]:text-white group-hover:text-white" />
+                                      <span className="truncate font-medium">{subItem.title}</span>
+                                    </Link>
+                                  </SidebarMenuButton>
+                                </SidebarMenuItem>
+                              ))}
+                            </SidebarMenu>
+                          </CollapsibleContent>
+                        </SidebarMenuItem>
+                      </Collapsible>
+                    );
+                  }
+                  
+                  // Item normal sem subitens
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === item.url}
+                        className="group h-9 rounded-xl px-3 text-sm text-white/80 dark:text-white transition data-[active=true]:bg-white/20 data-[active=true]:text-white hover:bg-white/15"
+                      >
+                        <Link href={item.url}>
+                          <item.icon className="h-4 w-4 text-white/60 dark:text-white/90 transition group-data-[active=true]:text-white group-hover:text-white" />
+                          <span className="truncate font-semibold dark:font-semibold">{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

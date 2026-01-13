@@ -39,6 +39,16 @@ export interface Category {
   updated_at: string;
 }
 
+export interface DeliveryAddress {
+  cep?: string;
+  address?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+}
+
 export interface Sale {
   id: number;
   user_id: number;
@@ -47,13 +57,21 @@ export interface Sale {
   total_amount: number;
   discount_amount: number;
   final_amount: number;
-  payment_method: 'dinheiro' | 'pix' | 'cartao_debito' | 'cartao_credito' | 'fiado';
+  payment_method: 'dinheiro' | 'pix' | 'cartao_debito' | 'cartao_credito' | 'fiado' | 'boleto';
   sale_type: 'balcao' | 'entrega';
-  status: 'finalizada' | 'cancelada';
+  sale_source?: 'pdv' | 'produtos';
+  status: 'finalizada' | 'cancelada' | 'pendente' | 'paga';
   notes?: string;
   sold_at: string;
   created_at: string;
   updated_at: string;
+  // Novos campos para vendas de produtos
+  delivery_date?: string;
+  carrier_name?: string;
+  payment_condition?: string;
+  delivery_address?: DeliveryAddress;
+  seller_name?: string;
+  customer_name?: string;
 }
 
 export interface SaleItem {

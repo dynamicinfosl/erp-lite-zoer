@@ -21,8 +21,10 @@ interface SaleConfirmationModalProps {
   onClose: () => void;
   onNewSale: () => void;
   onPrintReceipt: () => void;
+  onPrintA4?: () => void;
   onEmitirNota?: () => void;
   saleData: {
+    id?: string;
     numero: string;
     cliente: string;
     total: number;
@@ -42,6 +44,7 @@ export function SaleConfirmationModal({
   onClose, 
   onNewSale, 
   onPrintReceipt,
+  onPrintA4,
   onEmitirNota,
   saleData 
 }: SaleConfirmationModalProps) {
@@ -168,6 +171,15 @@ export function SaleConfirmationModal({
 
           {/* Botões de Ação */}
           <div className="flex flex-col sm:flex-row gap-3">
+            {onPrintA4 && (
+              <Button
+                onClick={onPrintA4}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 text-base"
+              >
+                <FileText className="h-5 w-5 mr-2" />
+                Imprimir A4
+              </Button>
+            )}
             <Button
               onClick={onPrintReceipt}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 text-base"

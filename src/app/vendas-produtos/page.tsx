@@ -13,7 +13,6 @@ import {
   DialogDescription, 
   DialogHeader, 
   DialogTitle, 
-  DialogTrigger,
   DialogFooter
 } from '@/components/ui/dialog';
 import {
@@ -38,7 +37,6 @@ import {
   MoreHorizontal, 
   Search, 
   Settings2, 
-  Upload, 
   Download, 
   Filter,
   ShoppingCart,
@@ -51,12 +49,14 @@ import {
   Receipt,
   TrendingUp,
   Clock,
+  Printer,
   FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { TenantPageWrapper } from '@/components/layout/PageWrapper';
+import { NewSaleForm } from '@/components/vendas-produtos/NewSaleForm';
 
 interface Sale {
   id: string;
@@ -88,7 +88,7 @@ interface ColumnVisibility {
   data_venda: boolean;
 }
 
-export default function VendasPage() {
+export default function VendasProdutosPage() {
   const { tenant } = useSimpleAuth();
   const [vendas, setVendas] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,12 +96,8 @@ export default function VendasPage() {
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [selectedVenda, setSelectedVenda] = useState<Sale | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [editFormData, setEditFormData] = useState<Partial<Sale>>({});
+  const [showNewSaleDialog, setShowNewSaleDialog] = useState(false);
   const [selectedVendas, setSelectedVendas] = useState<Set<string>>(new Set());
-  const [showImportDialog, setShowImportDialog] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
     numero: true,
     cliente: true,
@@ -132,16 +128,15 @@ export default function VendasPage() {
         return;
       }
 
-      console.log('📦 Carregando vendas de balcão para o tenant:', tenant.id);
+      console.log('📦 Carregando vendas de produtos para o tenant:', tenant.id);
       
-      const res = await fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}&sale_source=pdv`);
+      const res = await fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}&sale_source=produtos`);
       if (!res.ok) {
         const errorText = await res.text();
         console.error('❌ Erro na resposta da API:', res.status, errorText);
         throw new Error(`Erro ao carregar vendas: ${res.status}`);
       }
       
-      // Verificar content-type antes de fazer parse
       const contentType = res.headers.get('content-type') || '';
       let json: any;
       if (contentType.includes('application/json')) {
@@ -156,39 +151,20 @@ export default function VendasPage() {
         console.error('❌ Resposta não é JSON:', text.substring(0, 100));
         throw new Error('Resposta inválida do servidor');
       }
-      console.log('📥 Resposta da API:', json);
       
-      // A API pode retornar data, rows ou um array direto
-      const allData = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
+      const data = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
       
-      // Filtrar apenas vendas de PDV/balcão (sale_source = 'pdv' ou sale_type = 'balcao' ou sem sale_source)
-      const data = allData.filter((s: any) => 
-        s.sale_source === 'pdv' || 
-        s.sale_type === 'balcao' || 
-        s.sale_type === 'entrega' ||
-        (!s.sale_source && s.sale_type !== 'produtos')
-      );
+      // Filtrar apenas vendas de produtos
+      const produtosData = data.filter((s: any) => s.sale_source === 'produtos');
       
-      console.log(`📊 Total de vendas de balcão encontradas: ${data.length}`);
-      
-      // Debug: verificar se os itens estão vindo
-      if (data.length > 0) {
-        console.log('🔍 Primeira venda (exemplo):', data[0]);
-        console.log('🔍 Itens da primeira venda:', data[0]?.items);
-        console.log('🔍 Tipo de items:', typeof data[0]?.items, Array.isArray(data[0]?.items));
-      }
-      
-      // Mapear vendas para o formato esperado
-      const mapped: Sale[] = (data || []).map((s: any, i: number) => {
+      const mapped: Sale[] = produtosData.map((s: any, i: number) => {
         const items = Array.isArray(s.items) ? s.items : [];
-        console.log(`📦 Venda ${i + 1} (${s.sale_number}): ${items.length} itens`, items);
         
         return {
           id: String(s.id ?? i + 1),
           numero: s.sale_number ?? s.numero ?? `VND-${String(i + 1).padStart(6, '0')}`,
           cliente: s.customer?.name ?? s.customer_name ?? s.cliente ?? 'Cliente Avulso',
           vendedor: s.seller_name ?? s.vendedor ?? '',
-          // Se os itens vierem junto com a venda, usar; caso contrário, deixar vazio
           itens: items.map((it: any) => ({
             produto: it.product?.name ?? it.product_name ?? it.produto ?? 'Produto',
             quantidade: Number(it.quantity ?? it.quantidade ?? 1),
@@ -213,7 +189,7 @@ export default function VendasPage() {
         };
       });
       
-      console.log(`✅ ${mapped.length} vendas carregadas com sucesso`);
+      console.log(`✅ ${mapped.length} vendas de produtos carregadas com sucesso`);
       setVendas(mapped);
     } catch (error) {
       console.error('❌ Erro ao carregar vendas:', error);
@@ -267,7 +243,6 @@ export default function VendasPage() {
       'cancelada': { label: 'Cancelada', variant: 'destructive' }
     };
     
-    // Fallback para valores não mapeados ou undefined
     const statusData = status && statusMap[status] 
       ? statusMap[status] 
       : { label: status || 'Desconhecido', variant: 'secondary' as const };
@@ -288,7 +263,6 @@ export default function VendasPage() {
       'boleto': { label: 'Boleto', variant: 'secondary' }
     };
     
-    // Fallback para valores não mapeados ou undefined
     const formaData = forma && formaMap[forma] 
       ? formaMap[forma] 
       : { label: forma || 'Não informado', variant: 'secondary' as const };
@@ -317,64 +291,12 @@ export default function VendasPage() {
     setShowDetailsDialog(true);
   };
 
-  const handleImprimirCupom = (venda: Sale) => {
-    // Abrir página de cupom em nova aba
-    window.open(`/cupom/${venda.id}`, '_blank');
-  };
-
   const handleImprimirA4 = (venda: Sale) => {
-    // Abrir página de impressão A4 em nova aba
-    window.open(`/vendas/${venda.id}/a4`, '_blank');
+    window.open(`/vendas-produtos/${venda.id}/a4`, '_blank');
   };
 
-  const handleEditar = (venda: Sale) => {
-    setSelectedVenda(venda);
-    setEditFormData({
-      cliente: venda.cliente,
-      forma_pagamento: venda.forma_pagamento,
-      status: venda.status,
-      observacoes: venda.observacoes || '',
-      total: venda.total,
-    });
-    setShowEditDialog(true);
-  };
-
-  const handleSalvarEdicao = async () => {
-    if (!selectedVenda) return;
-
-    try {
-      const updateData: any = {
-        customer_name: editFormData.cliente,
-        payment_method: editFormData.forma_pagamento,
-        status: editFormData.status,
-        notes: editFormData.observacoes || '',
-      };
-
-      if (editFormData.total !== undefined) {
-        updateData.total_amount = editFormData.total;
-      }
-
-      const response = await fetch(`/next_api/sales/${selectedVenda.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updateData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao atualizar venda');
-      }
-
-      toast.success('Venda atualizada com sucesso');
-      setShowEditDialog(false);
-      setEditFormData({});
-      loadVendas(); // Recarregar lista
-    } catch (error) {
-      console.error('Erro ao atualizar venda:', error);
-      toast.error(error instanceof Error ? error.message : 'Erro ao atualizar venda');
-    }
+  const handleImprimirCupom = (venda: Sale) => {
+    window.open(`/cupom/${venda.id}`, '_blank');
   };
 
   const handleCancelarVenda = async (venda: Sale) => {
@@ -395,377 +317,34 @@ export default function VendasPage() {
       }
 
       toast.success('Venda cancelada com sucesso');
-      loadVendas(); // Recarregar lista
+      loadVendas();
     } catch (error) {
       console.error('Erro ao cancelar venda:', error);
       toast.error('Erro ao cancelar venda. Tente novamente.');
     }
   };
 
-  // Exportar lista de vendas para CSV
-  const handleExportarLista = () => {
-    try {
-      const rows: string[] = [];
-      
-      // Cabeçalho
-      rows.push([
-        'Número',
-        'Cliente',
-        'Vendedor',
-        'Data',
-        'Total',
-        'Forma de Pagamento',
-        'Status',
-        'Observações'
-      ].join(','));
-      
-      // Dados
-      filteredVendas.forEach(venda => {
-        const date = formatDate(venda.data_venda).split(' ')[0]; // Apenas data
-        const totalValue = formatCurrency(venda.total).replace(/R\$\s*/g, '').trim();
-        rows.push([
-          `"${venda.numero}"`,
-          `"${venda.cliente}"`,
-          `"${venda.vendedor || ''}"`,
-          `"${date}"`,
-          totalValue,
-          `"${venda.forma_pagamento}"`,
-          `"${venda.status}"`,
-          `"${(venda.observacoes || '').replace(/"/g, '""')}"`
-        ].join(','));
-      });
-
-      const csv = rows.join('\n');
-      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const dateStr = new Date().toISOString().slice(0, 10);
-      a.download = `vendas_${dateStr}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      toast.success(`${filteredVendas.length} venda(s) exportada(s) com sucesso!`);
-    } catch (error) {
-      console.error('Erro ao exportar vendas:', error);
-      toast.error('Erro ao exportar vendas');
-    }
+  const handleSaleCreated = () => {
+    setShowNewSaleDialog(false);
+    loadVendas();
   };
 
-  // Importar vendas
-  const handleImportarVendas = () => {
-    fileInputRef.current?.click();
-  };
-
-  // Processar arquivo CSV de importação
-  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setImporting(true);
-      const ext = file.name.split('.').pop()?.toLowerCase();
-      
-      if (ext !== 'csv') {
-        toast.error('Por favor, envie um arquivo CSV');
-        setImporting(false);
-        return;
-      }
-
-      const text = await file.text();
-      const lines = text.split(/\r?\n/).filter(l => l.trim());
-      
-      if (lines.length < 2) {
-        toast.error('CSV inválido. Deve conter cabeçalho e pelo menos uma linha de dados');
-        setImporting(false);
-        return;
-      }
-
-      // Detectar delimitador
-      const delimiter = (lines[0].split(';').length - 1) > (lines[0].split(',').length - 1) ? ';' : ',';
-      
-      // Parsear CSV manualmente
-      const parseCSVLine = (line: string): string[] => {
-        const values: string[] = [];
-        let current = '';
-        let quoted = false;
-        
-        for (let i = 0; i < line.length; i++) {
-          const ch = line[i];
-          if (ch === '"') {
-            if (quoted && line[i + 1] === '"') {
-              current += '"';
-              i++;
-            } else {
-              quoted = !quoted;
-            }
-          } else if (ch === delimiter && !quoted) {
-            values.push(current.trim());
-            current = '';
-          } else {
-            current += ch;
-          }
-        }
-        values.push(current.trim());
-        return values;
-      };
-
-      const headers = parseCSVLine(lines[0]).map(h => h.replace(/"/g, '').trim());
-      const rows = lines.slice(1).map(line => parseCSVLine(line));
-
-      console.log('📋 Headers:', headers);
-      console.log('📊 Rows:', rows.length);
-
-      // Normalizar nomes de colunas
-      const normalizeHeader = (h: string): string => {
-        return h.toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/[^a-z0-9\s]/g, '')
-          .trim();
-      };
-
-      // Mapear colunas esperadas
-      const columnMap: Record<string, string> = {
-        'numero': 'numero',
-        'numero da venda': 'numero',
-        'numero venda': 'numero',
-        'cliente': 'cliente',
-        'nome cliente': 'cliente',
-        'customer': 'cliente',
-        'data': 'data',
-        'data venda': 'data',
-        'date': 'data',
-        'total': 'total',
-        'valor': 'total',
-        'amount': 'total',
-        'forma pagamento': 'forma_pagamento',
-        'payment method': 'forma_pagamento',
-        'metodo pagamento': 'forma_pagamento',
-        'status': 'status',
-        'observacoes': 'observacoes',
-        'notes': 'observacoes',
-        'vendedor': 'vendedor',
-        'seller': 'vendedor'
-      };
-
-      // Processar e validar dados
-      let successCount = 0;
-      let errorCount = 0;
-      const errors: string[] = [];
-
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        if (row.length === 0 || row.every(cell => !cell || cell.trim() === '')) {
-          continue; // Linha vazia
-        }
-
-        try {
-          // Criar objeto de dados da venda
-          const rowData: Record<string, string> = {};
-          headers.forEach((header, idx) => {
-            const normalized = normalizeHeader(header);
-            const mappedKey = columnMap[normalized] || normalized;
-            rowData[mappedKey] = row[idx] || '';
-          });
-
-          // Validar dados obrigatórios
-          if (!rowData.cliente || !rowData.total) {
-            errors.push(`Linha ${i + 2}: Cliente e Total são obrigatórios`);
-            errorCount++;
-            continue;
-          }
-
-          // Parsear total (remover R$ e formatação)
-          const totalStr = rowData.total.toString().replace(/R\$|\s|\./g, '').replace(',', '.');
-          const total = parseFloat(totalStr);
-          
-          if (isNaN(total) || total <= 0) {
-            errors.push(`Linha ${i + 2}: Total inválido (${rowData.total})`);
-            errorCount++;
-            continue;
-          }
-
-          // Preparar dados para a API
-          // A API exige produtos, então vamos criar um item genérico
-          const saleData: any = {
-            tenant_id: tenant?.id,
-            user_id: '00000000-0000-0000-0000-000000000000', // Usuário padrão para importação
-            customer_name: rowData.cliente.trim(),
-            total_amount: total,
-            payment_method: rowData.forma_pagamento?.toLowerCase() || 'dinheiro',
-            status: rowData.status?.toLowerCase() === 'cancelada' ? 'canceled' : (rowData.status?.toLowerCase() === 'paga' ? 'completed' : null),
-            notes: rowData.observacoes || null,
-            products: [
-              {
-                id: null, // Sem produto específico para vendas importadas
-                name: 'Venda Importada',
-                code: 'IMP',
-                price: total,
-                quantity: 1,
-                discount: 0,
-                subtotal: total
-              }
-            ]
-          };
-
-          // Parsear data se fornecida
-          if (rowData.data) {
-            try {
-              const dateStr = rowData.data.trim();
-              // Tentar diferentes formatos de data
-              let saleDate: Date;
-              if (dateStr.includes('/')) {
-                // Formato DD/MM/YYYY ou DD/MM/YYYY HH:MM
-                const parts = dateStr.split(' ');
-                const datePart = parts[0].split('/');
-                if (datePart.length === 3) {
-                  saleDate = new Date(parseInt(datePart[2]), parseInt(datePart[1]) - 1, parseInt(datePart[0]));
-                  if (parts[1]) {
-                    const timePart = parts[1].split(':');
-                    if (timePart.length >= 2) {
-                      saleDate.setHours(parseInt(timePart[0]), parseInt(timePart[1]));
-                    }
-                  }
-                } else {
-                  saleDate = new Date(dateStr);
-                }
-              } else {
-                saleDate = new Date(dateStr);
-              }
-              
-              if (!isNaN(saleDate.getTime())) {
-                saleData.created_at = saleDate.toISOString();
-              }
-            } catch (e) {
-              console.warn(`Linha ${i + 2}: Data inválida, usando data atual`);
-            }
-          }
-
-          // Criar venda via API
-          const response = await fetch('/next_api/sales', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(saleData),
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            errors.push(`Linha ${i + 2}: ${errorData.error || 'Erro ao criar venda'}`);
-            errorCount++;
-          } else {
-            successCount++;
-          }
-        } catch (error) {
-          console.error(`Erro ao processar linha ${i + 2}:`, error);
-          errors.push(`Linha ${i + 2}: Erro ao processar - ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-          errorCount++;
-        }
-      }
-
-      // Limpar input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-
-      // Mostrar resultados
-      if (successCount > 0) {
-        toast.success(`${successCount} venda(s) importada(s) com sucesso!`);
-      }
-      if (errorCount > 0) {
-        toast.error(`${errorCount} venda(s) não puderam ser importadas. Verifique o console.`);
-        console.error('Erros de importação:', errors);
-      }
-
-      // Recarregar lista
-      loadVendas();
-    } catch (error) {
-      console.error('Erro ao importar arquivo:', error);
-      toast.error('Erro ao importar arquivo. Verifique o formato do CSV.');
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  // Cancelar vendas selecionadas
-  const handleCancelarSelecionadas = async () => {
-    if (selectedVendas.size === 0) {
-      toast.warning('Selecione pelo menos uma venda para cancelar');
-      return;
-    }
-
-    if (!confirm(`Tem certeza que deseja cancelar ${selectedVendas.size} venda(s) selecionada(s)?`)) {
-      return;
-    }
-
-    try {
-      const promises = Array.from(selectedVendas).map(vendaId => 
-        fetch(`/next_api/sales/${vendaId}`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
-      );
-
-      const results = await Promise.allSettled(promises);
-      const success = results.filter(r => r.status === 'fulfilled' && r.value.ok).length;
-      const failed = results.length - success;
-
-      if (success > 0) {
-        toast.success(`${success} venda(s) cancelada(s) com sucesso`);
-      }
-      if (failed > 0) {
-        toast.error(`${failed} venda(s) não puderam ser canceladas`);
-      }
-
-      setSelectedVendas(new Set());
-      loadVendas(); // Recarregar lista
-    } catch (error) {
-      console.error('Erro ao cancelar vendas selecionadas:', error);
-      toast.error('Erro ao cancelar vendas selecionadas');
-    }
-  };
-
-  // Toggle seleção de venda
-  const toggleVendaSelection = (vendaId: string) => {
-    setSelectedVendas(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(vendaId)) {
-        newSet.delete(vendaId);
-      } else {
-        newSet.add(vendaId);
-      }
-      return newSet;
-    });
-  };
-
-  // Selecionar todas as vendas
-  const toggleSelectAll = () => {
-    if (selectedVendas.size === filteredVendas.length) {
-      setSelectedVendas(new Set());
-    } else {
-      setSelectedVendas(new Set(filteredVendas.map(v => v.id)));
-    }
-  };
-
-  // Renderizar componente
   return (
     <TenantPageWrapper>
       <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Vendas de Balcão</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Vendas de Produtos</h1>
           <p className="text-sm sm:text-base text-muted-foreground">
-            Visualize todas as vendas realizadas no PDV/Balcão
+            Gerencie vendas diretas de produtos para clientes específicos
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={() => setShowNewSaleDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar Venda
+          </Button>
           <Badge variant="secondary" className="px-3 py-1 text-xs sm:text-sm">
             <ShoppingCart className="h-3 w-3 mr-1" />
             {vendas.length} vendas
@@ -777,7 +356,7 @@ export default function VendasPage() {
         </div>
       </div>
 
-      {/* Quick Stats - JUGA */}
+      {/* Quick Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
         <JugaKPICard
           title="Total de Vendas"
@@ -830,47 +409,7 @@ export default function VendasPage() {
       <Card className="juga-card">
         <CardContent className="pt-6">
           <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-            {/* Lado esquerdo - Botões de ação */}
             <div className="flex items-center gap-2">
-              <Button 
-                variant="outline"
-                onClick={() => window.location.href = '/pdv'}
-                className="border-border bg-background hover:bg-accent hover:text-accent-foreground"
-              >
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Ir para PDV
-              </Button>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="border-border bg-background hover:bg-accent hover:text-accent-foreground">
-                    <MoreHorizontal className="h-4 w-4 mr-2" />
-                    Mais Ações
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleImportarVendas}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Importar Vendas
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExportarLista}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportar Lista
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    className="text-red-600 dark:text-red-400"
-                    onClick={handleCancelarSelecionadas}
-                    disabled={selectedVendas.size === 0}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Cancelar Selecionadas ({selectedVendas.size})
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="border-border bg-background hover:bg-accent hover:text-accent-foreground">
@@ -902,7 +441,6 @@ export default function VendasPage() {
               </DropdownMenu>
             </div>
 
-            {/* Lado direito - Busca */}
             <div className="flex items-center gap-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -988,7 +526,7 @@ export default function VendasPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5" />
-            Lista de Vendas ({filteredVendas.length})
+            Lista de Vendas de Produtos ({filteredVendas.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1000,12 +538,6 @@ export default function VendasPage() {
                 <Table>
                 <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={selectedVendas.size === filteredVendas.length && filteredVendas.length > 0}
-                      onCheckedChange={toggleSelectAll}
-                    />
-                  </TableHead>
                   {columnVisibility.numero && <TableHead>Número</TableHead>}
                   {columnVisibility.cliente && <TableHead>Cliente</TableHead>}
                   {columnVisibility.vendedor && <TableHead>Vendedor</TableHead>}
@@ -1020,12 +552,6 @@ export default function VendasPage() {
               <TableBody>
                 {filteredVendas.map((venda) => (
                   <TableRow key={venda.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedVendas.has(venda.id)}
-                        onCheckedChange={() => toggleVendaSelection(venda.id)}
-                      />
-                    </TableCell>
                     {columnVisibility.numero && (
                       <TableCell className="font-mono text-sm font-medium">
                         {venda.numero}
@@ -1096,10 +622,6 @@ export default function VendasPage() {
                             <Receipt className="h-4 w-4 mr-2" />
                             Imprimir Cupom
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditar(venda)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
                             className="text-red-600 dark:text-red-400"
@@ -1121,7 +643,7 @@ export default function VendasPage() {
 
           {filteredVendas.length === 0 && !loading && (
             <div className="text-center py-8 text-muted-foreground">
-              Nenhuma venda encontrada
+              Nenhuma venda encontrada. Clique em "Adicionar Venda" para criar uma nova venda de produtos.
             </div>
           )}
         </CardContent>
@@ -1238,160 +760,18 @@ export default function VendasPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de Edição da Venda */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Editar Venda</DialogTitle>
+      {/* Dialog de Nova Venda */}
+      <Dialog open={showNewSaleDialog} onOpenChange={setShowNewSaleDialog}>
+        <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden p-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b bg-muted/30">
+            <DialogTitle className="text-xl font-bold">Nova Venda de Produtos</DialogTitle>
             <DialogDescription>
-              Edite as informações da venda {selectedVenda?.numero}
+              Preencha os dados da venda de produtos para um cliente específico
             </DialogDescription>
           </DialogHeader>
-          {selectedVenda && (
-            <div className="space-y-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="cliente">Cliente *</Label>
-                <Input
-                  id="cliente"
-                  value={editFormData.cliente || ''}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, cliente: e.target.value }))}
-                  placeholder="Nome do cliente"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="forma_pagamento">Forma de Pagamento</Label>
-                <select
-                  id="forma_pagamento"
-                  className="px-3 py-2 border rounded-md bg-background text-foreground border-input"
-                  value={editFormData.forma_pagamento || 'dinheiro'}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, forma_pagamento: e.target.value as Sale['forma_pagamento'] }))}
-                >
-                  <option value="dinheiro">Dinheiro</option>
-                  <option value="cartao_debito">Cartão Débito</option>
-                  <option value="cartao_credito">Cartão Crédito</option>
-                  <option value="pix">PIX</option>
-                  <option value="boleto">Boleto</option>
-                </select>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="status">Status</Label>
-                <select
-                  id="status"
-                  className="px-3 py-2 border rounded-md bg-background text-foreground border-input"
-                  value={editFormData.status || 'pendente'}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, status: e.target.value as Sale['status'] }))}
-                >
-                  <option value="pendente">Pendente</option>
-                  <option value="paga">Paga</option>
-                  <option value="cancelada">Cancelada</option>
-                </select>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="total">Total (R$)</Label>
-                <Input
-                  id="total"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={editFormData.total || 0}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, total: parseFloat(e.target.value) || 0 }))}
-                  placeholder="0.00"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="observacoes">Observações</Label>
-                <textarea
-                  id="observacoes"
-                  className="px-3 py-2 border rounded-md min-h-[80px] bg-background text-foreground border-input"
-                  value={editFormData.observacoes || ''}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, observacoes: e.target.value }))}
-                  placeholder="Observações adicionais..."
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowEditDialog(false);
-              setEditFormData({});
-            }}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSalvarEdicao} className="bg-emerald-600 hover:bg-emerald-700">
-              Salvar Alterações
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Input de arquivo oculto */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".csv"
-        onChange={handleImportFile}
-        className="hidden"
-      />
-
-      {/* Dialog de Importação de Vendas */}
-      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Importar Vendas</DialogTitle>
-            <DialogDescription>
-              Importe vendas através de um arquivo CSV
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="text-sm text-muted-foreground">
-              <p className="font-medium mb-2">Formato do CSV esperado:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li><strong>Cliente</strong> (obrigatório) - Nome do cliente</li>
-                <li><strong>Total</strong> (obrigatório) - Valor da venda (ex: 100.50 ou R$ 100,50)</li>
-                <li><strong>Data</strong> (opcional) - Data da venda (ex: 01/11/2025 ou 01/11/2025 14:30)</li>
-                <li><strong>Forma de Pagamento</strong> (opcional) - dinheiro, pix, cartao_debito, cartao_credito, boleto</li>
-                <li><strong>Status</strong> (opcional) - pendente, paga, cancelada</li>
-                <li><strong>Observações</strong> (opcional) - Observações adicionais</li>
-              </ul>
-              <p className="mt-4 font-medium">Exemplo de cabeçalho:</p>
-              <code className="block mt-2 p-2 bg-muted rounded text-xs">
-                Cliente,Total,Data,Forma de Pagamento,Status,Observações
-              </code>
-            </div>
-            {importing && (
-              <div className="text-center py-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="mt-2 text-sm text-muted-foreground">Importando vendas...</p>
-              </div>
-            )}
+          <div className="overflow-y-auto max-h-[calc(95vh-120px)] px-6 py-4">
+            <NewSaleForm onSuccess={handleSaleCreated} onCancel={() => setShowNewSaleDialog(false)} />
           </div>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setShowImportDialog(false);
-                if (fileInputRef.current) {
-                  fileInputRef.current.value = '';
-                }
-              }}
-            >
-              Fechar
-            </Button>
-            <Button 
-              onClick={() => {
-                setShowImportDialog(false);
-                fileInputRef.current?.click();
-              }}
-              disabled={importing}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Selecionar Arquivo CSV
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 

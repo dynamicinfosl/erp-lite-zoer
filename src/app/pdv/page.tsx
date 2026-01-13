@@ -37,6 +37,7 @@ import {
   Barcode,
   CreditCard,
   Receipt,
+  FileText,
   User,
   Package,
   X,
@@ -453,6 +454,7 @@ export default function PDVPage() {
         tenant_id: tenant.id,
         user_id: user?.id || '00000000-0000-0000-0000-000000000000',
         sale_type: null,
+        sale_source: 'pdv', // Marcar como venda do PDV
         customer_name: customerName || 'Cliente Avulso',
         total_amount: total,
         total: total,
@@ -722,10 +724,25 @@ export default function PDVPage() {
     setShowConfirmationModal(false);
   };
 
+  const handlePrintA4 = () => {
+    if (lastSaleData?.id) {
+      // Abrir impressão A4 em nova aba usando o ID da venda
+      const a4Url = `/vendas/${lastSaleData.id}/a4`;
+      window.open(a4Url, '_blank');
+    }
+    setShowConfirmationModal(false);
+  };
+
   // Função para imprimir cupom do histórico
   const handlePrintHistoryReceipt = (saleId: string) => {
     const cupomUrl = `/cupom/${saleId}`;
     window.open(cupomUrl, '_blank');
+  };
+
+  // Função para imprimir A4 do histórico
+  const handlePrintHistoryA4 = (saleId: string) => {
+    const a4Url = `/vendas/${saleId}/a4`;
+    window.open(a4Url, '_blank');
   };
 
   const handleNewSale = () => {
@@ -1233,15 +1250,26 @@ export default function PDVPage() {
                             <div className="text-2xl font-bold text-primary">
                               R$ {sale.total.toFixed(2)}
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handlePrintHistoryReceipt(sale.id)}
-                              className="gap-1 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
-                            >
-                              <Receipt className="h-4 w-4" />
-                              Cupom
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handlePrintHistoryA4(sale.id)}
+                                className="gap-1 hover:bg-green-50 hover:text-green-700 hover:border-green-300"
+                              >
+                                <FileText className="h-4 w-4" />
+                                A4
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handlePrintHistoryReceipt(sale.id)}
+                                className="gap-1 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+                              >
+                                <Receipt className="h-4 w-4" />
+                                Cupom
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </CardContent>
@@ -1389,6 +1417,7 @@ export default function PDVPage() {
         onClose={handleCloseConfirmation}
         onNewSale={handleNewSale}
         onPrintReceipt={handlePrintReceipt}
+        onPrintA4={handlePrintA4}
         onEmitirNota={handleEmitirNota}
         saleData={lastSaleData}
       />

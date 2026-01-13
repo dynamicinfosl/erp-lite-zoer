@@ -12,7 +12,24 @@ async function createSaleHandler(request: NextRequest) {
   try {
 
     const body = await request.json();
-    const { customer_id, products, total, total_amount, payment_method, tenant_id, user_id, sale_type } = body;
+    const { 
+      customer_id, 
+      products, 
+      total, 
+      total_amount, 
+      payment_method, 
+      tenant_id, 
+      user_id, 
+      sale_type,
+      sale_source,
+      customer_name,
+      seller_name,
+      carrier_name,
+      payment_condition,
+      delivery_date,
+      delivery_address,
+      notes
+    } = body;
     
     // Usar total_amount se fornecido, senão usar total
     const finalTotal = total_amount || total;
@@ -126,21 +143,43 @@ async function createSaleHandler(request: NextRequest) {
       day: currentDate.getDate()
     });
     
+    const saleData: any = {
+      tenant_id: tenant_id, // ✅ Usar tenant_id validado
+      user_id: user_id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
+      sale_type: sale_type || null, // ✅ Usar NULL como padrão
+      sale_number: saleNumber,
+      customer_name: customer_name || body.customer_name || 'Cliente Avulso',
+      total_amount: parseFloat(finalTotal),
+      final_amount: parseFloat(finalTotal),
+      payment_method,
+      status: null, // ✅ Usar NULL para evitar constraint
+      notes: notes || body.notes || null,
+      created_at: createdAt,
+    };
+
+    // Adicionar novos campos se fornecidos
+    if (sale_source) {
+      saleData.sale_source = sale_source;
+    }
+    if (seller_name) {
+      saleData.seller_name = seller_name;
+    }
+    if (carrier_name) {
+      saleData.carrier_name = carrier_name;
+    }
+    if (payment_condition) {
+      saleData.payment_condition = payment_condition;
+    }
+    if (delivery_date) {
+      saleData.delivery_date = delivery_date;
+    }
+    if (delivery_address) {
+      saleData.delivery_address = delivery_address;
+    }
+
     const { data: sale, error: saleError } = await supabaseAdmin
       .from('sales')
-      .insert({
-        tenant_id: tenant_id, // ✅ Usar tenant_id validado
-        user_id: user_id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
-        sale_type: sale_type || null, // ✅ Usar NULL como padrão
-        sale_number: saleNumber,
-        customer_name: body.customer_name || 'Cliente Avulso',
-        total_amount: parseFloat(finalTotal),
-        final_amount: parseFloat(finalTotal),
-        payment_method,
-        status: null, // ✅ Usar NULL para evitar constraint
-        notes: body.notes || null,
-        created_at: createdAt,
-      })
+      .insert(saleData)
       .select()
       .single();
 
@@ -233,9 +272,10 @@ async function listSalesHandler(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const today = searchParams.get('today');
     const tenant_id = searchParams.get('tenant_id');
+    const sale_source = searchParams.get('sale_source');
     const tzParam = searchParams.get('tz'); // minutos de offset do fuso (ex: -180 para BRT)
 
-    console.log(`💰 GET /sales - tenant_id: ${tenant_id}, today: ${today}`);
+    console.log(`💰 GET /sales - tenant_id: ${tenant_id}, today: ${today}, sale_source: ${sale_source}`);
 
     // Buscar apenas as vendas (sem JOIN para evitar erro de relacionamento)
     let query = supabaseAdmin
@@ -248,6 +288,12 @@ async function listSalesHandler(request: NextRequest) {
       console.log(`🔍 Buscando vendas com tenant_id: ${tenant_id}`);
     } else {
       console.log('⚠️ GET /sales - Nenhum tenant_id válido fornecido');
+    }
+
+    // Filtrar por sale_source se fornecido
+    if (sale_source) {
+      query = query.eq('sale_source', sale_source);
+      console.log(`🔍 Filtrando por sale_source: ${sale_source}`);
     }
 
     // Se solicitado apenas vendas de hoje
