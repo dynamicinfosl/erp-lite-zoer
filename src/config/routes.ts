@@ -18,6 +18,8 @@ export const ROUTES = {
   FINANCIAL: '/financeiro',
   REPORTS: '/relatorios',
   SETTINGS: '/configuracoes',
+  DELIVERIES: '/entregas',
+  DRIVERS: '/entregadores',
   
   // Páginas especiais
   TRIAL_EXPIRED: '/trial-expirado',
@@ -35,6 +37,8 @@ export const PROTECTED_ROUTES = [
   ROUTES.FINANCIAL,
   ROUTES.REPORTS,
   ROUTES.SETTINGS,
+  ROUTES.DELIVERIES,
+  ROUTES.DRIVERS,
 ] as const;
 
 // Rotas públicas

@@ -8,15 +8,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { FileText, Download, Upload, X, Save, Database, Plus, UserPlus, CheckSquare, Square, AlertTriangle, CheckCircle, Users, FileSpreadsheet } from 'lucide-react';
+import { X, UserPlus, CheckSquare, AlertTriangle, CheckCircle, Users, FileSpreadsheet, FileText } from 'lucide-react';
 
 interface ImportPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
-  onSave?: () => void;
-  onExtract?: () => void;
-  onConsume?: () => void;
   onRegister?: (selectedRows: any[]) => void;
   fileName: string;
   headers: string[];
@@ -25,18 +21,12 @@ interface ImportPreviewModalProps {
   validRows: number;
   invalidRows: number;
   errors?: string[];
-  isExtracting?: boolean;
-  isConsuming?: boolean;
   isRegistering?: boolean;
 }
 
 export function ImportPreviewModal({
   isOpen,
   onClose,
-  onConfirm,
-  onSave,
-  onExtract,
-  onConsume,
   onRegister,
   fileName,
   headers,
@@ -45,15 +35,10 @@ export function ImportPreviewModal({
   validRows,
   invalidRows,
   errors = [],
-  isExtracting = false,
-  isConsuming = false,
   isRegistering = false
 }: ImportPreviewModalProps) {
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
-  
-  const maxPreviewRows = 50;
-  const handleSave = onSave || onConfirm;
 
   // Reset selection when modal opens/closes
   useEffect(() => {
@@ -351,38 +336,14 @@ export function ImportPreviewModal({
                   <UserPlus className="h-3 w-3 sm:h-4 sm:w-4" />
                   <span className="hidden sm:inline">
                     {isRegistering ? 'Cadastrando...' : 
-                     selectedRows.size > 0 ? `Cadastrar (${selectedRows.size})` : 
-                     `Cadastrar (${data.length})`}
+                     selectedRows.size > 0 ? `Cadastrar ${selectedRows.size} selecionados` : 
+                     `Cadastrar ${data.length} clientes`}
                   </span>
                   <span className="sm:hidden">
-                    {isRegistering ? 'Salvando...' : 'Cadastrar'}
+                    {isRegistering ? 'Cadastrando...' : 'Cadastrar'}
                   </span>
                 </Button>
               )}
-              
-              <Button 
-                variant="secondary"
-                onClick={() => {
-                  console.log('💾 Botão Salvar clicado');
-                  handleSave();
-                }}
-                className="flex items-center gap-1 sm:gap-2 px-3 sm:px-6 text-xs sm:text-sm h-8 sm:h-10"
-              >
-                <Save className="h-3 w-3 sm:h-4 sm:w-4" />
-                Salvar
-              </Button>
-              
-              <Button 
-                onClick={() => {
-                  console.log('📥 Botão Importar clicado');
-                  onConfirm();
-                }}
-                disabled={validRows === 0}
-                className="flex items-center gap-1 sm:gap-2 px-3 sm:px-6 bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm h-8 sm:h-10"
-              >
-                <Upload className="h-3 w-3 sm:h-4 sm:w-4" />
-                Importar
-              </Button>
             </div>
           </div>
         </div>

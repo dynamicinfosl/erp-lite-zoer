@@ -27,7 +27,9 @@ async function createCustomerHandler(request: NextRequest) {
       neighborhood,
       state,
       zipcode,
-      notes
+      notes,
+      external_code,
+      is_active
     } = body;
 
     if (!tenant_id || !name) {
@@ -36,6 +38,14 @@ async function createCustomerHandler(request: NextRequest) {
         { error: 'Tenant ID e nome são obrigatórios' },
         { status: 400 }
       );
+    }
+
+    // Determinar is_active: priorizar status, depois is_active, default é true (ativo)
+    let activeStatus = true;
+    if (status !== undefined) {
+      activeStatus = status === 'active';
+    } else if (is_active !== undefined) {
+      activeStatus = Boolean(is_active);
     }
 
     // Preparar dados para inserção (incluindo tenant_id)
@@ -52,7 +62,8 @@ async function createCustomerHandler(request: NextRequest) {
       state: state || null,
       zipcode: zipcode || null,
       notes: notes || null,
-      is_active: status === 'active',
+      external_code: external_code || null,
+      is_active: activeStatus,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -153,7 +164,7 @@ async function updateCustomerHandler(request: NextRequest) {
     const body = await request.json();
     const allowed: Record<string, any> = {};
     // Campos compatíveis com o schema atual da tabela `customers`
-    const fields = ['name','email','phone','document','city','address','neighborhood','state','zipcode','notes','is_active'];
+    const fields = ['name','email','phone','document','city','address','neighborhood','state','zipcode','notes','external_code','is_active'];
     for (const key of fields) if (key in body) allowed[key] = body[key];
     
     // Mapear status para is_active se fornecido

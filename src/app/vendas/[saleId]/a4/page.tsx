@@ -45,6 +45,13 @@ interface CompanyData {
   city?: string;
   state?: string;
   zipcode?: string;
+  nome_fantasia?: string;
+  razao_social?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  inscricao_estadual?: string;
+  inscricao_municipal?: string;
 }
 
 export default function VendasBalcaoA4Page() {
@@ -124,7 +131,7 @@ export default function VendasBalcaoA4Page() {
           })),
         });
 
-        // Buscar dados da empresa (tenant)
+        // Buscar dados da empresa (tenant) do perfil da empresa
         if (sale.tenant_id) {
           const tenantResponse = await fetch(`/next_api/tenants/${sale.tenant_id}`);
           
@@ -134,13 +141,20 @@ export default function VendasBalcaoA4Page() {
             
             setCompanyData({
               name: tenantData.name || 'Sua Empresa',
+              nome_fantasia: tenantData.nome_fantasia || tenantData.name || '',
+              razao_social: tenantData.razao_social || '',
               document: tenantData.document || '',
               address: tenantData.address || '',
+              numero: tenantData.numero || '',
+              complemento: tenantData.complemento || '',
+              bairro: tenantData.bairro || '',
               phone: tenantData.phone || tenantData.corporate_phone || '',
               email: tenantData.email || '',
               city: tenantData.city || '',
               state: tenantData.state || '',
-              zipcode: tenantData.zip_code || '',
+              zipcode: tenantData.zip_code || tenantData.zipcode || '',
+              inscricao_estadual: tenantData.inscricao_estadual || '',
+              inscricao_municipal: tenantData.inscricao_municipal || '',
             });
           } else {
             setCompanyData({
@@ -162,6 +176,7 @@ export default function VendasBalcaoA4Page() {
             phone: '',
             email: '',
             city: '',
+            state: '',
             zipcode: '',
           });
         }

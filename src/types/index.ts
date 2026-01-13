@@ -114,6 +114,7 @@ export interface Delivery {
   user_id: number;
   sale_id: number;
   driver_id?: number;
+  manifest_id?: string | null;
   customer_name: string;
   delivery_address: string;
   neighborhood?: string;

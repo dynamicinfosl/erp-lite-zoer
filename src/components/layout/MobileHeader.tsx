@@ -26,6 +26,7 @@ import {
   Tag,
   CreditCard,
   Building2,
+  UsersRound,
 } from 'lucide-react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { ENABLE_AUTH } from '@/constants/auth';
@@ -54,6 +55,7 @@ const menuGroups = [
       { title: 'Clientes', url: '/clientes', icon: Users },
       { title: 'Produtos', url: '/produtos', icon: Package },
       { title: 'Entregas', url: '/entregas', icon: Truck },
+      { title: 'Entregadores', url: '/entregadores', icon: UsersRound },
       { title: 'Entregador', url: '/entregador', icon: Truck },
     ],
   },

@@ -30,6 +30,13 @@ interface SaleA4LayoutProps {
     city?: string;
     state?: string;
     zipcode?: string;
+    nome_fantasia?: string;
+    razao_social?: string;
+    numero?: string;
+    complemento?: string;
+    bairro?: string;
+    inscricao_estadual?: string;
+    inscricao_municipal?: string;
   };
 }
 
@@ -79,6 +86,10 @@ export function SaleA4Layout({ sale, company }: SaleA4LayoutProps) {
     <div className="a4-container">
       <style jsx global>{`
         @media print {
+          @page {
+            size: A4;
+            margin: 10mm 15mm;
+          }
           body {
             margin: 0;
             padding: 0;
@@ -88,12 +99,15 @@ export function SaleA4Layout({ sale, company }: SaleA4LayoutProps) {
             display: none !important;
           }
           .a4-container {
-            width: 210mm;
-            min-height: 297mm;
-            margin: 0 auto;
-            padding: 15mm;
+            width: 100%;
+            max-width: 180mm;
+            min-height: 277mm;
+            margin: 0;
+            padding: 0;
             background: white;
             box-sizing: border-box;
+            page-break-after: avoid;
+            page-break-inside: avoid;
           }
         }
         @media screen {
@@ -101,7 +115,7 @@ export function SaleA4Layout({ sale, company }: SaleA4LayoutProps) {
             width: 210mm;
             min-height: 297mm;
             margin: 20px auto;
-            padding: 15mm;
+            padding: 10mm 15mm;
             background: white;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             box-sizing: border-box;
@@ -109,80 +123,90 @@ export function SaleA4Layout({ sale, company }: SaleA4LayoutProps) {
         }
         .a4-container {
           font-family: Arial, sans-serif;
-          font-size: 11pt;
+          font-size: 10pt;
           color: #000;
-          line-height: 1.4;
+          line-height: 1.3;
         }
         .header {
           border-bottom: 2px solid #333;
-          padding-bottom: 10px;
-          margin-bottom: 15px;
+          padding-bottom: 8px;
+          margin-bottom: 12px;
+          page-break-inside: avoid;
         }
         .company-name {
-          font-size: 18pt;
+          font-size: 16pt;
           font-weight: bold;
-          margin-bottom: 5px;
+          margin-bottom: 4px;
           text-align: center;
         }
         .company-info {
-          font-size: 9pt;
+          font-size: 8.5pt;
           text-align: center;
-          color: #666;
+          color: #333;
+          line-height: 1.4;
+        }
+        .company-info-line {
+          margin: 2px 0;
         }
         .order-header {
           background-color: #f0f0f0;
-          padding: 8px;
-          margin: 15px 0;
+          padding: 6px;
+          margin: 10px 0;
           text-align: center;
           font-weight: bold;
-          font-size: 12pt;
+          font-size: 11pt;
+          page-break-inside: avoid;
         }
         .order-info {
-          margin: 10px 0;
-          font-size: 10pt;
+          margin: 6px 0;
+          font-size: 9pt;
         }
         .section-title {
           background-color: #e0e0e0;
-          padding: 5px 8px;
-          margin: 15px 0 8px 0;
+          padding: 4px 6px;
+          margin: 10px 0 6px 0;
           font-weight: bold;
-          font-size: 10pt;
+          font-size: 9.5pt;
           border-left: 4px solid #333;
+          page-break-inside: avoid;
         }
         .two-columns {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 15px;
-          margin: 10px 0;
+          gap: 10px;
+          margin: 6px 0;
         }
         .field-label {
           font-weight: bold;
-          font-size: 9pt;
+          font-size: 8.5pt;
           color: #333;
           margin-bottom: 2px;
         }
         .field-value {
-          font-size: 10pt;
-          margin-bottom: 8px;
-          min-height: 20px;
+          font-size: 9pt;
+          margin-bottom: 6px;
+          min-height: 18px;
           border-bottom: 1px solid #ccc;
         }
         .products-table {
           width: 100%;
           border-collapse: collapse;
-          margin: 10px 0;
-          font-size: 9pt;
+          margin: 6px 0;
+          font-size: 8.5pt;
+          page-break-inside: avoid;
         }
         .products-table th {
           background-color: #f0f0f0;
-          padding: 6px 4px;
+          padding: 5px 3px;
           text-align: left;
           border: 1px solid #ccc;
           font-weight: bold;
+          font-size: 8.5pt;
         }
         .products-table td {
-          padding: 5px 4px;
+          padding: 4px 3px;
           border: 1px solid #ccc;
+          font-size: 8.5pt;
         }
         .products-table .text-center {
           text-align: center;
@@ -191,67 +215,104 @@ export function SaleA4Layout({ sale, company }: SaleA4LayoutProps) {
           text-align: right;
         }
         .totals {
-          margin-top: 10px;
+          margin-top: 8px;
           text-align: right;
-          font-size: 10pt;
+          font-size: 9pt;
+          page-break-inside: avoid;
         }
         .total-row {
-          margin: 5px 0;
+          margin: 4px 0;
         }
         .total-final {
-          font-size: 14pt;
+          font-size: 12pt;
           font-weight: bold;
-          margin-top: 10px;
-          padding-top: 10px;
+          margin-top: 8px;
+          padding-top: 8px;
           border-top: 2px solid #333;
         }
         .payment-table {
           width: 100%;
           border-collapse: collapse;
-          margin: 10px 0;
-          font-size: 9pt;
+          margin: 6px 0;
+          font-size: 8.5pt;
+          page-break-inside: avoid;
         }
         .payment-table th {
           background-color: #f0f0f0;
-          padding: 6px 4px;
+          padding: 5px 3px;
           text-align: left;
           border: 1px solid #ccc;
           font-weight: bold;
+          font-size: 8.5pt;
         }
         .payment-table td {
-          padding: 5px 4px;
+          padding: 4px 3px;
           border: 1px solid #ccc;
+          font-size: 8.5pt;
         }
         .signature {
-          margin-top: 40px;
-          padding-top: 10px;
+          margin-top: 20px;
+          padding-top: 8px;
           border-top: 1px solid #333;
           text-align: center;
-          font-size: 10pt;
+          font-size: 9pt;
+          page-break-inside: avoid;
         }
         .footer {
-          margin-top: 30px;
-          padding-top: 10px;
+          margin-top: 15px;
+          padding-top: 8px;
           border-top: 1px dashed #999;
           text-align: center;
-          font-size: 8pt;
+          font-size: 7.5pt;
           color: #666;
+          page-break-inside: avoid;
         }
       `}</style>
 
       {/* Cabeçalho da Empresa */}
       <div className="header">
-        <div className="company-name">{company.name}</div>
+        <div className="company-name">
+          {company.nome_fantasia || company.razao_social || company.name}
+        </div>
         <div className="company-info">
-          {company.address && <div>{company.address}</div>}
+          {company.razao_social && company.razao_social !== company.nome_fantasia && (
+            <div className="company-info-line">
+              <strong>Razão Social:</strong> {company.razao_social}
+            </div>
+          )}
+          {company.document && (
+            <div className="company-info-line">
+              <strong>CNPJ:</strong> {company.document}
+            </div>
+          )}
+          {(company.inscricao_estadual || company.inscricao_municipal) && (
+            <div className="company-info-line">
+              {company.inscricao_estadual && `IE: ${company.inscricao_estadual}`}
+              {company.inscricao_estadual && company.inscricao_municipal && ' | '}
+              {company.inscricao_municipal && `IM: ${company.inscricao_municipal}`}
+            </div>
+          )}
+          {company.address && (
+            <div className="company-info-line">
+              {company.address}
+              {company.numero && `, ${company.numero}`}
+              {company.complemento && ` - ${company.complemento}`}
+              {company.bairro && ` - ${company.bairro}`}
+            </div>
+          )}
           {company.city && company.state && (
-            <div>
+            <div className="company-info-line">
               {company.city} - {company.state}
               {company.zipcode && ` - CEP: ${company.zipcode}`}
             </div>
           )}
-          {company.phone && <div>Tel: {company.phone}</div>}
-          {company.email && <div>{company.email}</div>}
+          {(company.phone || company.email) && (
+            <div className="company-info-line">
+              {company.phone && `Tel: ${company.phone}`}
+              {company.phone && company.email && ' | '}
+              {company.email && company.email}
+            </div>
+          )}
         </div>
       </div>
 
@@ -405,7 +466,7 @@ export function SaleA4Layout({ sale, company }: SaleA4LayoutProps) {
 
       {/* Rodapé */}
       <div className="footer">
-        Pedido emitido no GestãoClick - www.gestaoclick.com.br
+        Pedido emitido no JUGA - Sistema de Gestão Empresarial
       </div>
     </div>
   );

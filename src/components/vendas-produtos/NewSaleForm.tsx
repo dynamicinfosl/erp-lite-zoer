@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Table,
   TableBody,
@@ -31,7 +33,8 @@ import {
   FileText,
   Calendar,
   User,
-  Building
+  Building,
+  ChevronsUpDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
@@ -102,6 +105,8 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
   const [showDeliveryAddress, setShowDeliveryAddress] = useState(false);
   const [generatePaymentConditions, setGeneratePaymentConditions] = useState(true);
   const [paymentType, setPaymentType] = useState<'vista' | 'parcelado'>('vista');
+  const [customerOpen, setCustomerOpen] = useState(false);
+  const customerTriggerRef = useRef<HTMLButtonElement>(null);
   
   // Form data
   const [formData, setFormData] = useState({
@@ -447,17 +452,27 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
     }).format(value);
   };
 
+  // Opções de forma de pagamento
+  const paymentMethods = [
+    { value: 'dinheiro', label: 'Dinheiro' },
+    { value: 'pix', label: 'PIX' },
+    { value: 'cartao_debito', label: 'Cartão de Débito' },
+    { value: 'cartao_credito', label: 'Cartão de Crédito' },
+    { value: 'boleto', label: 'Boleto' },
+    { value: 'transferencia', label: 'Transferência Bancária' },
+  ];
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* 1. Dados Gerais */}
-      <Card className="border-2">
-        <CardHeader className="bg-muted/50 border-b">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <FileText className="h-5 w-5" />
+      <Card className="border-2 juga-card shadow-md">
+        <CardHeader className="bg-gradient-to-r from-blue-600/10 via-blue-500/10 to-blue-600/10 border-b border-blue-200/50 dark:border-blue-800/50">
+          <CardTitle className="flex items-center gap-2 text-lg text-blue-700 dark:text-blue-300 font-semibold">
+            <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             Dados Gerais
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 bg-juga-surface-elevated/30">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="sale_number">Número</Label>
@@ -476,53 +491,91 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
               </div>
             </div>
 
-            <div className="space-y-2 relative">
-              <Label htmlFor="customer">Cliente *</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
-                <Input
-                  id="customer"
-                  placeholder="Digite para buscar"
-                  value={searchCustomer}
-                  onChange={(e) => setSearchCustomer(e.target.value)}
-                  className="pl-10"
-                  required
-                />
-              </div>
-              {searchCustomer && filteredCustomers.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-md shadow-lg max-h-60 overflow-y-auto">
-                  {filteredCustomers.map((customer) => (
-                    <div
-                      key={customer.id}
-                      className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-                      onClick={() => handleSelectCustomer(customer.id)}
-                    >
-                      <div className="font-medium">{customer.name}</div>
-                      {customer.document && (
-                        <div className="text-sm text-muted-foreground">{customer.document}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {formData.customer_name && (
-                <div className="flex items-center gap-2 p-2 bg-muted rounded-md mt-2">
-                  <span className="text-sm font-medium flex-1">{formData.customer_name}</span>
+            <div className="space-y-2">
+              <Label htmlFor="customer" className="text-blue-700 dark:text-blue-300 font-medium">Cliente *</Label>
+              {formData.customer_name ? (
+                <div className="flex items-center gap-2 p-2.5 bg-blue-50 dark:bg-blue-950/30 border-2 border-blue-200 dark:border-blue-800 rounded-lg">
+                  <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-sm font-medium flex-1 text-blue-900 dark:text-blue-100">{formData.customer_name}</span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     onClick={() => {
                       setFormData(prev => ({ ...prev, customer_id: '', customer_name: '' }));
+                      setSearchCustomer('');
                       setDeliveryAddress({
                         cep: '', address: '', city: '', state: '',
                         number: '', complement: '', neighborhood: '',
                       });
                     }}
+                    className="h-7 w-7 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/50"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   </Button>
                 </div>
+              ) : (
+                <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      ref={customerTriggerRef}
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={customerOpen}
+                      className="w-full justify-between bg-white dark:bg-gray-900 border-2 border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600"
+                    >
+                      <div className="flex items-center gap-2 flex-1">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span className={searchCustomer ? 'text-foreground' : 'text-muted-foreground'}>
+                          {searchCustomer || 'Digite para buscar cliente...'}
+                        </span>
+                      </div>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    className="p-0" 
+                    align="start" 
+                    sideOffset={4}
+                    style={{ 
+                      width: customerTriggerRef.current ? `${customerTriggerRef.current.offsetWidth}px` : '100%',
+                      minWidth: '300px'
+                    }}
+                  >
+                    <Command>
+                      <CommandInput 
+                        placeholder="Buscar cliente..." 
+                        value={searchCustomer}
+                        onValueChange={setSearchCustomer}
+                      />
+                      <CommandList>
+                        <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {filteredCustomers.map((customer) => (
+                            <CommandItem
+                              key={customer.id}
+                              value={customer.name}
+                              onSelect={() => {
+                                handleSelectCustomer(customer.id);
+                                setCustomerOpen(false);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <User className="mr-2 h-4 w-4" />
+                              <div className="flex flex-col">
+                                <span className="font-medium">{customer.name}</span>
+                                {customer.document && (
+                                  <span className="text-xs text-muted-foreground">{customer.document}</span>
+                                )}
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
 
@@ -617,14 +670,14 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
       </Card>
 
       {/* 2. Produtos */}
-      <Card className="border-2">
-        <CardHeader className="bg-muted/50 border-b">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Package className="h-5 w-5" />
+      <Card className="border-2 juga-card shadow-md">
+        <CardHeader className="bg-gradient-to-r from-purple-600/10 via-purple-500/10 to-purple-600/10 border-b border-purple-200/50 dark:border-purple-800/50">
+          <CardTitle className="flex items-center gap-2 text-lg text-purple-700 dark:text-purple-300 font-semibold">
+            <Package className="h-5 w-5 text-purple-600 dark:text-purple-400" />
             Produtos
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 bg-juga-surface-elevated/30">
           {/* Buscar produto */}
           <div className="space-y-4">
             <div className="relative">
@@ -767,14 +820,14 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
       </Card>
 
       {/* 3. Serviços */}
-      <Card className="border-2">
-        <CardHeader className="bg-muted/50 border-b">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Wrench className="h-5 w-5" />
+      <Card className="border-2 juga-card shadow-md">
+        <CardHeader className="bg-gradient-to-r from-orange-600/10 via-orange-500/10 to-orange-600/10 border-b border-orange-200/50 dark:border-orange-800/50">
+          <CardTitle className="flex items-center gap-2 text-lg text-orange-700 dark:text-orange-300 font-semibold">
+            <Wrench className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             Serviços
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 bg-juga-surface-elevated/30">
           <div className="space-y-4">
             <div className="p-4 border rounded-lg bg-muted/30">
               <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
@@ -891,14 +944,14 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
       </Card>
 
       {/* 4. Transporte */}
-      <Card className="border-2">
-        <CardHeader className="bg-muted/50 border-b">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Truck className="h-5 w-5" />
+      <Card className="border-2 juga-card shadow-md">
+        <CardHeader className="bg-gradient-to-r from-teal-600/10 via-teal-500/10 to-teal-600/10 border-b border-teal-200/50 dark:border-teal-800/50">
+          <CardTitle className="flex items-center gap-2 text-lg text-teal-700 dark:text-teal-300 font-semibold">
+            <Truck className="h-5 w-5 text-teal-600 dark:text-teal-400" />
             Transporte
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 bg-juga-surface-elevated/30">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="freight_value">Valor do frete</Label>
@@ -926,14 +979,14 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
       </Card>
 
       {/* 5. Endereço de Entrega */}
-      <Card className="border-2">
-        <CardHeader className="bg-muted/50 border-b">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <MapPin className="h-5 w-5" />
+      <Card className="border-2 juga-card shadow-md">
+        <CardHeader className="bg-gradient-to-r from-pink-600/10 via-pink-500/10 to-pink-600/10 border-b border-pink-200/50 dark:border-pink-800/50">
+          <CardTitle className="flex items-center gap-2 text-lg text-pink-700 dark:text-pink-300 font-semibold">
+            <MapPin className="h-5 w-5 text-pink-600 dark:text-pink-400" />
             Endereço de entrega
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 bg-juga-surface-elevated/30">
           <div className="flex items-center space-x-2 mb-4">
             <Checkbox
               id="show_delivery"
@@ -1017,14 +1070,14 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
       </Card>
 
       {/* 6. Total */}
-      <Card className="border-2">
-        <CardHeader className="bg-muted/50 border-b">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <DollarSign className="h-5 w-5" />
+      <Card className="border-2 juga-card shadow-md">
+        <CardHeader className="bg-gradient-to-r from-green-600/10 via-green-500/10 to-green-600/10 border-b border-green-200/50 dark:border-green-800/50">
+          <CardTitle className="flex items-center gap-2 text-lg text-green-700 dark:text-green-300 font-semibold">
+            <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
             Total
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 bg-juga-surface-elevated/30">
           <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
@@ -1072,14 +1125,14 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
       </Card>
 
       {/* 7. Pagamento */}
-      <Card className="border-2">
-        <CardHeader className="bg-muted/50 border-b">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <CreditCard className="h-5 w-5" />
+      <Card className="border-2 juga-card shadow-md">
+        <CardHeader className="bg-gradient-to-r from-cyan-600/10 via-cyan-500/10 to-cyan-600/10 border-b border-cyan-200/50 dark:border-cyan-800/50">
+          <CardTitle className="flex items-center gap-2 text-lg text-cyan-700 dark:text-cyan-300 font-semibold">
+            <CreditCard className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
             Pagamento
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 bg-juga-surface-elevated/30">
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <Checkbox
@@ -1145,13 +1198,22 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
                             />
                           </TableCell>
                           <TableCell>
-                            <Input
-                              placeholder="Digite para buscar"
+                            <Select
                               value={payment.payment_method}
-                              onChange={(e) => handlePaymentChange(index, 'payment_method', e.target.value)}
+                              onValueChange={(value) => handlePaymentChange(index, 'payment_method', value)}
                               required
-                              className="w-full"
-                            />
+                            >
+                              <SelectTrigger className="w-full bg-white dark:bg-gray-900 border-2 border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600">
+                                <SelectValue placeholder="Selecione a forma de pagamento" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {paymentMethods.map((method) => (
+                                  <SelectItem key={method.value} value={method.value}>
+                                    {method.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-2">
@@ -1212,14 +1274,14 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
       </Card>
 
       {/* 8. Observações */}
-      <Card className="border-2">
-        <CardHeader className="bg-muted/50 border-b">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <FileText className="h-5 w-5" />
+      <Card className="border-2 juga-card shadow-md">
+        <CardHeader className="bg-gradient-to-r from-indigo-600/10 via-indigo-500/10 to-indigo-600/10 border-b border-indigo-200/50 dark:border-indigo-800/50">
+          <CardTitle className="flex items-center gap-2 text-lg text-indigo-700 dark:text-indigo-300 font-semibold">
+            <FileText className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
             Observações
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 bg-juga-surface-elevated/30">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
@@ -1254,12 +1316,21 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
       </Card>
 
       {/* Botões */}
-      <div className="flex justify-end gap-2 pt-4 border-t">
-        <Button type="button" variant="outline" onClick={onCancel}>
+      <div className="flex justify-end gap-3 pt-6 border-t border-blue-200 dark:border-blue-800">
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={onCancel}
+          className="border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
+        >
           Cancelar
         </Button>
-        <Button type="submit" disabled={loading || (items.length === 0 && services.length === 0)}>
-          {loading ? 'Salvando...' : 'Cadastrar'}
+        <Button 
+          type="submit" 
+          disabled={loading || (items.length === 0 && services.length === 0)}
+          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-500/50 dark:shadow-blue-900/50 font-semibold px-6"
+        >
+          {loading ? 'Salvando...' : 'Cadastrar Venda'}
         </Button>
       </div>
     </form>

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Dialog, 
   DialogContent, 
@@ -51,7 +52,8 @@ import {
   Receipt,
   TrendingUp,
   Clock,
-  FileText
+  FileText,
+  Truck
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
@@ -62,6 +64,7 @@ interface Sale {
   id: string;
   numero: string;
   cliente: string;
+  customer_id?: number | null;
   vendedor?: string;
   itens: Array<{
     produto: string;
@@ -102,6 +105,14 @@ export default function VendasPage() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  
+  // Estados para modal de entrega
+  const [showDeliveryDialog, setShowDeliveryDialog] = useState(false);
+  const [deliveryDrivers, setDeliveryDrivers] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedDriverId, setSelectedDriverId] = useState<string>('');
+  const [isDelivery, setIsDelivery] = useState(false);
+  const [savingDelivery, setSavingDelivery] = useState(false);
+  const [loadingDrivers, setLoadingDrivers] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
     numero: true,
     cliente: true,
@@ -134,7 +145,9 @@ export default function VendasPage() {
 
       console.log('📦 Carregando vendas de balcão para o tenant:', tenant.id);
       
-      const res = await fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}&sale_source=pdv`);
+      // Buscar todas as vendas do tenant (sem filtrar por sale_source na API)
+      // O filtro será feito no frontend para incluir vendas antigas sem sale_source
+      const res = await fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}`);
       if (!res.ok) {
         const errorText = await res.text();
         console.error('❌ Erro na resposta da API:', res.status, errorText);
@@ -161,13 +174,20 @@ export default function VendasPage() {
       // A API pode retornar data, rows ou um array direto
       const allData = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
       
-      // Filtrar apenas vendas de PDV/balcão (sale_source = 'pdv' ou sale_type = 'balcao' ou sem sale_source)
-      const data = allData.filter((s: any) => 
-        s.sale_source === 'pdv' || 
-        s.sale_type === 'balcao' || 
-        s.sale_type === 'entrega' ||
-        (!s.sale_source && s.sale_type !== 'produtos')
-      );
+      // Filtrar apenas vendas de PDV/balcão
+      // Incluir: sale_source = 'pdv', sale_type = 'balcao' ou 'entrega', ou vendas sem sale_source e sem sale_type='produtos'
+      const data = allData.filter((s: any) => {
+        // Vendas do PDV (marcadas explicitamente)
+        if (s.sale_source === 'pdv') return true;
+        // Vendas de balcão ou entrega (tipo antigo)
+        if (s.sale_type === 'balcao' || s.sale_type === 'entrega') return true;
+        // Vendas sem sale_source e sem sale_type='produtos' (vendas antigas de balcão)
+        if (!s.sale_source && s.sale_type !== 'produtos') return true;
+        // Excluir vendas de produtos
+        if (s.sale_source === 'produtos' || s.sale_type === 'produtos') return false;
+        // Por padrão, incluir se não tiver sale_source definido (vendas antigas)
+        return !s.sale_source;
+      });
       
       console.log(`📊 Total de vendas de balcão encontradas: ${data.length}`);
       
@@ -187,6 +207,7 @@ export default function VendasPage() {
           id: String(s.id ?? i + 1),
           numero: s.sale_number ?? s.numero ?? `VND-${String(i + 1).padStart(6, '0')}`,
           cliente: s.customer?.name ?? s.customer_name ?? s.cliente ?? 'Cliente Avulso',
+          customer_id: s.customer_id ?? s.customer?.id ?? null,
           vendedor: s.seller_name ?? s.vendedor ?? '',
           // Se os itens vierem junto com a venda, usar; caso contrário, deixar vazio
           itens: items.map((it: any) => ({
@@ -374,6 +395,165 @@ export default function VendasPage() {
     } catch (error) {
       console.error('Erro ao atualizar venda:', error);
       toast.error(error instanceof Error ? error.message : 'Erro ao atualizar venda');
+    }
+  };
+
+  const loadDeliveryDrivers = useCallback(async () => {
+    if (!tenant?.id) {
+      setDeliveryDrivers([]);
+      return;
+    }
+    try {
+      setLoadingDrivers(true);
+      const res = await fetch(`/next_api/delivery-drivers?tenant_id=${encodeURIComponent(tenant.id)}`);
+      if (!res.ok) {
+        setDeliveryDrivers([]);
+        return;
+      }
+      const json = await res.json();
+      const rows = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
+      const list = Array.isArray(rows) ? rows : [];
+      const driversList = list
+        .filter((d: any) => d.id && d.name && d.is_active !== false)
+        .map((d: any) => ({ id: Number(d.id), name: String(d.name) }));
+      setDeliveryDrivers(driversList);
+    } catch (error) {
+      console.error('Erro ao carregar entregadores:', error);
+      setDeliveryDrivers([]);
+    } finally {
+      setLoadingDrivers(false);
+    }
+  }, [tenant?.id]);
+
+  const handleMarcarEntrega = async (venda: Sale) => {
+    setSelectedVenda(venda);
+    setShowDeliveryDialog(true);
+    await loadDeliveryDrivers();
+    
+    // Verificar se já existe entrega para esta venda
+    try {
+      const res = await fetch(
+        `/next_api/deliveries?tenant_id=${encodeURIComponent(tenant?.id || '')}&sale_id=${encodeURIComponent(venda.id)}&limit=1`
+      );
+      if (res.ok) {
+        const json = await res.json();
+        const rows = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
+        const existing = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+        if (existing?.id) {
+          setIsDelivery(true);
+          setSelectedDriverId(existing.driver_id ? String(existing.driver_id) : '');
+        } else {
+          setIsDelivery(false);
+          setSelectedDriverId('');
+        }
+      }
+    } catch {
+      setIsDelivery(false);
+      setSelectedDriverId('');
+    }
+  };
+
+  const saveDeliveryConfig = async () => {
+    if (!selectedVenda || !tenant?.id) {
+      toast.error('Dados insuficientes para configurar entrega');
+      return;
+    }
+
+    if (!isDelivery) {
+      // Desmarcar entrega
+      try {
+        setSavingDelivery(true);
+        const res = await fetch('/next_api/deliveries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenant_id: tenant.id,
+            sale_id: selectedVenda.id,
+            customer_id: null,
+            status: 'cancelada',
+            driver_id: null,
+            notes: 'Entrega desmarcada na página de vendas',
+          }),
+        });
+        
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ errorMessage: 'Erro desconhecido' }));
+          throw new Error(errorData.errorMessage || `Erro ${res.status}`);
+        }
+        
+        toast.success('Entrega desmarcada com sucesso');
+        setShowDeliveryDialog(false);
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : 'Erro ao desmarcar entrega';
+        console.error('Erro ao desmarcar entrega:', e);
+        toast.error(errorMessage);
+      } finally {
+        setSavingDelivery(false);
+      }
+      return;
+    }
+
+    // Validações para marcar como entrega
+    if (!selectedDriverId) {
+      toast.error('Selecione um entregador para vincular a entrega', {
+        duration: 3000,
+      });
+      return;
+    }
+
+    try {
+      setSavingDelivery(true);
+      const res = await fetch('/next_api/deliveries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant_id: tenant.id,
+          sale_id: selectedVenda.id,
+          customer_id: selectedVenda.customer_id || null,
+          driver_id: Number(selectedDriverId),
+          status: 'aguardando',
+          notes: `Vinculada na página de vendas para entregador: ${deliveryDrivers.find(d => d.id === Number(selectedDriverId))?.name || selectedDriverId}`,
+        }),
+      });
+      
+      if (!res.ok) {
+        let errorMessage = 'Erro ao salvar entrega';
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.errorMessage || errorMessage;
+          
+          if (errorMessage.includes('Endereço de entrega é obrigatório') || 
+              errorMessage.includes('endereço cadastrado')) {
+            errorMessage = 'O cliente desta venda não possui endereço cadastrado. Por favor, cadastre o endereço do cliente antes de marcar como entrega.';
+          } else if (errorMessage.includes('customer_id')) {
+            errorMessage = 'Cliente inválido. Verifique se o cliente está cadastrado corretamente.';
+          } else if (errorMessage.includes('driver_id')) {
+            errorMessage = 'Entregador inválido. Verifique se o entregador está ativo.';
+          }
+        } catch {
+          const text = await res.text().catch(() => '');
+          errorMessage = text || `Erro ${res.status}: ${res.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const result = await res.json();
+      const driverName = deliveryDrivers.find(d => d.id === Number(selectedDriverId))?.name || selectedDriverId;
+      toast.success('Venda marcada para entrega com sucesso!', {
+        description: `Entregador: ${driverName}`,
+        duration: 4000,
+      });
+      setShowDeliveryDialog(false);
+      loadVendas(); // Recarregar lista
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : 'Erro ao salvar entrega';
+      console.error('Erro ao salvar entrega:', e);
+      toast.error(errorMessage, {
+        description: 'Verifique se o cliente possui endereço cadastrado e tente novamente.',
+        duration: 6000,
+      });
+    } finally {
+      setSavingDelivery(false);
     }
   };
 
@@ -1101,6 +1281,11 @@ export default function VendasPage() {
                             Editar
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleMarcarEntrega(venda)}>
+                            <Truck className="h-4 w-4 mr-2" />
+                            Marcar como Entrega
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem 
                             className="text-red-600 dark:text-red-400"
                             onClick={() => handleCancelarVenda(venda)}
@@ -1390,6 +1575,94 @@ export default function VendasPage() {
             >
               <Upload className="h-4 w-4 mr-2" />
               Selecionar Arquivo CSV
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Configurar Entrega */}
+      <Dialog open={showDeliveryDialog} onOpenChange={setShowDeliveryDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Truck className="h-5 w-5" />
+              Configurar Entrega
+            </DialogTitle>
+            <DialogDescription>
+              Configure a entrega para a venda {selectedVenda?.numero}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="rounded-lg border border-gray-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-800 text-sm">Entrega</h3>
+                  <p className="text-xs text-gray-500">
+                    Marque se essa venda deve entrar no romaneio do entregador.
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 text-sm font-medium whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={isDelivery}
+                    onChange={(e) => setIsDelivery(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  É entrega
+                </label>
+              </div>
+
+              {isDelivery && (
+                <div className="mt-3 space-y-3">
+                  <div className="text-xs text-gray-600">
+                    <strong>Cliente:</strong> {selectedVenda?.cliente || 'Não informado'}
+                    {!selectedVenda?.cliente && (
+                      <span className="ml-2 text-red-600">
+                        (cliente precisa ter endereço cadastrado)
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium text-gray-700">Entregador</Label>
+                    <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+                      <SelectTrigger className="w-full h-9 text-xs">
+                        <SelectValue placeholder={loadingDrivers ? 'Carregando...' : deliveryDrivers.length === 0 ? 'Nenhum entregador cadastrado' : 'Selecione um entregador'} />
+                      </SelectTrigger>
+                      <SelectContent className="z-[10000] max-h-[200px] overflow-y-auto">
+                        {deliveryDrivers.length === 0 && !loadingDrivers ? (
+                          <div className="px-2 py-1.5 text-xs text-gray-400 text-center">
+                            Nenhum entregador cadastrado
+                          </div>
+                        ) : loadingDrivers ? (
+                          <div className="px-2 py-1.5 text-xs text-gray-400 text-center">
+                            Carregando...
+                          </div>
+                        ) : (
+                          deliveryDrivers.map((d) => (
+                            <SelectItem key={d.id} value={String(d.id)} className="text-xs">
+                              {d.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeliveryDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={saveDeliveryConfig}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              disabled={savingDelivery || (isDelivery && !selectedDriverId)}
+            >
+              {savingDelivery ? 'Salvando...' : 'Salvar'}
             </Button>
           </DialogFooter>
         </DialogContent>

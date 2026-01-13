@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10';
 
-const supabaseAdmin = supabaseUrl && supabaseServiceKey 
-  ? createClient(supabaseUrl, supabaseServiceKey) 
-  : null;
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 // Headers para desabilitar cache
 const noCacheHeaders = {
@@ -19,17 +17,6 @@ const noCacheHeaders = {
 // Buscar subscription de um tenant
 export async function GET(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      console.error('❌ Cliente Supabase não configurado');
-      return NextResponse.json(
-        { 
-          success: true, 
-          data: null,
-          message: 'Cliente Supabase não configurado' 
-        },
-        { status: 200, headers: noCacheHeaders }
-      );
-    }
 
     const { searchParams } = new URL(request.url);
     const tenant_id = searchParams.get('tenant_id');
@@ -200,13 +187,6 @@ export async function GET(request: NextRequest) {
 // Atualizar plano de um tenant
 export async function PUT(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Cliente Supabase não configurado' },
-        { status: 500 }
-      );
-    }
-
     const body = await request.json();
     const { tenant_id, plan_id } = body;
 
@@ -288,20 +268,6 @@ export async function PUT(request: NextRequest) {
 // Criar subscription para um tenant
 export async function POST(request: NextRequest) {
   try {
-    // Verificação mais rigorosa do cliente Supabase
-    if (!supabaseAdmin) {
-      console.error('❌ [POST] Cliente Supabase não configurado');
-      console.error('❌ [POST] NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? '✅ Configurado' : '❌ Não configurado');
-      console.error('❌ [POST] SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ Configurado' : '❌ Não configurado');
-      return NextResponse.json(
-        { 
-          error: 'Cliente Supabase não configurado',
-          details: 'Verifique as variáveis de ambiente NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY'
-        },
-        { status: 500 }
-      );
-    }
-
     const body = await request.json();
     let { tenant_id, plan_id, status = 'trial' } = body as { tenant_id?: string; plan_id?: string | null; status?: 'trial' | 'active' };
 

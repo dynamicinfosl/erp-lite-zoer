@@ -65,15 +65,28 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     }
     
     // ✅ VERSÃO ULTRA SIMPLIFICADA: Usar API route com timeout curto
+    let controller: AbortController | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isAborted = false;
+    
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+      controller = new AbortController();
+      timeoutId = setTimeout(() => {
+        if (!isAborted) {
+          isAborted = true;
+          controller?.abort();
+        }
+      }, 5000); // 5s timeout
       
       const response = await fetch(`/next_api/admin/get-tenant?user_id=${userId}`, {
         signal: controller.signal
       });
       
-      clearTimeout(timeoutId);
+      // Limpar timeout se a requisição completou com sucesso
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
       
       if (response.ok) {
         const result = await response.json();
@@ -95,10 +108,22 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.warn('⏰ [SIMPLE] Timeout ao buscar tenant via API');
+      // Limpar timeout em caso de erro
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      
+      if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+        console.warn('⏰ [SIMPLE] Timeout ao buscar tenant via API (esperado)');
+        // Não propagar o erro, apenas continuar com o fallback
       } else {
         console.error('⚠️ [SIMPLE] Erro ao buscar tenant via API:', error);
+      }
+    } finally {
+      // Garantir limpeza do timeout
+      if (timeoutId) {
+        clearTimeout(timeoutId);
       }
     }
 

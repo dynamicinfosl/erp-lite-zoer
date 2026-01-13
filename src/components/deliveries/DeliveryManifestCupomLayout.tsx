@@ -1,0 +1,304 @@
+'use client';
+
+import React, { useMemo } from 'react';
+
+type Manifest = {
+  id: string;
+  manifest_number?: string | null;
+  status: string;
+  created_at: string;
+};
+
+type Driver = {
+  name?: string;
+  phone?: string;
+  vehicle_type?: string;
+  vehicle_plate?: string;
+};
+
+type Delivery = {
+  id: number;
+  sale_id?: number | string | null;
+  customer_name: string;
+  delivery_address: string;
+  neighborhood?: string | null;
+  phone?: string | null;
+  status: string;
+};
+
+type Sale = {
+  id: number;
+  sale_number?: string;
+  created_at?: string;
+};
+
+type SaleItem = {
+  sale_id: number;
+  product_name?: string | null;
+  quantity: number;
+  unit_price?: number | null;
+  subtotal?: number | null;
+  total_price?: number | null;
+};
+
+export function DeliveryManifestCupomLayout({
+  manifest,
+  driver,
+  deliveries,
+  sales,
+  saleItems,
+  companyName = 'JUGA',
+}: {
+  manifest: Manifest;
+  driver: Driver | null;
+  deliveries: Delivery[];
+  sales: Sale[];
+  saleItems: SaleItem[];
+  companyName?: string;
+}) {
+  const salesById = useMemo(() => {
+    const map = new Map<number, Sale>();
+    (sales || []).forEach((s) => map.set(Number(s.id), s));
+    return map;
+  }, [sales]);
+
+  const itemsBySaleId = useMemo(() => {
+    const map = new Map<number, SaleItem[]>();
+    (saleItems || []).forEach((it) => {
+      const sid = Number(it.sale_id);
+      const list = map.get(sid) || [];
+      list.push(it);
+      map.set(sid, list);
+    });
+    return map;
+  }, [saleItems]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, { key: string; customer_name: string; delivery_address: string; deliveries: Delivery[] }>();
+    (deliveries || []).forEach((d) => {
+      const key = `${d.customer_name}||${d.delivery_address}`;
+      const existing = map.get(key) || { key, customer_name: d.customer_name, delivery_address: d.delivery_address, deliveries: [] };
+      existing.deliveries.push(d);
+      map.set(key, existing);
+    });
+    return Array.from(map.values());
+  }, [deliveries]);
+
+  const formatDateTime = (s: string) =>
+    new Date(s).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  const formatQty = (q: number) => (Number(q) || 0).toFixed(2);
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  return (
+    <div className="receipt-container">
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: 80mm auto;
+            margin: 0;
+          }
+          body {
+            margin: 0;
+            padding: 0;
+            background: white;
+          }
+          .no-print {
+            display: none !important;
+          }
+          .receipt-container {
+            width: 80mm;
+            margin: 0 auto;
+            padding: 8mm;
+            background: white;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.3;
+          }
+        }
+        @media screen {
+          .receipt-container {
+            width: 80mm;
+            margin: 20px auto;
+            padding: 8mm;
+            background: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.3;
+          }
+        }
+        .receipt-container {
+          color: #000;
+        }
+        .header {
+          text-align: center;
+          border-bottom: 1px dashed #000;
+          padding-bottom: 8px;
+          margin-bottom: 8px;
+        }
+        .company-name {
+          font-weight: bold;
+          font-size: 14px;
+          margin-bottom: 4px;
+        }
+        .title {
+          font-weight: bold;
+          font-size: 12px;
+          margin: 6px 0;
+        }
+        .meta {
+          font-size: 10px;
+          margin: 4px 0;
+        }
+        .section {
+          margin-top: 8px;
+          border-top: 1px dashed #000;
+          padding-top: 6px;
+        }
+        .section-title {
+          font-weight: bold;
+          font-size: 11px;
+          margin-bottom: 4px;
+          text-align: center;
+        }
+        .stop {
+          margin-top: 6px;
+          padding: 4px 0;
+          border-bottom: 1px dashed #999;
+        }
+        .stop-customer {
+          font-weight: bold;
+          font-size: 11px;
+        }
+        .stop-address {
+          font-size: 10px;
+          color: #333;
+          margin-top: 2px;
+        }
+        .stop-sale {
+          font-size: 9px;
+          color: #666;
+          margin-top: 2px;
+        }
+        .items {
+          margin-top: 4px;
+          font-size: 10px;
+        }
+        .item {
+          display: flex;
+          justify-content: space-between;
+          margin: 2px 0;
+        }
+        .footer {
+          margin-top: 12px;
+          padding-top: 8px;
+          border-top: 1px dashed #000;
+          text-align: center;
+          font-size: 9px;
+        }
+        .divider {
+          border-top: 1px dashed #000;
+          margin: 6px 0;
+        }
+      `}</style>
+
+      <div className="header">
+        <div className="company-name">{companyName}</div>
+        <div className="title">ROMANEIO DE ENTREGA</div>
+        <div className="meta">
+          {manifest.manifest_number ? `#${manifest.manifest_number}` : `#${manifest.id.slice(0, 8)}`}
+        </div>
+        <div className="meta">{formatDateTime(manifest.created_at)}</div>
+        {driver ? (
+          <>
+            <div className="meta">
+              <strong>Entregador:</strong> {driver.name || 'Não informado'}
+            </div>
+            {(driver.vehicle_type || driver.vehicle_plate) ? (
+              <div className="meta">
+                <strong>Veículo:</strong> {[driver.vehicle_type, driver.vehicle_plate].filter(Boolean).join(' - ') || 'Não informado'}
+              </div>
+            ) : (
+              <div className="meta">
+                <strong>Veículo:</strong> Não informado
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="meta">
+              <strong>Entregador:</strong> Não encontrado
+            </div>
+            <div className="meta">
+              <strong>Veículo:</strong> Não encontrado
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="section">
+        <div className="section-title">PARADAS</div>
+        {grouped.map((g, idx) => {
+          const rows: Array<{ label: string; qty: number }> = [];
+          g.deliveries.forEach((d) => {
+            const sid = Number(d.sale_id);
+            const its = itemsBySaleId.get(sid) || [];
+            its.forEach((it) => {
+              rows.push({ label: it.product_name || 'Item', qty: Number(it.quantity || 0) });
+            });
+          });
+
+          const consolidated = new Map<string, number>();
+          rows.forEach((r) => consolidated.set(r.label, (consolidated.get(r.label) || 0) + r.qty));
+          const itemsList = Array.from(consolidated.entries()).map(([label, qty]) => ({ label, qty }));
+
+          const saleNumbers = g.deliveries
+            .map((d) => {
+              const sid = Number(d.sale_id);
+              const sale = salesById.get(sid);
+              return sale?.sale_number ? `#${sale.sale_number}` : (d.sale_id ? `#${d.sale_id}` : '');
+            })
+            .filter(Boolean)
+            .join(', ');
+
+          return (
+            <div key={g.key} className="stop">
+              <div className="stop-customer">
+                {idx + 1}. {g.customer_name}
+              </div>
+              <div className="stop-address">{g.delivery_address}</div>
+              {saleNumbers && (
+                <div className="stop-sale">
+                  <strong>Venda(s):</strong> {saleNumbers}
+                </div>
+              )}
+              {itemsList.length > 0 && (
+                <div className="items">
+                  {itemsList.map((it, i) => (
+                    <div key={`${it.label}-${i}`} className="item">
+                      <span>{it.label}</span>
+                      <span>Qtd: {formatQty(it.qty)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="footer">
+        <div className="divider"></div>
+        Total de paradas: {grouped.length}
+        <br />
+        Gerado pelo JUGA
+      </div>
+    </div>
+  );
+}

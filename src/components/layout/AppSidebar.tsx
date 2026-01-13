@@ -40,6 +40,7 @@ import {
   Building2,
   RotateCcw,
   FileText,
+  UsersRound,
 } from 'lucide-react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { ENABLE_AUTH } from '@/constants/auth';
@@ -90,6 +91,7 @@ const menuGroups = [
       { title: 'Estoque', url: '/estoque', icon: Warehouse, roles: ['admin', 'vendedor'] },
       { title: 'Devolução', url: '/estoque/devolucao', icon: RotateCcw, roles: ['admin', 'vendedor'] },
       { title: 'Entregas', url: '/entregas', icon: Truck, roles: ['admin', 'vendedor'] },
+      { title: 'Entregadores', url: '/entregadores', icon: UsersRound, roles: ['admin', 'vendedor'] },
       { title: 'Ordem de Serviços', url: '/ordem-servicos', icon: Wrench, roles: ['admin', 'vendedor'] },
     ],
   },

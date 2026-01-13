@@ -166,11 +166,11 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
   }, [addPayment, finalizePayment, onCancel, selectedPaymentMethod]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-purple-50 pb-20">
       {/* Header */}
-      <div className="bg-white shadow-lg border-b border-gray-200">
-        <div className="flex items-center justify-between p-6">
-          <div className="flex items-center gap-4">
+      <div className="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-30">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-6 gap-4">
+          <div className="flex items-center gap-4 flex-1">
             <Button
               variant="outline"
               size="sm"
@@ -178,18 +178,19 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
               className="flex items-center gap-2 hover:bg-gray-100"
             >
               <ArrowLeft className="h-4 w-4" />
-              Voltar ao PDV
+              <span className="hidden sm:inline">Voltar ao PDV</span>
+              <span className="sm:hidden">Voltar</span>
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
                 Finalizar Venda
               </h1>
-              <p className="text-gray-600">{customerName || 'Cliente Avulso'}</p>
+              <p className="text-sm sm:text-base text-gray-600">{customerName || 'Cliente Avulso'}</p>
             </div>
           </div>
           <div className="text-right">
-            <div className="text-sm text-gray-500">Total da Venda</div>
-            <div className="text-3xl font-bold text-blue-600">
+            <div className="text-xs sm:text-sm text-gray-500">Total da Venda</div>
+            <div className="text-2xl sm:text-3xl font-bold text-blue-600">
               {formatCurrency(finalTotal)}
             </div>
           </div>
@@ -481,11 +482,11 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
         </div>
 
         {/* Botões de Ação */}
-        <div className="flex justify-center gap-4 mt-6">
+        <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mt-6 mb-6">
           <Button
             variant="outline"
             onClick={onCancel}
-            className="px-6 py-2 text-base font-semibold border-2 border-gray-300 hover:bg-gray-50"
+            className="px-4 sm:px-6 py-2 text-sm sm:text-base font-semibold border-2 border-gray-300 hover:bg-gray-50"
           >
             CANCELAR
           </Button>
@@ -493,20 +494,21 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
           <Button
             onClick={finalizePayment}
             disabled={payments.length === 0}
-            className={`px-6 py-2 text-base font-bold ${
+            className={`px-4 sm:px-6 py-2 text-sm sm:text-base font-bold ${
               remaining > 0 
                 ? 'bg-orange-600 hover:bg-orange-700 text-white' 
                 : 'bg-green-600 hover:bg-green-700 text-white'
             }`}
           >
             <CheckCircle2 className="h-4 w-4 mr-2" />
-            {remaining > 0 ? 'PAGAMENTO PARCIAL' : 'FINALIZAR'}
+            <span className="hidden sm:inline">{remaining > 0 ? 'PAGAMENTO PARCIAL' : 'FINALIZAR'}</span>
+            <span className="sm:hidden">{remaining > 0 ? 'PARCIAL' : 'FINALIZAR'}</span>
           </Button>
         </div>
 
         {/* Atalhos de Teclado */}
-        <div className="fixed bottom-0 left-0 right-0 bg-gray-800 text-white p-3 text-sm">
-          <div className="flex justify-center gap-6">
+        <div className="fixed bottom-0 left-0 right-0 bg-gray-800 text-white p-3 text-xs sm:text-sm z-40">
+          <div className="flex flex-wrap justify-center gap-3 sm:gap-6">
             <span><strong>F2</strong> = Mudar Forma de Pagamento</span>
             <span><strong>F3</strong> = Confirmar Pagamento</span>
             <span><strong>F6</strong> = Finalizar Venda</span>

@@ -165,6 +165,9 @@ export default function JugaDashboard() {
 
   useEffect(() => {
     const loadDashboardData = async () => {
+      let timeoutId: NodeJS.Timeout | null = null;
+      let controller: AbortController | null = null;
+
       try {
         setLoading(true);
         
@@ -204,17 +207,24 @@ export default function JugaDashboard() {
         }
 
         // Timeout de 5 segundos para evitar loading infinito
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          console.log('⏰ Timeout atingido, usando dados de exemplo');
-          controller.abort();
-        }, 5000);
+        controller = new AbortController();
+        let isAborted = false;
+
+        const timeoutHandler = () => {
+          if (!isAborted && controller) {
+            console.log('⏰ Timeout atingido, usando dados de exemplo');
+            isAborted = true;
+            controller.abort();
+          }
+        };
+
+        timeoutId = setTimeout(timeoutHandler, 5000);
 
         try {
           // Carregar dados em paralelo com cache
           const tz = -new Date().getTimezoneOffset();
           const fetchOptions = { 
-            signal: controller.signal,
+            signal: controller!.signal,
             headers: {
               'Cache-Control': 'max-age=60', // Cache por 1 minuto
             }
@@ -226,7 +236,16 @@ export default function JugaDashboard() {
             fetch(`/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}`, fetchOptions)
           ]);
 
-          clearTimeout(timeoutId);
+          // Limpar timeout se as requisições completaram
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+
+          // Verificar se foi abortado antes de processar os dados
+          if (controller && controller.signal.aborted) {
+            throw new Error('Request was aborted');
+          }
 
           const salesData = salesRes.status === 'fulfilled' ? await salesRes.value.json() : { data: [] };
           const productsData = productsRes.status === 'fulfilled' ? await productsRes.value.json() : { data: [] };
@@ -267,7 +286,19 @@ export default function JugaDashboard() {
           setLoading(false);
 
         } catch (fetchError) {
-          console.log('⚠️ Erro ao carregar dados, usando dados de exemplo');
+          // Limpar timeout em caso de erro
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+
+          // Ignorar erros de aborto (timeout intencional)
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            console.log('⏰ Requisição cancelada por timeout, usando dados de exemplo');
+          } else {
+            console.log('⚠️ Erro ao carregar dados, usando dados de exemplo:', fetchError);
+          }
+
           // Usar dados de exemplo para manter o design
           setStats({
             totalSales: 0,
@@ -287,11 +318,22 @@ export default function JugaDashboard() {
       } catch (error) {
         console.error('❌ Erro ao carregar dashboard:', error);
       } finally {
+        // Garantir que o timeout seja limpo
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
         setLoading(false);
       }
     };
 
     loadDashboardData();
+
+    // Cleanup: limpar timeout se o componente for desmontado
+    return () => {
+      // O timeout será limpo dentro da função loadDashboardData
+      // Mas garantimos que não haja vazamentos
+    };
   }, [tenant?.id, generateRecentActivity, initialLoad, lastFetchTime]);
 
   // Gerar dados mensais (semestre atual)

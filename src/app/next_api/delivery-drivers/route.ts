@@ -1,92 +1,122 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-import CrudOperations from '@/lib/crud-operations';
-import { createSuccessResponse, createErrorResponse } from '@/lib/create-response';
-import { requestMiddleware, parseQueryParams, validateRequestBody } from "@/lib/api-utils";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY 
+  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10'
+  || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY 
+  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImV4cCI6MjA3MjU5Mzc0M30.NBHrAlv8RPxu1QhLta76Uoh6Bc_OnqhfVydy8_TX6GQ';
+
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 // GET - buscar entregadores
-export const GET = requestMiddleware(async (request, context) => {
+export async function GET(request: NextRequest) {
   try {
-    const { limit, offset } = parseQueryParams(request);
-    const driversCrud = new CrudOperations("delivery_drivers", context.token);
-    
-    const filters = {
-      user_id: context.payload?.sub,
-      is_active: true,
-    };
+    const { searchParams } = new URL(request.url);
+    const tenant_id = searchParams.get('tenant_id');
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const offset = parseInt(searchParams.get('offset') || '0');
 
-    const drivers = await driversCrud.findMany(filters, { 
-      limit: limit || 50, 
-      offset,
-      orderBy: { column: 'name', direction: 'asc' }
-    });
-
-    return createSuccessResponse(drivers || []);
-  } catch (error) {
-    console.error('Erro ao buscar entregadores:', error);
-    return createErrorResponse({
-      errorMessage: "Erro ao buscar entregadores",
-      status: 500,
-    });
-  }
-}, true);
-
-// POST - criar entregador
-export const POST = requestMiddleware(async (request, context) => {
-  try {
-    const body = await validateRequestBody(request);
-    
-    if (!body.name || !body.phone || !body.vehicle_type) {
-      return createErrorResponse({
-        errorMessage: "Nome, telefone e tipo de veículo são obrigatórios",
-        status: 400,
-      });
+    if (!tenant_id) {
+      return NextResponse.json(
+        { success: false, errorMessage: "tenant_id é obrigatório" },
+        { status: 400 }
+      );
     }
 
-    const driversCrud = new CrudOperations("delivery_drivers", context.token);
+    const { data: drivers, error } = await supabaseAdmin
+      .from('delivery_drivers')
+      .select('*')
+      .eq('tenant_id', tenant_id)
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      console.error('Erro ao buscar entregadores:', error);
+      return NextResponse.json(
+        { success: false, errorMessage: "Erro ao buscar entregadores" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true, data: drivers || [] });
+  } catch (error) {
+    console.error('Erro ao buscar entregadores:', error);
+    return NextResponse.json(
+      { success: false, errorMessage: "Erro ao buscar entregadores" },
+      { status: 500 }
+    );
+  }
+}
+
+// POST - criar entregador
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
     
+    if (!body.tenant_id) {
+      return NextResponse.json(
+        { success: false, errorMessage: "tenant_id é obrigatório" },
+        { status: 400 }
+      );
+    }
+
+    if (!body.name || !body.phone || !body.vehicle_type) {
+      return NextResponse.json(
+        { success: false, errorMessage: "Nome, telefone e tipo de veículo são obrigatórios" },
+        { status: 400 }
+      );
+    }
+
     const driverData = {
-      user_id: context.payload?.sub,
+      tenant_id: body.tenant_id,
       name: body.name,
       phone: body.phone,
       vehicle_type: body.vehicle_type,
       vehicle_plate: body.vehicle_plate || null,
       is_active: body.is_active !== false,
+      updated_at: new Date().toISOString(),
     };
 
-    const driver = await driversCrud.create(driverData);
-    return createSuccessResponse(driver, 201);
+    const { data: driver, error } = await supabaseAdmin
+      .from('delivery_drivers')
+      .insert([driverData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao criar entregador:', error);
+      return NextResponse.json(
+        { success: false, errorMessage: "Erro ao criar entregador" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true, data: driver }, { status: 201 });
   } catch (error) {
     console.error('Erro ao criar entregador:', error);
-    return createErrorResponse({
-      errorMessage: "Erro ao criar entregador",
-      status: 500,
-    });
+    return NextResponse.json(
+      { success: false, errorMessage: "Erro ao criar entregador" },
+      { status: 500 }
+    );
   }
-}, true);
+}
 
 // PUT - atualizar entregador
-export const PUT = requestMiddleware(async (request, context) => {
+export async function PUT(request: NextRequest) {
   try {
-    const { id } = parseQueryParams(request);
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
     
     if (!id) {
-      return createErrorResponse({
-        errorMessage: "ID do entregador é obrigatório",
-        status: 400,
-      });
+      return NextResponse.json(
+        { success: false, errorMessage: "ID do entregador é obrigatório" },
+        { status: 400 }
+      );
     }
 
-    const body = await validateRequestBody(request);
-    const driversCrud = new CrudOperations("delivery_drivers", context.token);
-    
-    // Verificar se o entregador existe e pertence ao usuário
-    const existing = await driversCrud.findById(id);
-    if (!existing || existing.user_id !== parseInt(context.payload?.sub || '0')) {
-      return createErrorResponse({
-        errorMessage: "Entregador não encontrado",
-        status: 404,
-      });
-    }
+    const body = await request.json();
 
     const updateData = {
       name: body.name,
@@ -97,52 +127,83 @@ export const PUT = requestMiddleware(async (request, context) => {
       updated_at: new Date().toISOString(),
     };
 
-    const driver = await driversCrud.update(id, updateData);
-    return createSuccessResponse(driver);
-  } catch (error) {
-    console.error('Erro ao atualizar entregador:', error);
-    return createErrorResponse({
-      errorMessage: "Erro ao atualizar entregador",
-      status: 500,
-    });
-  }
-}, true);
+    const { data: driver, error } = await supabaseAdmin
+      .from('delivery_drivers')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
 
-// DELETE - excluir entregador
-export const DELETE = requestMiddleware(async (request, context) => {
-  try {
-    const { id } = parseQueryParams(request);
-    
-    if (!id) {
-      return createErrorResponse({
-        errorMessage: "ID do entregador é obrigatório",
-        status: 400,
-      });
+    if (error) {
+      console.error('Erro ao atualizar entregador:', error);
+      return NextResponse.json(
+        { success: false, errorMessage: "Erro ao atualizar entregador" },
+        { status: 500 }
+      );
     }
 
-    const driversCrud = new CrudOperations("delivery_drivers", context.token);
+    if (!driver) {
+      return NextResponse.json(
+        { success: false, errorMessage: "Entregador não encontrado" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true, data: driver });
+  } catch (error) {
+    console.error('Erro ao atualizar entregador:', error);
+    return NextResponse.json(
+      { success: false, errorMessage: "Erro ao atualizar entregador" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE - excluir entregador
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
     
-    // Verificar se o entregador existe e pertence ao usuário
-    const existing = await driversCrud.findById(id);
-    if (!existing || existing.user_id !== parseInt(context.payload?.sub || '0')) {
-      return createErrorResponse({
-        errorMessage: "Entregador não encontrado",
-        status: 404,
-      });
+    if (!id) {
+      return NextResponse.json(
+        { success: false, errorMessage: "ID do entregador é obrigatório" },
+        { status: 400 }
+      );
     }
 
     // Soft delete - marcar como inativo
-    await driversCrud.update(id, { 
-      is_active: false,
-      updated_at: new Date().toISOString(),
-    });
+    const { data: driver, error } = await supabaseAdmin
+      .from('delivery_drivers')
+      .update({ 
+        is_active: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao excluir entregador:', error);
+      return NextResponse.json(
+        { success: false, errorMessage: "Erro ao excluir entregador" },
+        { status: 500 }
+      );
+    }
+
+    if (!driver) {
+      return NextResponse.json(
+        { success: false, errorMessage: "Entregador não encontrado" },
+        { status: 404 }
+      );
+    }
     
-    return createSuccessResponse({ id });
+    return NextResponse.json({ success: true, data: { id } });
   } catch (error) {
     console.error('Erro ao excluir entregador:', error);
-    return createErrorResponse({
-      errorMessage: "Erro ao excluir entregador",
-      status: 500,
-    });
+    return NextResponse.json(
+      { success: false, errorMessage: "Erro ao excluir entregador" },
+      { status: 500 }
+    );
   }
-}, true);
+}

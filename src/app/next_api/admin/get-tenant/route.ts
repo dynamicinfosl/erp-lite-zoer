@@ -1,28 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10';
 
-const supabaseAdmin = supabaseUrl && supabaseServiceKey 
-  ? createClient(supabaseUrl, supabaseServiceKey) 
-  : null;
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 // Buscar tenant de um usuário
 export async function GET(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      console.error('❌ [API] Cliente Supabase não configurado');
-      return NextResponse.json(
-        { 
-          success: false, 
-          data: null,
-          error: 'Cliente Supabase não configurado' 
-        },
-        { status: 200 }
-      );
-    }
-
     const { searchParams } = new URL(request.url);
     const user_id = searchParams.get('user_id');
 

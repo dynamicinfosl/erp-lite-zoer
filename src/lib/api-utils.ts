@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createErrorResponse } from "./create-response";
 import { AUTH_CODE, ENABLE_AUTH } from "@/constants/auth";
 import { verifyToken } from "./auth";
+import { decodeJwt } from "jose";
 import { User } from "@/types/auth";
 
 export interface JWTPayload extends User {
@@ -13,6 +14,160 @@ export interface JWTPayload extends User {
 export interface ApiParams {
   token: string;
   payload: JWTPayload | null;
+}
+
+function decodeBase64ToString(input: string): string {
+  // Suporte a runtime Node e Edge
+  try {
+    // @ts-expect-error - atob pode existir no edge
+    if (typeof atob === "function") {
+      // @ts-expect-error
+      return atob(input);
+    }
+  } catch {}
+  // Node
+  // eslint-disable-next-line no-undef
+  return Buffer.from(input, "base64").toString("utf-8");
+}
+
+function tryParseSupabaseSessionCookie(raw: string): any | null {
+  if (!raw) return null;
+  let value = raw;
+  try {
+    value = decodeURIComponent(value);
+  } catch {
+    // ignore
+  }
+
+  // Supabase pode armazenar como "base64-<...>"
+  if (value.startsWith("base64-")) {
+    const b64 = value.slice("base64-".length);
+    try {
+      const decoded = decodeBase64ToString(b64);
+      return JSON.parse(decoded);
+    } catch {
+      return null;
+    }
+  }
+
+  // JSON direto
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function getSupabaseCookieValue(request: NextRequest, needle: string): string | null {
+  // Suporte a cookies chunked: sb-...-auth-token.0, .1, ...
+  const all = request.cookies.getAll();
+  const matching = all
+    .filter((c) => c.name.includes("sb-") && c.name.includes(needle))
+    .sort((a, b) => {
+      const aM = a.name.match(/\.(\d+)$/);
+      const bM = b.name.match(/\.(\d+)$/);
+      const ai = aM ? parseInt(aM[1], 10) : 0;
+      const bi = bM ? parseInt(bM[1], 10) : 0;
+      return ai - bi;
+    });
+
+  if (matching.length === 0) return null;
+  if (matching.length === 1) return matching[0].value;
+  return matching.map((c) => c.value).join("");
+}
+
+function getAllSupabaseCookieGroups(request: NextRequest): Array<{ name: string; value: string }> {
+  const all = request.cookies.getAll().filter((c) => c.name.startsWith("sb-"));
+  // agrupar por nome base (remove .0/.1/.2...)
+  const groups = new Map<string, Array<{ name: string; value: string }>>();
+  for (const c of all) {
+    const base = c.name.replace(/\.\d+$/, "");
+    const list = groups.get(base) || [];
+    list.push({ name: c.name, value: c.value });
+    groups.set(base, list);
+  }
+  const result: Array<{ name: string; value: string }> = [];
+  for (const [base, list] of groups.entries()) {
+    const merged = list
+      .sort((a, b) => {
+        const aM = a.name.match(/\.(\d+)$/);
+        const bM = b.name.match(/\.(\d+)$/);
+        const ai = aM ? parseInt(aM[1], 10) : 0;
+        const bi = bM ? parseInt(bM[1], 10) : 0;
+        return ai - bi;
+      })
+      .map((p) => p.value)
+      .join("");
+    result.push({ name: base, value: merged });
+  }
+  return result;
+}
+
+function looksLikeJwt(token: string): boolean {
+  const parts = token.split(".");
+  return parts.length === 3 && parts.every((p) => p.length > 0);
+}
+
+function getAuthTokenFromRequest(request: NextRequest): { token: string | null; payload: JWTPayload | null } {
+  // 1) Token do sistema (JWT próprio)
+  const all = request.cookies.getAll();
+  const legacy = all.find((c) => c.name === "auth-token")?.value || null;
+  if (legacy) {
+    // payload será preenchido por verifyToken no fluxo padrão
+    return { token: legacy, payload: null };
+  }
+
+  // 2) Supabase: pode armazenar sessão JSON em cookies sb-*, às vezes chunkado
+  // Primeiro tenta pelos nomes comuns, depois faz varredura em todos sb-*
+  const candidates: Array<{ name: string; value: string }> = [];
+
+  const named =
+    getSupabaseCookieValue(request, "auth-token") ||
+    getSupabaseCookieValue(request, "access-token") ||
+    null;
+  if (named) {
+    candidates.push({ name: "sb-<named>", value: named });
+  }
+  candidates.push(...getAllSupabaseCookieGroups(request));
+
+  let accessToken: string | null = null;
+  for (const c of candidates) {
+    // Alguns cookies Supabase já podem ser JWT direto
+    if (typeof c.value === "string" && looksLikeJwt(c.value)) {
+      accessToken = c.value;
+      break;
+    }
+
+    const parsed = tryParseSupabaseSessionCookie(c.value);
+    const tokenFromSession =
+      parsed?.access_token ||
+      parsed?.currentSession?.access_token ||
+      parsed?.session?.access_token ||
+      null;
+    if (tokenFromSession && typeof tokenFromSession === "string") {
+      accessToken = tokenFromSession;
+      break;
+    }
+  }
+
+  if (!accessToken) return { token: null, payload: null };
+
+  // Decodificar sem validar assinatura (o PostgREST/Supabase valida no backend)
+  try {
+    const decoded: any = decodeJwt(accessToken);
+    const payload: JWTPayload = {
+      // manter campos mínimos usados no backend
+      sub: decoded?.sub || "",
+      email: decoded?.email || "",
+      role: decoded?.role || "user",
+      isAdmin: false,
+      iat: decoded?.iat || 0,
+      exp: decoded?.exp || 0,
+    };
+    return { token: accessToken, payload };
+  } catch {
+    return { token: accessToken, payload: null };
+  }
 }
 
 /**
@@ -89,23 +244,37 @@ export function requestMiddleware(
     try {
       const params: any = {};
       if(checkToken && ENABLE_AUTH) {
-        const [token] = getCookies(request, ["auth-token"]);
-        const { code, payload } = await verifyToken(token);
-        if(code === AUTH_CODE.TOKEN_EXPIRED) {
-          return createErrorResponse({
-            errorCode: AUTH_CODE.TOKEN_EXPIRED,
-            errorMessage: "Token expired",
-            status: 401,
-          });
-        } else if (code === AUTH_CODE.TOKEN_MISSING) {
+        const { token, payload: preDecodedPayload } = getAuthTokenFromRequest(request);
+
+        // Se for token legado, valida com JWT_SECRET (fluxo antigo)
+        if (token && !preDecodedPayload) {
+          const { code, payload } = await verifyToken(token);
+          if(code === AUTH_CODE.TOKEN_EXPIRED) {
+            return createErrorResponse({
+              errorCode: AUTH_CODE.TOKEN_EXPIRED,
+              errorMessage: "Token expired",
+              status: 401,
+            });
+          } else if (code === AUTH_CODE.TOKEN_MISSING) {
+            return createErrorResponse({
+              errorCode: AUTH_CODE.TOKEN_MISSING,
+              errorMessage: "Token missing",
+              status: 401,
+            });
+          }
+          params.token = token;
+          params.payload = payload;
+        } else if (token) {
+          // Token Supabase (access_token) - payload pode ser null (não obrigamos)
+          params.token = token;
+          params.payload = preDecodedPayload;
+        } else {
           return createErrorResponse({
             errorCode: AUTH_CODE.TOKEN_MISSING,
             errorMessage: "Token missing",
             status: 401,
           });
         }
-        params.token = token
-        params.payload = payload
       }
   
       return await handler(request, params);
