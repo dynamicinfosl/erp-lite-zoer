@@ -133,7 +133,7 @@ export default function EntregasPage() {
     loadDeliveries();
     loadDrivers();
     loadManifests();
-  }, [tenant?.id, loadDeliveries]);
+  }, [tenant?.id, loadDeliveries, loadDrivers, loadManifests]);
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'todos' | 'aguardando' | 'em_rota' | 'entregue' | 'cancelada'>('todos');

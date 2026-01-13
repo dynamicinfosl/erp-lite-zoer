@@ -19,14 +19,10 @@ export interface ApiParams {
 function decodeBase64ToString(input: string): string {
   // Suporte a runtime Node e Edge
   try {
-    // @ts-expect-error - atob pode existir no edge
-    if (typeof atob === "function") {
-      // @ts-expect-error
-      return atob(input);
-    }
+    const edgeAtob = (globalThis as any)?.atob as undefined | ((s: string) => string);
+    if (typeof edgeAtob === "function") return edgeAtob(input);
   } catch {}
   // Node
-  // eslint-disable-next-line no-undef
   return Buffer.from(input, "base64").toString("utf-8");
 }
 

@@ -155,8 +155,8 @@ export function DeliveryManifestA4Layout(props: {
       { className: 'section' },
       React.createElement('div', { className: 'section-title' }, 'PARADAS (POR CLIENTE/ENDEREÇO)'),
       grouped.map((g, idx) => {
-        const rows = [];
-        g.deliveries.forEach((d) => {
+        const rows: Array<{ label: string; qty: number }> = [];
+        g.deliveries.forEach((d: any) => {
           const sid = Number(d.sale_id);
           const its = itemsBySaleId.get(sid) || [];
           its.forEach((it) => {
@@ -164,7 +164,7 @@ export function DeliveryManifestA4Layout(props: {
           });
         });
 
-        const consolidated = new Map();
+        const consolidated = new Map<string, number>();
         rows.forEach((r) => consolidated.set(r.label, (consolidated.get(r.label) || 0) + r.qty));
         const itemsList = Array.from(consolidated.entries()).map(([label, qty]) => ({ label, qty }));
 

@@ -744,10 +744,7 @@ export default function FornecedoresPage() {
       <ImportPreviewModal
         isOpen={showImportPreview}
         onClose={handleImportCancel}
-        onConfirm={handleImportConfirm}
-        onSave={handleSaveImportData}
-        onExtract={handleExtractData}
-        onConsume={handleConsumeData}
+        onRegister={importRows}
         fileName={importFileName}
         headers={importHeaders}
         data={importRowsData}
@@ -755,8 +752,7 @@ export default function FornecedoresPage() {
         validRows={importRowsData.length - importErrors.length}
         invalidRows={importErrors.length}
         errors={importErrors}
-        isExtracting={isExtracting}
-        isConsuming={isConsuming}
+        isRegistering={importLoading}
       />
     </div>
   );

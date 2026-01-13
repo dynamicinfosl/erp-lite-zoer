@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -58,8 +58,6 @@ export function SaleConfirmationModal({
   onEmitirNota,
   saleData 
 }: SaleConfirmationModalProps) {
-  if (!isOpen) return null;
-
   const [isDelivery, setIsDelivery] = useState(false);
   const [drivers, setDrivers] = useState<Array<{ id: number; name: string }>>([]);
   const [driversLoading, setDriversLoading] = useState(false);
@@ -84,7 +82,7 @@ export function SaleConfirmationModal({
     });
   };
 
-  const loadDrivers = async () => {
+  const loadDrivers = useCallback(async () => {
     if (!saleData?.tenant_id) {
       setDrivers([]);
       return;
@@ -112,9 +110,9 @@ export function SaleConfirmationModal({
     } finally {
       setDriversLoading(false);
     }
-  };
+  }, [saleData?.tenant_id]);
 
-  const loadExistingDelivery = async () => {
+  const loadExistingDelivery = useCallback(async () => {
     if (!saleData?.tenant_id || !saleData?.id) return;
     try {
       const res = await fetch(
@@ -134,14 +132,13 @@ export function SaleConfirmationModal({
     } catch {
       // ignore
     }
-  };
+  }, [saleData?.tenant_id, saleData?.id]);
 
   useEffect(() => {
     if (!isOpen) return;
     loadDrivers();
     loadExistingDelivery();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, saleData?.tenant_id, saleData?.id]);
+  }, [isOpen, loadDrivers, loadExistingDelivery]);
 
   const selectedDriverName = useMemo(() => {
     const id = Number(selectedDriverId);
@@ -256,6 +253,9 @@ export function SaleConfirmationModal({
       setSavingDelivery(false);
     }
   };
+
+  // Só renderiza quando aberto (mas os hooks acima sempre rodam na mesma ordem)
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-2 sm:p-4">

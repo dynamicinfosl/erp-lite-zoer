@@ -1724,7 +1724,6 @@ export default function ProdutosPage() {
       <ImportPreviewModal
         isOpen={showImportPreview}
         onClose={handleImportCancel}
-        onConfirm={handleImportConfirm}
         onRegister={handleRegisterSelected}
         fileName={importFileName}
         headers={importHeaders}

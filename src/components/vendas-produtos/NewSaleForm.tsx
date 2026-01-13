@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -95,6 +95,7 @@ interface NewSaleFormProps {
 
 export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
   const { tenant, user } = useSimpleAuth();
+  const tenantId = tenant?.id;
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -163,17 +164,10 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
     discount: 0,
   });
 
-  // Load products and customers
-  useEffect(() => {
-    if (tenant?.id) {
-      loadProducts();
-      loadCustomers();
-    }
-  }, [tenant?.id]);
-
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
+    if (!tenantId) return;
     try {
-      const response = await fetch(`/next_api/products?tenant_id=${encodeURIComponent(tenant!.id)}`);
+      const response = await fetch(`/next_api/products?tenant_id=${encodeURIComponent(tenantId)}`);
       if (response.ok) {
         const data = await response.json();
         const rows = Array.isArray(data?.data) ? data.data : (data?.rows || []);
@@ -182,11 +176,12 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
     }
-  };
+  }, [tenantId]);
 
-  const loadCustomers = async () => {
+  const loadCustomers = useCallback(async () => {
+    if (!tenantId) return;
     try {
-      const response = await fetch(`/next_api/customers?tenant_id=${encodeURIComponent(tenant!.id)}`);
+      const response = await fetch(`/next_api/customers?tenant_id=${encodeURIComponent(tenantId)}`);
       if (response.ok) {
         const data = await response.json();
         const rows = Array.isArray(data?.data) ? data.data : (data?.rows || []);
@@ -195,7 +190,14 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
     }
-  };
+  }, [tenantId]);
+
+  // Load products and customers
+  useEffect(() => {
+    if (!tenantId) return;
+    loadProducts();
+    loadCustomers();
+  }, [tenantId, loadProducts, loadCustomers]);
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchProduct.toLowerCase()) ||
