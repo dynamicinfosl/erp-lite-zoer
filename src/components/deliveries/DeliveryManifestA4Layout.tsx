@@ -68,7 +68,7 @@ export function DeliveryManifestA4Layout(props: {
   const salesById = new Map();
   (sales || []).forEach((s) => salesById.set(Number(s.id), s));
 
-  const itemsBySaleId = new Map();
+  const itemsBySaleId = new Map<number, SaleItem[]>();
   (saleItems || []).forEach((it) => {
     const sid = Number(it.sale_id);
     const list = itemsBySaleId.get(sid) || [];
@@ -158,8 +158,8 @@ export function DeliveryManifestA4Layout(props: {
         const rows: Array<{ label: string; qty: number }> = [];
         g.deliveries.forEach((d: any) => {
           const sid = Number(d.sale_id);
-          const its = itemsBySaleId.get(sid) || [];
-          its.forEach((it) => {
+          const its: SaleItem[] = itemsBySaleId.get(sid) || [];
+          its.forEach((it: SaleItem) => {
             rows.push({ label: it.product_name || 'Item', qty: Number(it.quantity || 0) });
           });
         });
@@ -184,7 +184,7 @@ export function DeliveryManifestA4Layout(props: {
               'div',
               { style: { textAlign: 'right', fontSize: '9pt', color: '#333', fontWeight: 'bold' } },
               g.deliveries
-                .map((d) => {
+                .map((d: Delivery) => {
                   const sid = Number(d.sale_id);
                   const sale = salesById.get(sid);
                   return sale?.sale_number ? `Venda #${sale.sale_number}` : d.sale_id ? `Venda #${d.sale_id}` : '';
