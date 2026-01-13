@@ -532,7 +532,12 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
               }
             })
             .catch((error) => {
-              console.error('❌ [FAST] Erro ao carregar tenant:', error);
+              // Ignorar erros de abort silenciosamente
+              if (error?.name === 'AbortError' || error?.message?.includes('aborted') || error?.message?.includes('signal is aborted')) {
+                console.warn('⏰ Requisição abortada ao carregar tenant (esperado)');
+              } else {
+                console.error('❌ [FAST] Erro ao carregar tenant:', error);
+              }
             });
         } else if (event === 'SIGNED_OUT') {
           setSession(null);
