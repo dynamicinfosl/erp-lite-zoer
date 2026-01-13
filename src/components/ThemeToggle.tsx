@@ -13,6 +13,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function ThemeToggle() {
+  // Temporariamente desativado - tema fixo em light
+  return null;
+  
+  // Código original comentado temporariamente
+  /*
   const { setTheme } = useTheme();
 
   return (
@@ -37,4 +42,5 @@ export function ThemeToggle() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
+  */
 }

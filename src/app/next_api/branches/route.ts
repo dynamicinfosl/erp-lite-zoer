@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { checkFeatureAccess } from '@/lib/plan-middleware';
 
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
@@ -66,22 +65,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Feature paga (preparado): para criar filiais além da Matriz, precisa do recurso "branches"
-    const skipGate =
-      process.env.NODE_ENV !== 'production' ||
-      process.env.NEXT_PUBLIC_DISABLE_PLAN_VALIDATION === 'true';
-    if (!skipGate) {
-      const access = await checkFeatureAccess(tenant_id, 'branches');
-      if (!access.hasAccess) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: access.reason || 'Recurso de filiais não disponível no seu plano',
-            errorCode: 'FEATURE_NOT_AVAILABLE',
-          },
-          { status: 403 },
-        );
-      }
+    // ✅ Feature gate via SuperAdmin (tenant_feature_flags)
+    const { data: flags, error: flagsError } = await supabaseAdmin
+      .from('tenant_feature_flags')
+      .select('features')
+      .eq('tenant_id', tenant_id)
+      .maybeSingle();
+
+    if (flagsError) {
+      console.warn('⚠️ tenant_feature_flags não disponível:', flagsError.message);
+    }
+    const enabled = flags?.features?.branches === true;
+    if (!enabled) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Recurso de filiais não está ativo para este tenant (habilitar no SuperAdmin).',
+          errorCode: 'FEATURE_NOT_AVAILABLE',
+        },
+        { status: 403 },
+      );
     }
 
     const payload: Partial<BranchRow> = {

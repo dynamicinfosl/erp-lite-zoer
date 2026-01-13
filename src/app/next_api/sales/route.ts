@@ -20,6 +20,7 @@ async function createSaleHandler(request: NextRequest) {
       payment_method, 
       tenant_id, 
       user_id, 
+      branch_id,
       sale_type,
       sale_source,
       customer_name,
@@ -146,6 +147,7 @@ async function createSaleHandler(request: NextRequest) {
     const saleData: any = {
       tenant_id: tenant_id, // ✅ Usar tenant_id validado
       user_id: user_id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
+      branch_id: branch_id || null,
       sale_type: sale_type || null, // ✅ Usar NULL como padrão
       sale_number: saleNumber,
       customer_id: customer_id || null,
@@ -274,10 +276,14 @@ async function listSalesHandler(request: NextRequest) {
     const today = searchParams.get('today');
     const tenant_id = searchParams.get('tenant_id');
     const sale_source = searchParams.get('sale_source');
+    const branch_id = searchParams.get('branch_id'); // ✅ Novo: filtrar por filial
+    const branch_scope = searchParams.get('branch_scope'); // 'all' | 'branch'
     const tzParam = searchParams.get('tz'); // minutos de offset do fuso (ex: -180 para BRT)
 
     console.log(`💰 [SALES API] GET /sales INICIADO`);
     console.log(`💰 [SALES API] tenant_id: ${tenant_id}`);
+    console.log(`💰 [SALES API] branch_id: ${branch_id}`);
+    console.log(`💰 [SALES API] branch_scope: ${branch_scope}`);
     console.log(`💰 [SALES API] today: ${today}`);
     console.log(`💰 [SALES API] sale_source: ${sale_source}`);
     console.log(`💰 [SALES API] tz: ${tzParam}`);
@@ -294,6 +300,24 @@ async function listSalesHandler(request: NextRequest) {
       console.log(`🔍 Buscando vendas com tenant_id: ${tenant_id}`);
     } else {
       console.log('⚠️ GET /sales - Nenhum tenant_id válido fornecido');
+    }
+
+    // ✅ Filtrar por branch_id se fornecido (filial específica)
+    // Agora sempre filtra por branch_id (não existe mais 'all')
+    if (branch_id) {
+      const bid = Number(branch_id);
+      if (Number.isFinite(bid) && bid > 0) {
+        query = query.eq('branch_id', bid);
+        console.log(`🔍 Filtrando vendas da filial: ${bid}`);
+      } else {
+        // Se branch_id inválido, não retornar nada
+        console.log(`⚠️ branch_id inválido, retornando array vazio`);
+        return NextResponse.json({ success: true, data: [] });
+      }
+    } else {
+      // Se não tem branch_id, não retornar vendas (deve sempre ter branch_id)
+      console.log(`⚠️ Sem branch_id fornecido, retornando array vazio`);
+      return NextResponse.json({ success: true, data: [] });
     }
 
     // Filtrar por sale_source se fornecido

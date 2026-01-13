@@ -215,8 +215,10 @@ async function listProductsHandler(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const tenant_id = searchParams.get('tenant_id');
     const sku = searchParams.get('sku');
+    const branch_id = searchParams.get('branch_id');
+    const branch_scope = searchParams.get('branch_scope'); // 'all' | 'branch'
 
-    console.log(`📦 GET /products - tenant_id: ${tenant_id}, sku: ${sku}`);
+    console.log(`📦 GET /products - tenant_id: ${tenant_id}, sku: ${sku}, branch_id: ${branch_id}, scope: ${branch_scope}`);
 
     if (!tenant_id) {
       // Em desenvolvimento, quando tenant ainda não está resolvido no cliente,
@@ -225,12 +227,40 @@ async function listProductsHandler(request: NextRequest) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-    let query = supabaseAdmin
-      .from('products')
-      .select('*')
-      .eq('tenant_id', tenant_id);
+    // ✅ Lógica de compartilhamento:
+    // - Se branch_scope='all' (matriz): retorna todos os produtos do tenant
+    // - Se branch_id fornecido (filial): retorna TODOS os produtos do tenant (compartilhados automaticamente)
+    //   O estoque será separado por filial via product_stocks
+    let query;
     
-    console.log(`🔍 Buscando produtos com tenant_id: ${tenant_id}`);
+    if (branch_scope === 'all') {
+      // Matriz vê todos os produtos
+      query = supabaseAdmin
+        .from('products')
+        .select('*')
+        .eq('tenant_id', tenant_id);
+      console.log(`🔍 [Matriz] Buscando todos os produtos do tenant`);
+    } else if (branch_id) {
+      // Filial: ver TODOS os produtos do tenant (compartilhados automaticamente)
+      // O estoque será separado por filial via product_stocks
+      const bid = Number(branch_id);
+      if (Number.isFinite(bid) && bid > 0) {
+        query = supabaseAdmin
+          .from('products')
+          .select('*')
+          .eq('tenant_id', tenant_id);
+        console.log(`🔍 [Filial ${bid}] Buscando todos os produtos do tenant (compartilhados automaticamente)`);
+      } else {
+        return NextResponse.json({ success: true, data: [] });
+      }
+    } else {
+      // Fallback: retornar todos (compatibilidade com código antigo)
+      query = supabaseAdmin
+        .from('products')
+        .select('*')
+        .eq('tenant_id', tenant_id);
+      console.log(`🔍 [Fallback] Buscando todos os produtos do tenant`);
+    }
 
     // Se SKU foi fornecido, filtrar por SKU DENTRO DO TENANT
     if (sku && sku.trim()) {
@@ -246,6 +276,69 @@ async function listProductsHandler(request: NextRequest) {
         { error: 'Erro ao listar produtos: ' + error.message },
         { status: 400 }
       );
+    }
+
+    // ✅ Branch-aware stock: se branch_id ou branch_scope=all, substituir stock_quantity usando product_stocks
+    try {
+      const rows = Array.isArray(data) ? data : [];
+      const productIds = rows.map((p: any) => Number(p.id)).filter((id: number) => Number.isFinite(id));
+
+      if (productIds.length > 0 && (branch_id || branch_scope === 'all')) {
+        if (branch_scope === 'all') {
+          // Somar estoque de todas as filiais para cada produto
+          const { data: stocks, error: stocksError } = await supabaseAdmin
+            .from('product_stocks')
+            .select('product_id, quantity')
+            .eq('tenant_id', tenant_id)
+            .in('product_id', productIds);
+
+          if (!stocksError && stocks) {
+            const sumByProduct: Record<number, number> = {};
+            for (const s of stocks as any[]) {
+              const pid = Number(s.product_id);
+              const qty = Number(s.quantity) || 0;
+              if (!Number.isFinite(pid)) continue;
+              sumByProduct[pid] = (sumByProduct[pid] || 0) + qty;
+            }
+            for (const p of rows as any[]) {
+              const pid = Number(p.id);
+              if (Number.isFinite(pid) && pid in sumByProduct) {
+                p.stock_quantity = sumByProduct[pid];
+              } else {
+                // se não tiver registro em product_stocks, considerar 0 para visão agregada
+                p.stock_quantity = 0;
+              }
+            }
+          }
+        } else if (branch_id) {
+          const bid = Number(branch_id);
+          if (Number.isFinite(bid)) {
+            const { data: stocks, error: stocksError } = await supabaseAdmin
+              .from('product_stocks')
+              .select('product_id, quantity')
+              .eq('tenant_id', tenant_id)
+              .eq('branch_id', bid)
+              .in('product_id', productIds);
+
+            if (!stocksError) {
+              const qtyByProduct: Record<number, number> = {};
+              for (const s of (stocks || []) as any[]) {
+                const pid = Number(s.product_id);
+                if (!Number.isFinite(pid)) continue;
+                qtyByProduct[pid] = Number(s.quantity) || 0;
+              }
+              for (const p of rows as any[]) {
+                const pid = Number(p.id);
+                if (!Number.isFinite(pid)) continue;
+                p.stock_quantity = pid in qtyByProduct ? qtyByProduct[pid] : 0;
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // não quebrar listagem se product_stocks ainda não estiver populado para algum tenant
+      console.warn('⚠️ Falha ao aplicar estoque por filial em /products (fallback para stock_quantity do products):', e);
     }
 
     // Log para debug

@@ -49,6 +49,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { mockUserProfile } from '@/lib/mock-data';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { BranchSelector } from '@/components/branches/BranchSelector';
+import { useBranch } from '@/contexts/BranchContext';
 import {
   Dialog,
   DialogContent,
@@ -105,6 +106,7 @@ const menuGroups = [
       { title: 'Perfil da Empresa', url: '/perfil-empresa', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Configuração Fiscal', url: '/configuracao-fiscal', icon: FileText, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Perfil do Usuário', url: '/perfil-usuario', icon: UserCog, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Usuários', url: '/configuracoes/usuarios', icon: Users, roles: ['admin'] },
       { title: 'Assinatura', url: '/assinatura', icon: CreditCard, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Configurações', url: '/configuracoes', icon: Settings, roles: ['admin', 'vendedor', 'financeiro'] },
       // Botão Administração oculto - acesso restrito apenas para usuário "julga"
@@ -117,6 +119,7 @@ const menuGroups = [
 function SidebarContentInternal() {
   const pathname = usePathname();
   const { user, tenant, signOut } = useSimpleAuth();
+  const { enabled: isBranchesEnabled } = useBranch();
   
   
   // Simular perfil do usuário baseado no role ou usar um perfil padrão se auth estiver desabilitado
@@ -129,7 +132,9 @@ function SidebarContentInternal() {
 
   const filteredGroups = menuGroups.map(group => ({
     title: group.title,
-    items: group.items.filter(item => item.roles.includes(userRole)),
+    items: group.items
+      .filter(item => item.roles.includes(userRole))
+      .filter(item => (item.url === '/filiais' ? isBranchesEnabled : true)),
   })).filter(group => group.items.length > 0);
 
 

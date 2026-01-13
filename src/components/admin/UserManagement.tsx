@@ -69,6 +69,52 @@ export function UserManagement() {
   const [expirationDate, setExpirationDate] = useState<string>('');
   const [availablePlans, setAvailablePlans] = useState<Array<{ id: string; name: string; slug: string }>>([]);
 
+  // Feature flags por tenant (controlado pelo SuperAdmin)
+  const [tenantFeatures, setTenantFeatures] = useState<Record<string, any>>({});
+  const [updatingFeatureTenantId, setUpdatingFeatureTenantId] = useState<string | null>(null);
+
+  const loadTenantFeaturesFor = useCallback(async (tenantIds: string[]) => {
+    try {
+      const unique = Array.from(new Set(tenantIds.filter(Boolean)));
+      const map: Record<string, any> = {};
+      for (const tenantId of unique) {
+        const res = await fetch(`/next_api/tenant-features?tenant_id=${encodeURIComponent(tenantId)}`, { cache: 'no-store' });
+        if (res.ok) {
+          const json = await res.json();
+          map[tenantId] = json?.data?.features || {};
+        } else {
+          map[tenantId] = {};
+        }
+      }
+      setTenantFeatures(map);
+    } catch (e) {
+      console.error('Erro ao carregar tenant features:', e);
+      setTenantFeatures({});
+    }
+  }, []);
+
+  const toggleBranchesFeature = useCallback(async (tenantId: string, enabled: boolean) => {
+    try {
+      setUpdatingFeatureTenantId(tenantId);
+      const res = await fetch('/next_api/admin/tenant-features', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant_id: tenantId, feature: 'branches', enabled }),
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `HTTP ${res.status}`);
+      }
+      setTenantFeatures((prev) => ({ ...prev, [tenantId]: { ...(prev[tenantId] || {}), branches: enabled } }));
+      toast.success(enabled ? 'Filiais habilitado para o tenant' : 'Filiais desabilitado para o tenant');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao atualizar recurso de filiais');
+    } finally {
+      setUpdatingFeatureTenantId(null);
+    }
+  }, []);
+
   const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
@@ -149,6 +195,10 @@ export function UserManagement() {
       setUsers(data);
       setFilteredUsers(data);
       console.log('✅ Usuários carregados com sucesso:', data.length);
+
+      // carregar flags de tenant (superadmin)
+      const tenantIds = data.map((u) => u.tenant_id).filter(Boolean);
+      await loadTenantFeaturesFor(tenantIds);
     } catch (error: any) {
       console.error('❌ Erro ao carregar usuários:', error);
       const errorMessage = error?.message || 'Erro desconhecido ao carregar usuários';
@@ -159,7 +209,7 @@ export function UserManagement() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadTenantFeaturesFor]);
 
   const loadPlans = useCallback(async () => {
     try {
@@ -846,6 +896,7 @@ export function UserManagement() {
                     <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Responsável</TableHead>
                     <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Status</TableHead>
                     <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Plano</TableHead>
+                    <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Filiais</TableHead>
                     <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Expiração</TableHead>
                     <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Aprovação</TableHead>
                     <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Cadastro</TableHead>
@@ -889,6 +940,18 @@ export function UserManagement() {
                             Sem plano
                           </Badge>
                         )}
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={tenantFeatures[user.tenant_id]?.branches === true}
+                            onCheckedChange={(checked) => toggleBranchesFeature(user.tenant_id, checked)}
+                            disabled={updatingFeatureTenantId === user.tenant_id}
+                          />
+                          <span className="text-[11px] text-gray-400">
+                            {updatingFeatureTenantId === user.tenant_id ? '...' : (tenantFeatures[user.tenant_id]?.branches ? 'Ativo' : 'Inativo')}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="py-2">
                         {(() => {

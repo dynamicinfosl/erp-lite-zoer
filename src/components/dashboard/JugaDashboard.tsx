@@ -27,6 +27,7 @@ import {
   Tooltip
 } from 'recharts';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
+import { useBranch } from '@/contexts/BranchContext';
 
 interface DashboardStats {
   totalSales: number;
@@ -60,6 +61,7 @@ interface MonthlyData {
 
 export default function JugaDashboard() {
   const { tenant } = useSimpleAuth();
+  const { branchId, scope } = useBranch();
   const router = useRouter();
 
   // Funções de navegação
@@ -230,10 +232,26 @@ export default function JugaDashboard() {
             }
           };
           
+          // Montar URLs com parâmetros de branch (sempre precisa de branch_id)
+          let salesUrl = `/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}&tz=${tz}`;
+          let productsUrl = `/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`;
+          let customersUrl = `/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}`;
+          
+          // Sempre passar branch_id (se não tiver, não fazer requisição)
+          if (branchId) {
+            salesUrl += `&branch_id=${branchId}`;
+            productsUrl += `&branch_id=${branchId}`;
+            customersUrl += `&branch_id=${branchId}`;
+          } else {
+            // Se não tem branchId, não fazer requisição (aguardar carregar)
+            console.warn('[Dashboard] Sem branchId, aguardando...');
+            return;
+          }
+          
           const [salesRes, productsRes, customersRes] = await Promise.allSettled([
-            fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}&tz=${tz}`, fetchOptions),
-            fetch(`/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`, fetchOptions),
-            fetch(`/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}`, fetchOptions)
+            fetch(salesUrl, fetchOptions),
+            fetch(productsUrl, fetchOptions),
+            fetch(customersUrl, fetchOptions)
           ]);
 
           // Limpar timeout se as requisições completaram
@@ -334,7 +352,7 @@ export default function JugaDashboard() {
       // O timeout será limpo dentro da função loadDashboardData
       // Mas garantimos que não haja vazamentos
     };
-  }, [tenant?.id, generateRecentActivity, initialLoad, lastFetchTime]);
+  }, [tenant?.id, branchId, scope, generateRecentActivity, initialLoad, lastFetchTime]);
 
   // Gerar dados mensais (semestre atual)
   const generateMonthlyData = (sales: any[]) => {

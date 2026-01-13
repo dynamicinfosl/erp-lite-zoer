@@ -32,6 +32,7 @@ import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { BranchSelector } from '@/components/branches/BranchSelector';
+import { useBranch } from '@/contexts/BranchContext';
 
 const menuGroups = [
   {
@@ -67,6 +68,7 @@ const menuGroups = [
       { title: 'Fornecedores', url: '/fornecedores', icon: Building2 },
       { title: 'Ordem de Serviços', url: '/ordem-servicos', icon: Wrench },
       { title: 'Assinatura', url: '/assinatura', icon: CreditCard },
+      { title: 'Usuários', url: '/configuracoes/usuarios', icon: Users },
       { title: 'Configurações', url: '/configuracoes', icon: Settings },
       { title: 'Perfil Empresa', url: '/perfil-empresa', icon: Store },
       { title: 'Perfil Usuário', url: '/perfil-usuario', icon: UserCog },
@@ -79,6 +81,7 @@ export function MobileHeader() {
   const [openGroups, setOpenGroups] = useState<string[]>([]);
   const pathname = usePathname();
   const { signOut } = useSimpleAuth();
+  const { enabled: isBranchesEnabled } = useBranch();
 
   const toggleGroup = (groupTitle: string) => {
     setOpenGroups(prev => 
@@ -151,7 +154,9 @@ export function MobileHeader() {
                     </Button>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="space-y-1">
-                    {group.items.map((item: any) => (
+                    {group.items
+                      .filter((item: any) => (item.url === '/filiais' ? isBranchesEnabled : true))
+                      .map((item: any) => (
                       <Link
                         key={item.title}
                         href={item.url}

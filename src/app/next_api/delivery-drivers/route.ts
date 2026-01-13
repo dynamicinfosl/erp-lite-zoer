@@ -61,14 +61,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
+    
     if (!body.name || !body.phone || !body.vehicle_type) {
       return NextResponse.json(
         { success: false, errorMessage: "Nome, telefone e tipo de veículo são obrigatórios" },
         { status: 400 }
       );
     }
-
+    
     const driverData = {
       tenant_id: body.tenant_id,
       name: body.name,
@@ -176,8 +176,8 @@ export async function DELETE(request: NextRequest) {
     const { data: driver, error } = await supabaseAdmin
       .from('delivery_drivers')
       .update({ 
-        is_active: false,
-        updated_at: new Date().toISOString(),
+      is_active: false,
+      updated_at: new Date().toISOString(),
       })
       .eq('id', id)
       .select()

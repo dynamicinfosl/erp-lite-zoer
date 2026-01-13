@@ -21,6 +21,7 @@ export const ROUTES = {
   DELIVERIES: '/entregas',
   DRIVERS: '/entregadores',
   BRANCHES: '/filiais',
+  STOCK_TRANSFERS: '/estoque/transferencias',
   
   // Páginas especiais
   TRIAL_EXPIRED: '/trial-expirado',

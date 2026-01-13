@@ -10,9 +10,11 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Building2, Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
+import { Building2, Plus, Pencil, Trash2, RefreshCw, Share2, Users, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBranch } from '@/contexts/BranchContext';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type BranchRow = {
   id: number;
@@ -32,7 +34,7 @@ type BranchForm = {
 
 export default function FiliaisPage() {
   const { tenant } = useSimpleAuth();
-  const { refresh: refreshBranchContext } = useBranch();
+  const { enabled: branchesEnabled, refresh: refreshBranchContext } = useBranch();
 
   const [loading, setLoading] = useState(false);
   const [branches, setBranches] = useState<BranchRow[]>([]);
@@ -40,6 +42,17 @@ export default function FiliaisPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<BranchForm>({ name: '', code: '' });
+  
+  // Estados para modal de compartilhamento
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState<BranchRow | null>(null);
+  const [shareType, setShareType] = useState<'customers' | 'products'>('customers');
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [selectedCustomers, setSelectedCustomers] = useState<number[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
+  const [loadingShare, setLoadingShare] = useState(false);
+  const [loadingShareData, setLoadingShareData] = useState(false);
 
   const resetForm = useCallback(() => {
     setForm({ name: '', code: '' });
@@ -172,9 +185,141 @@ export default function FiliaisPage() {
     }
   };
 
+  const openShareModal = async (b: BranchRow) => {
+    if (b.is_headquarters) {
+      toast.error('Não é possível compartilhar com a Matriz');
+      return;
+    }
+    setSelectedBranch(b);
+    setShareType('customers');
+    setSelectedCustomers([]);
+    setSelectedProducts([]);
+    setShareModalOpen(true);
+    await loadShareData();
+  };
+
+  const loadShareData = async () => {
+    if (!tenant?.id) return;
+    try {
+      setLoadingShareData(true);
+      
+      // Carregar clientes da matriz
+      const customersRes = await fetch(`/next_api/customers?tenant_id=${tenant.id}&branch_scope=all`);
+      if (customersRes.ok) {
+        const customersJson = await customersRes.json();
+        setCustomers(Array.isArray(customersJson?.data) ? customersJson.data : []);
+      }
+      
+      // Carregar produtos da matriz
+      const productsRes = await fetch(`/next_api/products?tenant_id=${tenant.id}&branch_scope=all`);
+      if (productsRes.ok) {
+        const productsJson = await productsRes.json();
+        setProducts(Array.isArray(productsJson?.data) ? productsJson.data : []);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao carregar dados para compartilhamento');
+    } finally {
+      setLoadingShareData(false);
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (shareType === 'customers') {
+      if (customers.length === 0) return;
+      const allSelected = customers.length > 0 && selectedCustomers.length === customers.length;
+      if (allSelected) {
+        setSelectedCustomers([]);
+      } else {
+        setSelectedCustomers(customers.map((c) => Number(c.id)).filter((id) => Number.isFinite(id)));
+      }
+    } else {
+      if (products.length === 0) return;
+      const allSelected = products.length > 0 && selectedProducts.length === products.length;
+      if (allSelected) {
+        setSelectedProducts([]);
+      } else {
+        setSelectedProducts(products.map((p) => Number(p.id)).filter((id) => Number.isFinite(id)));
+      }
+    }
+  };
+
+  const handleShare = async (shareAll = false) => {
+    if (!tenant?.id || !selectedBranch) return;
+    
+    let customerIds = shareType === 'customers' ? selectedCustomers : undefined;
+    let productIds = shareType === 'products' ? selectedProducts : undefined;
+
+    if (shareAll) {
+      // Compartilhar todos
+      if (shareType === 'customers') {
+        customerIds = customers.map((c) => Number(c.id));
+      } else {
+        productIds = products.map((p) => Number(p.id));
+      }
+    }
+    
+    if (shareType === 'customers' && (!customerIds || customerIds.length === 0)) {
+      toast.error('Selecione pelo menos um cliente');
+      return;
+    }
+    
+    if (shareType === 'products' && (!productIds || productIds.length === 0)) {
+      toast.error('Selecione pelo menos um produto');
+      return;
+    }
+
+    try {
+      setLoadingShare(true);
+      const res = await fetch('/next_api/branch-sharing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: shareType,
+          tenant_id: tenant.id,
+          branch_ids: [selectedBranch.id],
+          customer_ids: customerIds,
+          product_ids: productIds,
+        }),
+      });
+
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json?.error || 'Erro ao compartilhar');
+      }
+
+      const json = await res.json();
+      toast.success(json.message || 'Compartilhado com sucesso');
+      setShareModalOpen(false);
+      setSelectedCustomers([]);
+      setSelectedProducts([]);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || 'Erro ao compartilhar');
+    } finally {
+      setLoadingShare(false);
+    }
+  };
+
   return (
     <TenantPageWrapper>
       <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+        {!branchesEnabled ? (
+          <Card className="juga-card">
+            <CardHeader>
+              <CardTitle className="text-heading">Filiais</CardTitle>
+              <CardDescription>
+                Recurso desativado para sua conta. Solicite ao suporte/administrador para habilitar.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-body">
+                Esta funcionalidade é ativada pelo <strong>SuperAdmin</strong> por tenant.
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <h1 className="text-2xl sm:text-3xl font-bold text-heading flex items-center gap-2">
@@ -240,6 +385,12 @@ export default function FiliaisPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            {!b.is_headquarters && (
+                              <Button variant="outline" size="sm" onClick={() => openShareModal(b)} className="gap-1">
+                                <Share2 className="h-4 w-4" />
+                                Compartilhar
+                              </Button>
+                            )}
                             <Button variant="outline" size="sm" onClick={() => openEdit(b)} className="gap-1">
                               <Pencil className="h-4 w-4" />
                               Editar
@@ -305,6 +456,238 @@ export default function FiliaisPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={shareModalOpen} onOpenChange={setShareModalOpen}>
+          <DialogContent className="sm:max-w-2xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>Compartilhar com {selectedBranch?.name}</DialogTitle>
+              <DialogDescription>
+                Selecione os cadastros que deseja compartilhar com esta filial
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <Button
+                  variant={shareType === 'customers' ? 'default' : 'outline'}
+                  onClick={() => {
+                    setShareType('customers');
+                    setSelectedCustomers([]);
+                  }}
+                  className="gap-2"
+                >
+                  <Users className="h-4 w-4" />
+                  Clientes ({customers.length})
+                </Button>
+                <Button
+                  variant={shareType === 'products' ? 'default' : 'outline'}
+                  onClick={() => {
+                    setShareType('products');
+                    setSelectedProducts([]);
+                  }}
+                  className="gap-2"
+                >
+                  <Package className="h-4 w-4" />
+                  Produtos ({products.length})
+                </Button>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-body font-medium">
+                  {shareType === 'customers'
+                    ? `${selectedCustomers.length} de ${customers.length} cliente(s) selecionado(s)`
+                    : `${selectedProducts.length} de ${products.length} produto(s) selecionado(s)`}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSelectAll}
+                    disabled={loadingShareData || (shareType === 'customers' ? customers.length === 0 : products.length === 0)}
+                  >
+                    {shareType === 'customers'
+                      ? selectedCustomers.length === customers.length && customers.length > 0
+                        ? 'Desmarcar Todos'
+                        : 'Selecionar Todos'
+                      : selectedProducts.length === products.length && products.length > 0
+                      ? 'Desmarcar Todos'
+                      : 'Selecionar Todos'}
+                  </Button>
+                </div>
+              </div>
+
+              {loadingShareData ? (
+                <div className="text-center py-8 text-body">Carregando...</div>
+              ) : (
+                <div className="border rounded-md overflow-hidden">
+                  <ScrollArea className="h-[400px]">
+                    {shareType === 'customers' ? (
+                      customers.length === 0 ? (
+                        <div className="text-center py-8 text-body">Nenhum cliente cadastrado na matriz</div>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-12">
+                                <Checkbox
+                                  checked={customers.length > 0 && selectedCustomers.length === customers.length}
+                                  onCheckedChange={handleSelectAll}
+                                />
+                              </TableHead>
+                              <TableHead>Nome</TableHead>
+                              <TableHead>Email</TableHead>
+                              <TableHead>Telefone</TableHead>
+                              <TableHead>Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {customers.map((customer) => {
+                              const isSelected = selectedCustomers.includes(Number(customer.id));
+                              return (
+                                <TableRow
+                                  key={customer.id}
+                                  className={isSelected ? 'bg-blue-50' : ''}
+                                  onClick={() => {
+                                    const id = Number(customer.id);
+                                    if (isSelected) {
+                                      setSelectedCustomers(selectedCustomers.filter((c) => c !== id));
+                                    } else {
+                                      setSelectedCustomers([...selectedCustomers, id]);
+                                    }
+                                  }}
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={(checked) => {
+                                        const id = Number(customer.id);
+                                        if (checked) {
+                                          setSelectedCustomers([...selectedCustomers, id]);
+                                        } else {
+                                          setSelectedCustomers(selectedCustomers.filter((c) => c !== id));
+                                        }
+                                      }}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="font-medium">
+                                    {customer.name || customer.customer_name || `Cliente #${customer.id}`}
+                                  </TableCell>
+                                  <TableCell>{customer.email || '—'}</TableCell>
+                                  <TableCell>{customer.phone || customer.telephone || '—'}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={customer.status === 'active' || customer.is_active ? 'outline' : 'secondary'}>
+                                      {customer.status === 'active' || customer.is_active ? 'Ativo' : 'Inativo'}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      )
+                    ) : (
+                      products.length === 0 ? (
+                        <div className="text-center py-8 text-body">Nenhum produto cadastrado na matriz</div>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-12">
+                                <Checkbox
+                                  checked={products.length > 0 && selectedProducts.length === products.length}
+                                  onCheckedChange={handleSelectAll}
+                                />
+                              </TableHead>
+                              <TableHead>Nome</TableHead>
+                              <TableHead>SKU</TableHead>
+                              <TableHead>Preço</TableHead>
+                              <TableHead>Estoque</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {products.map((product) => {
+                              const isSelected = selectedProducts.includes(Number(product.id));
+                              return (
+                                <TableRow
+                                  key={product.id}
+                                  className={isSelected ? 'bg-blue-50' : ''}
+                                  onClick={() => {
+                                    const id = Number(product.id);
+                                    if (isSelected) {
+                                      setSelectedProducts(selectedProducts.filter((p) => p !== id));
+                                    } else {
+                                      setSelectedProducts([...selectedProducts, id]);
+                                    }
+                                  }}
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={(checked) => {
+                                        const id = Number(product.id);
+                                        if (checked) {
+                                          setSelectedProducts([...selectedProducts, id]);
+                                        } else {
+                                          setSelectedProducts(selectedProducts.filter((p) => p !== id));
+                                        }
+                                      }}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="font-medium">{product.name || `Produto #${product.id}`}</TableCell>
+                                  <TableCell className="font-mono text-sm">{product.sku || '—'}</TableCell>
+                                  <TableCell>
+                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                      Number(product.sale_price || product.price || 0)
+                                    )}
+                                  </TableCell>
+                                  <TableCell>{product.stock_quantity || 0}</TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      )
+                    )}
+                  </ScrollArea>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center pt-2 border-t">
+                <div className="text-sm text-body">
+                  {shareType === 'customers'
+                    ? `${selectedCustomers.length} cliente(s) selecionado(s)`
+                    : `${selectedProducts.length} produto(s) selecionado(s)`}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setShareModalOpen(false)} disabled={loadingShare}>
+                    Cancelar
+                  </Button>
+                  {(shareType === 'customers' ? customers.length > 0 : products.length > 0) && (
+                    <Button
+                      variant="outline"
+                      onClick={() => handleShare(true)}
+                      disabled={loadingShare}
+                      className="gap-2"
+                    >
+                      Compartilhar Todos
+                    </Button>
+                  )}
+                  <Button
+                    className="juga-gradient text-white"
+                    onClick={() => handleShare(false)}
+                    disabled={loadingShare || (shareType === 'customers' ? selectedCustomers.length === 0 : selectedProducts.length === 0)}
+                  >
+                    {loadingShare ? 'Compartilhando...' : 'Compartilhar Selecionados'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+          </>
+        )}
       </div>
     </TenantPageWrapper>
   );

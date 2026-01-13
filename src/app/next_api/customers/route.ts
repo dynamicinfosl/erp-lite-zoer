@@ -29,7 +29,8 @@ async function createCustomerHandler(request: NextRequest) {
       zipcode,
       notes,
       external_code,
-      is_active
+      is_active,
+      branch_id // ✅ Novo: ID da filial onde está sendo cadastrado (null = matriz)
     } = body;
 
     if (!tenant_id || !name) {
@@ -64,6 +65,7 @@ async function createCustomerHandler(request: NextRequest) {
       notes: notes || null,
       external_code: external_code || null,
       is_active: activeStatus,
+      created_at_branch_id: branch_id ? Number(branch_id) : null, // ✅ Salvar onde foi cadastrado
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -109,21 +111,99 @@ async function listCustomersHandler(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const tenant_id = searchParams.get('tenant_id');
+    const branch_id = searchParams.get('branch_id'); // ✅ Novo: filtrar por filial
+    const branch_scope = searchParams.get('branch_scope'); // 'all' | 'branch'
 
-    console.log(`👥 GET /customers - tenant_id: ${tenant_id}`);
+    console.log(`👥 GET /customers - tenant_id: ${tenant_id}, branch_id: ${branch_id}, scope: ${branch_scope}`);
 
-    // Filtrar clientes por tenant_id se fornecido
-    let query = supabaseAdmin
-      .from('customers')
-      .select('*');
-    
-    // Se tenant_id foi fornecido, filtrar por ele (incluindo o zero UUID)
-    if (tenant_id) {
-      query = query.eq('tenant_id', tenant_id);
-      console.log(`🔍 Buscando clientes com tenant_id: ${tenant_id}`);
-    } else {
+    if (!tenant_id) {
       console.log('⚠️ GET /customers - Nenhum tenant_id fornecido, retornando lista vazia');
       return NextResponse.json({ success: true, data: [] });
+    }
+
+    // ✅ Lógica de compartilhamento:
+    // - Se branch_scope='all' (matriz): retorna apenas clientes cadastrados na matriz
+    // - Se branch_id fornecido (filial ou matriz visitando filial): retorna clientes daquela filial
+    let query;
+    
+    if (branch_scope === 'all') {
+      // Matriz vê apenas clientes cadastrados na matriz (created_at_branch_id IS NULL)
+      // Não mostra clientes cadastrados em filiais por padrão
+      query = supabaseAdmin
+        .from('customers')
+        .select('*')
+        .eq('tenant_id', tenant_id)
+        .is('created_at_branch_id', null); // ✅ Apenas clientes da matriz
+      console.log(`🔍 [Matriz] Buscando clientes cadastrados na matriz`);
+    } else if (branch_id) {
+      // Filial: buscar apenas clientes compartilhados
+      const bid = Number(branch_id);
+      if (Number.isFinite(bid) && bid > 0) {
+        // Primeiro: buscar IDs dos clientes compartilhados
+        const { data: sharedCustomers } = await supabaseAdmin
+          .from('branch_customers')
+          .select('customer_id')
+          .eq('tenant_id', tenant_id)
+          .eq('branch_id', bid)
+          .eq('is_active', true);
+        
+        const customerIds = (sharedCustomers || [])
+          .map((c: any) => Number(c.customer_id))
+          .filter((id: number) => Number.isFinite(id) && id > 0);
+        
+        // Filial vê: clientes compartilhados + clientes cadastrados nela
+        // Fazer duas queries e combinar resultados
+        const allCustomers: any[] = [];
+        const seenIds = new Set<number>();
+        
+        // Query 1: Clientes compartilhados
+        if (customerIds.length > 0) {
+          const sharedResult = await supabaseAdmin
+            .from('customers')
+            .select('*')
+            .eq('tenant_id', tenant_id)
+            .in('id', customerIds);
+          
+          if (!sharedResult.error && sharedResult.data) {
+            for (const customer of sharedResult.data) {
+              const id = Number(customer.id);
+              if (!seenIds.has(id)) {
+                seenIds.add(id);
+                allCustomers.push(customer);
+              }
+            }
+          }
+        }
+        
+        // Query 2: Clientes cadastrados nesta filial
+        const branchResult = await supabaseAdmin
+          .from('customers')
+          .select('*')
+          .eq('tenant_id', tenant_id)
+          .eq('created_at_branch_id', bid);
+        
+        if (!branchResult.error && branchResult.data) {
+          for (const customer of branchResult.data) {
+            const id = Number(customer.id);
+            if (!seenIds.has(id)) {
+              seenIds.add(id);
+              allCustomers.push(customer);
+            }
+          }
+        }
+        
+        console.log(`🔍 [Filial ${bid}] Encontrados ${allCustomers.length} clientes (compartilhados + cadastrados aqui)`);
+        return NextResponse.json({ success: true, data: allCustomers });
+      } else {
+        return NextResponse.json({ success: true, data: [] });
+      }
+    } else {
+      // Fallback: retornar todos (compatibilidade com código antigo)
+      query = supabaseAdmin
+        .from('customers')
+        .select('*')
+        .eq('tenant_id', tenant_id);
+      console.log(`🔍 [Fallback] Buscando todos os clientes do tenant`);
     }
     
     const { data, error } = await query.order('is_active', { ascending: false }).order('created_at', { ascending: false });

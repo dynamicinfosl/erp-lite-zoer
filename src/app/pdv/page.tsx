@@ -82,6 +82,7 @@ import { Product, PDVItem } from '@/types';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { api } from '@/lib/api-client';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
+import { useBranch } from '@/contexts/BranchContext';
 import { TenantPageWrapper } from '@/components/layout/PageWrapper';
 import { PaymentSection } from '@/components/pdv/PaymentSection';
 import { SaleConfirmationModal } from '@/components/pdv/SaleConfirmationModal';
@@ -119,6 +120,7 @@ interface CaixaOperation {
 
 export default function PDVPage() {
   const { user, tenant, signOut } = useSimpleAuth();
+  const { scope, branchId } = useBranch();
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<PDVItem[]>([]);
@@ -235,7 +237,10 @@ export default function PDVPage() {
         }
 
         console.log('🔄 Carregando produtos para tenant:', tenant.id);
-        const res = await fetch(`/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`);
+        const params = new URLSearchParams({ tenant_id: tenant.id });
+        // PDV opera em uma filial específica; se estiver em "todas", carregamos sem filtro (fallback)
+        if (scope === 'branch' && branchId) params.set('branch_id', String(branchId));
+        const res = await fetch(`/next_api/products?${params.toString()}`);
         if (!res.ok) throw new Error('Erro ao carregar produtos');
         const json = await res.json();
         const data = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
@@ -251,7 +256,7 @@ export default function PDVPage() {
     };
 
     loadProducts();
-  }, [tenant?.id]);
+  }, [tenant?.id, scope, branchId]);
 
   // Função para recarregar vendas do dia
   const reloadTodaySales = useCallback(async () => {
@@ -476,9 +481,10 @@ export default function PDVPage() {
         throw new Error('Total da venda inválido.');
       }
 
-      const saleData = {
+       const saleData = {
         tenant_id: tenant.id,
         user_id: user?.id || '00000000-0000-0000-0000-000000000000',
+        branch_id: scope === 'branch' ? branchId : null,
         sale_type: null,
         sale_source: 'pdv', // Marcar como venda do PDV
         customer_id: selectedCustomerId,
@@ -611,7 +617,7 @@ export default function PDVPage() {
       console.error('Erro ao finalizar venda:', error);
       toast.error(`Erro ao salvar venda: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
-  }, [total, customerName, paymentMethod, cart, calculateItemTotal, saveTodaySalesLocal, tenant, user?.id, selectedCustomerId, reloadTodaySales]);
+  }, [total, customerName, paymentMethod, cart, calculateItemTotal, saveTodaySalesLocal, tenant, user?.id, selectedCustomerId, reloadTodaySales, scope, branchId]);
 
   const loadCustomers = useCallback(async () => {
     if (!tenant?.id) {

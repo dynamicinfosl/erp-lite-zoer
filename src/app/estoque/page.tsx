@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
+import { useBranch } from '@/contexts/BranchContext';
 
 interface Product {
   id: string;
@@ -67,24 +68,53 @@ interface StockMovement {
   created_at: string;
 }
 
+type StockTransfer = {
+  id: number;
+  tenant_id: string;
+  from_branch_id: number;
+  to_branch_id: number;
+  status: 'draft' | 'sent' | 'received' | 'cancelled';
+  notes?: string | null;
+  created_at?: string;
+  sent_at?: string | null;
+  received_at?: string | null;
+  items: Array<{ product_id: number; quantity: number }>;
+};
+
 const lowStockThreshold = 10;
 
 export default function EstoquePage() {
   const { tenant, user } = useSimpleAuth();
+  const { scope, branchId, branches } = useBranch();
   const [products, setProducts] = useState<Product[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showMovementDialog, setShowMovementDialog] = useState(false);
   const [showMovementsHistory, setShowMovementsHistory] = useState(false);
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
+  const [transfers, setTransfers] = useState<StockTransfer[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
 
   const [movementForm, setMovementForm] = useState({
     product_id: '',
     movement_type: 'entrada' as 'entrada' | 'saida' | 'ajuste',
     quantity: '',
     reason: '',
+  });
+
+  const [transferForm, setTransferForm] = useState<{
+    from_branch_id: string;
+    to_branch_id: string;
+    notes: string;
+    items: Array<{ product_id: string; quantity: string }>;
+  }>({
+    from_branch_id: '',
+    to_branch_id: '',
+    notes: '',
+    items: [{ product_id: '', quantity: '' }],
   });
 
   useEffect(() => {
@@ -100,6 +130,12 @@ export default function EstoquePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant?.id]);
 
+  useEffect(() => {
+    // sempre que mudar a filial selecionada, recarregar transferências também
+    loadTransfers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenant?.id, scope, branchId]);
+
   const loadProducts = async () => {
     try {
       setLoading(true);
@@ -107,7 +143,11 @@ export default function EstoquePage() {
       const tenantId = tenant?.id || storedTenantId;
       if (!tenantId) return;
 
-      const response = await fetch(`/next_api/products?tenant_id=${encodeURIComponent(tenantId)}`);
+      const params = new URLSearchParams({ tenant_id: tenantId });
+      if (scope === 'all') params.set('branch_scope', 'all');
+      if (scope === 'branch' && branchId) params.set('branch_id', String(branchId));
+
+      const response = await fetch(`/next_api/products?${params.toString()}`);
       if (!response.ok) throw new Error('Erro ao carregar produtos');
 
       const data = await response.json();
@@ -127,7 +167,11 @@ export default function EstoquePage() {
       const tenantId = tenant?.id || storedTenantId;
       if (!tenantId) return;
 
-      const response = await fetch(`/next_api/stock-movements?tenant_id=${encodeURIComponent(tenantId)}`);
+      const params = new URLSearchParams({ tenant_id: tenantId });
+      if (scope === 'all') params.set('branch_scope', 'all');
+      if (scope === 'branch' && branchId) params.set('branch_id', String(branchId));
+
+      const response = await fetch(`/next_api/stock-movements?${params.toString()}`);
       if (!response.ok) {
         console.warn('Movimentações não disponíveis');
         setMovements([]);
@@ -143,6 +187,30 @@ export default function EstoquePage() {
     }
   };
 
+  const loadTransfers = async () => {
+    try {
+      const storedTenantId = typeof window !== 'undefined' ? localStorage.getItem('lastProductsTenantId') : null;
+      const tenantId = tenant?.id || storedTenantId;
+      if (!tenantId) return;
+
+      const params = new URLSearchParams({ tenant_id: tenantId });
+      if (scope === 'all') params.set('branch_scope', 'all');
+      if (scope === 'branch' && branchId) params.set('branch_id', String(branchId));
+
+      const response = await fetch(`/next_api/stock-transfers?${params.toString()}`);
+      if (!response.ok) {
+        setTransfers([]);
+        return;
+      }
+      const data = await response.json();
+      const rows = Array.isArray(data?.data) ? data.data : [];
+      setTransfers(rows);
+    } catch (error) {
+      console.error('Erro ao carregar transferências:', error);
+      setTransfers([]);
+    }
+  };
+
   const handleMovementSubmit = async () => {
     try {
       setIsSubmitting(true);
@@ -150,11 +218,19 @@ export default function EstoquePage() {
       const tenantId = tenant?.id || storedTenantId;
       const userId = user?.id || '00000000-0000-0000-0000-000000000000';
 
+      // Movimentação precisa ser feita em uma filial específica
+      const effectiveBranchId = scope === 'branch' ? branchId : null;
+      if (!effectiveBranchId) {
+        toast.error('Selecione uma filial no seletor (não é possível movimentar em "todas")');
+        return;
+      }
+
       const response = await fetch('/next_api/stock-movements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenant_id: tenantId,
+          branch_id: effectiveBranchId,
           user_id: userId,
           product_id: movementForm.product_id,
           movement_type: movementForm.movement_type,
@@ -182,6 +258,110 @@ export default function EstoquePage() {
       toast.error(`Erro: ${error?.message || 'erro desconhecido'}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const openTransfer = () => {
+    const active = branches.filter((b) => b.is_active);
+    const fromDefault = scope === 'branch' && branchId ? String(branchId) : (active.find((b) => b.is_headquarters)?.id ? String(active.find((b) => b.is_headquarters)!.id) : '');
+    setTransferForm({
+      from_branch_id: fromDefault,
+      to_branch_id: '',
+      notes: '',
+      items: [{ product_id: '', quantity: '' }],
+    });
+    setShowTransferDialog(true);
+  };
+
+  const createTransfer = async () => {
+    try {
+      const storedTenantId = typeof window !== 'undefined' ? localStorage.getItem('lastProductsTenantId') : null;
+      const tenantId = tenant?.id || storedTenantId;
+      const userId = user?.id || '00000000-0000-0000-0000-000000000000';
+      if (!tenantId) throw new Error('Tenant não disponível');
+
+      const fromId = Number(transferForm.from_branch_id);
+      const toId = Number(transferForm.to_branch_id);
+      if (!Number.isFinite(fromId) || !Number.isFinite(toId) || fromId <= 0 || toId <= 0) {
+        toast.error('Selecione filial origem e destino');
+        return;
+      }
+      if (fromId === toId) {
+        toast.error('Origem e destino não podem ser iguais');
+        return;
+      }
+
+      const parsedItems = transferForm.items
+        .map((it) => ({ product_id: Number(it.product_id), quantity: Number(it.quantity) }))
+        .filter((it) => Number.isFinite(it.product_id) && it.product_id > 0 && Number.isFinite(it.quantity) && it.quantity > 0);
+
+      if (parsedItems.length === 0) {
+        toast.error('Adicione ao menos 1 item com quantidade');
+        return;
+      }
+
+      setTransferSubmitting(true);
+      const res = await fetch('/next_api/stock-transfers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          from_branch_id: fromId,
+          to_branch_id: toId,
+          user_id: userId,
+          notes: transferForm.notes || null,
+          items: parsedItems,
+        }),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `HTTP ${res.status}`);
+      }
+
+      toast.success('Transferência criada (rascunho)');
+      setShowTransferDialog(false);
+      await loadTransfers();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Erro ao criar transferência');
+    } finally {
+      setTransferSubmitting(false);
+    }
+  };
+
+  const actionTransfer = async (transferId: number, action: 'send' | 'receive' | 'cancel') => {
+    try {
+      const storedTenantId = typeof window !== 'undefined' ? localStorage.getItem('lastProductsTenantId') : null;
+      const tenantId = tenant?.id || storedTenantId;
+      const userId = user?.id || '00000000-0000-0000-0000-000000000000';
+      if (!tenantId) throw new Error('Tenant não disponível');
+
+      if (action === 'send' && !confirm('Marcar como ENVIADO? Isso já vai baixar do estoque da origem.')) return;
+      if (action === 'receive' && !confirm('Marcar como RECEBIDO? Isso dará entrada no estoque do destino.')) return;
+      if (action === 'cancel' && !confirm('Cancelar transferência?')) return;
+
+      const res = await fetch(`/next_api/stock-transfers/${transferId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant_id: tenantId, user_id: userId, action }),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `HTTP ${res.status}`);
+      }
+
+      if (action === 'send') toast.success('Transferência enviada (estoque baixado na origem)');
+      if (action === 'receive') toast.success('Transferência recebida (estoque lançado no destino)');
+      if (action === 'cancel') toast.success('Transferência cancelada');
+
+      await loadTransfers();
+      await loadProducts();
+      await loadMovements();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Erro na ação');
     }
   };
 
@@ -237,6 +417,14 @@ export default function EstoquePage() {
           >
             <Warehouse className="h-4 w-4" />
             Movimentar Estoque
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto gap-2"
+            onClick={openTransfer}
+          >
+            <ArrowDownUp className="h-4 w-4" />
+            Transferir entre Filiais
           </Button>
           <Button
             variant="secondary"
@@ -300,6 +488,66 @@ export default function EstoquePage() {
               className="pl-10"
             />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Transferências */}
+      <Card className="juga-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ArrowDownUp className="h-5 w-5" />
+            Transferências ({transfers.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {transfers.length === 0 ? (
+            <div className="text-sm text-muted-foreground">Nenhuma transferência encontrada.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>#</TableHead>
+                  <TableHead>Origem</TableHead>
+                  <TableHead>Destino</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Itens</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transfers.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-mono">#{t.id}</TableCell>
+                    <TableCell>{t.from_branch_id}</TableCell>
+                    <TableCell>{t.to_branch_id}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{t.status}</Badge>
+                    </TableCell>
+                    <TableCell>{t.items?.reduce((sum, it) => sum + (it.quantity || 0), 0) || 0}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {t.status === 'draft' && (
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => actionTransfer(t.id, 'send')}>
+                              Enviar
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => actionTransfer(t.id, 'cancel')}>
+                              Cancelar
+                            </Button>
+                          </>
+                        )}
+                        {t.status === 'sent' && (
+                          <Button size="sm" variant="outline" onClick={() => actionTransfer(t.id, 'receive')}>
+                            Receber
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -458,6 +706,140 @@ export default function EstoquePage() {
               </div>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Transferir entre Filiais */}
+      <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Transferir entre Filiais</DialogTitle>
+            <DialogDescription>
+              Ao marcar como <strong>Enviado</strong>, o estoque já será baixado da origem. Ao marcar como <strong>Recebido</strong>, será lançado no destino.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Filial Origem *</Label>
+              <Select value={transferForm.from_branch_id} onValueChange={(v) => setTransferForm((p) => ({ ...p, from_branch_id: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {branches.filter((b) => b.is_active).map((b) => (
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      {b.name}{b.is_headquarters ? ' (Matriz)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Filial Destino *</Label>
+              <Select value={transferForm.to_branch_id} onValueChange={(v) => setTransferForm((p) => ({ ...p, to_branch_id: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {branches.filter((b) => b.is_active).map((b) => (
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      {b.name}{b.is_headquarters ? ' (Matriz)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Observações</Label>
+            <Input value={transferForm.notes} onChange={(e) => setTransferForm((p) => ({ ...p, notes: e.target.value }))} />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Itens *</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() =>
+                  setTransferForm((p) => ({ ...p, items: [...p.items, { product_id: '', quantity: '' }] }))
+                }
+              >
+                <Plus className="h-4 w-4" />
+                Adicionar item
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              {transferForm.items.map((it, idx) => (
+                <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_180px_40px] gap-2 items-end">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Produto</Label>
+                    <Select
+                      value={it.product_id}
+                      onValueChange={(v) =>
+                        setTransferForm((p) => ({
+                          ...p,
+                          items: p.items.map((x, i) => (i === idx ? { ...x, product_id: v } : x)),
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o produto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {products.map((p) => (
+                          <SelectItem key={p.id} value={String(p.id)}>
+                            {p.name} ({p.sku})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Quantidade</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={it.quantity}
+                      onChange={(e) =>
+                        setTransferForm((p) => ({
+                          ...p,
+                          items: p.items.map((x, i) => (i === idx ? { ...x, quantity: e.target.value } : x)),
+                        }))
+                      }
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setTransferForm((p) => ({ ...p, items: p.items.filter((_, i) => i !== idx) }))
+                    }
+                    className="text-red-600"
+                    title="Remover"
+                  >
+                    ×
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTransferDialog(false)} disabled={transferSubmitting}>
+              Cancelar
+            </Button>
+            <Button className="juga-gradient text-white" onClick={createTransfer} disabled={transferSubmitting}>
+              {transferSubmitting ? 'Salvando...' : 'Criar Transferência'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

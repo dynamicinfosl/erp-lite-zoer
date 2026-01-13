@@ -58,6 +58,7 @@ import {
 import { toast } from 'sonner';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
+import { useBranch } from '@/contexts/BranchContext';
 import { TenantPageWrapper } from '@/components/layout/PageWrapper';
 
 interface Sale {
@@ -93,6 +94,7 @@ interface ColumnVisibility {
 
 export default function VendasPage() {
   const { tenant } = useSimpleAuth();
+  const { branchId, scope } = useBranch();
   const [vendas, setVendas] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -144,10 +146,23 @@ export default function VendasPage() {
       }
 
       console.log('📦 Carregando vendas de balcão para o tenant:', tenant.id);
+      console.log('📦 Branch scope:', scope, 'branchId:', branchId);
+      
+      // Montar URL com parâmetros de branch (sempre precisa de branch_id)
+      let url = `/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}`;
+      if (branchId) {
+        url += `&branch_id=${branchId}`;
+      } else {
+        // Se não tem branchId, não fazer requisição
+        console.warn('[Vendas] Sem branchId, aguardando...');
+        setVendas([]);
+        setLoading(false);
+        return;
+      }
       
       // Buscar todas as vendas do tenant (sem filtrar por sale_source na API)
       // O filtro será feito no frontend para incluir vendas antigas sem sale_source
-      const res = await fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}`);
+      const res = await fetch(url);
       if (!res.ok) {
         const errorText = await res.text();
         console.error('❌ Erro na resposta da API:', res.status, errorText);
@@ -247,7 +262,7 @@ export default function VendasPage() {
 
   useEffect(() => {
     loadVendas();
-  }, [loadVendas]);
+  }, [loadVendas, scope, branchId]);
 
   // Filtrar vendas
   const filteredVendas = vendas.filter(venda => {

@@ -50,6 +50,7 @@ import { toast } from 'sonner';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
 import * as XLSX from 'xlsx';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
+import { useBranch } from '@/contexts/BranchContext';
 
 interface Customer {
   id: string;
@@ -74,6 +75,7 @@ interface ColumnVisibility {
 
 export default function ClientesPage() {
   const { tenant } = useSimpleAuth();
+  const { branchId, scope } = useBranch();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -167,8 +169,21 @@ export default function ClientesPage() {
       }
 
       setLoading(true);
-      const url = `/next_api/customers?tenant_id=${encodeURIComponent(tenantId)}`;
-      console.log(`🔄 Carregando clientes para tenant: ${tenantId}`);
+      
+      // Sempre precisa de branch_id
+      const params = new URLSearchParams({ tenant_id: tenantId });
+      if (branchId) {
+        params.set('branch_id', String(branchId));
+      } else {
+        // Se não tem branchId, não fazer requisição
+        console.warn('[Clientes] Sem branchId, aguardando...');
+        setCustomers([]);
+        setLoading(false);
+        return;
+      }
+      
+      const url = `/next_api/customers?${params.toString()}`;
+      console.log(`🔄 Carregando clientes para tenant: ${tenantId}, branch: ${branchId}, scope: ${scope}`);
       console.log(`📡 URL da requisição: ${url}`);
       
       const response = await fetch(url);
@@ -217,7 +232,7 @@ export default function ClientesPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, branchId, scope]);
 
   // Carregar clientes quando houver tenant
   useEffect(() => {
@@ -271,6 +286,7 @@ export default function ClientesPage() {
         body: JSON.stringify({
           ...newCustomer,
           tenant_id: tenant.id,
+          branch_id: scope === 'branch' && branchId ? branchId : null, // ✅ Incluir branch_id se estiver em filial
         })
       });
 
@@ -564,7 +580,8 @@ export default function ClientesPage() {
           // Garantir que tenant_id está presente
           const rowData = {
             ...row,
-            tenant_id: tenant.id
+            tenant_id: tenant.id,
+            branch_id: scope === 'branch' && branchId ? branchId : null, // ✅ Incluir branch_id se estiver em filial
           };
           
           const res = await fetch('/next_api/customers', {
