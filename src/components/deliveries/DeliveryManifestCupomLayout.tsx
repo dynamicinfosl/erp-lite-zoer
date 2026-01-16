@@ -188,28 +188,39 @@ export function DeliveryManifestCupomLayout({
           }
         }
         .receipt-container {
-          color: #000;
+          color: #000 !important;
+        }
+        .receipt-container * {
+          color: #000 !important;
         }
         .header {
           text-align: center;
           border-bottom: 1px dashed #000;
           padding-bottom: 8px;
           margin-bottom: 8px;
+          color: #000 !important;
         }
         .company-name {
           font-weight: bold;
           font-size: ${baseFontSize + 3}px;
           margin-bottom: 4px;
+          color: #000 !important;
         }
         .title {
           font-weight: bold;
           font-size: ${baseFontSize + 1}px;
           margin: 6px 0;
+          color: #000 !important;
         }
         .meta {
           font-size: ${baseFontSize - 2}px;
           margin: 4px 0;
           font-weight: 500;
+          color: #000 !important;
+        }
+        .meta strong {
+          color: #000 !important;
+          opacity: 1 !important;
         }
         .section {
           margin-top: 8px;
@@ -221,37 +232,49 @@ export function DeliveryManifestCupomLayout({
           font-size: ${baseFontSize}px;
           margin-bottom: 4px;
           text-align: center;
+          color: #000 !important;
         }
         .stop {
           margin-top: 6px;
           padding: 4px 0;
           border-bottom: 1px dashed #000;
+          color: #000 !important;
         }
         .stop-customer {
           font-weight: bold;
           font-size: ${baseFontSize}px;
+          color: #000 !important;
         }
         .stop-address {
           font-size: ${baseFontSize - 2}px;
-          color: #000;
+          color: #000 !important;
           margin-top: 2px;
           font-weight: 500;
         }
         .stop-sale {
           font-size: ${baseFontSize - 3}px;
-          color: #000;
+          color: #000 !important;
           margin-top: 2px;
           font-weight: 500;
+        }
+        .stop-sale strong {
+          color: #000 !important;
+          opacity: 1 !important;
         }
         .items {
           margin-top: 4px;
           font-size: ${baseFontSize - 2}px;
+          color: #000 !important;
         }
         .item {
           display: flex;
           justify-content: space-between;
           margin: 2px 0;
           font-weight: 500;
+          color: #000 !important;
+        }
+        .item span {
+          color: #000 !important;
         }
         .footer {
           margin-top: 12px;
@@ -260,6 +283,7 @@ export function DeliveryManifestCupomLayout({
           text-align: center;
           font-size: ${baseFontSize - 3}px;
           font-weight: 500;
+          color: #000 !important;
         }
         .divider {
           border-top: 1px dashed #000;
