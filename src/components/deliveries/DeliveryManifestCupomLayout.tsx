@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import { useCouponSettings } from '@/hooks/useCouponSettings';
 
 type Manifest = {
   id: string;
@@ -59,6 +60,13 @@ export function DeliveryManifestCupomLayout({
   saleItems: SaleItem[];
   companyName?: string;
 }) {
+  // Hook para configurações do cupom/romaneio
+  const { settings: couponSettings } = useCouponSettings();
+  
+  // Usar fontSize do romaneio ou padrão maior se não configurado
+  const manifestFontSize = couponSettings.manifestFontSize || 13;
+  const baseFontSize = manifestFontSize;
+  
   const salesById = useMemo(() => {
     const map = new Map<number, Sale>();
     (sales || []).forEach((s) => map.set(Number(s.id), s));
@@ -161,8 +169,9 @@ export function DeliveryManifestCupomLayout({
             padding: 8mm;
             background: white;
             font-family: 'Courier New', monospace;
-            font-size: 11px;
-            line-height: 1.3;
+            font-size: ${baseFontSize}px;
+            line-height: 1.4;
+            font-weight: 500;
           }
         }
         @media screen {
@@ -173,8 +182,9 @@ export function DeliveryManifestCupomLayout({
             background: white;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             font-family: 'Courier New', monospace;
-            font-size: 11px;
-            line-height: 1.3;
+            font-size: ${baseFontSize}px;
+            line-height: 1.4;
+            font-weight: 500;
           }
         }
         .receipt-container {
@@ -188,17 +198,18 @@ export function DeliveryManifestCupomLayout({
         }
         .company-name {
           font-weight: bold;
-          font-size: 14px;
+          font-size: ${baseFontSize + 3}px;
           margin-bottom: 4px;
         }
         .title {
           font-weight: bold;
-          font-size: 12px;
+          font-size: ${baseFontSize + 1}px;
           margin: 6px 0;
         }
         .meta {
-          font-size: 10px;
+          font-size: ${baseFontSize - 2}px;
           margin: 4px 0;
+          font-weight: 500;
         }
         .section {
           margin-top: 8px;
@@ -207,7 +218,7 @@ export function DeliveryManifestCupomLayout({
         }
         .section-title {
           font-weight: bold;
-          font-size: 11px;
+          font-size: ${baseFontSize}px;
           margin-bottom: 4px;
           text-align: center;
         }
@@ -218,33 +229,37 @@ export function DeliveryManifestCupomLayout({
         }
         .stop-customer {
           font-weight: bold;
-          font-size: 11px;
+          font-size: ${baseFontSize}px;
         }
         .stop-address {
-          font-size: 10px;
+          font-size: ${baseFontSize - 2}px;
           color: #333;
           margin-top: 2px;
+          font-weight: 500;
         }
         .stop-sale {
-          font-size: 9px;
+          font-size: ${baseFontSize - 3}px;
           color: #666;
           margin-top: 2px;
+          font-weight: 500;
         }
         .items {
           margin-top: 4px;
-          font-size: 10px;
+          font-size: ${baseFontSize - 2}px;
         }
         .item {
           display: flex;
           justify-content: space-between;
           margin: 2px 0;
+          font-weight: 500;
         }
         .footer {
           margin-top: 12px;
           padding-top: 8px;
           border-top: 1px dashed #000;
           text-align: center;
-          font-size: 9px;
+          font-size: ${baseFontSize - 3}px;
+          font-weight: 500;
         }
         .divider {
           border-top: 1px dashed #000;

@@ -7,6 +7,7 @@ export interface CouponSettings {
   companyPhone: string;
   companyEmail: string;
   fontSize: number;
+  manifestFontSize: number; // Tamanho da fonte do romaneio
   showLogo: boolean;
   showAddress: boolean;
   showPhone: boolean;
@@ -25,6 +26,7 @@ const defaultSettings: CouponSettings = {
   companyPhone: '(11) 99999-9999',
   companyEmail: 'contato@empresa.com',
   fontSize: 12,
+  manifestFontSize: 13, // Fonte maior e mais legível para romaneio
   showLogo: true,
   showAddress: true,
   showPhone: true,

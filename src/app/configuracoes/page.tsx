@@ -706,6 +706,36 @@ export default function ConfiguracoesPage() {
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader>
+              <CardTitle>Configurações do Romaneio</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="manifestFontSize">Tamanho da Fonte do Romaneio</Label>
+                <Select
+                  value={couponSettings.manifestFontSize?.toString() || '13'}
+                  onValueChange={(value) => updateCouponSettings({manifestFontSize: parseInt(value)})}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="11">11px - Pequena</SelectItem>
+                    <SelectItem value="12">12px - Normal</SelectItem>
+                    <SelectItem value="13">13px - Grande (Recomendado)</SelectItem>
+                    <SelectItem value="14">14px - Muito Grande</SelectItem>
+                    <SelectItem value="15">15px - Extra Grande</SelectItem>
+                    <SelectItem value="16">16px - Máximo</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground mt-2">
+                  A fonte maior facilita a leitura durante a entrega. Recomendamos 13px ou maior.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="flex justify-end space-x-2">
             <Button variant="outline">Cancelar</Button>
             <Button onClick={handleSaveCouponSettings}>Salvar Configurações</Button>
