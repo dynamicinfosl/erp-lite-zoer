@@ -225,7 +225,7 @@ export function DeliveryManifestCupomLayout({
         .stop {
           margin-top: 6px;
           padding: 4px 0;
-          border-bottom: 1px dashed #999;
+          border-bottom: 1px dashed #000;
         }
         .stop-customer {
           font-weight: bold;
@@ -233,13 +233,13 @@ export function DeliveryManifestCupomLayout({
         }
         .stop-address {
           font-size: ${baseFontSize - 2}px;
-          color: #333;
+          color: #000;
           margin-top: 2px;
           font-weight: 500;
         }
         .stop-sale {
           font-size: ${baseFontSize - 3}px;
-          color: #666;
+          color: #000;
           margin-top: 2px;
           font-weight: 500;
         }
