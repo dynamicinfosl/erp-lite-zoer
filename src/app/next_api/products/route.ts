@@ -183,6 +183,8 @@ async function createProductHandler(request: NextRequest) {
         barcode: barcode || null,
         ncm: ncm || null,
         unit: unit || 'UN',
+        status: 'active', // ✅ Produtos criados sempre começam como ativos
+        is_active: true, // ✅ Garantir que is_active também seja true (caso o banco use este campo)
         created_at: new Date().toISOString(),
       })
       .select()
@@ -419,14 +421,28 @@ async function listProductsHandler(request: NextRequest) {
       console.warn('⚠️ Falha ao aplicar estoque por filial em /products (fallback para stock_quantity do products):', e);
     }
 
+    // ✅ Mapear is_active (boolean) para status (string) se necessário
+    const rows = Array.isArray(data) ? data : [];
+    const mappedRows = rows.map((p: any) => {
+      // Se o produto tem is_active mas não tem status, converter
+      if (p.is_active !== undefined && !p.status) {
+        p.status = p.is_active ? 'active' : 'inactive';
+      }
+      // Se o produto tem status mas não tem is_active, converter
+      if (p.status && p.is_active === undefined) {
+        p.is_active = p.status === 'active';
+      }
+      return p;
+    });
+
     // Log para debug
     if (sku) {
-      console.log(`✅ GET /products - SKU "${sku}": ${data?.length || 0} produtos encontrados no tenant ${tenant_id}`);
+      console.log(`✅ GET /products - SKU "${sku}": ${mappedRows.length} produtos encontrados no tenant ${tenant_id}`);
     } else {
-      console.log(`✅ GET /products - ${data?.length || 0} produtos encontrados para tenant ${tenant_id}`);
+      console.log(`✅ GET /products - ${mappedRows.length} produtos encontrados para tenant ${tenant_id}`);
     }
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data: mappedRows });
 
   } catch (error) {
     console.error('Erro no handler de listagem:', error);
