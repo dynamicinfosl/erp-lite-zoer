@@ -141,6 +141,46 @@ export default function ReceiptPage() {
     }
   }, [loading, saleData]);
 
+  useEffect(() => {
+    // Fechar janela automaticamente ao mover o mouse após a impressão
+    let shouldCloseOnMouseMove = false;
+    let mouseMoveTimeout: NodeJS.Timeout | null = null;
+
+    const handleAfterPrint = () => {
+      // Marcar que a impressão foi concluída
+      shouldCloseOnMouseMove = true;
+    };
+
+    const handleMouseMove = () => {
+      if (shouldCloseOnMouseMove) {
+        // Limpar timeout anterior se existir
+        if (mouseMoveTimeout) {
+          clearTimeout(mouseMoveTimeout);
+        }
+        
+        // Fechar após um pequeno delay para evitar fechamento acidental
+        mouseMoveTimeout = setTimeout(() => {
+          window.close();
+        }, 300);
+      }
+    };
+
+    // Adicionar listener para detectar quando a impressão foi concluída
+    window.addEventListener('afterprint', handleAfterPrint);
+    
+    // Adicionar listener para detectar movimento do mouse
+    window.addEventListener('mousemove', handleMouseMove);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('afterprint', handleAfterPrint);
+      window.removeEventListener('mousemove', handleMouseMove);
+      if (mouseMoveTimeout) {
+        clearTimeout(mouseMoveTimeout);
+      }
+    };
+  }, []);
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
