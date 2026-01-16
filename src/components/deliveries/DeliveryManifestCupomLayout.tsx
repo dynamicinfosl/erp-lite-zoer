@@ -213,14 +213,15 @@ export function DeliveryManifestCupomLayout({
           color: #000 !important;
         }
         .meta {
-          font-size: ${baseFontSize - 2}px;
+          font-size: ${baseFontSize + 1}px;
           margin: 4px 0;
-          font-weight: 500;
+          font-weight: bold;
           color: #000 !important;
         }
         .meta strong {
           color: #000 !important;
           opacity: 1 !important;
+          font-weight: bold;
         }
         .section {
           margin-top: 8px;
@@ -229,7 +230,7 @@ export function DeliveryManifestCupomLayout({
         }
         .section-title {
           font-weight: bold;
-          font-size: ${baseFontSize}px;
+          font-size: ${baseFontSize + 1}px;
           margin-bottom: 4px;
           text-align: center;
           color: #000 !important;
@@ -242,35 +243,36 @@ export function DeliveryManifestCupomLayout({
         }
         .stop-customer {
           font-weight: bold;
-          font-size: ${baseFontSize}px;
+          font-size: ${baseFontSize + 1}px;
           color: #000 !important;
         }
         .stop-address {
-          font-size: ${baseFontSize - 2}px;
+          font-size: ${baseFontSize + 1}px;
           color: #000 !important;
           margin-top: 2px;
-          font-weight: 500;
+          font-weight: bold;
         }
         .stop-sale {
-          font-size: ${baseFontSize - 3}px;
+          font-size: ${baseFontSize + 1}px;
           color: #000 !important;
           margin-top: 2px;
-          font-weight: 500;
+          font-weight: bold;
         }
         .stop-sale strong {
           color: #000 !important;
           opacity: 1 !important;
+          font-weight: bold;
         }
         .items {
           margin-top: 4px;
-          font-size: ${baseFontSize - 2}px;
+          font-size: ${baseFontSize + 1}px;
           color: #000 !important;
         }
         .item {
           display: flex;
           justify-content: space-between;
           margin: 2px 0;
-          font-weight: 500;
+          font-weight: bold;
           color: #000 !important;
         }
         .item span {
@@ -281,8 +283,8 @@ export function DeliveryManifestCupomLayout({
           padding-top: 8px;
           border-top: 1px dashed #000;
           text-align: center;
-          font-size: ${baseFontSize - 3}px;
-          font-weight: 500;
+          font-size: ${baseFontSize + 1}px;
+          font-weight: bold;
           color: #000 !important;
         }
         .divider {
