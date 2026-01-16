@@ -697,6 +697,12 @@ export default function VendasPage() {
 
     try {
       setSavingDelivery(true);
+      
+      // Garantir que driver_id seja null se não houver entregador selecionado
+      const driverIdValue = selectedDriverId && selectedDriverId.trim() !== '' && selectedDriverId !== '__none__'
+        ? Number(selectedDriverId)
+        : null;
+      
       const res = await fetch('/next_api/deliveries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -704,10 +710,10 @@ export default function VendasPage() {
           tenant_id: tenant.id,
           sale_id: selectedVenda.id,
           customer_id: selectedVenda.customer_id || null,
-          driver_id: selectedDriverId ? Number(selectedDriverId) : null,
+          driver_id: driverIdValue, // Pode ser null se não houver entregador
           status: 'aguardando',
-          notes: selectedDriverId
-            ? `Vinculada na página de vendas para entregador: ${deliveryDrivers.find(d => d.id === Number(selectedDriverId))?.name || selectedDriverId}`
+          notes: driverIdValue
+            ? `Vinculada na página de vendas para entregador: ${deliveryDrivers.find(d => d.id === driverIdValue)?.name || selectedDriverId}`
             : 'Vinculada na página de vendas (sem entregador definido)',
         }),
       });
@@ -734,11 +740,11 @@ export default function VendasPage() {
       }
 
       const result = await res.json();
-      const driverName = selectedDriverId
-        ? (deliveryDrivers.find(d => d.id === Number(selectedDriverId))?.name || selectedDriverId)
+      const driverName = driverIdValue
+        ? (deliveryDrivers.find(d => d.id === driverIdValue)?.name || null)
         : null;
       toast.success('Venda marcada para entrega com sucesso!', {
-        description: driverName ? `Entregador: ${driverName}` : 'Entregador: não definido',
+        description: driverName ? `Entregador: ${driverName}` : 'Entregador: não definido (pode ser atribuído depois)',
         duration: 4000,
       });
       setShowDeliveryDialog(false);
