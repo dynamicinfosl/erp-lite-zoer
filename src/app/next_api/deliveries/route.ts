@@ -183,19 +183,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ✅ Endereço NÃO é obrigatório para marcar como entrega.
+    // Se não houver endereço no cadastro do cliente, salvamos como "Endereço não informado"
+    // para permitir que o operador complete depois.
     if (!deliveryAddress || deliveryAddress.trim().length === 0) {
-      console.error('❌ Endereço de entrega inválido:', { 
-        deliveryAddress, 
+      console.warn('⚠️ Entrega criada sem endereço cadastrado:', {
         customer_id: body.customer_id,
-        customer_name: customerName 
+        customer_name: customerName,
       });
-      return NextResponse.json(
-        { 
-          success: false, 
-          errorMessage: "Endereço de entrega é obrigatório. O cliente selecionado não possui endereço completo cadastrado. Por favor, cadastre o endereço do cliente (rua, número, bairro, cidade e estado) antes de marcar como entrega." 
-        },
-        { status: 400 }
-      );
+      const fallback = typeof body.delivery_address === 'string' ? body.delivery_address.trim() : '';
+      deliveryAddress = fallback && fallback.length > 0 ? fallback : 'Endereço não informado';
     }
 
     // Obter user_id: primeiro do body, depois da venda relacionada, ou usar fallback

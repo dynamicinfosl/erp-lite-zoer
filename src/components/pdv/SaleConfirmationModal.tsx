@@ -187,7 +187,7 @@ export function SaleConfirmationModal({
     // Validações para marcar como entrega
     if (!saleData.customer_id) {
       toast.error('Para marcar como entrega, é necessário selecionar um cliente cadastrado no PDV.', {
-        description: 'O cliente precisa ter endereço cadastrado para realizar a entrega.',
+        description: 'Selecione um cliente (o endereço pode ser preenchido depois).',
         duration: 5000,
       });
       return;
@@ -217,10 +217,7 @@ export function SaleConfirmationModal({
           errorMessage = errorData.errorMessage || errorMessage;
           
           // Mensagens específicas para erros comuns
-          if (errorMessage.includes('Endereço de entrega é obrigatório') || 
-              errorMessage.includes('endereço cadastrado')) {
-            errorMessage = 'O cliente selecionado não possui endereço cadastrado. Por favor, cadastre o endereço do cliente antes de marcar como entrega.';
-          } else if (errorMessage.includes('customer_id')) {
+          if (errorMessage.includes('customer_id')) {
             errorMessage = 'Cliente inválido. Verifique se o cliente está cadastrado corretamente.';
           }
         } catch {
@@ -239,7 +236,7 @@ export function SaleConfirmationModal({
       const errorMessage = e instanceof Error ? e.message : 'Erro ao salvar entrega';
       console.error('Erro ao salvar entrega:', e);
       toast.error(errorMessage, {
-        description: 'Verifique se o cliente possui endereço cadastrado e tente novamente.',
+        description: 'Verifique os dados do cliente e tente novamente.',
         duration: 6000,
       });
     } finally {

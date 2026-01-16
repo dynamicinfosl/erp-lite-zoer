@@ -1632,7 +1632,7 @@ export default function VendasPage() {
                     <strong>Cliente:</strong> {selectedVenda?.cliente || 'Não informado'}
                     {!selectedVenda?.cliente && (
                       <span className="ml-2 text-red-600">
-                        (cliente precisa ter endereço cadastrado)
+                        (cliente não informado)
                       </span>
                     )}
                   </div>
