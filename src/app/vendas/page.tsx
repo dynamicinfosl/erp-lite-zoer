@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { 
   Dialog, 
   DialogContent, 
@@ -56,9 +55,6 @@ import {
   Clock,
   FileText,
   Truck,
-  ChevronsUpDown,
-  Check,
-  X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
@@ -91,59 +87,77 @@ interface Sale {
 type QuickCustomer = { id: number; name: string; document?: string | null; phone?: string | null };
 type QuickProduct = { id: number; name: string; sku?: string | null; sale_price?: number | null };
 
-function SearchCombobox({
+function AutocompleteInput({
   value,
   onChange,
+  onPick,
   placeholder,
   options,
   disabled,
 }: {
   value: string;
   onChange: (v: string) => void;
+  onPick: (opt: { value: string; label: string }) => void;
   placeholder: string;
   options: Array<{ value: string; label: string; keywords?: string }>;
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const selected = options.find((o) => o.value === value);
+
+  const normalizedQuery = (value || '').toLowerCase().trim();
+  const filtered = useMemo(() => {
+    if (!normalizedQuery) return options.slice(0, 30);
+    const out = options.filter((o) => {
+      const hay = `${o.label} ${o.keywords || ''}`.toLowerCase();
+      return hay.includes(normalizedQuery);
+    });
+    return out.slice(0, 30);
+  }, [options, normalizedQuery]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
+        <Input
+          value={value}
           disabled={disabled}
-          className="w-full justify-between"
-        >
-          <span className="truncate text-left">
-            {selected?.label || placeholder}
-          </span>
-          <ChevronsUpDown className="h-4 w-4 opacity-50" />
-        </Button>
+          placeholder={placeholder}
+          className="bg-white dark:bg-slate-900"
+          onFocus={() => setOpen(true)}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setOpen(false);
+          }}
+        />
       </PopoverTrigger>
-      <PopoverContent className="w-[420px] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Pesquisar..." />
-          <CommandList>
-            <CommandEmpty>Nenhum resultado</CommandEmpty>
-            <CommandGroup>
-              {options.map((o) => (
-                <CommandItem
-                  key={o.value}
-                  value={`${o.label} ${o.keywords || ''}`}
-                  onSelect={() => {
-                    onChange(o.value);
-                    setOpen(false);
-                  }}
-                >
-                  <Check className={`mr-2 h-4 w-4 ${o.value === value ? 'opacity-100' : 'opacity-0'}`} />
-                  <span className="truncate">{o.label}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+      <PopoverContent
+        align="start"
+        sideOffset={4}
+        className="w-[--radix-popover-trigger-width] p-1"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <div className="max-h-[260px] overflow-auto">
+          {filtered.length === 0 ? (
+            <div className="px-2 py-2 text-sm text-muted-foreground">Nenhum resultado</div>
+          ) : (
+            filtered.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                className="w-full text-left px-2 py-2 rounded-sm hover:bg-accent hover:text-accent-foreground text-sm"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onPick({ value: o.value, label: o.label });
+                  setOpen(false);
+                }}
+              >
+                <span className="truncate block">{o.label}</span>
+              </button>
+            ))
+          )}
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -1621,25 +1635,29 @@ export default function VendasPage() {
               <div className="grid gap-2">
                 <Label>Cliente</Label>
                 <div className="space-y-2">
-                  <SearchCombobox
-                    value={editFormData.customer_id ? String(editFormData.customer_id) : '__walkin__'}
-                    onChange={(v) => {
-                      if (v === '__walkin__') {
+                  <AutocompleteInput
+                    value={editFormData.cliente || ''}
+                    onChange={(text) => {
+                      // Ao digitar, vira cliente avulso automaticamente
+                      setEditFormData((prev) => ({ ...prev, cliente: text, customer_id: null }));
+                    }}
+                    onPick={(opt) => {
+                      if (opt.value === '__walkin__') {
                         setEditFormData((prev) => ({ ...prev, customer_id: null }));
                         return;
                       }
-                      const id = Number(v);
+                      const id = Number(opt.value);
                       const c = customersForEdit.find((x) => x.id === id);
                       setEditFormData((prev) => ({
                         ...prev,
                         customer_id: Number.isFinite(id) ? id : null,
-                        cliente: c?.name || prev.cliente,
+                        cliente: c?.name || opt.label || prev.cliente,
                       }));
                     }}
-                    placeholder={loadingEditDetails ? 'Carregando...' : 'Selecionar cliente...'}
+                    placeholder={loadingEditDetails ? 'Carregando...' : 'Pesquisar cliente (ou digitar avulso)...'}
                     disabled={loadingEditDetails}
                     options={[
-                      { value: '__walkin__', label: 'Cliente avulso', keywords: 'avulso' },
+                      { value: '__walkin__', label: 'Cliente avulso (não vincular)', keywords: 'avulso' },
                       ...customersForEdit.map((c) => ({
                         value: String(c.id),
                         label: `${c.name}${c.document ? ` — ${c.document}` : ''}${c.phone ? ` — ${c.phone}` : ''}`,
@@ -1647,26 +1665,6 @@ export default function VendasPage() {
                       })),
                     ]}
                   />
-
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="cliente"
-                      value={editFormData.cliente || ''}
-                      onChange={(e) => setEditFormData((prev) => ({ ...prev, cliente: e.target.value }))}
-                      placeholder="Nome do cliente (avulso)"
-                      disabled={Boolean(editFormData.customer_id)}
-                    />
-                    {editFormData.customer_id ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setEditFormData((prev) => ({ ...prev, customer_id: null }))}
-                        title="Tornar cliente avulso"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    ) : null}
-                  </div>
                 </div>
               </div>
 
@@ -1677,10 +1675,25 @@ export default function VendasPage() {
                     (editFormData.itens as any[]).map((it, idx) => (
                       <div key={idx} className="grid grid-cols-12 gap-2 items-center">
                         <div className="col-span-6">
-                          <SearchCombobox
-                            value={it.product_id ? String(it.product_id) : '__custom__'}
-                            onChange={(v) => {
-                              if (v === '__custom__') {
+                          <AutocompleteInput
+                            value={it.produto || ''}
+                            onChange={(text) => {
+                              // Ao digitar, vira produto manual automaticamente
+                              setEditFormData((prev) => {
+                                const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
+                                const qty = Number((itens[idx] as any)?.quantidade) || 1;
+                                const price = Number((itens[idx] as any)?.preco_unitario) || 0;
+                                (itens[idx] as any) = {
+                                  ...(itens[idx] as any),
+                                  product_id: null,
+                                  produto: text,
+                                  subtotal: qty * price,
+                                };
+                                return { ...prev, itens };
+                              });
+                            }}
+                            onPick={(opt) => {
+                              if (opt.value === '__custom__') {
                                 setEditFormData((prev) => {
                                   const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
                                   (itens[idx] as any) = { ...(itens[idx] as any), product_id: null };
@@ -1688,7 +1701,7 @@ export default function VendasPage() {
                                 });
                                 return;
                               }
-                              const id = Number(v);
+                              const id = Number(opt.value);
                               const p = productsForEdit.find((x) => x.id === id);
                               setEditFormData((prev) => {
                                 const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
@@ -1697,36 +1710,23 @@ export default function VendasPage() {
                                 (itens[idx] as any) = {
                                   ...(itens[idx] as any),
                                   product_id: Number.isFinite(id) ? id : null,
-                                  produto: p?.name || (itens[idx] as any)?.produto || '',
+                                  produto: p?.name || opt.label || (itens[idx] as any)?.produto || '',
                                   preco_unitario: price,
                                   subtotal: qty * price,
                                 };
                                 return { ...prev, itens };
                               });
                             }}
-                            placeholder={loadingEditDetails ? 'Carregando...' : 'Selecionar produto...'}
+                            placeholder={loadingEditDetails ? 'Carregando...' : 'Pesquisar produto (ou digitar manual)...'}
                             disabled={loadingEditDetails}
                             options={[
-                              { value: '__custom__', label: 'Produto manual (texto livre)', keywords: 'manual' },
+                              { value: '__custom__', label: 'Produto manual (não vincular)', keywords: 'manual' },
                               ...productsForEdit.map((p) => ({
                                 value: String(p.id),
                                 label: `${p.name}${p.sku ? ` — ${p.sku}` : ''}${p.sale_price ? ` — R$ ${Number(p.sale_price).toFixed(2)}` : ''}`,
                                 keywords: `${p.name} ${p.sku || ''}`,
                               })),
                             ]}
-                          />
-                          <Input
-                            className="mt-2"
-                            value={it.produto || ''}
-                            onChange={(e) =>
-                              setEditFormData((prev) => {
-                                const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
-                                (itens[idx] as any) = { ...(itens[idx] as any), produto: e.target.value };
-                                return { ...prev, itens };
-                              })
-                            }
-                            placeholder="Nome do produto (manual)"
-                            disabled={Boolean(it.product_id)}
                           />
                         </div>
                         <div className="col-span-3">
