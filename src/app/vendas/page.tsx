@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { 
   Dialog, 
   DialogContent, 
@@ -53,7 +55,10 @@ import {
   TrendingUp,
   Clock,
   FileText,
-  Truck
+  Truck,
+  ChevronsUpDown,
+  Check,
+  X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
@@ -72,6 +77,7 @@ interface Sale {
     quantidade: number;
     preco_unitario: number;
     subtotal: number;
+    product_id?: number | null;
   }>;
   subtotal: number;
   desconto: number;
@@ -80,6 +86,67 @@ interface Sale {
   status: 'pendente' | 'paga' | 'cancelada';
   data_venda: string;
   observacoes?: string;
+}
+
+type QuickCustomer = { id: number; name: string; document?: string | null; phone?: string | null };
+type QuickProduct = { id: number; name: string; sku?: string | null; sale_price?: number | null };
+
+function SearchCombobox({
+  value,
+  onChange,
+  placeholder,
+  options,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  options: Array<{ value: string; label: string; keywords?: string }>;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.value === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={disabled}
+          className="w-full justify-between"
+        >
+          <span className="truncate text-left">
+            {selected?.label || placeholder}
+          </span>
+          <ChevronsUpDown className="h-4 w-4 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[420px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Pesquisar..." />
+          <CommandList>
+            <CommandEmpty>Nenhum resultado</CommandEmpty>
+            <CommandGroup>
+              {options.map((o) => (
+                <CommandItem
+                  key={o.value}
+                  value={`${o.label} ${o.keywords || ''}`}
+                  onSelect={() => {
+                    onChange(o.value);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={`mr-2 h-4 w-4 ${o.value === value ? 'opacity-100' : 'opacity-0'}`} />
+                  <span className="truncate">{o.label}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 interface ColumnVisibility {
@@ -103,6 +170,9 @@ export default function VendasPage() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editFormData, setEditFormData] = useState<Partial<Sale>>({});
+  const [loadingEditDetails, setLoadingEditDetails] = useState(false);
+  const [customersForEdit, setCustomersForEdit] = useState<QuickCustomer[]>([]);
+  const [productsForEdit, setProductsForEdit] = useState<QuickProduct[]>([]);
   const [selectedVendas, setSelectedVendas] = useState<Set<string>>(new Set());
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -365,15 +435,102 @@ export default function VendasPage() {
 
   const handleEditar = (venda: Sale) => {
     setSelectedVenda(venda);
+    setShowEditDialog(true);
+    // Inicial rápido (fallback) enquanto carrega detalhes/itens
     setEditFormData({
       cliente: venda.cliente,
+      customer_id: venda.customer_id ?? null,
       forma_pagamento: venda.forma_pagamento,
       status: venda.status,
       observacoes: venda.observacoes || '',
       total: venda.total,
+      itens: venda.itens || [],
     });
-    setShowEditDialog(true);
   };
+
+  // Carregar detalhes completos (inclui itens) e listas de clientes/produtos ao abrir o modal de edição
+  useEffect(() => {
+    const loadEditResources = async () => {
+      if (!showEditDialog || !selectedVenda || !tenant?.id) return;
+
+      try {
+        setLoadingEditDetails(true);
+
+        // 1) Detalhe da venda (itens + customer_id)
+        const saleRes = await fetch(`/next_api/sales/${selectedVenda.id}`);
+        if (saleRes.ok) {
+          const saleJson = await saleRes.json().catch(() => ({}));
+          const data = saleJson?.data;
+          if (data) {
+            const items = Array.isArray(data.items) ? data.items : [];
+            const mappedItems = items.map((it: any) => ({
+              produto: String(it?.product_name || it?.produto || '').trim(),
+              quantidade: Number(it?.quantity) || 1,
+              preco_unitario: Number(it?.unit_price) || 0,
+              subtotal: Number(it?.subtotal) || (Number(it?.unit_price) || 0) * (Number(it?.quantity) || 1),
+              product_id: null as any, // detalhe atual não retorna product_id; usuário pode escolher no combo
+            }));
+
+            setEditFormData((prev) => ({
+              ...prev,
+              cliente: String(data.customer_name || prev.cliente || ''),
+              customer_id: data.customer_id ?? null,
+              total: Number(data.total_amount ?? prev.total ?? 0),
+              itens: mappedItems,
+            }));
+          }
+        }
+
+        // 2) Clientes (para selecionar/pesquisar)
+        try {
+          const cParams = new URLSearchParams({ tenant_id: tenant.id });
+          if (scope === 'all') cParams.set('branch_scope', 'all');
+          if (scope === 'branch' && branchId) cParams.set('branch_id', String(branchId));
+          const cRes = await fetch(`/next_api/customers?${cParams.toString()}`);
+          if (cRes.ok) {
+            const cJson = await cRes.json().catch(() => ({}));
+            const rows = Array.isArray(cJson?.data) ? cJson.data : [];
+            setCustomersForEdit(
+              rows
+                .filter((c: any) => c?.id && c?.name)
+                .map((c: any) => ({
+                  id: Number(c.id),
+                  name: String(c.name),
+                  document: c.document || null,
+                  phone: c.phone || null,
+                }))
+            );
+          }
+        } catch {}
+
+        // 3) Produtos (para selecionar/pesquisar nos itens)
+        try {
+          const pParams = new URLSearchParams({ tenant_id: tenant.id });
+          // Mantemos o comportamento atual: matriz vê todos
+          pParams.set('branch_scope', 'all');
+          const pRes = await fetch(`/next_api/products?${pParams.toString()}`);
+          if (pRes.ok) {
+            const pJson = await pRes.json().catch(() => ({}));
+            const rows = Array.isArray(pJson?.data) ? pJson.data : [];
+            setProductsForEdit(
+              rows
+                .filter((p: any) => p?.id && p?.name)
+                .map((p: any) => ({
+                  id: Number(p.id),
+                  name: String(p.name),
+                  sku: p.sku || null,
+                  sale_price: typeof p.sale_price === 'number' ? p.sale_price : Number(p.sale_price) || null,
+                }))
+            );
+          }
+        } catch {}
+      } finally {
+        setLoadingEditDetails(false);
+      }
+    };
+
+    loadEditResources();
+  }, [showEditDialog, selectedVenda?.id, tenant?.id, scope, branchId]);
 
   const handleSalvarEdicao = async () => {
     if (!selectedVenda) return;
@@ -381,6 +538,7 @@ export default function VendasPage() {
     try {
       const updateData: any = {
         customer_name: editFormData.cliente,
+        customer_id: editFormData.customer_id ?? null,
         payment_method: editFormData.forma_pagamento,
         status: editFormData.status,
         notes: editFormData.observacoes || '',
@@ -388,6 +546,19 @@ export default function VendasPage() {
 
       if (editFormData.total !== undefined) {
         updateData.total_amount = editFormData.total;
+      }
+
+      // Atualizar itens (produto vendido) se existirem no form
+      if (Array.isArray(editFormData.itens)) {
+        updateData.products = editFormData.itens
+          .map((it: any) => ({
+            id: it?.product_id ?? null,
+            name: String(it?.produto || '').trim(),
+            price: Number(it?.preco_unitario),
+            quantity: Number(it?.quantidade),
+            discount: 0,
+          }))
+          .filter((p: any) => p.name && Number.isFinite(p.price) && Number.isFinite(p.quantity) && p.quantity > 0);
       }
 
       const response = await fetch(`/next_api/sales/${selectedVenda.id}`, {
@@ -1448,13 +1619,208 @@ export default function VendasPage() {
           {selectedVenda && (
             <div className="space-y-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="cliente">Cliente *</Label>
-                <Input
-                  id="cliente"
-                  value={editFormData.cliente || ''}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, cliente: e.target.value }))}
-                  placeholder="Nome do cliente"
-                />
+                <Label>Cliente</Label>
+                <div className="space-y-2">
+                  <SearchCombobox
+                    value={editFormData.customer_id ? String(editFormData.customer_id) : '__walkin__'}
+                    onChange={(v) => {
+                      if (v === '__walkin__') {
+                        setEditFormData((prev) => ({ ...prev, customer_id: null }));
+                        return;
+                      }
+                      const id = Number(v);
+                      const c = customersForEdit.find((x) => x.id === id);
+                      setEditFormData((prev) => ({
+                        ...prev,
+                        customer_id: Number.isFinite(id) ? id : null,
+                        cliente: c?.name || prev.cliente,
+                      }));
+                    }}
+                    placeholder={loadingEditDetails ? 'Carregando...' : 'Selecionar cliente...'}
+                    disabled={loadingEditDetails}
+                    options={[
+                      { value: '__walkin__', label: 'Cliente avulso', keywords: 'avulso' },
+                      ...customersForEdit.map((c) => ({
+                        value: String(c.id),
+                        label: `${c.name}${c.document ? ` — ${c.document}` : ''}${c.phone ? ` — ${c.phone}` : ''}`,
+                        keywords: `${c.name} ${c.document || ''} ${c.phone || ''}`,
+                      })),
+                    ]}
+                  />
+
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="cliente"
+                      value={editFormData.cliente || ''}
+                      onChange={(e) => setEditFormData((prev) => ({ ...prev, cliente: e.target.value }))}
+                      placeholder="Nome do cliente (avulso)"
+                      disabled={Boolean(editFormData.customer_id)}
+                    />
+                    {editFormData.customer_id ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setEditFormData((prev) => ({ ...prev, customer_id: null }))}
+                        title="Tornar cliente avulso"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Produtos vendidos</Label>
+                <div className="space-y-2 rounded-md border p-3">
+                  {Array.isArray(editFormData.itens) && editFormData.itens.length > 0 ? (
+                    (editFormData.itens as any[]).map((it, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                        <div className="col-span-6">
+                          <SearchCombobox
+                            value={it.product_id ? String(it.product_id) : '__custom__'}
+                            onChange={(v) => {
+                              if (v === '__custom__') {
+                                setEditFormData((prev) => {
+                                  const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
+                                  (itens[idx] as any) = { ...(itens[idx] as any), product_id: null };
+                                  return { ...prev, itens };
+                                });
+                                return;
+                              }
+                              const id = Number(v);
+                              const p = productsForEdit.find((x) => x.id === id);
+                              setEditFormData((prev) => {
+                                const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
+                                const qty = Number((itens[idx] as any)?.quantidade) || 1;
+                                const price = Number(p?.sale_price) || Number((itens[idx] as any)?.preco_unitario) || 0;
+                                (itens[idx] as any) = {
+                                  ...(itens[idx] as any),
+                                  product_id: Number.isFinite(id) ? id : null,
+                                  produto: p?.name || (itens[idx] as any)?.produto || '',
+                                  preco_unitario: price,
+                                  subtotal: qty * price,
+                                };
+                                return { ...prev, itens };
+                              });
+                            }}
+                            placeholder={loadingEditDetails ? 'Carregando...' : 'Selecionar produto...'}
+                            disabled={loadingEditDetails}
+                            options={[
+                              { value: '__custom__', label: 'Produto manual (texto livre)', keywords: 'manual' },
+                              ...productsForEdit.map((p) => ({
+                                value: String(p.id),
+                                label: `${p.name}${p.sku ? ` — ${p.sku}` : ''}${p.sale_price ? ` — R$ ${Number(p.sale_price).toFixed(2)}` : ''}`,
+                                keywords: `${p.name} ${p.sku || ''}`,
+                              })),
+                            ]}
+                          />
+                          <Input
+                            className="mt-2"
+                            value={it.produto || ''}
+                            onChange={(e) =>
+                              setEditFormData((prev) => {
+                                const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
+                                (itens[idx] as any) = { ...(itens[idx] as any), produto: e.target.value };
+                                return { ...prev, itens };
+                              })
+                            }
+                            placeholder="Nome do produto (manual)"
+                            disabled={Boolean(it.product_id)}
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <Label className="text-xs text-muted-foreground">Qtd</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={it.quantidade ?? 1}
+                            onChange={(e) => {
+                              const q = Number(e.target.value) || 0;
+                              setEditFormData((prev) => {
+                                const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
+                                const price = Number((itens[idx] as any)?.preco_unitario) || 0;
+                                (itens[idx] as any) = { ...(itens[idx] as any), quantidade: q, subtotal: q * price };
+                                return { ...prev, itens };
+                              });
+                            }}
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <Label className="text-xs text-muted-foreground">R$ Unit.</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={it.preco_unitario ?? 0}
+                            onChange={(e) => {
+                              const pr = Number(e.target.value) || 0;
+                              setEditFormData((prev) => {
+                                const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
+                                const qty = Number((itens[idx] as any)?.quantidade) || 0;
+                                (itens[idx] as any) = { ...(itens[idx] as any), preco_unitario: pr, subtotal: qty * pr };
+                                return { ...prev, itens };
+                              });
+                            }}
+                          />
+                        </div>
+                        <div className="col-span-12 flex justify-between items-center">
+                          <span className="text-xs text-muted-foreground">
+                            Subtotal: R$ {Number(it.subtotal ?? (Number(it.quantidade) || 0) * (Number(it.preco_unitario) || 0)).toFixed(2)}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setEditFormData((prev) => {
+                                const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
+                                itens.splice(idx, 1);
+                                return { ...prev, itens };
+                              })
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {idx < (editFormData.itens as any[]).length - 1 ? <div className="col-span-12 border-t my-2" /> : null}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-muted-foreground">Nenhum item encontrado nesta venda.</div>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        setEditFormData((prev) => ({
+                          ...prev,
+                          itens: [
+                            ...(Array.isArray(prev.itens) ? prev.itens : []),
+                            { produto: '', quantidade: 1, preco_unitario: 0, subtotal: 0, product_id: null },
+                          ],
+                        }))
+                      }
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Adicionar item
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const itens = Array.isArray(editFormData.itens) ? (editFormData.itens as any[]) : [];
+                        const total = itens.reduce((acc, it) => acc + (Number(it.subtotal) || (Number(it.quantidade) || 0) * (Number(it.preco_unitario) || 0)), 0);
+                        setEditFormData((prev) => ({ ...prev, total }));
+                      }}
+                    >
+                      Recalcular total
+                    </Button>
+                  </div>
+                </div>
               </div>
 
               <div className="grid gap-2">

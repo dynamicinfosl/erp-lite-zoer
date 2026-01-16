@@ -141,7 +141,7 @@ export async function PUT(
     
     let query = supabaseAdmin
       .from('sales')
-      .select('id');
+      .select('id, tenant_id, user_id');
     
     if (isNumber) {
       query = query.eq('id', parseInt(saleId));
@@ -161,7 +161,7 @@ export async function PUT(
       );
     }
 
-    const sale = sales[0];
+    const sale = sales[0] as any;
     
     // Preparar dados de atualização
     const updateData: any = {
@@ -170,14 +170,80 @@ export async function PUT(
 
     // Adicionar apenas campos que foram enviados
     if (body.customer_name !== undefined) updateData.customer_name = body.customer_name;
+    if (body.customer_id !== undefined) updateData.customer_id = body.customer_id === null ? null : body.customer_id;
     if (body.payment_method !== undefined) updateData.payment_method = body.payment_method;
     if (body.status !== undefined) updateData.status = body.status;
     if (body.notes !== undefined) updateData.notes = body.notes;
-    if (body.total_amount !== undefined) {
+    // Se vier total_amount explicitamente e não vier products, respeitar.
+    // Se vier products, o total será recalculado a partir dos itens (mais confiável).
+    const hasProductsArray = Array.isArray(body?.products);
+    if (!hasProductsArray && body.total_amount !== undefined) {
       const total = parseFloat(body.total_amount);
       if (!isNaN(total) && total >= 0) {
         updateData.total_amount = total;
         updateData.final_amount = total;
+      }
+    }
+
+    // ✅ Se vier products/items, atualizar também os itens da venda (sale_items) e recalcular total.
+    if (hasProductsArray) {
+      const products = body.products as any[];
+      const cleaned = products
+        .map((p) => ({
+          id: p?.id === null || p?.id === undefined ? null : Number(p.id),
+          name: String(p?.name || p?.product_name || '').trim(),
+          price: Number(p?.price ?? p?.unit_price),
+          quantity: Number(p?.quantity),
+          discount: Number(p?.discount || 0),
+        }))
+        .filter((p) => p.name && Number.isFinite(p.price) && Number.isFinite(p.quantity) && p.quantity > 0);
+
+      // Recalcular total a partir dos itens
+      const computedTotal = cleaned.reduce((acc, p) => {
+        const discountAmount = (p.price * p.quantity * (p.discount || 0)) / 100;
+        const subtotal = (p.price * p.quantity) - discountAmount;
+        return acc + subtotal;
+      }, 0);
+
+      updateData.total_amount = computedTotal;
+      updateData.final_amount = computedTotal;
+
+      // Substituir itens: apagar e inserir novamente
+      const saleIdNum = Number(sale.id);
+      await supabaseAdmin.from('sale_items').delete().eq('sale_id', saleIdNum);
+
+      const tenantId = sale.tenant_id || body.tenant_id;
+      const userId = sale.user_id || body.user_id || '00000000-0000-0000-0000-000000000000';
+      const now = new Date().toISOString();
+
+      const saleItems = cleaned.map((p) => {
+        const discountAmount = (p.price * p.quantity * (p.discount || 0)) / 100;
+        const subtotal = (p.price * p.quantity) - discountAmount;
+        const itemData: any = {
+          sale_id: saleIdNum,
+          tenant_id: tenantId,
+          user_id: userId,
+          product_name: p.name,
+          unit_price: p.price,
+          quantity: p.quantity,
+          subtotal: subtotal,
+          total_price: subtotal,
+          created_at: now,
+          updated_at: now,
+        };
+        if (p.id !== null && Number.isFinite(p.id)) itemData.product_id = p.id;
+        return itemData;
+      });
+
+      if (saleItems.length > 0) {
+        const { error: itemsError } = await supabaseAdmin.from('sale_items').insert(saleItems);
+        if (itemsError) {
+          console.error('❌ Erro ao atualizar itens da venda:', itemsError);
+          return NextResponse.json(
+            { error: 'Erro ao atualizar itens da venda: ' + itemsError.message },
+            { status: 400 }
+          );
+        }
       }
     }
 
