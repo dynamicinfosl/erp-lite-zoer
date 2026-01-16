@@ -508,13 +508,7 @@ export default function VendasPage() {
       return;
     }
 
-    // Validações para marcar como entrega
-    if (!selectedDriverId) {
-      toast.error('Selecione um entregador para vincular a entrega', {
-        duration: 3000,
-      });
-      return;
-    }
+    // ✅ Entregador NÃO é obrigatório para marcar como entrega (pode ser definido depois)
 
     try {
       setSavingDelivery(true);
@@ -525,9 +519,11 @@ export default function VendasPage() {
           tenant_id: tenant.id,
           sale_id: selectedVenda.id,
           customer_id: selectedVenda.customer_id || null,
-          driver_id: Number(selectedDriverId),
+          driver_id: selectedDriverId ? Number(selectedDriverId) : null,
           status: 'aguardando',
-          notes: `Vinculada na página de vendas para entregador: ${deliveryDrivers.find(d => d.id === Number(selectedDriverId))?.name || selectedDriverId}`,
+          notes: selectedDriverId
+            ? `Vinculada na página de vendas para entregador: ${deliveryDrivers.find(d => d.id === Number(selectedDriverId))?.name || selectedDriverId}`
+            : 'Vinculada na página de vendas (sem entregador definido)',
         }),
       });
       
@@ -553,9 +549,11 @@ export default function VendasPage() {
       }
 
       const result = await res.json();
-      const driverName = deliveryDrivers.find(d => d.id === Number(selectedDriverId))?.name || selectedDriverId;
+      const driverName = selectedDriverId
+        ? (deliveryDrivers.find(d => d.id === Number(selectedDriverId))?.name || selectedDriverId)
+        : null;
       toast.success('Venda marcada para entrega com sucesso!', {
-        description: `Entregador: ${driverName}`,
+        description: driverName ? `Entregador: ${driverName}` : 'Entregador: não definido',
         duration: 4000,
       });
       setShowDeliveryDialog(false);
@@ -1640,9 +1638,12 @@ export default function VendasPage() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-medium text-gray-700">Entregador</Label>
-                    <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+                    <Select
+                      value={selectedDriverId}
+                      onValueChange={(v) => setSelectedDriverId(v === '__none__' ? '' : v)}
+                    >
                       <SelectTrigger className="w-full h-9 text-xs">
-                        <SelectValue placeholder={loadingDrivers ? 'Carregando...' : deliveryDrivers.length === 0 ? 'Nenhum entregador cadastrado' : 'Selecione um entregador'} />
+                        <SelectValue placeholder={loadingDrivers ? 'Carregando...' : deliveryDrivers.length === 0 ? 'Nenhum entregador cadastrado' : 'Selecione um entregador (opcional)'} />
                       </SelectTrigger>
                       <SelectContent className="z-[10000] max-h-[200px] overflow-y-auto">
                         {deliveryDrivers.length === 0 && !loadingDrivers ? (
@@ -1654,11 +1655,16 @@ export default function VendasPage() {
                             Carregando...
                           </div>
                         ) : (
-                          deliveryDrivers.map((d) => (
-                            <SelectItem key={d.id} value={String(d.id)} className="text-xs">
-                              {d.name}
+                          <>
+                            <SelectItem value="__none__" className="text-xs">
+                              Sem entregador
                             </SelectItem>
-                          ))
+                            {deliveryDrivers.map((d) => (
+                              <SelectItem key={d.id} value={String(d.id)} className="text-xs">
+                                {d.name}
+                              </SelectItem>
+                            ))}
+                          </>
                         )}
                       </SelectContent>
                     </Select>
@@ -1675,7 +1681,7 @@ export default function VendasPage() {
             <Button
               onClick={saveDeliveryConfig}
               className="bg-amber-600 hover:bg-amber-700 text-white"
-              disabled={savingDelivery || (isDelivery && !selectedDriverId)}
+              disabled={savingDelivery}
             >
               {savingDelivery ? 'Salvando...' : 'Salvar'}
             </Button>
