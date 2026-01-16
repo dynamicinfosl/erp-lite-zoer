@@ -150,6 +150,7 @@ export default function ProdutosPage() {
     ncm: '',
     unit: 'UN',
   });
+  const [extraSalePrices, setExtraSalePrices] = useState<Array<{ name: string; price: string }>>([]);
 
   // Estados para preview de importação
   const [showImportPreview, setShowImportPreview] = useState(false);
@@ -226,9 +227,19 @@ export default function ProdutosPage() {
     try {
       setLoading(true);
       const currentTenantId = overrideTenantId || tenant?.id;
-      const url = currentTenantId
-        ? `/next_api/products?tenant_id=${encodeURIComponent(currentTenantId)}`
-        : `/next_api/products`;
+
+      if (!currentTenantId) {
+        console.warn('⚠️ loadProducts: tenant_id ausente, retornando lista vazia');
+        setProducts([]);
+        return;
+      }
+
+      // ✅ Construir parâmetros da query com branch_scope para garantir que produtos importados apareçam
+      const params = new URLSearchParams({ tenant_id: currentTenantId });
+      // Sempre buscar todos os produtos da matriz quando não há branch específica
+      params.set('branch_scope', 'all');
+      
+      const url = `/next_api/products?${params.toString()}`;
       
       console.log(`🔄 Carregando produtos para tenant: ${currentTenantId}`);
       console.log(`📡 URL da requisição: ${url}`);
@@ -423,6 +434,16 @@ export default function ProdutosPage() {
         barcode: newProduct.barcode || null,
         ncm: newProduct.ncm || null,
         unit: newProduct.unit || 'UN',
+        price_tiers: [
+          // Preço padrão (equivalente ao "Valor Varejo")
+          ...(parseFloat(newProduct.sale_price) > 0
+            ? [{ name: 'Valor Varejo', price: parseFloat(newProduct.sale_price) }]
+            : []),
+          // Extras
+          ...extraSalePrices
+            .map((p) => ({ name: (p.name || '').trim(), price: parseFloat(p.price) }))
+            .filter((p) => p.name && Number.isFinite(p.price) && p.price > 0),
+        ],
       } as any;
 
       const response = await fetch('/next_api/products', {
@@ -482,6 +503,7 @@ export default function ProdutosPage() {
         ncm: '',
         unit: 'UN',
       });
+      setExtraSalePrices([]);
       setFormErrors({}); // Limpar erros
       toast.success('Produto adicionado com sucesso!');
     } catch (error: any) {
@@ -513,8 +535,26 @@ export default function ProdutosPage() {
           setImporting(false);
           return;
         }
-        headers = (json[0] as any[]).map(h => String(h || '').trim());
-        rows = json.slice(1);
+        // ✅ Detectar linha de cabeçalho (muitas planilhas têm linhas de título/mescladas acima do header real)
+        const looksLikeHeader = (row: any[]): boolean => {
+          if (!Array.isArray(row)) return false;
+          const cells = row.map((c) => String(c ?? '').trim()).filter(Boolean);
+          if (cells.length < 3) return false;
+          // header "real" tende a ter letras (não só números)
+          const withLetters = cells.filter((c) => /[a-zA-ZÀ-ÿ]/.test(c));
+          return withLetters.length >= 3;
+        };
+
+        let headerRowIndex = 0;
+        for (let i = 0; i < Math.min(json.length, 10); i++) {
+          if (looksLikeHeader(json[i] as any[])) {
+            headerRowIndex = i;
+            break;
+          }
+        }
+
+        headers = (json[headerRowIndex] as any[]).map((h) => String(h || '').trim());
+        rows = json.slice(headerRowIndex + 1);
       } else if (ext === 'csv') {
         const text = await file.text();
         const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -607,6 +647,9 @@ export default function ProdutosPage() {
   };
 
   const handleRegisterSelected = async (selected: any[]) => {
+    console.log('🚀 [handleRegisterSelected] INICIADO - Itens recebidos:', selected.length);
+    console.log('🚀 [handleRegisterSelected] Primeiro item:', selected[0]);
+    
     try {
       setIsRegistering(true);
       let success = 0;
@@ -616,17 +659,26 @@ export default function ProdutosPage() {
       // ✅ DEBUG: Verificar tenant antes de processar
       console.log('🔍 DEBUG - Tenant atual:', tenant);
       console.log('🔍 DEBUG - Tenant ID:', tenant?.id);
+      console.log('🔍 DEBUG - Itens selecionados para cadastro:', selected.length);
       
-      if (!tenant?.id) {
+      // ✅ Usar tenant atual do contexto
+      let currentTenantId = tenant?.id;
+      
+      if (!currentTenantId) {
         console.error('❌ Tenant não disponível para importação');
         console.log('🔄 Tentando recarregar tenant...');
         
         // Tentar recarregar o tenant
         try {
           await refreshTenant();
-          console.log('🔄 Tenant após refresh:', tenant);
+          // Aguardar um pouco para o estado atualizar
+          await new Promise(resolve => setTimeout(resolve, 500));
           
-          if (!tenant?.id) {
+          // Tentar novamente após refresh
+          currentTenantId = tenant?.id;
+          console.log('🔄 Tenant após refresh:', currentTenantId);
+          
+          if (!currentTenantId) {
             toast.error('Erro: Tenant não disponível. Recarregue a página.');
             setIsRegistering(false);
             return;
@@ -638,8 +690,27 @@ export default function ProdutosPage() {
           return;
         }
       }
+      
+      // ✅ Confirmar tenant_id final
+      const finalTenantId = currentTenantId;
+      if (!finalTenantId) {
+        console.error('❌ Tenant ainda não disponível após tentativas');
+        toast.error('Erro: Tenant não disponível. Recarregue a página.');
+        setIsRegistering(false);
+        return;
+      }
+      
+      console.log('✅ Tenant confirmado:', finalTenantId);
 
-      for (const row of selected) {
+      // Mapear header normalizado -> header original (para nomes bonitos dos price_tiers)
+      const headerNormToRaw = new Map<string, string>();
+      for (const h of importHeaders) {
+        const norm = normalizeHeader(h);
+        if (norm && !headerNormToRaw.has(norm)) headerNormToRaw.set(norm, String(h).trim());
+      }
+
+      for (let rowIndex = 0; rowIndex < selected.length; rowIndex++) {
+        const row = selected[rowIndex];
         const obj: Record<string, any> = Array.isArray(row)
           ? (() => {
               const keys = importHeaders.map(normalizeHeader);
@@ -657,33 +728,122 @@ export default function ProdutosPage() {
               return out;
             })();
 
+        // Pick flexível: tenta chaves exatas e também por "contém" (para cabeçalhos variados)
+        const pick = (cands: string[]): string => {
+          for (const key of cands) {
+            const val = obj[key];
+            if (val !== undefined && val !== null && String(val).trim() !== '') return String(val);
+          }
+          for (const [k, v] of Object.entries(obj)) {
+            if (cands.some((c) => k.includes(c))) {
+              if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
+            }
+          }
+          return '';
+        };
+
+        const sku = pick(['codigo', 'sku', 'cod', 'codigo produto', 'codigo interno', 'id']).trim();
+        const name = pick(['nome', 'produto', 'nome produto', 'descricao', 'descrição']).trim();
+        const description = pick(['descricao', 'descrição', 'observacoes', 'obs']).trim();
+        const category = pick(['categoria', 'grupo', 'departamento', 'secao', 'seção']).trim();
+        const brand = pick(['marca', 'fabricante']).trim();
+        const unit = (pick(['unidade', 'und', 'un', 'unid', 'u.m', 'um']).trim() || 'UN').toUpperCase();
+        const barcode = pick(['codigo de barra', 'codigo de barras', 'codbarras', 'barcode', 'ean']).trim();
+        const ncm = pick(['ncm']).trim();
+        const costStr = pick(['valor de custo', 'preco de custo', 'preco custo', 'custo', 'custo unitario', 'custo unitário']);
+        const priceStr = pick([
+          'valor varejo',
+          'valor atacado',
+          'valor de venda',
+          'valor venda',
+          'preco de venda',
+          'preco venda',
+          'preco',
+          'preco unitario',
+          'preco unitário',
+        ]);
+        const stockStr = pick(['estoque', 'estoque atual', 'quantidade', 'qtd', 'saldo']);
+
+        // ✅ Capturar todos os "Valor ..." como múltiplos preços (tiers)
+        const priceTiers: Array<{ name: string; price: number }> = [];
+        for (const [k, v] of Object.entries(obj)) {
+          if (!k) continue;
+          // Ex.: "valor varejo", "valor varejo cartao", "valor atacado" etc.
+          if (k.startsWith('valor ') && !k.includes('custo')) {
+            const p = parseBrazilianPrice(v as any);
+            if (p > 0) {
+              const rawName = headerNormToRaw.get(k) || k;
+              priceTiers.push({ name: rawName, price: p });
+            }
+          }
+        }
+
+        // Preferir "Valor Varejo" como preço padrão; senão usa o primeiro tier válido
+        const varejoTier = priceTiers.find((t) => normalizeHeader(t.name).includes('valor varejo'));
+        const defaultPrice = varejoTier?.price ?? (priceTiers[0]?.price ?? 0);
+
         const productData = {
-          sku: (obj['codigo'] || obj['sku'] || '').toString().trim(),
-          name: (obj['nome'] || obj['produto'] || '').toString().trim(),
-          description: (obj['descricao'] || obj['descrição'] || '').toString().trim() || null,
-          category: (obj['categoria'] || '').toString().trim() || null,
-          brand: (obj['marca'] || '').toString().trim() || null,
-          cost_price: parseBrazilianPrice(obj['valor de custo'] || obj['custo'] || obj['preco de custo'] || '0'),
-          sale_price: parseBrazilianPrice(obj['valor de venda'] || obj['preco'] || obj['preco de venda'] || '0'),
-          stock_quantity: parseInt((obj['estoque'] || obj['quantidade'] || '0').toString(), 10) || 0,
-          barcode: (obj['codigo de barra'] || obj['codigo de barras'] || obj['barcode'] || '').toString().trim() || null,
-          ncm: (obj['ncm'] || '').toString().trim() || null,
-          unit: (obj['unidade'] || obj['und'] || 'UN').toString().trim().toUpperCase() || 'UN',
+          sku,
+          name,
+          description: description || null,
+          category: category || null,
+          brand: brand || null,
+          cost_price: parseBrazilianPrice(costStr || '0'),
+          // ✅ CORREÇÃO: API espera 'price'
+          price: defaultPrice || parseBrazilianPrice(priceStr || '0'),
+          stock: parseInt((stockStr || '0').toString(), 10) || 0,
+          barcode: barcode || null,
+          ncm: ncm || null,
+          unit,
           imported_at: new Date().toISOString(),
         };
 
-        if (!productData.sku || !productData.name || productData.sale_price <= 0) {
+        // ✅ Fallback por posição (para planilhas no padrão do seu Produtos.xlsx / exportações sem header consistente)
+        // Exemplo observado: [0]=codigo, [3]=categoria, [4]=nome, [10]=preço, [11]=unidade
+        if ((!productData.sku || !productData.name || productData.price <= 0) && Array.isArray(row)) {
+          const byIdxSku = String(row[0] ?? '').trim();
+          const byIdxCategory = String(row[3] ?? '').trim();
+          const byIdxName = String(row[4] ?? '').trim();
+          const byIdxPrice = parseBrazilianPrice(String(row[10] ?? '').trim());
+          const byIdxUnit = String(row[11] ?? row[12] ?? 'UN').trim().toUpperCase();
+
+          if (byIdxSku && byIdxName && byIdxPrice > 0) {
+            productData.sku = byIdxSku;
+            productData.name = byIdxName;
+            productData.category = byIdxCategory || productData.category;
+            productData.price = byIdxPrice;
+            productData.unit = byIdxUnit || productData.unit;
+            console.log('🧩 [Import Produtos] Fallback por índice aplicado:', {
+              rowIndex: rowIndex + 1,
+              sku: productData.sku,
+              name: productData.name,
+              price: productData.price,
+              unit: productData.unit,
+            });
+          }
+        }
+
+        if (!productData.sku || !productData.name || productData.price <= 0) {
           fail++;
-          errors.push(`Produto com dados inválidos (SKU: ${productData.sku}, Nome: ${productData.name}, Preço: ${productData.sale_price}), pulado.`);
+          errors.push(`Produto com dados inválidos (SKU: ${productData.sku}, Nome: ${productData.name}, Preço: ${productData.price}), pulado.`);
+          console.warn(
+            `⚠️ [Import Produtos] Linha ${rowIndex + 1} pulada (sku="${productData.sku}", name="${productData.name}", price=${productData.price}). ` +
+              `Headers(normalizados) amostra: ${Object.keys(obj).slice(0, 15).join(', ')}`
+          );
           continue;
         }
 
         // ✅ DEBUG: Log dos dados antes do envio
-        const requestData = { tenant_id: tenant?.id, ...productData };
+        const requestData = {
+          tenant_id: finalTenantId,
+          ...productData,
+          // ✅ enviar tiers para o backend cadastrar/atualizar tipos automaticamente
+          price_tiers: priceTiers,
+        };
         console.log('📤 Enviando dados do produto:', {
           tenant_id: requestData.tenant_id,
           name: requestData.name,
-          sale_price: requestData.sale_price,
+          price: requestData.price,
           sku: requestData.sku
         });
 
@@ -693,13 +853,29 @@ export default function ProdutosPage() {
           body: JSON.stringify(requestData),
         });
 
+        // ✅ DEBUG: Log detalhado da resposta
+        const responseText = await response.text();
+        console.log(`📥 Resposta da API - Status: ${response.status}, OK: ${response.ok}`);
+        console.log(`📥 Resposta da API - Body:`, responseText);
+
         if (response.ok) {
-          success++;
+          try {
+            const responseData = JSON.parse(responseText);
+            console.log(`✅ Produto cadastrado com sucesso:`, responseData);
+            success++;
+          } catch (e) {
+            console.warn('⚠️ Resposta OK mas não é JSON válido:', responseText);
+            success++; // Considerar sucesso mesmo sem JSON válido
+          }
         } else {
           fail++;
-          const text = await response.text();
-          console.error('Erro ao cadastrar produto:', text);
-          errors.push(text);
+          console.error(`❌ Erro ao cadastrar produto (${response.status}):`, responseText);
+          try {
+            const errorData = JSON.parse(responseText);
+            errors.push(`Linha ${rowIndex + 1}: ${errorData.error || responseText}`);
+          } catch {
+            errors.push(`Linha ${rowIndex + 1}: ${responseText || 'Erro desconhecido'}`);
+          }
         }
       }
 
@@ -744,8 +920,9 @@ export default function ProdutosPage() {
   const [showProductDetails, setShowProductDetails] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingPriceTiers, setLoadingPriceTiers] = useState(false);
 
-  const openEditProduct = (p: Product) => {
+  const openEditProduct = async (p: Product) => {
     setEditingProduct(p);
     setShowAddDialog(true);
     setNewProduct({
@@ -761,6 +938,42 @@ export default function ProdutosPage() {
       ncm: p.ncm || '',
       unit: p.unit || 'UN',
     });
+
+    // ✅ Carregar valores de venda diferentes cadastrados/importados
+    try {
+      if (!tenant?.id) return;
+      setLoadingPriceTiers(true);
+      const res = await fetch(
+        `/next_api/product-price-tiers?tenant_id=${encodeURIComponent(tenant.id)}&product_id=${encodeURIComponent(String(p.id))}`
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || 'Erro ao carregar valores de venda');
+      const tiers = Array.isArray(json?.data) ? json.data : [];
+
+      // Separar "Valor Varejo" (vai para o campo principal) e demais vão para lista adicional
+      const extras: Array<{ name: string; price: string }> = [];
+      let varejo: number | null = null;
+      for (const t of tiers) {
+        const nm = String(t?.price_type?.name || t?.name || '').trim();
+        const pr = Number(t?.price);
+        if (!nm || !Number.isFinite(pr) || pr <= 0) continue;
+        const norm = normalizeHeader(nm);
+        if (norm.includes('valor varejo')) {
+          varejo = pr;
+        } else {
+          extras.push({ name: nm, price: String(pr) });
+        }
+      }
+      if (typeof varejo === 'number' && varejo > 0) {
+        setNewProduct((prev) => ({ ...prev, sale_price: String(varejo) }));
+      }
+      setExtraSalePrices(extras);
+    } catch (e: any) {
+      console.warn(e);
+      // não bloquear edição se falhar
+    } finally {
+      setLoadingPriceTiers(false);
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -771,11 +984,20 @@ export default function ProdutosPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          tenant_id: tenant?.id,
           id: editingProduct.id,
           name: newProduct.name,
           description: newProduct.description,
           price: parseFloat(newProduct.sale_price) || 0,
           stock: parseInt(newProduct.stock_quantity) || 0,
+          price_tiers: [
+            ...(parseFloat(newProduct.sale_price) > 0
+              ? [{ name: 'Valor Varejo', price: parseFloat(newProduct.sale_price) }]
+              : []),
+            ...extraSalePrices
+              .map((p) => ({ name: (p.name || '').trim(), price: parseFloat(p.price) }))
+              .filter((p) => p.name && Number.isFinite(p.price) && p.price > 0),
+          ],
         })
       });
       if (!res.ok) throw new Error(await res.text());
@@ -1550,6 +1772,74 @@ export default function ProdutosPage() {
                       className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
                     />
                   </div>
+                </div>
+
+                {/* Valores de venda adicionais (atacado, cartão, etc.) */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <Label className="text-sm font-medium text-slate-200">Valores de venda adicionais (opcional)</Label>
+                      <p className="text-xs text-slate-400">
+                        Ex.: Valor atacado, Valor varejo cartão, Valor gelado à vista. Se não existir, o sistema cria automaticamente.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-slate-500 bg-slate-700/40 hover:bg-slate-600 text-slate-200 h-9"
+                      onClick={() => setExtraSalePrices((prev) => [...prev, { name: '', price: '' }])}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Adicionar valor
+                    </Button>
+                  </div>
+
+                  {extraSalePrices.length > 0 && (
+                    <div className="space-y-2">
+                      {extraSalePrices.map((p, idx) => (
+                        <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                          <div className="md:col-span-7">
+                            <Input
+                              value={p.name}
+                              onChange={(e) =>
+                                setExtraSalePrices((prev) =>
+                                  prev.map((it, i) => (i === idx ? { ...it, name: e.target.value } : it))
+                                )
+                              }
+                              placeholder="Ex.: Valor atacado"
+                              className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
+                            />
+                          </div>
+                          <div className="md:col-span-4">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={p.price}
+                              onChange={(e) =>
+                                setExtraSalePrices((prev) =>
+                                  prev.map((it, i) => (i === idx ? { ...it, price: e.target.value } : it))
+                                )
+                              }
+                              placeholder="0.00"
+                              className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
+                            />
+                          </div>
+                          <div className="md:col-span-1 flex justify-end">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="border-slate-500 bg-slate-700/40 hover:bg-slate-600 text-slate-200 h-11 px-3"
+                              onClick={() => setExtraSalePrices((prev) => prev.filter((_, i) => i !== idx))}
+                              title="Remover"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

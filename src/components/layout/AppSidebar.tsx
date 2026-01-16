@@ -73,7 +73,16 @@ const menuGroups = [
     title: 'Vendas',
     items: [
       { title: 'Clientes', url: '/clientes', icon: Users, roles: ['admin', 'vendedor'] },
-      { title: 'Produtos', url: '/produtos', icon: Package, roles: ['admin', 'vendedor'] },
+      { 
+        title: 'Produtos', 
+        url: '/produtos', 
+        icon: Package, 
+        roles: ['admin', 'vendedor'],
+        subItems: [
+          { title: 'Lista de Produtos', url: '/produtos', icon: Package },
+          { title: 'Valores de Venda', url: '/produtos/valores-venda', icon: Tag },
+        ]
+      },
       { 
         title: 'Vendas', 
         url: '/vendas', 

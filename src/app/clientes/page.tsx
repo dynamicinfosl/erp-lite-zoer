@@ -170,16 +170,17 @@ export default function ClientesPage() {
 
       setLoading(true);
       
-      // Sempre precisa de branch_id
+      // Construir parâmetros da query
       const params = new URLSearchParams({ tenant_id: tenantId });
-      if (branchId) {
+      
+      // Se está na matriz (scope === 'all' ou sem branchId), buscar todos os clientes da matriz
+      if (scope === 'all' || !branchId) {
+        params.set('branch_scope', 'all');
+        console.log(`🔄 [Matriz] Buscando todos os clientes da matriz`);
+      } else if (branchId) {
+        // Se está em uma filial, buscar clientes compartilhados + da filial
         params.set('branch_id', String(branchId));
-      } else {
-        // Se não tem branchId, não fazer requisição
-        console.warn('[Clientes] Sem branchId, aguardando...');
-        setCustomers([]);
-        setLoading(false);
-        return;
+        console.log(`🔄 [Filial ${branchId}] Buscando clientes compartilhados e da filial`);
       }
       
       const url = `/next_api/customers?${params.toString()}`;
@@ -1355,6 +1356,8 @@ export default function ClientesPage() {
                 external_code: pick(['codigo', 'code', 'id externo', 'external_code']).trim() || null,
                 status: 'active' as 'active' | 'inactive',
                 tenant_id: tenant?.id,
+                // ✅ IMPORTANTE: Incluir branch_id explicitamente para garantir que os clientes sejam salvos na matriz (null) ou na filial correta
+                branch_id: scope === 'branch' && branchId ? branchId : null,
               } as any;
 
               // Validações obrigatórias

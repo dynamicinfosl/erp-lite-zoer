@@ -134,6 +134,7 @@ export default function PDVPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedPriceTiers, setSelectedPriceTiers] = useState<Array<{ name: string; price: number; price_type_id?: number }>>([]);
   
   // Novos estados para funcionalidades avançadas
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -381,16 +382,54 @@ export default function PDVPage() {
       );
   }, [loading, products, searchTerm]); // Dependências estáveis
 
-  const selectProduct = (product: { id: number; name: string; price: number; code: string }) => {
-    setSelectedProduct({
-      ...product,
-      quantity: 1,
-      discount: 0,
-    });
+  const selectProduct = async (product: { id: number; name: string; price: number; code: string }) => {
+    // Se o produto tem variações de valor, carregá-las e permitir seleção inline (sem modal)
+    try {
+      if (!tenant?.id) {
+        setSelectedProduct({ ...product, quantity: 1, discount: 0 });
+        return;
+      }
+      const res = await fetch(
+        `/next_api/product-price-tiers?tenant_id=${encodeURIComponent(tenant.id)}&product_id=${encodeURIComponent(String(product.id))}`
+      );
+      const json = await res.json().catch(() => ({}));
+      const tiersRaw = Array.isArray(json?.data) ? json.data : [];
+      const tiers = tiersRaw
+        .map((t: any) => ({
+          name: String(t?.price_type?.name || '').trim(),
+          price: Number(t?.price),
+          price_type_id: Number(t?.price_type_id),
+        }))
+        .filter((t: any) => t.name && Number.isFinite(t.price) && t.price > 0);
+
+      setSelectedPriceTiers(tiers);
+
+      // Se existir "Valor Varejo", usar como padrão; senão usa o primeiro tier; senão cai no preço do produto
+      const varejo = tiers.find((t: any) => String(t.name).toLowerCase().includes('varejo'));
+      const initial = varejo || tiers[0];
+
+      if (initial) {
+        setSelectedProduct({
+          ...product,
+          price: initial.price,
+          quantity: 1,
+          discount: 0,
+          price_type_name: initial.name as any,
+          price_type_id: initial.price_type_id as any,
+        } as any);
+      } else {
+        setSelectedProduct({ ...product, quantity: 1, discount: 0 });
+      }
+    } catch {
+      // fallback: seleciona com preço padrão
+      setSelectedPriceTiers([]);
+      setSelectedProduct({ ...product, quantity: 1, discount: 0 });
+    }
   };
 
   const clearSelection = () => {
     setSelectedProduct(null);
+    setSelectedPriceTiers([]);
     setSearchTerm('');
   };
 
@@ -865,6 +904,7 @@ export default function PDVPage() {
   return (
     <TenantPageWrapper>
       <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+        {/* Seleção de variação de preço agora é inline (abaixo do valor unitário) */}
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
           <div className="fixed top-4 left-4 z-40">
             <SheetTrigger asChild>
@@ -1104,7 +1144,42 @@ export default function PDVPage() {
                         <div>
                           <Label className="text-sm font-medium text-muted-foreground uppercase">Valor Unitário</Label>
                           <Input value={`R$ ${selectedProduct.price.toFixed(2)}`} disabled className="mt-1 bg-gray-50 dark:bg-gray-900" />
+                          {(selectedProduct as any).price_type_name && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Tabela: {(selectedProduct as any).price_type_name}
+                            </p>
+                          )}
                 </div>
+
+                        {selectedPriceTiers.length > 1 && (
+                          <div>
+                            <Label className="text-sm font-medium text-muted-foreground uppercase">Variação de valor</Label>
+                            <Select
+                              value={String((selectedProduct as any)?.price_type_id || '')}
+                              onValueChange={(value) => {
+                                const tier = selectedPriceTiers.find((t) => String(t.price_type_id) === String(value));
+                                if (!tier) return;
+                                setSelectedProduct({
+                                  ...selectedProduct,
+                                  price: tier.price,
+                                  price_type_id: tier.price_type_id as any,
+                                  price_type_name: tier.name as any,
+                                } as any);
+                              }}
+                            >
+                              <SelectTrigger className="mt-1">
+                                <SelectValue placeholder="Selecione..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {selectedPriceTiers.map((t) => (
+                                  <SelectItem key={`${t.price_type_id}-${t.name}`} value={String(t.price_type_id)}>
+                                    {t.name} — R$ {t.price.toFixed(2)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
 
                 <div>
                           <Label className="text-sm font-medium text-muted-foreground uppercase">Desconto (%)</Label>

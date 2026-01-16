@@ -7,6 +7,16 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.
 
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+function slugify(input: string): string {
+  return String(input || '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .slice(0, 80);
+}
+
 // Handler original para criar produto
 async function createProductHandler(request: NextRequest) {
   try {
@@ -19,6 +29,7 @@ async function createProductHandler(request: NextRequest) {
 
     const body = await request.json();
     let { tenant_id, user_id, sku, name, description, category, brand, price, cost_price, stock, barcode, ncm, unit } = body;
+    const price_tiers = Array.isArray(body?.price_tiers) ? body.price_tiers : [];
 
     if (!name || price === undefined || price === null) {
       return NextResponse.json(
@@ -183,6 +194,73 @@ async function createProductHandler(request: NextRequest) {
         { error: 'Erro ao criar produto: ' + error.message },
         { status: 400 }
       );
+    }
+
+    // ✅ Suporte a múltiplos valores de venda (tabelas de preço)
+    // Espera: price_tiers = [{ name: "Valor Varejo", price: 54.0 }, ...]
+    try {
+      if (Array.isArray(price_tiers) && price_tiers.length > 0) {
+        const now = new Date().toISOString();
+        const productId = Number((data as any)?.id);
+        const cleaned = price_tiers
+          .map((t: any) => ({
+            name: String(t?.name || '').trim(),
+            price: Number(t?.price),
+          }))
+          .filter((t: any) => t.name && Number.isFinite(t.price) && t.price > 0);
+
+        if (productId && cleaned.length > 0) {
+          const uniqBySlug = new Map<string, { tenant_id: string; name: string; slug: string; is_active: boolean; updated_at: string }>();
+          for (const t of cleaned) {
+            const slug = slugify(t.name);
+            if (!slug) continue;
+            if (!uniqBySlug.has(slug)) {
+              uniqBySlug.set(slug, { tenant_id, name: t.name, slug, is_active: true, updated_at: now });
+            }
+          }
+
+          const typesPayload = Array.from(uniqBySlug.values());
+          if (typesPayload.length > 0) {
+            const { data: typeRows, error: typeErr } = await supabaseAdmin
+              .from('product_price_types')
+              .upsert(typesPayload, { onConflict: 'tenant_id,slug' })
+              .select('id,slug');
+
+            if (!typeErr && typeRows && typeRows.length > 0) {
+              const slugToId = new Map<string, number>();
+              for (const r of typeRows as any[]) {
+                slugToId.set(String(r.slug), Number(r.id));
+              }
+
+              const tiersPayload = cleaned
+                .map((t: any) => {
+                  const slug = slugify(t.name);
+                  const typeId = slugToId.get(slug);
+                  if (!typeId) return null;
+                  return {
+                    tenant_id,
+                    product_id: productId,
+                    price_type_id: typeId,
+                    price: t.price,
+                    updated_at: now,
+                  };
+                })
+                .filter(Boolean) as any[];
+
+              if (tiersPayload.length > 0) {
+                const { error: tiersErr } = await supabaseAdmin
+                  .from('product_price_tiers')
+                  .upsert(tiersPayload, { onConflict: 'tenant_id,product_id,price_type_id' });
+                if (tiersErr) console.warn('⚠️ Falha ao salvar price_tiers:', tiersErr);
+              }
+            } else if (typeErr) {
+              console.warn('⚠️ Falha ao upsert product_price_types:', typeErr);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Erro ao processar price_tiers (ignorado):', e);
     }
 
     // Registrar movimentação de entrada inicial se houver estoque
@@ -374,7 +452,8 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, name, description, price, stock } = body;
+    const { id, name, description, price, stock, tenant_id } = body;
+    const price_tiers = Array.isArray(body?.price_tiers) ? body.price_tiers : [];
     if (!id) return NextResponse.json({ error: 'ID é obrigatório' }, { status: 400 });
 
     const { data, error } = await supabaseAdmin
@@ -393,6 +472,70 @@ export async function PUT(request: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    // ✅ Atualizar price_tiers (se fornecido) para o produto
+    try {
+      const resolvedTenantId = tenant_id || (data as any)?.tenant_id;
+      const productId = Number((data as any)?.id || id);
+      if (resolvedTenantId && productId && Array.isArray(price_tiers) && price_tiers.length > 0) {
+        const now = new Date().toISOString();
+        const cleaned = price_tiers
+          .map((t: any) => ({
+            name: String(t?.name || '').trim(),
+            price: Number(t?.price),
+          }))
+          .filter((t: any) => t.name && Number.isFinite(t.price) && t.price > 0);
+
+        const uniqBySlug = new Map<string, { tenant_id: string; name: string; slug: string; is_active: boolean; updated_at: string }>();
+        for (const t of cleaned) {
+          const slug = slugify(t.name);
+          if (!slug) continue;
+          if (!uniqBySlug.has(slug)) {
+            uniqBySlug.set(slug, { tenant_id: resolvedTenantId, name: t.name, slug, is_active: true, updated_at: now });
+          }
+        }
+
+        const typesPayload = Array.from(uniqBySlug.values());
+        if (typesPayload.length > 0) {
+          const { data: typeRows, error: typeErr } = await supabaseAdmin
+            .from('product_price_types')
+            .upsert(typesPayload, { onConflict: 'tenant_id,slug' })
+            .select('id,slug');
+
+          if (!typeErr && typeRows && typeRows.length > 0) {
+            const slugToId = new Map<string, number>();
+            for (const r of typeRows as any[]) slugToId.set(String(r.slug), Number(r.id));
+
+            const tiersPayload = cleaned
+              .map((t: any) => {
+                const slug = slugify(t.name);
+                const typeId = slugToId.get(slug);
+                if (!typeId) return null;
+                return {
+                  tenant_id: resolvedTenantId,
+                  product_id: productId,
+                  price_type_id: typeId,
+                  price: t.price,
+                  updated_at: now,
+                };
+              })
+              .filter(Boolean) as any[];
+
+            if (tiersPayload.length > 0) {
+              const { error: tiersErr } = await supabaseAdmin
+                .from('product_price_tiers')
+                .upsert(tiersPayload, { onConflict: 'tenant_id,product_id,price_type_id' });
+              if (tiersErr) console.warn('⚠️ Falha ao salvar price_tiers no PUT:', tiersErr);
+            }
+          } else if (typeErr) {
+            console.warn('⚠️ Falha ao upsert product_price_types no PUT:', typeErr);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Erro ao atualizar price_tiers no PUT (ignorado):', e);
+    }
+
     return NextResponse.json({ success: true, data });
   } catch (e) {
     return NextResponse.json({ error: 'Erro ao atualizar produto' }, { status: 500 });

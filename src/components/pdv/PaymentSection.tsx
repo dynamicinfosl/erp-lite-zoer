@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -67,10 +67,12 @@ const paymentMethods = [
 export function PaymentSection({ total, onFinalize, onCancel, customerName, cartItems = [] }: PaymentSectionProps) {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('dinheiro');
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentAmountTouched, setPaymentAmountTouched] = useState(false);
   const [discountAmount, setDiscountAmount] = useState('');
   const [discountPercentage, setDiscountPercentage] = useState('');
   const [payments, setPayments] = useState<PaymentEntry[]>([]);
   const [notes, setNotes] = useState('');
+  const paymentInputRef = useRef<HTMLInputElement>(null);
 
   // Calcular valores
   const discountValue = parseFloat(discountAmount) || 0;
@@ -81,6 +83,16 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
   const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
   const remaining = Math.max(0, finalTotal - totalPaid);
   const change = Math.max(0, totalPaid - finalTotal);
+
+  // ✅ UX: sugerir automaticamente o valor a pagar (restante) no input.
+  // - Começa preenchido com o total (remaining === finalTotal).
+  // - Após adicionar um pagamento parcial, preenche com o "restante".
+  // - Se o usuário editar (touched), não sobrescreve.
+  useEffect(() => {
+    if (paymentAmountTouched) return;
+    // sempre sugerir o valor restante (com 2 casas) para evitar digitação
+    setPaymentAmount(remaining.toFixed(2));
+  }, [remaining, paymentAmountTouched]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -103,9 +115,10 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
     };
 
     setPayments(prev => [...prev, payment]);
-    setPaymentAmount('');
+    setPaymentAmountTouched(false); // após confirmar, voltar a sugerir automaticamente
+    setPaymentAmount(''); // será preenchido pelo efeito com o "restante" atualizado
     toast.success(`Pagamento de ${formatCurrency(amount)} adicionado`);
-  }, [paymentAmount, selectedPaymentMethod]);
+  }, [paymentAmount, selectedPaymentMethod, formatCurrency]);
 
   const removePayment = useCallback((id: string) => {
     setPayments(prev => prev.filter(p => p.id !== id));
@@ -264,18 +277,39 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
                   </div>
 
                   <div>
-                    <Label className="text-sm font-semibold text-gray-700">TOTAL A PAGAR</Label>
-                    <div className="flex items-center gap-3 mt-2">
+                    <Label className="text-sm font-semibold text-gray-700">VALOR DO PAGAMENTO</Label>
+                    <div className="flex items-center gap-2 mt-2">
                       <Input
+                        ref={paymentInputRef}
                         type="number"
                         step="0.01"
                         min="0"
                         placeholder="0,00"
                         value={paymentAmount}
-                        onChange={(e) => setPaymentAmount(e.target.value)}
+                        onChange={(e) => {
+                          setPaymentAmountTouched(true);
+                          setPaymentAmount(e.target.value);
+                        }}
                         className="text-lg font-semibold h-10"
+                        onFocus={(e) => {
+                          // Seleciona tudo para sobrescrever rápido (sem precisar apagar)
+                          try { (e.target as HTMLInputElement).select(); } catch {}
+                        }}
                         onKeyPress={(e) => e.key === 'Enter' && addPayment()}
                       />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 px-3"
+                        onClick={() => {
+                          setPaymentAmountTouched(true);
+                          setPaymentAmount('');
+                          setTimeout(() => paymentInputRef.current?.focus(), 0);
+                        }}
+                        title="Limpar para digitar outro valor"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                       <Button
                         onClick={addPayment}
                         className="h-10 px-4 bg-green-600 hover:bg-green-700 text-white font-bold text-sm"
@@ -283,6 +317,9 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
                         CONFIRMAR
                       </Button>
                     </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Sugestão automática: {formatCurrency(remaining)}
+                    </p>
                   </div>
                 </div>
               </CardContent>
