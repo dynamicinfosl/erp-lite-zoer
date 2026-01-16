@@ -183,7 +183,6 @@ async function createProductHandler(request: NextRequest) {
         barcode: barcode || null,
         ncm: ncm || null,
         unit: unit || 'UN',
-        status: 'active', // ✅ Produtos criados sempre começam como ativos
         is_active: true, // ✅ Garantir que is_active também seja true (caso o banco use este campo)
         created_at: new Date().toISOString(),
       })
