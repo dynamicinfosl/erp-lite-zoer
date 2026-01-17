@@ -170,6 +170,33 @@ export default function ProdutosPage() {
     failed: number;
     currentLabel?: string;
   } | null>(null);
+
+  const openFailedProductsReport = () => {
+    // Preferir estado em memória (mais recente). Se estiver vazio, tenta carregar do localStorage.
+    if (failedProductsData.length > 0) {
+      setShowFailedProductsReport(true);
+      return;
+    }
+
+    const saved = localStorage.getItem('failed_products_import');
+    if (!saved) {
+      toast.info('Nenhum produto não cadastrado encontrado');
+      return;
+    }
+
+    try {
+      const data = JSON.parse(saved);
+      if (data.products && Array.isArray(data.products) && data.products.length > 0) {
+        setFailedProductsData(data.products);
+        setImportHeaders(data.headers || []);
+        setShowFailedProductsReport(true);
+      } else {
+        toast.info('Nenhum produto não cadastrado encontrado');
+      }
+    } catch {
+      toast.error('Erro ao carregar produtos não cadastrados');
+    }
+  };
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isCheckingSku, setIsCheckingSku] = useState(false);
   const [skuValidationTimeout, setSkuValidationTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -1421,33 +1448,6 @@ export default function ProdutosPage() {
                       Importar Produtos
                     </DropdownMenuItem>
                     
-                    <DropdownMenuItem 
-                      onClick={() => {
-                        // Carregar produtos não cadastrados do localStorage
-                        const saved = localStorage.getItem('failed_products_import');
-                        if (saved) {
-                          try {
-                            const data = JSON.parse(saved);
-                            if (data.products && Array.isArray(data.products) && data.products.length > 0) {
-                              setFailedProductsData(data.products);
-                              setImportHeaders(data.headers || []);
-                              setShowFailedProductsReport(true);
-                            } else {
-                              toast.info('Nenhum produto não cadastrado encontrado');
-                            }
-                          } catch (e) {
-                            toast.error('Erro ao carregar produtos não cadastrados');
-                          }
-                        } else {
-                          toast.info('Nenhum produto não cadastrado encontrado');
-                        }
-                      }}
-                      className="cursor-pointer px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-700 flex items-center"
-                    >
-                      <AlertTriangle className="h-4 w-4 mr-3 text-yellow-400" />
-                      Ver Produtos Não Cadastrados
-                    </DropdownMenuItem>
-                    
                     <DropdownMenuItem className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center">
                       <Download className="h-4 w-4 mr-3 text-gray-400" />
                       Exportar Lista
@@ -2262,6 +2262,17 @@ export default function ProdutosPage() {
         onClose={handleImportCancel}
         onRegister={handleRegisterSelected}
         entityName="produtos"
+        extraActions={
+          <Button
+            variant="outline"
+            onClick={openFailedProductsReport}
+            disabled={isRegistering}
+            className="flex items-center gap-1 sm:gap-2 px-3 sm:px-6 text-xs sm:text-sm h-8 sm:h-10"
+          >
+            <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-600" />
+            Não cadastrados
+          </Button>
+        }
         fileName={importFileName}
         headers={importHeaders}
         data={importRows}

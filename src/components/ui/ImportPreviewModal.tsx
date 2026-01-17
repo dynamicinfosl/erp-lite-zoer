@@ -15,6 +15,7 @@ interface ImportPreviewModalProps {
   onClose: () => void;
   onRegister?: (selectedRows: any[]) => void;
   entityName?: string; // ex.: "produtos", "clientes"
+  extraActions?: React.ReactNode; // ações extras no rodapé (ex.: "Ver não cadastrados")
   fileName: string;
   headers: string[];
   data: any[][];
@@ -39,6 +40,7 @@ export function ImportPreviewModal({
   onClose,
   onRegister,
   entityName = 'registros',
+  extraActions,
   fileName,
   headers,
   data,
@@ -349,6 +351,7 @@ export function ImportPreviewModal({
 
             {/* Botões de Ação */}
             <div className="flex flex-wrap gap-2 sm:gap-3 justify-center">
+              {extraActions}
               <Button 
                 variant="outline" 
                 onClick={onClose} 
