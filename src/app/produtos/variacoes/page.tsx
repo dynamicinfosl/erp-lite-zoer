@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
@@ -46,7 +46,7 @@ type VariantRow = {
   is_active: boolean;
 };
 
-export default function ProdutoVariacoesPage() {
+function ProdutoVariacoesContent() {
   const { tenant } = useSimpleAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
