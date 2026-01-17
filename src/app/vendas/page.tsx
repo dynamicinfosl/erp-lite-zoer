@@ -313,7 +313,12 @@ export default function VendasPage() {
       
       // Filtrar apenas vendas de PDV/balcão
       // Incluir: sale_source = 'pdv', sale_type = 'balcao' ou 'entrega', ou vendas sem sale_source e sem sale_type='produtos'
+      // EXCLUIR: vendas canceladas da visualização padrão (só aparecem quando filtradas por status)
       const data = allData.filter((s: any) => {
+        // Excluir vendas canceladas da visualização padrão
+        if (s.status === 'canceled' || s.status === 'cancelada') {
+          return false;
+        }
         // Vendas do PDV (marcadas explicitamente)
         if (s.sale_source === 'pdv') return true;
         // Vendas de balcão ou entrega (tipo antigo)
@@ -387,6 +392,7 @@ export default function VendasPage() {
   }, [loadVendas]);
 
   // Filtrar vendas
+  // Se não houver filtro de status ou filtro de status diferente de 'cancelada', excluir canceladas da visualização padrão
   const filteredVendas = vendas.filter(venda => {
     const matchesSearch = venda.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          venda.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -397,6 +403,14 @@ export default function VendasPage() {
                            (!advancedFilters.vendedor || venda.vendedor?.toLowerCase().includes(advancedFilters.vendedor.toLowerCase())) &&
                            (!advancedFilters.valor_min || venda.total >= parseFloat(advancedFilters.valor_min)) &&
                            (!advancedFilters.valor_max || venda.total <= parseFloat(advancedFilters.valor_max));
+
+    // Se não há filtro de status específico, excluir canceladas
+    // Se há filtro de status 'cancelada', incluir apenas canceladas
+    // Se há filtro de outro status, excluir canceladas
+    if (!advancedFilters.status) {
+      // Sem filtro: excluir canceladas da visualização padrão
+      if (venda.status === 'cancelada') return false;
+    }
 
     return matchesSearch && matchesAdvanced;
   });
@@ -821,6 +835,32 @@ export default function VendasPage() {
     } catch (error) {
       console.error('Erro ao cancelar venda:', error);
       toast.error('Erro ao cancelar venda. Tente novamente.');
+    }
+  };
+
+  const handleExcluirVenda = async (venda: Sale) => {
+    if (!confirm(`Tem certeza que deseja EXCLUIR permanentemente a venda ${venda.numero}?\n\nEsta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/next_api/sales/${venda.id}?hard_delete=true`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao excluir venda');
+      }
+
+      toast.success('Venda excluída permanentemente');
+      loadVendas(); // Recarregar lista
+    } catch (error) {
+      console.error('Erro ao excluir venda:', error);
+      toast.error(error instanceof Error ? error.message : 'Erro ao excluir venda. Tente novamente.');
     }
   };
 
@@ -1528,13 +1568,23 @@ export default function VendasPage() {
                             Marcar como Entrega
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            className="text-red-600 dark:text-red-400"
-                            onClick={() => handleCancelarVenda(venda)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Cancelar Venda
-                          </DropdownMenuItem>
+                          {venda.status === 'cancelada' ? (
+                            <DropdownMenuItem 
+                              className="text-red-600 dark:text-red-400"
+                              onClick={() => handleExcluirVenda(venda)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Excluir Permanentemente
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem 
+                              className="text-red-600 dark:text-red-400"
+                              onClick={() => handleCancelarVenda(venda)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Cancelar Venda
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

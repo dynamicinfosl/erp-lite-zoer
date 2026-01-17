@@ -155,7 +155,14 @@ export default function VendasProdutosPage() {
       const data = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
       
       // Filtrar apenas vendas de produtos
-      const produtosData = data.filter((s: any) => s.sale_source === 'produtos');
+      // EXCLUIR: vendas canceladas da visualização padrão (só aparecem quando filtradas por status)
+      const produtosData = data.filter((s: any) => {
+        // Excluir vendas canceladas da visualização padrão
+        if (s.status === 'canceled' || s.status === 'cancelada') {
+          return false;
+        }
+        return s.sale_source === 'produtos';
+      });
       
       const mapped: Sale[] = produtosData.map((s: any, i: number) => {
         const items = Array.isArray(s.items) ? s.items : [];

@@ -167,6 +167,7 @@ async function createSaleHandler(
 
     // Se for venda de entrega, criar registro de entrega automaticamente
     let delivery = null;
+    let deliveryErrorMsg: string | null = null;
     if (sale_type === 'entrega') {
       // Priorizar endereço do cliente cadastrado, depois usar campos do body
       const finalDeliveryAddress = 
@@ -189,12 +190,13 @@ async function createSaleHandler(
         user_id: '00000000-0000-0000-0000-000000000000',
         sale_id: sale.id,
         customer_name: customer_name || 'Cliente Avulso',
-        delivery_address: finalDeliveryAddress || '', // Usar string vazia se não houver endereço
+        delivery_address: finalDeliveryAddress || 'Endereço não informado', // Usar valor padrão se não houver endereço
         neighborhood: finalNeighborhood || null,
         phone: finalPhone || null,
         delivery_fee: delivery_fee ? parseFloat(String(delivery_fee)) : 0,
         status: 'aguardando',
         notes: notes || `Venda de entrega criada via API - Venda #${saleNumber}`,
+        branch_id: null, // Usar mesmo branch_id da venda (null para vendas via API)
         created_at: createdAt,
         updated_at: createdAt,
       };
@@ -211,15 +213,42 @@ async function createSaleHandler(
         .single();
 
       if (deliveryError) {
-        console.error('⚠️ Erro ao criar entrega automaticamente:', deliveryError);
-        console.error('⚠️ Delivery data tentado:', { 
-          delivery_address: finalDeliveryAddress,
-          customer_id: customer_id,
-          sale_id: sale.id 
-        });
-        // Não falhar a venda se a entrega falhar, apenas logar o erro
-        // A entrega pode ser atualizada depois quando o endereço estiver disponível
+        console.error('❌ Erro ao criar entrega automaticamente:', deliveryError);
+        console.error('❌ Delivery data tentado:', JSON.stringify(deliveryData, null, 2));
+        
+        // Armazenar mensagem de erro para retornar na resposta
+        deliveryErrorMsg = deliveryError.message || 'Erro desconhecido ao criar entrega';
+        
+        // Tentar novamente com endereço padrão explícito se o erro for sobre delivery_address
+        if (deliveryError.message?.includes('delivery_address') || 
+            deliveryError.code === '23502' || 
+            (!finalDeliveryAddress && deliveryError.message?.includes('null'))) {
+          
+          const retryDeliveryData = {
+            ...deliveryData,
+            delivery_address: 'Endereço não informado - será atualizado posteriormente',
+          };
+          
+          const { data: retryDelivery, error: retryError } = await supabaseAdmin
+            .from('deliveries')
+            .insert(retryDeliveryData)
+            .select()
+            .single();
+          
+          if (retryError) {
+            console.error('❌ Erro ao criar entrega mesmo com valor padrão:', retryError);
+            deliveryErrorMsg = `Falha ao criar entrega: ${retryError.message || deliveryErrorMsg}. Código: ${retryError.code || deliveryError.code}`;
+          } else {
+            console.log('✅ Entrega criada com sucesso após retry');
+            delivery = retryDelivery;
+            deliveryErrorMsg = null; // Limpar erro se o retry funcionou
+          }
+        } else {
+          // Para outros erros, armazenar mensagem detalhada
+          deliveryErrorMsg = `Erro ao criar entrega: ${deliveryError.message}. Código: ${deliveryError.code || 'N/A'}. Detalhes: ${deliveryError.details || 'N/A'}`;
+        }
       } else {
+        console.log('✅ Entrega criada com sucesso:', createdDelivery?.id);
         delivery = createdDelivery;
       }
     }
@@ -230,6 +259,10 @@ async function createSaleHandler(
         sale,
         delivery, // Incluir dados da entrega se foi criada
       },
+      ...(deliveryErrorMsg && {
+        warning: 'Venda criada com sucesso, mas houve um problema ao criar a entrega automaticamente',
+        delivery_error: deliveryErrorMsg,
+      }),
     });
   } catch (error) {
     console.error('❌ Erro no handler de criação de venda:', error);
