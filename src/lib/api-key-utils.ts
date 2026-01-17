@@ -64,10 +64,12 @@ export async function verifyApiKey(key: string): Promise<{
     }
 
     // Atualizar last_used_at (async, não bloqueia)
-    supabaseAdmin
-      .from('api_keys')
-      .update({ last_used_at: new Date().toISOString() })
-      .eq('id', data.id)
+    Promise.resolve(
+      supabaseAdmin
+        .from('api_keys')
+        .update({ last_used_at: new Date().toISOString() })
+        .eq('id', data.id)
+    )
       .then(() => {
         // Sucesso silencioso
       })
