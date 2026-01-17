@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -161,6 +162,10 @@ export default function ClientesPage() {
     status: 'active' as 'active' | 'inactive',
   });
 
+  // Controle de concorrência: evita respostas antigas sobrescreverem novas
+  const requestSeqRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+
   const loadCustomers = useCallback(async () => {
     try {
       const tenantId = tenant?.id;
@@ -188,6 +193,15 @@ export default function ClientesPage() {
         }
       }
 
+      // iniciar nova requisição e cancelar a anterior
+      requestSeqRef.current += 1;
+      const mySeq = requestSeqRef.current;
+      if (abortRef.current) {
+        try { abortRef.current.abort(); } catch {}
+      }
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       setLoading(true);
       
       // Construir parâmetros da query
@@ -197,14 +211,16 @@ export default function ClientesPage() {
       // - Se estiver em "all" OU sem branchId, buscar cadastros da matriz
       // - Se a filial atual for a HQ (Matriz), também buscar cadastros da matriz (created_at_branch_id IS NULL)
       const isHeadquarters = Boolean(currentBranch?.is_headquarters);
+      const shouldUseMatrix = scope === 'all' || !branchId || isHeadquarters || !branchesEnabled;
 
       // Se está na matriz (scope === 'all' ou sem branchId ou HQ), buscar todos os clientes da matriz
-      if (scope === 'all' || !branchId || isHeadquarters) {
+      if (shouldUseMatrix) {
         params.set('branch_scope', 'all');
         console.log(`🔄 [Matriz] Buscando todos os clientes da matriz`, {
           scope,
           branchId,
           isHeadquarters,
+          branchesEnabled,
           isMatrixAdmin,
           userBranchId,
         });
@@ -218,10 +234,15 @@ export default function ClientesPage() {
       console.log(`🔄 Carregando clientes para tenant: ${tenantId}, branch: ${branchId}, scope: ${scope}`);
       console.log(`📡 URL da requisição: ${url}`);
       
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
       if (!response.ok) throw new Error('Erro ao carregar clientes');
       
       const data = await response.json();
+      // ignorar se já houve outra requisição depois
+      if (mySeq !== requestSeqRef.current) {
+        console.log('⚠️ Resposta antiga ignorada (customers)', { mySeq, current: requestSeqRef.current });
+        return;
+      }
       console.log(`📊 Dados recebidos:`, data);
       const rows = Array.isArray(data?.data) ? data.data : (data?.rows || data || []);
       console.log(`👥 Clientes encontrados: ${rows.length}`);
@@ -259,9 +280,15 @@ export default function ClientesPage() {
       console.log(`✅ Clientes mapeados: ${mappedCustomers.length}`);
       setCustomers(mappedCustomers);
     } catch (error) {
+      // abort é esperado quando outra requisição começou
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
       console.error('❌ Erro ao carregar clientes:', error);
       toast.error('Erro ao carregar clientes');
     } finally {
+      // Só finalizar loading se esta for a requisição mais recente
+      if (abortRef.current && abortRef.current.signal.aborted) return;
       setLoading(false);
     }
   }, [
