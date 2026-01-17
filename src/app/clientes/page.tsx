@@ -44,7 +44,8 @@ import {
   Edit,
   Eye,
   Phone,
-  Mail
+  Mail,
+  RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
@@ -75,7 +76,7 @@ interface ColumnVisibility {
 
 export default function ClientesPage() {
   const { tenant } = useSimpleAuth();
-  const { branchId, scope } = useBranch();
+  const { enabled: branchesEnabled, loading: branchLoading, branches, branchId, scope, currentBranch, isMatrixAdmin, userBranchId } = useBranch();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -168,15 +169,45 @@ export default function ClientesPage() {
         return;
       }
 
+      // Evitar “piscar” dados: aguardar BranchContext resolver a branch atual
+      // (principalmente quando admin matriz usa branchId da HQ, mas currentBranch ainda não carregou)
+      if (branchesEnabled && scope === 'branch' && branchId && !currentBranch) {
+        if (branchLoading) {
+          console.log('⏳ Aguardando carregar filiais para determinar HQ antes de buscar clientes...', { branchId });
+          return;
+        }
+        if (Array.isArray(branches) && branches.length > 0) {
+          const resolved = branches.find((b) => b.id === branchId) || null;
+          if (!resolved) {
+            console.log('⏳ Branch selecionada ainda não resolvida, aguardando...', { branchId });
+            return;
+          }
+        } else {
+          console.log('⏳ Filiais ainda não carregadas, aguardando...', { branchId });
+          return;
+        }
+      }
+
       setLoading(true);
       
       // Construir parâmetros da query
       const params = new URLSearchParams({ tenant_id: tenantId });
       
-      // Se está na matriz (scope === 'all' ou sem branchId), buscar todos os clientes da matriz
-      if (scope === 'all' || !branchId) {
+      // Matriz x Filial:
+      // - Se estiver em "all" OU sem branchId, buscar cadastros da matriz
+      // - Se a filial atual for a HQ (Matriz), também buscar cadastros da matriz (created_at_branch_id IS NULL)
+      const isHeadquarters = Boolean(currentBranch?.is_headquarters);
+
+      // Se está na matriz (scope === 'all' ou sem branchId ou HQ), buscar todos os clientes da matriz
+      if (scope === 'all' || !branchId || isHeadquarters) {
         params.set('branch_scope', 'all');
-        console.log(`🔄 [Matriz] Buscando todos os clientes da matriz`);
+        console.log(`🔄 [Matriz] Buscando todos os clientes da matriz`, {
+          scope,
+          branchId,
+          isHeadquarters,
+          isMatrixAdmin,
+          userBranchId,
+        });
       } else if (branchId) {
         // Se está em uma filial, buscar clientes compartilhados + da filial
         params.set('branch_id', String(branchId));
@@ -233,7 +264,18 @@ export default function ClientesPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id, branchId, scope]);
+  }, [
+    tenant?.id,
+    branchesEnabled,
+    branchLoading,
+    branches,
+    branchId,
+    scope,
+    currentBranch?.id,
+    currentBranch?.is_headquarters,
+    isMatrixAdmin,
+    userBranchId,
+  ]);
 
   // Carregar clientes quando houver tenant
   useEffect(() => {
@@ -248,6 +290,18 @@ export default function ClientesPage() {
     // Se há tenant, carregar clientes
     console.log(`👥 Carregando clientes para tenant: ${tenant.id}`);
     loadCustomers();
+  }, [tenant?.id, loadCustomers]);
+
+  // Recarregar quando o usuário volta para a aba (útil quando cadastro vem de API externa)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (tenant?.id) {
+        console.log('🔄 Janela/aba em foco: recarregando clientes...');
+        loadCustomers();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, [tenant?.id, loadCustomers]);
 
   // Filtrar clientes
@@ -766,6 +820,14 @@ export default function ClientesPage() {
                   className="pl-10 w-80"
                 />
               </div>
+              <Button
+                variant="outline"
+                onClick={() => loadCustomers()}
+                disabled={loading}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Atualizar
+              </Button>
               <Button 
                 variant="outline" 
                 onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
