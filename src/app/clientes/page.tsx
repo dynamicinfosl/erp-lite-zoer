@@ -167,6 +167,7 @@ export default function ClientesPage() {
   const abortRef = useRef<AbortController | null>(null);
 
   const loadCustomers = useCallback(async () => {
+    let mySeq = 0;
     try {
       const tenantId = tenant?.id;
       if (!tenantId) {
@@ -195,7 +196,7 @@ export default function ClientesPage() {
 
       // iniciar nova requisição e cancelar a anterior
       requestSeqRef.current += 1;
-      const mySeq = requestSeqRef.current;
+      mySeq = requestSeqRef.current;
       if (abortRef.current) {
         try { abortRef.current.abort(); } catch {}
       }
@@ -280,15 +281,20 @@ export default function ClientesPage() {
       console.log(`✅ Clientes mapeados: ${mappedCustomers.length}`);
       setCustomers(mappedCustomers);
     } catch (error) {
-      // abort é esperado quando outra requisição começou
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        return;
-      }
+      // Abort é esperado quando outra requisição começou (não deve aparecer como erro)
+      const anyErr = error as any;
+      const isAbort =
+        anyErr?.name === 'AbortError' ||
+        (typeof anyErr?.message === 'string' && anyErr.message.toLowerCase().includes('aborted')) ||
+        (typeof anyErr?.message === 'string' && anyErr.message.toLowerCase().includes('signal is aborted')) ||
+        (typeof DOMException !== 'undefined' && anyErr instanceof DOMException && anyErr.name === 'AbortError');
+      if (isAbort) return;
+
       console.error('❌ Erro ao carregar clientes:', error);
       toast.error('Erro ao carregar clientes');
     } finally {
       // Só finalizar loading se esta for a requisição mais recente
-      if (abortRef.current && abortRef.current.signal.aborted) return;
+      if (mySeq && mySeq !== requestSeqRef.current) return;
       setLoading(false);
     }
   }, [
