@@ -155,14 +155,8 @@ export default function VendasProdutosPage() {
       const data = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
       
       // Filtrar apenas vendas de produtos
-      // EXCLUIR: vendas canceladas da visualização padrão (só aparecem quando filtradas por status)
-      const produtosData = data.filter((s: any) => {
-        // Excluir vendas canceladas da visualização padrão
-        if (s.status === 'canceled' || s.status === 'cancelada') {
-          return false;
-        }
-        return s.sale_source === 'produtos';
-      });
+      // NOTA: Vendas canceladas são carregadas mas filtradas na visualização padrão (filteredVendas)
+      const produtosData = data.filter((s: any) => s.sale_source === 'produtos');
       
       const mapped: Sale[] = produtosData.map((s: any, i: number) => {
         const items = Array.isArray(s.items) ? s.items : [];
@@ -212,6 +206,7 @@ export default function VendasProdutosPage() {
   }, [loadVendas]);
 
   // Filtrar vendas
+  // Se não houver filtro de status ou filtro de status diferente de 'cancelada', excluir canceladas da visualização padrão
   const filteredVendas = vendas.filter(venda => {
     const matchesSearch = venda.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          venda.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -222,6 +217,14 @@ export default function VendasProdutosPage() {
                            (!advancedFilters.vendedor || venda.vendedor?.toLowerCase().includes(advancedFilters.vendedor.toLowerCase())) &&
                            (!advancedFilters.valor_min || venda.total >= parseFloat(advancedFilters.valor_min)) &&
                            (!advancedFilters.valor_max || venda.total <= parseFloat(advancedFilters.valor_max));
+
+    // Se não há filtro de status específico, excluir canceladas
+    // Se há filtro de status 'cancelada', incluir apenas canceladas
+    // Se há filtro de outro status, excluir canceladas
+    if (!advancedFilters.status) {
+      // Sem filtro: excluir canceladas da visualização padrão
+      if (venda.status === 'cancelada') return false;
+    }
 
     return matchesSearch && matchesAdvanced;
   });
@@ -328,6 +331,32 @@ export default function VendasProdutosPage() {
     } catch (error) {
       console.error('Erro ao cancelar venda:', error);
       toast.error('Erro ao cancelar venda. Tente novamente.');
+    }
+  };
+
+  const handleExcluirVenda = async (venda: Sale) => {
+    if (!confirm(`Tem certeza que deseja EXCLUIR permanentemente a venda ${venda.numero}?\n\nEsta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/next_api/sales/${venda.id}?hard_delete=true`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao excluir venda');
+      }
+
+      toast.success('Venda excluída permanentemente');
+      loadVendas();
+    } catch (error) {
+      console.error('Erro ao excluir venda:', error);
+      toast.error(error instanceof Error ? error.message : 'Erro ao excluir venda. Tente novamente.');
     }
   };
 
@@ -630,13 +659,23 @@ export default function VendasProdutosPage() {
                             Imprimir Cupom
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            className="text-red-600 dark:text-red-400"
-                            onClick={() => handleCancelarVenda(venda)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Cancelar Venda
-                          </DropdownMenuItem>
+                          {venda.status === 'cancelada' ? (
+                            <DropdownMenuItem 
+                              className="text-red-600 dark:text-red-400"
+                              onClick={() => handleExcluirVenda(venda)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Excluir Permanentemente
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem 
+                              className="text-red-600 dark:text-red-400"
+                              onClick={() => handleCancelarVenda(venda)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Cancelar Venda
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

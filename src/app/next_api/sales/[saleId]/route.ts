@@ -289,7 +289,10 @@ export async function DELETE(
 ) {
   try {
     const { saleId } = await params;
-    console.log('🗑️ API - Cancelando venda:', saleId);
+    const { searchParams } = new URL(request.url);
+    const hardDelete = searchParams.get('hard_delete') === 'true';
+    
+    console.log('🗑️ API - ' + (hardDelete ? 'Excluindo' : 'Cancelando') + ' venda:', saleId);
     
     if (!saleId) {
       console.error('❌ ID da venda não fornecido');
@@ -327,6 +330,42 @@ export async function DELETE(
 
     const sale = sales[0];
     
+    // Se hard_delete=true, excluir permanentemente (apenas se já estiver cancelada)
+    if (hardDelete) {
+      if (sale.status !== 'canceled' && sale.status !== 'cancelada') {
+        return NextResponse.json(
+          { error: 'Apenas vendas canceladas podem ser excluídas permanentemente' },
+          { status: 400 }
+        );
+      }
+
+      // Excluir itens da venda primeiro (devido à foreign key)
+      const saleIdNum = Number(sale.id);
+      await supabaseAdmin.from('sale_items').delete().eq('sale_id', saleIdNum);
+
+      // Excluir a venda permanentemente
+      const { error: deleteError } = await supabaseAdmin
+        .from('sales')
+        .delete()
+        .eq('id', sale.id);
+
+      if (deleteError) {
+        console.error('❌ Erro ao excluir venda:', deleteError);
+        return NextResponse.json(
+          { error: 'Erro ao excluir venda: ' + deleteError.message },
+          { status: 500 }
+        );
+      }
+
+      console.log('✅ Venda excluída permanentemente:', sale.id);
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Venda excluída permanentemente',
+        data: { id: sale.id }
+      });
+    }
+
+    // Se não for hard_delete, apenas cancelar (comportamento padrão)
     // Verificar se já está cancelada
     if (sale.status === 'canceled' || sale.status === 'cancelada') {
       return NextResponse.json(
@@ -357,7 +396,7 @@ export async function DELETE(
     });
 
   } catch (error: any) {
-    console.error('❌ Erro no handler de cancelamento:', error);
+    console.error('❌ Erro no handler de cancelamento/exclusão:', error);
     return NextResponse.json(
       { 
         error: 'Erro interno do servidor',

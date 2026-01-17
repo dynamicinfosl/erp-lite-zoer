@@ -313,12 +313,8 @@ export default function VendasPage() {
       
       // Filtrar apenas vendas de PDV/balcão
       // Incluir: sale_source = 'pdv', sale_type = 'balcao' ou 'entrega', ou vendas sem sale_source e sem sale_type='produtos'
-      // EXCLUIR: vendas canceladas da visualização padrão (só aparecem quando filtradas por status)
+      // NOTA: Vendas canceladas são carregadas mas filtradas na visualização padrão (filteredVendas)
       const data = allData.filter((s: any) => {
-        // Excluir vendas canceladas da visualização padrão
-        if (s.status === 'canceled' || s.status === 'cancelada') {
-          return false;
-        }
         // Vendas do PDV (marcadas explicitamente)
         if (s.sale_source === 'pdv') return true;
         // Vendas de balcão ou entrega (tipo antigo)
