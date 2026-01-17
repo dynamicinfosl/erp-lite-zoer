@@ -745,6 +745,7 @@ export default function FornecedoresPage() {
         isOpen={showImportPreview}
         onClose={handleImportCancel}
         onRegister={importRows}
+        entityName="fornecedores"
         fileName={importFileName}
         headers={importHeaders}
         data={importRowsData}

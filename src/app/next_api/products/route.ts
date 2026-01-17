@@ -467,19 +467,24 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, name, description, price, stock, tenant_id } = body;
+    const { id, name, description, price, stock, tenant_id, has_variations } = body;
     const price_tiers = Array.isArray(body?.price_tiers) ? body.price_tiers : [];
     if (!id) return NextResponse.json({ error: 'ID é obrigatório' }, { status: 400 });
 
+    const updatePayload: any = {
+      name,
+      description,
+      sale_price: price !== undefined ? parseFloat(price) : undefined,
+      stock_quantity: stock !== undefined ? parseInt(stock) : undefined,
+      updated_at: new Date().toISOString(),
+    };
+    if (has_variations !== undefined) {
+      updatePayload.has_variations = Boolean(has_variations);
+    }
+
     const { data, error } = await supabaseAdmin
       .from('products')
-      .update({
-        name,
-        description,
-        sale_price: price !== undefined ? parseFloat(price) : undefined,
-        stock_quantity: stock !== undefined ? parseInt(stock) : undefined,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .maybeSingle();

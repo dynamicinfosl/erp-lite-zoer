@@ -161,6 +161,15 @@ export default function ProdutosPage() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [showFailedProductsReport, setShowFailedProductsReport] = useState(false);
   const [failedProductsData, setFailedProductsData] = useState<Array<{ row: any; sku: string; name: string; reason: string }>>([]);
+  const [importProgress, setImportProgress] = useState<{
+    total: number;
+    processed: number;
+    success: number;
+    variantsCreated: number;
+    duplicates: number;
+    failed: number;
+    currentLabel?: string;
+  } | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isCheckingSku, setIsCheckingSku] = useState(false);
   const [skuValidationTimeout, setSkuValidationTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -664,6 +673,15 @@ export default function ProdutosPage() {
     }
   };
 
+  const extractVariantLabelFromName = (fullName: string): string => {
+    const nm = String(fullName || '').trim();
+    if (!nm) return '';
+    // Pega o conteúdo do ÚLTIMO parênteses: ex "Convenção FD (com6) (LIMAO)" => "LIMAO"
+    const matches = [...nm.matchAll(/\(([^)]+)\)/g)];
+    const last = matches.length > 0 ? String(matches[matches.length - 1]?.[1] || '').trim() : '';
+    return last || nm;
+  };
+
   const handleRegisterSelected = async (selected: any[]) => {
     console.log('🚀 [handleRegisterSelected] INICIADO - Itens recebidos:', selected.length);
     console.log('🚀 [handleRegisterSelected] Primeiro item:', selected[0]);
@@ -726,6 +744,12 @@ export default function ProdutosPage() {
       const existingProductsData = existingProductsRes.ok ? await existingProductsRes.json().catch(() => ({})) : {};
       const existingProducts = Array.isArray(existingProductsData?.data) ? existingProductsData.data : [];
       const existingSkus = new Set(existingProducts.map((p: any) => String(p.sku || '').trim().toLowerCase()));
+      const skuToProductId = new Map<string, number>();
+      for (const p of existingProducts) {
+        const skuKey = String((p as any)?.sku || '').trim().toLowerCase();
+        const pid = Number((p as any)?.id);
+        if (skuKey && Number.isFinite(pid) && pid > 0) skuToProductId.set(skuKey, pid);
+      }
       console.log(`📊 ${existingProducts.length} produtos já cadastrados encontrados`);
 
       // Mapear header normalizado -> header original (para nomes bonitos dos price_tiers)
@@ -737,6 +761,17 @@ export default function ProdutosPage() {
 
       // ✅ Lista de produtos que falharam (para relatório e reimportação)
       const failedProducts: Array<{ row: any; sku: string; name: string; reason: string }> = [];
+
+      // ✅ Progresso visível no modal
+      setImportProgress({
+        total: selected.length,
+        processed: 0,
+        success: 0,
+        variantsCreated: 0,
+        duplicates: 0,
+        failed: 0,
+        currentLabel: '',
+      });
 
       for (let rowIndex = 0; rowIndex < selected.length; rowIndex++) {
         const row = selected[rowIndex];
@@ -861,17 +896,98 @@ export default function ProdutosPage() {
             `⚠️ [Import Produtos] Linha ${rowIndex + 1} pulada (sku="${productData.sku}", name="${productData.name}", price=${productData.price}). ` +
               `Headers(normalizados) amostra: ${Object.keys(obj).slice(0, 15).join(', ')}`
           );
+          setImportProgress((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  processed: rowIndex + 1,
+                  failed: prev.failed + 1,
+                  currentLabel: `${productData.sku} — ${productData.name}`,
+                }
+              : prev
+          );
           continue;
         }
 
-        // ✅ Verificar se SKU já existe (duplicata)
+        // ✅ Verificar se SKU já existe (duplicata) -> cadastrar como VARIAÇÃO automaticamente
         const skuLower = productData.sku.trim().toLowerCase();
         if (existingSkus.has(skuLower)) {
-          fail++;
-          const reason = `SKU "${productData.sku}" já está cadastrado`;
-          errors.push(`Linha ${rowIndex + 1}: ${reason}`);
-          failedProducts.push({ row, sku: productData.sku, name: productData.name, reason });
-          console.warn(`⚠️ [Import Produtos] Linha ${rowIndex + 1}: SKU "${productData.sku}" já existe, pulando...`);
+          const baseProductId = skuToProductId.get(skuLower);
+          if (!baseProductId) {
+            fail++;
+            const reason = `SKU "${productData.sku}" já existe, mas não foi possível resolver o product_id base`;
+            errors.push(`Linha ${rowIndex + 1}: ${reason}`);
+            failedProducts.push({ row, sku: productData.sku, name: productData.name, reason });
+            console.warn(`⚠️ [Import Produtos] Linha ${rowIndex + 1}: SKU existe mas sem product_id, não deu para criar variação`);
+            setImportProgress((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    processed: rowIndex + 1,
+                    failed: prev.failed + 1,
+                    currentLabel: `${productData.sku} — ${productData.name}`,
+                  }
+                : prev
+            );
+            continue;
+          }
+
+          const variantLabel = extractVariantLabelFromName(productData.name);
+          try {
+            const vr = await fetch('/next_api/product-variants', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tenant_id: finalTenantId,
+                product_id: baseProductId,
+                label: variantLabel,
+                name: productData.name,
+                barcode: productData.barcode,
+                unit: productData.unit,
+                sale_price: productData.price,
+                cost_price: productData.cost_price,
+                stock_quantity: productData.stock,
+                is_active: true,
+              }),
+            });
+            const vtxt = await vr.text();
+            if (!vr.ok) throw new Error(vtxt || 'Erro ao criar variação');
+
+            // marcar base como "has_variations" (não bloqueante)
+            fetch('/next_api/products', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tenant_id: finalTenantId, id: baseProductId, has_variations: true }),
+            }).catch(() => {});
+
+            console.log(`🧩 Variação criada/atualizada para SKU ${productData.sku}: ${variantLabel}`);
+            setImportProgress((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    processed: rowIndex + 1,
+                    duplicates: prev.duplicates + 1,
+                    variantsCreated: prev.variantsCreated + 1,
+                    currentLabel: `${productData.sku} — ${productData.name}`,
+                  }
+                : prev
+            );
+          } catch (e: any) {
+            fail++;
+            const reason = `Falha ao criar variação: ${e?.message || 'erro desconhecido'}`;
+            errors.push(`Linha ${rowIndex + 1}: ${reason}`);
+            failedProducts.push({ row, sku: productData.sku, name: productData.name, reason });
+            setImportProgress((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    processed: rowIndex + 1,
+                    failed: prev.failed + 1,
+                    currentLabel: `${productData.sku} — ${productData.name}`,
+                  }
+                : prev
+            );
+          }
           continue;
         }
 
@@ -905,9 +1021,35 @@ export default function ProdutosPage() {
             const responseData = JSON.parse(responseText);
             console.log(`✅ Produto cadastrado com sucesso:`, responseData);
             success++;
+            // atualizar caches para que duplicados no próprio arquivo virem variação
+            const createdId = Number(responseData?.data?.id ?? responseData?.id);
+            if (Number.isFinite(createdId) && createdId > 0) {
+              skuToProductId.set(skuLower, createdId);
+              existingSkus.add(skuLower);
+            }
+            setImportProgress((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    processed: rowIndex + 1,
+                    success: prev.success + 1,
+                    currentLabel: `${productData.sku} — ${productData.name}`,
+                  }
+                : prev
+            );
           } catch (e) {
             console.warn('⚠️ Resposta OK mas não é JSON válido:', responseText);
             success++; // Considerar sucesso mesmo sem JSON válido
+            setImportProgress((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    processed: rowIndex + 1,
+                    success: prev.success + 1,
+                    currentLabel: `${productData.sku} — ${productData.name}`,
+                  }
+                : prev
+            );
           }
         } else {
           fail++;
@@ -921,6 +1063,16 @@ export default function ProdutosPage() {
           }
           errors.push(`Linha ${rowIndex + 1}: ${errorMessage}`);
           failedProducts.push({ row, sku: productData.sku, name: productData.name, reason: errorMessage });
+          setImportProgress((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  processed: rowIndex + 1,
+                  failed: prev.failed + 1,
+                  currentLabel: `${productData.sku} — ${productData.name}`,
+                }
+              : prev
+          );
         }
       }
 
@@ -949,11 +1101,13 @@ export default function ProdutosPage() {
         setFailedProductsData(failedProducts);
         setShowFailedProductsReport(true);
       }
+      setImportProgress(null);
     } catch (error) {
       console.error('Erro ao cadastrar produtos:', error);
       toast.error('Erro ao cadastrar produtos');
     } finally {
       setIsRegistering(false);
+      setImportProgress(null);
     }
   };
 
@@ -2107,6 +2261,7 @@ export default function ProdutosPage() {
         isOpen={showImportPreview}
         onClose={handleImportCancel}
         onRegister={handleRegisterSelected}
+        entityName="produtos"
         fileName={importFileName}
         headers={importHeaders}
         data={importRows}
@@ -2115,6 +2270,7 @@ export default function ProdutosPage() {
         invalidRows={importErrors.length}
         errors={importErrors}
         isRegistering={isRegistering}
+        progress={importProgress || undefined}
       />
 
       {/* Dialog Relatório de Produtos Não Cadastrados */}

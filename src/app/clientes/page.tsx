@@ -1490,6 +1490,7 @@ export default function ClientesPage() {
             setIsRegistering(false);
           }
         }}
+        entityName="clientes"
         fileName={importFileName}
         headers={importHeaders}
         data={importRows}
@@ -1677,6 +1678,7 @@ export default function ClientesPage() {
             setIsImportingAddresses(false);
           }
         }}
+        entityName="endereços"
         fileName={importAddressFileName}
         headers={importAddressHeaders}
         data={importAddressRows}

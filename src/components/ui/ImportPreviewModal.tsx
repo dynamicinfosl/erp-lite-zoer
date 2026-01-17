@@ -14,6 +14,7 @@ interface ImportPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   onRegister?: (selectedRows: any[]) => void;
+  entityName?: string; // ex.: "produtos", "clientes"
   fileName: string;
   headers: string[];
   data: any[][];
@@ -22,12 +23,22 @@ interface ImportPreviewModalProps {
   invalidRows: number;
   errors?: string[];
   isRegistering?: boolean;
+  progress?: {
+    total: number;
+    processed: number;
+    success: number;
+    variantsCreated?: number;
+    duplicates?: number;
+    failed: number;
+    currentLabel?: string;
+  };
 }
 
 export function ImportPreviewModal({
   isOpen,
   onClose,
   onRegister,
+  entityName = 'registros',
   fileName,
   headers,
   data,
@@ -35,7 +46,8 @@ export function ImportPreviewModal({
   validRows,
   invalidRows,
   errors = [],
-  isRegistering = false
+  isRegistering = false,
+  progress
 }: ImportPreviewModalProps) {
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
@@ -295,6 +307,29 @@ export function ImportPreviewModal({
         {/* Footer com Ações - Fixo */}
         <div className="px-3 sm:px-6 py-3 sm:py-4 bg-gray-50 border-t flex-shrink-0">
           <div className="flex flex-col gap-3 sm:gap-4">
+            {/* Progresso */}
+            {isRegistering && progress && progress.total > 0 && (
+              <div className="w-full max-w-4xl mx-auto">
+                <div className="flex items-center justify-between text-xs sm:text-sm text-gray-700 mb-1">
+                  <span className="font-medium">
+                    Progresso: {progress.processed}/{progress.total}
+                    {progress.currentLabel ? ` — ${progress.currentLabel}` : ''}
+                  </span>
+                  <span className="text-gray-600">
+                    OK: {progress.success} | Variações: {progress.variantsCreated || 0} | Duplicados: {progress.duplicates || 0} | Erros: {progress.failed}
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-gray-200 rounded overflow-hidden">
+                  <div
+                    className="h-2 bg-blue-600"
+                    style={{
+                      width: `${Math.min(100, Math.round((progress.processed / progress.total) * 100))}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Status */}
             <div className="flex items-center justify-center">
               {validRows > 0 ? (
@@ -337,7 +372,7 @@ export function ImportPreviewModal({
                   <span className="hidden sm:inline">
                     {isRegistering ? 'Cadastrando...' : 
                      selectedRows.size > 0 ? `Cadastrar ${selectedRows.size} selecionados` : 
-                     `Cadastrar ${data.length} clientes`}
+                     `Cadastrar ${data.length} ${entityName}`}
                   </span>
                   <span className="sm:hidden">
                     {isRegistering ? 'Cadastrando...' : 'Cadastrar'}
