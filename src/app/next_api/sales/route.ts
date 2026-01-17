@@ -302,9 +302,15 @@ async function listSalesHandler(request: NextRequest) {
       console.log('⚠️ GET /sales - Nenhum tenant_id válido fornecido');
     }
 
-    // ✅ Filtrar por branch_id se fornecido (filial específica)
-    // Agora sempre filtra por branch_id (não existe mais 'all')
-    if (branch_id) {
+    // ✅ Filtrar por branch_id ou branch_scope
+    // - Se branch_scope='all': buscar TODAS as vendas do tenant (sem filtrar por branch_id)
+    // - Se branch_id fornecido: buscar vendas daquela filial específica
+    if (branch_scope === 'all') {
+      // Buscar TODAS as vendas do tenant (sem filtrar por branch_id)
+      // Isso inclui vendas da matriz (branch_id IS NULL ou branch_id da HQ) e todas as filiais
+      console.log(`🔍 [Matriz] Buscando TODAS as vendas do tenant (branch_scope=all)`);
+      // Não aplicar filtro de branch_id - buscar todas
+    } else if (branch_id) {
       const bid = Number(branch_id);
       if (Number.isFinite(bid) && bid > 0) {
         query = query.eq('branch_id', bid);
@@ -315,8 +321,8 @@ async function listSalesHandler(request: NextRequest) {
         return NextResponse.json({ success: true, data: [] });
       }
     } else {
-      // Se não tem branch_id, não retornar vendas (deve sempre ter branch_id)
-      console.log(`⚠️ Sem branch_id fornecido, retornando array vazio`);
+      // Se não tem branch_id nem branch_scope='all', não retornar vendas
+      console.log(`⚠️ Sem branch_id ou branch_scope='all' fornecido, retornando array vazio`);
       return NextResponse.json({ success: true, data: [] });
     }
 

@@ -175,7 +175,7 @@ interface ColumnVisibility {
 
 export default function VendasPage() {
   const { tenant } = useSimpleAuth();
-  const { branchId, scope } = useBranch();
+  const { enabled: branchesEnabled, loading: branchLoading, branches, branchId, scope, currentBranch, isMatrixAdmin } = useBranch();
   const [vendas, setVendas] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -229,20 +229,58 @@ export default function VendasPage() {
         return;
       }
 
+      // Evitar "piscar" dados: aguardar BranchContext resolver a branch atual
+      // (principalmente quando admin matriz usa branchId da HQ, mas currentBranch ainda não carregou)
+      if (branchesEnabled && scope === 'branch' && branchId && !currentBranch) {
+        if (branchLoading) {
+          console.log('⏳ Aguardando carregar filiais para determinar HQ antes de buscar vendas...', { branchId });
+          setLoading(false);
+          return;
+        }
+        if (Array.isArray(branches) && branches.length > 0) {
+          const resolved = branches.find((b) => b.id === branchId) || null;
+          if (!resolved) {
+            console.log('⏳ Branch selecionada ainda não resolvida, aguardando...', { branchId });
+            setLoading(false);
+            return;
+          }
+        } else {
+          console.log('⏳ Filiais ainda não carregadas, aguardando...', { branchId });
+          setLoading(false);
+          return;
+        }
+      }
+
       console.log('📦 Carregando vendas de balcão para o tenant:', tenant.id);
       console.log('📦 Branch scope:', scope, 'branchId:', branchId);
       
-      // Montar URL com parâmetros de branch (sempre precisa de branch_id)
-      let url = `/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}`;
-      if (branchId) {
-        url += `&branch_id=${branchId}`;
-      } else {
-        // Se não tem branchId, não fazer requisição
-        console.warn('[Vendas] Sem branchId, aguardando...');
-        setVendas([]);
-        setLoading(false);
-        return;
+      // Construir parâmetros da query
+      const params = new URLSearchParams({ tenant_id: tenant.id });
+      
+      // Matriz x Filial:
+      // - Se estiver em "all" OU sem branchId, buscar vendas da matriz (branch_id IS NULL)
+      // - Se a filial atual for a HQ (Matriz), também buscar vendas da matriz
+      const isHeadquarters = Boolean(currentBranch?.is_headquarters);
+      const shouldUseMatrix = scope === 'all' || !branchId || isHeadquarters || !branchesEnabled;
+
+      // Se está na matriz (scope === 'all' ou sem branchId ou HQ), buscar todas as vendas da matriz
+      if (shouldUseMatrix) {
+        params.set('branch_scope', 'all');
+        console.log(`🔄 [Matriz] Buscando todas as vendas da matriz`, {
+          scope,
+          branchId,
+          isHeadquarters,
+          branchesEnabled,
+          isMatrixAdmin,
+        });
+      } else if (branchId) {
+        // Se está em uma filial, buscar vendas da filial
+        params.set('branch_id', String(branchId));
+        console.log(`🔄 [Filial ${branchId}] Buscando vendas da filial`);
       }
+      
+      const url = `/next_api/sales?${params.toString()}`;
+      console.log(`📡 URL da requisição: ${url}`);
       
       // Buscar todas as vendas do tenant (sem filtrar por sale_source na API)
       // O filtro será feito no frontend para incluir vendas antigas sem sale_source
@@ -342,11 +380,11 @@ export default function VendasPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, branchesEnabled, branchLoading, branches, branchId, scope, currentBranch, isMatrixAdmin]);
 
   useEffect(() => {
     loadVendas();
-  }, [loadVendas, scope, branchId]);
+  }, [loadVendas]);
 
   // Filtrar vendas
   const filteredVendas = vendas.filter(venda => {

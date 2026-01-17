@@ -56,20 +56,23 @@ async function createSaleHandler(
       );
     }
 
-    // Validações específicas para vendas de entrega
-    if (sale_type === 'entrega') {
-      if (!delivery_address || delivery_address.trim().length === 0) {
-        return NextResponse.json(
-          { success: false, error: 'delivery_address é obrigatório para vendas de entrega' },
-          { status: 400 }
-        );
-      }
+    // Buscar dados do cliente se customer_id for fornecido (para usar endereço cadastrado)
+    let customerData: any = null;
+    if (customer_id) {
+      const { data: customer, error: customerError } = await supabaseAdmin
+        .from('customers')
+        .select('address, neighborhood, city, state, zipcode, phone')
+        .eq('id', Number(customer_id))
+        .eq('tenant_id', tenant_id)
+        .single();
 
-      if (!delivery_phone || delivery_phone.trim().length === 0) {
-        return NextResponse.json(
-          { success: false, error: 'delivery_phone é obrigatório para vendas de entrega' },
-          { status: 400 }
-        );
+      if (!customerError && customer) {
+        customerData = customer;
+        console.log('✅ Dados do cliente encontrados:', {
+          hasAddress: !!customer.address,
+          hasNeighborhood: !!customer.neighborhood,
+          hasPhone: !!customer.phone,
+        });
       }
     }
 
@@ -165,14 +168,30 @@ async function createSaleHandler(
     // Se for venda de entrega, criar registro de entrega automaticamente
     let delivery = null;
     if (sale_type === 'entrega') {
+      // Priorizar endereço do cliente cadastrado, depois usar campos do body
+      const finalDeliveryAddress = 
+        delivery_address || 
+        (customerData?.address ? `${customerData.address}${customerData.neighborhood ? `, ${customerData.neighborhood}` : ''}` : null) ||
+        null;
+      
+      const finalNeighborhood = 
+        delivery_neighborhood || 
+        customerData?.neighborhood || 
+        null;
+      
+      const finalPhone = 
+        delivery_phone || 
+        customerData?.phone || 
+        null;
+
       const deliveryData: any = {
         tenant_id,
         user_id: '00000000-0000-0000-0000-000000000000',
         sale_id: sale.id,
         customer_name: customer_name || 'Cliente Avulso',
-        delivery_address: delivery_address || 'Endereço não informado',
-        neighborhood: delivery_neighborhood || null,
-        phone: delivery_phone || null,
+        delivery_address: finalDeliveryAddress || '', // Usar string vazia se não houver endereço
+        neighborhood: finalNeighborhood || null,
+        phone: finalPhone || null,
         delivery_fee: delivery_fee ? parseFloat(String(delivery_fee)) : 0,
         status: 'aguardando',
         notes: notes || `Venda de entrega criada via API - Venda #${saleNumber}`,
@@ -193,7 +212,13 @@ async function createSaleHandler(
 
       if (deliveryError) {
         console.error('⚠️ Erro ao criar entrega automaticamente:', deliveryError);
+        console.error('⚠️ Delivery data tentado:', { 
+          delivery_address: finalDeliveryAddress,
+          customer_id: customer_id,
+          sale_id: sale.id 
+        });
         // Não falhar a venda se a entrega falhar, apenas logar o erro
+        // A entrega pode ser atualizada depois quando o endereço estiver disponível
       } else {
         delivery = createdDelivery;
       }
@@ -233,6 +258,27 @@ async function listSalesHandler(
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
     const sale_type = searchParams.get('sale_type');
+    const search = searchParams.get('search'); // Buscar por nome, telefone ou CPF do cliente
+
+    // Se tem busca por nome/telefone/CPF, precisamos buscar via customers primeiro
+    let customerIds: number[] | null = null;
+    if (search && search.trim().length > 0) {
+      const searchTerm = search.trim();
+      
+      // Buscar clientes que correspondem ao termo de busca
+      const { data: customers, error: customerSearchError } = await supabaseAdmin
+        .from('customers')
+        .select('id')
+        .eq('tenant_id', tenant_id)
+        .or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,document.ilike.%${searchTerm}%`);
+
+      if (!customerSearchError && customers && customers.length > 0) {
+        customerIds = customers.map(c => c.id);
+      } else if (!customerSearchError) {
+        // Se não encontrou clientes, também buscar por customer_name nas vendas
+        customerIds = []; // Array vazio, mas não null para não filtrar
+      }
+    }
 
     let query = supabaseAdmin
       .from('sales')
@@ -243,6 +289,66 @@ async function listSalesHandler(
 
     if (sale_type) {
       query = query.eq('sale_type', sale_type);
+    }
+
+    // Filtrar por IDs de clientes se busca foi fornecida
+    if (customerIds !== null && search) {
+      const searchTerm = search.trim();
+      if (customerIds.length === 0) {
+        // Se não encontrou clientes, buscar apenas por customer_name nas vendas
+        query = query.ilike('customer_name', `%${searchTerm}%`);
+      } else {
+        // Buscar vendas que têm customer_id nos IDs encontrados OU customer_name correspondente
+        // Usamos uma abordagem: buscar vendas com customer_id primeiro, depois unir com customer_name
+        // Por limitações do Supabase, vamos fazer duas queries e combinar os resultados
+        let queryById = supabaseAdmin
+          .from('sales')
+          .select('*')
+          .eq('tenant_id', tenant_id)
+          .in('customer_id', customerIds);
+
+        let queryByName = supabaseAdmin
+          .from('sales')
+          .select('*')
+          .eq('tenant_id', tenant_id)
+          .ilike('customer_name', `%${searchTerm}%`);
+
+        // Aplicar filtro de sale_type se fornecido
+        if (sale_type) {
+          queryById = queryById.eq('sale_type', sale_type);
+          queryByName = queryByName.eq('sale_type', sale_type);
+        }
+
+        const [resultById, resultByName] = await Promise.all([
+          queryById.order('created_at', { ascending: false }),
+          queryByName.order('created_at', { ascending: false }),
+        ]);
+
+        // Combinar e remover duplicatas
+        const combinedSales = [
+          ...(resultById.data || []),
+          ...(resultByName.data || []),
+        ];
+        const uniqueSales = combinedSales.filter((sale, index, self) =>
+          index === self.findIndex((s) => s.id === sale.id)
+        );
+
+        // Ordenar por created_at (mais recente primeiro) e aplicar paginação
+        uniqueSales.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        const paginatedSales = uniqueSales.slice(offset, offset + limit);
+
+        return NextResponse.json({
+          success: true,
+          data: paginatedSales || [],
+          pagination: {
+            limit,
+            offset,
+            count: paginatedSales?.length || 0,
+          },
+        });
+      }
     }
 
     const { data: sales, error } = await query;
