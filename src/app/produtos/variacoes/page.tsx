@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { TenantPageWrapper } from '@/components/layout/PageWrapper';
+import { PageLoadingSpinner } from '@/components/ui/loading-spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -640,3 +641,10 @@ function ProdutoVariacoesContent() {
   );
 }
 
+export default function ProdutoVariacoesPage() {
+  return (
+    <Suspense fallback={<PageLoadingSpinner />}>
+      <ProdutoVariacoesContent />
+    </Suspense>
+  );
+}
