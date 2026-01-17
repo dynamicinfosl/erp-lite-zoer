@@ -302,7 +302,6 @@ export default function ProdutoVariacoesPage() {
     try {
       for (const v of variants) {
         // best-effort
-        // eslint-disable-next-line no-await-in-loop
         await fetch(
           `/next_api/product-variants?tenant_id=${encodeURIComponent(tenantId)}&id=${encodeURIComponent(String(v.id))}`,
           { method: 'DELETE' }
@@ -316,7 +315,7 @@ export default function ProdutoVariacoesPage() {
   };
 
   return (
-    <TenantPageWrapper title="Variações de Produtos" icon={Layers}>
+    <TenantPageWrapper>
       <Card className="juga-card">
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <div>
