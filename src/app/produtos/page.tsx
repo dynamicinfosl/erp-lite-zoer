@@ -159,6 +159,8 @@ export default function ProdutosPage() {
   const [importRows, setImportRows] = useState<any[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [showFailedProductsReport, setShowFailedProductsReport] = useState(false);
+  const [failedProductsData, setFailedProductsData] = useState<Array<{ row: any; sku: string; name: string; reason: string }>>([]);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isCheckingSku, setIsCheckingSku] = useState(false);
   const [skuValidationTimeout, setSkuValidationTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -301,6 +303,22 @@ export default function ProdutosPage() {
     
     waitForTenant();
   }, [loadProducts, tenant?.id]); // Incluir dependências necessárias
+
+  // ✅ Verificar se há produtos não cadastrados salvos ao carregar a página
+  useEffect(() => {
+    const saved = localStorage.getItem('failed_products_import');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        if (data.products && Array.isArray(data.products) && data.products.length > 0) {
+          // Não mostrar automaticamente, apenas deixar disponível no menu
+          console.log(`📋 ${data.products.length} produtos não cadastrados encontrados em importação anterior`);
+        }
+      } catch (e) {
+        console.warn('Erro ao verificar produtos não cadastrados salvos:', e);
+      }
+    }
+  }, []);
 
   // Filtrar produtos
   const filteredProducts = products.filter(product => {
@@ -702,12 +720,23 @@ export default function ProdutosPage() {
       
       console.log('✅ Tenant confirmado:', finalTenantId);
 
+      // ✅ Carregar produtos existentes para verificar duplicatas
+      console.log('🔍 Carregando produtos existentes para verificar duplicatas...');
+      const existingProductsRes = await fetch(`/next_api/products?tenant_id=${finalTenantId}&branch_scope=all`);
+      const existingProductsData = existingProductsRes.ok ? await existingProductsRes.json().catch(() => ({})) : {};
+      const existingProducts = Array.isArray(existingProductsData?.data) ? existingProductsData.data : [];
+      const existingSkus = new Set(existingProducts.map((p: any) => String(p.sku || '').trim().toLowerCase()));
+      console.log(`📊 ${existingProducts.length} produtos já cadastrados encontrados`);
+
       // Mapear header normalizado -> header original (para nomes bonitos dos price_tiers)
       const headerNormToRaw = new Map<string, string>();
       for (const h of importHeaders) {
         const norm = normalizeHeader(h);
         if (norm && !headerNormToRaw.has(norm)) headerNormToRaw.set(norm, String(h).trim());
       }
+
+      // ✅ Lista de produtos que falharam (para relatório e reimportação)
+      const failedProducts: Array<{ row: any; sku: string; name: string; reason: string }> = [];
 
       for (let rowIndex = 0; rowIndex < selected.length; rowIndex++) {
         const row = selected[rowIndex];
@@ -825,11 +854,24 @@ export default function ProdutosPage() {
 
         if (!productData.sku || !productData.name || productData.price <= 0) {
           fail++;
-          errors.push(`Produto com dados inválidos (SKU: ${productData.sku}, Nome: ${productData.name}, Preço: ${productData.price}), pulado.`);
+          const reason = `Dados inválidos (SKU: ${productData.sku || 'vazio'}, Nome: ${productData.name || 'vazio'}, Preço: ${productData.price})`;
+          errors.push(`Linha ${rowIndex + 1}: ${reason}`);
+          failedProducts.push({ row, sku: productData.sku || '', name: productData.name || '', reason });
           console.warn(
             `⚠️ [Import Produtos] Linha ${rowIndex + 1} pulada (sku="${productData.sku}", name="${productData.name}", price=${productData.price}). ` +
               `Headers(normalizados) amostra: ${Object.keys(obj).slice(0, 15).join(', ')}`
           );
+          continue;
+        }
+
+        // ✅ Verificar se SKU já existe (duplicata)
+        const skuLower = productData.sku.trim().toLowerCase();
+        if (existingSkus.has(skuLower)) {
+          fail++;
+          const reason = `SKU "${productData.sku}" já está cadastrado`;
+          errors.push(`Linha ${rowIndex + 1}: ${reason}`);
+          failedProducts.push({ row, sku: productData.sku, name: productData.name, reason });
+          console.warn(`⚠️ [Import Produtos] Linha ${rowIndex + 1}: SKU "${productData.sku}" já existe, pulando...`);
           continue;
         }
 
@@ -870,20 +912,43 @@ export default function ProdutosPage() {
         } else {
           fail++;
           console.error(`❌ Erro ao cadastrar produto (${response.status}):`, responseText);
+          let errorMessage = 'Erro desconhecido';
           try {
             const errorData = JSON.parse(responseText);
-            errors.push(`Linha ${rowIndex + 1}: ${errorData.error || responseText}`);
+            errorMessage = errorData.error || responseText;
           } catch {
-            errors.push(`Linha ${rowIndex + 1}: ${responseText || 'Erro desconhecido'}`);
+            errorMessage = responseText || 'Erro desconhecido';
           }
+          errors.push(`Linha ${rowIndex + 1}: ${errorMessage}`);
+          failedProducts.push({ row, sku: productData.sku, name: productData.name, reason: errorMessage });
         }
       }
 
+      // ✅ Salvar produtos que falharam para relatório e reimportação
+      if (failedProducts.length > 0) {
+        localStorage.setItem('failed_products_import', JSON.stringify({
+          timestamp: new Date().toISOString(),
+          products: failedProducts,
+          headers: importHeaders,
+        }));
+      }
+
       if (success > 0) toast.success(`${success} produtos cadastrados`);
-      if (fail > 0) toast.error(`${fail} produtos não cadastrados`);
+      if (fail > 0) {
+        toast.error(`${fail} produtos não cadastrados`, {
+          description: 'Verifique o relatório de produtos não cadastrados',
+          duration: 5000,
+        });
+      }
       await loadProducts();
       setShowImportPreview(false);
       setImportErrors(errors);
+      
+      // ✅ Mostrar relatório de produtos não cadastrados se houver
+      if (failedProducts.length > 0) {
+        setFailedProductsData(failedProducts);
+        setShowFailedProductsReport(true);
+      }
     } catch (error) {
       console.error('Erro ao cadastrar produtos:', error);
       toast.error('Erro ao cadastrar produtos');
@@ -1200,6 +1265,33 @@ export default function ProdutosPage() {
                     >
                       <Upload className="h-4 w-4 mr-3 text-gray-400" />
                       Importar Produtos
+                    </DropdownMenuItem>
+                    
+                    <DropdownMenuItem 
+                      onClick={() => {
+                        // Carregar produtos não cadastrados do localStorage
+                        const saved = localStorage.getItem('failed_products_import');
+                        if (saved) {
+                          try {
+                            const data = JSON.parse(saved);
+                            if (data.products && Array.isArray(data.products) && data.products.length > 0) {
+                              setFailedProductsData(data.products);
+                              setImportHeaders(data.headers || []);
+                              setShowFailedProductsReport(true);
+                            } else {
+                              toast.info('Nenhum produto não cadastrado encontrado');
+                            }
+                          } catch (e) {
+                            toast.error('Erro ao carregar produtos não cadastrados');
+                          }
+                        } else {
+                          toast.info('Nenhum produto não cadastrado encontrado');
+                        }
+                      }}
+                      className="cursor-pointer px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-700 flex items-center"
+                    >
+                      <AlertTriangle className="h-4 w-4 mr-3 text-yellow-400" />
+                      Ver Produtos Não Cadastrados
                     </DropdownMenuItem>
                     
                     <DropdownMenuItem className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center">
@@ -2024,6 +2116,112 @@ export default function ProdutosPage() {
         errors={importErrors}
         isRegistering={isRegistering}
       />
+
+      {/* Dialog Relatório de Produtos Não Cadastrados */}
+      <Dialog open={showFailedProductsReport} onOpenChange={setShowFailedProductsReport}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              Produtos Não Cadastrados
+            </DialogTitle>
+            <DialogDescription>
+              {failedProductsData.length} produto(s) não foram cadastrados na importação anterior
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto py-4">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Você pode exportar esta lista ou tentar reimportar apenas os produtos que falharam
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Exportar para CSV
+                      const csvRows = [
+                        ['SKU', 'Nome', 'Motivo'],
+                        ...failedProductsData.map(p => [p.sku, p.name, p.reason]),
+                      ];
+                      const csv = csvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+                      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `produtos_nao_cadastrados_${new Date().toISOString().split('T')[0]}.csv`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      toast.success('Lista exportada com sucesso');
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar CSV
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Reimportar apenas os produtos que falharam
+                      const rowsToReimport = failedProductsData.map(p => p.row);
+                      setImportRows(rowsToReimport);
+                      setShowFailedProductsReport(false);
+                      setShowImportPreview(true);
+                      toast.info('Produtos não cadastrados carregados para reimportação');
+                    }}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Reimportar
+                  </Button>
+                </div>
+              </div>
+              <div className="border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>SKU</TableHead>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Motivo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {failedProductsData.map((product, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-mono text-sm">{index + 1}</TableCell>
+                        <TableCell className="font-mono text-sm">{product.sku || '-'}</TableCell>
+                        <TableCell className="font-medium">{product.name || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant="destructive" className="text-xs">
+                            {product.reason}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFailedProductsReport(false)}>
+              Fechar
+            </Button>
+            <Button
+              onClick={() => {
+                // Limpar dados salvos
+                localStorage.removeItem('failed_products_import');
+                setShowFailedProductsReport(false);
+              }}
+            >
+              Fechar e Limpar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </div>
     </TenantPageWrapper>
   );
