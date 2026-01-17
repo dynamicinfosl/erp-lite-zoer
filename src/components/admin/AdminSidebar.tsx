@@ -27,6 +27,7 @@ import {
   Home,
   LogOut,
   Database,
+  Key,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -43,6 +44,7 @@ const menuGroups = [
     items: [
       { title: 'Usuários', url: '/admin/users', icon: Users },
       { title: 'Planos', url: '/admin/plans', icon: CreditCard },
+      { title: 'API Keys', url: '/admin/api-keys', icon: Key },
     ],
   },
   {
