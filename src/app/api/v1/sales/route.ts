@@ -166,8 +166,8 @@ async function createSaleHandler(
     }
 
     // Se for venda de entrega, criar registro de entrega automaticamente
+    // Se a entrega falhar, fazer rollback (deletar venda e itens)
     let delivery = null;
-    let deliveryErrorMsg: string | null = null;
     if (sale_type === 'entrega') {
       // Priorizar endereço do cliente cadastrado, depois usar campos do body
       const finalDeliveryAddress = 
@@ -201,10 +201,8 @@ async function createSaleHandler(
         updated_at: createdAt,
       };
 
-      // Adicionar customer_id se fornecido
-      if (customer_id) {
-        deliveryData.customer_id = Number(customer_id);
-      }
+      // Nota: A tabela deliveries não possui coluna customer_id.
+      // O relacionamento com o cliente é feito através do sale_id -> sales.customer_id
 
       const { data: createdDelivery, error: deliveryError } = await supabaseAdmin
         .from('deliveries')
@@ -216,10 +214,8 @@ async function createSaleHandler(
         console.error('❌ Erro ao criar entrega automaticamente:', deliveryError);
         console.error('❌ Delivery data tentado:', JSON.stringify(deliveryData, null, 2));
         
-        // Armazenar mensagem de erro para retornar na resposta
-        deliveryErrorMsg = deliveryError.message || 'Erro desconhecido ao criar entrega';
-        
         // Tentar novamente com endereço padrão explícito se o erro for sobre delivery_address
+        let retrySucceeded = false;
         if (deliveryError.message?.includes('delivery_address') || 
             deliveryError.code === '23502' || 
             (!finalDeliveryAddress && deliveryError.message?.includes('null'))) {
@@ -235,17 +231,41 @@ async function createSaleHandler(
             .select()
             .single();
           
-          if (retryError) {
-            console.error('❌ Erro ao criar entrega mesmo com valor padrão:', retryError);
-            deliveryErrorMsg = `Falha ao criar entrega: ${retryError.message || deliveryErrorMsg}. Código: ${retryError.code || deliveryError.code}`;
-          } else {
+          if (!retryError && retryDelivery) {
             console.log('✅ Entrega criada com sucesso após retry');
             delivery = retryDelivery;
-            deliveryErrorMsg = null; // Limpar erro se o retry funcionou
+            retrySucceeded = true;
+          } else {
+            console.error('❌ Erro ao criar entrega mesmo com valor padrão:', retryError);
           }
-        } else {
-          // Para outros erros, armazenar mensagem detalhada
-          deliveryErrorMsg = `Erro ao criar entrega: ${deliveryError.message}. Código: ${deliveryError.code || 'N/A'}. Detalhes: ${deliveryError.details || 'N/A'}`;
+        }
+
+        // Se ainda não conseguiu criar a entrega (nem no retry), fazer rollback
+        if (!retrySucceeded) {
+          console.error('❌ Falha ao criar entrega. Fazendo rollback (deletando venda e itens)...');
+          
+          // Deletar itens da venda primeiro (devido à foreign key)
+          await supabaseAdmin
+            .from('sale_items')
+            .delete()
+            .eq('sale_id', sale.id);
+          
+          // Deletar a venda
+          await supabaseAdmin
+            .from('sales')
+            .delete()
+            .eq('id', sale.id);
+          
+          const errorMessage = `Erro ao criar entrega: ${deliveryError.message}. Código: ${deliveryError.code || 'N/A'}. A venda não foi criada.`;
+          
+          return NextResponse.json(
+            { 
+              success: false, 
+              error: 'Não foi possível criar a venda de entrega',
+              details: errorMessage,
+            },
+            { status: 500 }
+          );
         }
       } else {
         console.log('✅ Entrega criada com sucesso:', createdDelivery?.id);
@@ -259,10 +279,6 @@ async function createSaleHandler(
         sale,
         delivery, // Incluir dados da entrega se foi criada
       },
-      ...(deliveryErrorMsg && {
-        warning: 'Venda criada com sucesso, mas houve um problema ao criar a entrega automaticamente',
-        delivery_error: deliveryErrorMsg,
-      }),
     });
   } catch (error) {
     console.error('❌ Erro no handler de criação de venda:', error);

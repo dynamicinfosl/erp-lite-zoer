@@ -148,19 +148,19 @@ async function updateSaleHandler(
           user_id: '00000000-0000-0000-0000-000000000000',
           sale_id: saleIdNum,
           customer_name: sale.customer_name || 'Cliente Avulso',
-          delivery_address: finalDeliveryAddress,
-          neighborhood: finalNeighborhood,
-          phone: finalPhone,
+          delivery_address: finalDeliveryAddress || 'Endereço não informado',
+          neighborhood: finalNeighborhood || null,
+          phone: finalPhone || null,
           delivery_fee: delivery_fee ? parseFloat(String(delivery_fee)) : 0,
           status: 'aguardando',
           notes: notes || `Venda convertida para entrega via API - Venda #${sale.sale_number}`,
+          branch_id: null, // Usar mesmo branch_id da venda
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
 
-        if (sale.customer_id) {
-          deliveryData.customer_id = sale.customer_id;
-        }
+        // Nota: A tabela deliveries não possui coluna customer_id.
+        // O relacionamento com o cliente é feito através do sale_id -> sales.customer_id
 
         const { data: createdDelivery, error: deliveryError } = await supabaseAdmin
           .from('deliveries')
