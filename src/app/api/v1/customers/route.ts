@@ -19,7 +19,7 @@ async function createCustomerHandler(
     const { tenant_id } = context;
     const body = await request.json();
 
-    const { name, email, phone, document, address, neighborhood, state, zipcode, notes, is_active } = body;
+    const { name, email, phone, document, address, neighborhood, state, zipcode, notes, is_active, branch_id } = body;
 
     // Validações
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -27,6 +27,37 @@ async function createCustomerHandler(
         { success: false, error: 'Nome é obrigatório' },
         { status: 400 }
       );
+    }
+
+    // Opcional: permitir cadastrar diretamente em uma filial
+    // - Se branch_id for informado: cliente aparece na filial (created_at_branch_id = branch_id)
+    // - Se não: cliente fica na matriz (created_at_branch_id = NULL)
+    let createdAtBranchId: number | null = null;
+    if (branch_id !== undefined && branch_id !== null && String(branch_id).trim() !== '') {
+      const bid = typeof branch_id === 'number' ? branch_id : parseInt(String(branch_id), 10);
+      if (!Number.isFinite(bid) || bid <= 0) {
+        return NextResponse.json(
+          { success: false, error: 'branch_id inválido' },
+          { status: 400 }
+        );
+      }
+
+      // Validar que a filial pertence ao tenant
+      const { data: branch, error: branchError } = await supabaseAdmin
+        .from('branches')
+        .select('id, tenant_id')
+        .eq('id', bid)
+        .eq('tenant_id', tenant_id)
+        .maybeSingle();
+
+      if (branchError || !branch) {
+        return NextResponse.json(
+          { success: false, error: 'Filial (branch_id) não encontrada para este tenant' },
+          { status: 400 }
+        );
+      }
+
+      createdAtBranchId = bid;
     }
 
     // Preparar dados para inserção
@@ -43,7 +74,7 @@ async function createCustomerHandler(
       zipcode: zipcode ? zipcode.trim() : null,
       notes: notes ? notes.trim() : null,
       is_active: is_active !== undefined ? Boolean(is_active) : true,
-      created_at_branch_id: null, // API externa não tem branch por padrão
+      created_at_branch_id: createdAtBranchId, // NULL = matriz | number = filial
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

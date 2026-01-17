@@ -175,9 +175,15 @@ Cria um novo cliente.
   "state": "SP",                         // Opcional - UF (2 caracteres)
   "zipcode": "01310-100",                // Opcional - CEP
   "notes": "Observações do cliente",     // Opcional
-  "is_active": true                      // Opcional (padrão: true)
+  "is_active": true,                     // Opcional (padrão: true)
+  "branch_id": 1                         // Opcional: ID da filial (se omitido, cria na matriz)
 }
 ```
+
+**Observação (Matriz x Filial):**
+
+- Se você **não** informar `branch_id`, o cliente será cadastrado na **matriz** (`created_at_branch_id = NULL`).
+- Se você informar `branch_id`, o cliente será cadastrado diretamente naquela **filial** e aparecerá no frontend quando estiver visualizando essa filial.
 
 **Resposta de Sucesso:**
 
