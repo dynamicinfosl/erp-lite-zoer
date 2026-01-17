@@ -709,6 +709,39 @@ export default function ProdutosPage() {
     return last || nm;
   };
 
+  const normalizeTextLoose = (input: string): string => {
+    return String(input || '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const deriveVariantLabel = (fullName: string, baseName?: string): string => {
+    const nm = String(fullName || '').trim();
+    if (!nm) return '';
+    // Preferir o último parênteses quando existir
+    const matches = [...nm.matchAll(/\(([^)]+)\)/g)];
+    const last = matches.length > 0 ? String(matches[matches.length - 1]?.[1] || '').trim() : '';
+    if (last) return last;
+
+    // Caso contrário, tentar extrair "sufixo" quando o nome começa com o baseName
+    const base = String(baseName || '').trim();
+    if (base) {
+      const nmNorm = normalizeTextLoose(nm);
+      const baseNorm = normalizeTextLoose(base);
+      if (nmNorm.startsWith(baseNorm) && nmNorm.length > baseNorm.length) {
+        // pegar o sufixo do nome original (respeitando acentos), aproximando pelo tamanho do base
+        const suffix = nm.slice(base.length).trim().replace(/^[-–—:/\s]+/, '').trim();
+        if (suffix) return suffix;
+      }
+    }
+
+    // Fallback: nome completo
+    return extractVariantLabelFromName(nm);
+  };
+
   const handleRegisterSelected = async (selected: any[]) => {
     console.log('🚀 [handleRegisterSelected] INICIADO - Itens recebidos:', selected.length);
     console.log('🚀 [handleRegisterSelected] Primeiro item:', selected[0]);
@@ -778,6 +811,42 @@ export default function ProdutosPage() {
         if (skuKey && Number.isFinite(pid) && pid > 0) skuToProductId.set(skuKey, pid);
       }
       console.log(`📊 ${existingProducts.length} produtos já cadastrados encontrados`);
+
+      // ✅ Mapas auxiliares dos produtos existentes (para distinguir duplicado vs variação)
+      const skuToBaseNameNorm = new Map<string, string>();
+      const skuToBaseNameRaw = new Map<string, string>();
+      for (const p of existingProducts) {
+        const skuKey = String((p as any)?.sku || '').trim().toLowerCase();
+        if (!skuKey) continue;
+        const nm = String((p as any)?.name || '').trim();
+        skuToBaseNameRaw.set(skuKey, nm);
+        skuToBaseNameNorm.set(skuKey, normalizeTextLoose(nm));
+      }
+
+      // ✅ Contagem de SKUs no arquivo selecionado (para evitar reimport virar variação)
+      const fileSkuCounts = new Map<string, number>();
+      for (const row of selected) {
+        // tentar obter sku rapidamente (sem depender de header exato)
+        let skuCandidate = '';
+        if (Array.isArray(row)) {
+          skuCandidate = String(row[0] ?? '').trim();
+        } else if (row && typeof row === 'object') {
+          const objRow = row as Record<string, any>;
+          const keys = Object.keys(objRow);
+          // pegar primeiro campo que pareça código
+          const key = keys.find((k) => {
+            const nk = normalizeHeader(k);
+            return nk.includes('codigo') || nk === 'sku' || nk === 'cod' || nk.includes('codigo interno');
+          });
+          if (key) skuCandidate = String(objRow[key] ?? '').trim();
+        }
+        const skuKey = skuCandidate.trim().toLowerCase();
+        if (!skuKey) continue;
+        fileSkuCounts.set(skuKey, (fileSkuCounts.get(skuKey) || 0) + 1);
+      }
+
+      // Cache: labels existentes por produto base (para reimportação idempotente)
+      const baseProductIdToExistingLabels = new Map<number, Set<string>>();
 
       // Mapear header normalizado -> header original (para nomes bonitos dos price_tiers)
       const headerNormToRaw = new Map<string, string>();
@@ -936,9 +1005,45 @@ export default function ProdutosPage() {
           continue;
         }
 
-        // ✅ Verificar se SKU já existe (duplicata) -> cadastrar como VARIAÇÃO automaticamente
+        // ✅ Verificar se SKU já existe (duplicata). Criar VARIAÇÃO apenas quando:
+        // - O SKU está duplicado no arquivo importado (fileSkuCounts > 1) E
+        // - O nome é diferente do produto base (senão é duplicado real)
         const skuLower = productData.sku.trim().toLowerCase();
         if (existingSkus.has(skuLower)) {
+          const countInFile = fileSkuCounts.get(skuLower) || 0;
+          const baseNameNorm = skuToBaseNameNorm.get(skuLower) || '';
+          const incomingNameNorm = normalizeTextLoose(productData.name);
+
+          // Se o SKU aparece só uma vez no arquivo, é reimport / duplicado -> NÃO criar variação
+          if (countInFile <= 1) {
+            setImportProgress((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    processed: rowIndex + 1,
+                    duplicates: prev.duplicates + 1,
+                    currentLabel: `${productData.sku} — ${productData.name}`,
+                  }
+                : prev
+            );
+            continue;
+          }
+
+          // Se o nome é igual ao produto base, é duplicado -> NÃO criar variação
+          if (baseNameNorm && incomingNameNorm === baseNameNorm) {
+            setImportProgress((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    processed: rowIndex + 1,
+                    duplicates: prev.duplicates + 1,
+                    currentLabel: `${productData.sku} — ${productData.name}`,
+                  }
+                : prev
+            );
+            continue;
+          }
+
           const baseProductId = skuToProductId.get(skuLower);
           if (!baseProductId) {
             fail++;
@@ -959,7 +1064,45 @@ export default function ProdutosPage() {
             continue;
           }
 
-          const variantLabel = extractVariantLabelFromName(productData.name);
+          // Carregar labels existentes do produto base (1x por produto) para evitar recriar na reimportação
+          if (!baseProductIdToExistingLabels.has(baseProductId)) {
+            try {
+              const vr = await fetch(
+                `/next_api/product-variants?tenant_id=${encodeURIComponent(finalTenantId)}&product_id=${encodeURIComponent(String(baseProductId))}`
+              );
+              const json = await vr.json().catch(() => ({}));
+              const rows = Array.isArray(json?.data) ? json.data : [];
+              const set = new Set<string>();
+              for (const r of rows) {
+                const lbl = String((r as any)?.label || '').trim().toLowerCase();
+                if (lbl) set.add(lbl);
+              }
+              baseProductIdToExistingLabels.set(baseProductId, set);
+            } catch {
+              baseProductIdToExistingLabels.set(baseProductId, new Set());
+            }
+          }
+
+          const baseNameRaw = skuToBaseNameRaw.get(skuLower) || '';
+          const variantLabel = deriveVariantLabel(productData.name, baseNameRaw);
+          const variantLabelLower = String(variantLabel || '').trim().toLowerCase();
+
+          // Se já existe variação com esse label, considerar duplicado e seguir
+          const existingLabels = baseProductIdToExistingLabels.get(baseProductId)!;
+          if (variantLabelLower && existingLabels.has(variantLabelLower)) {
+            setImportProgress((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    processed: rowIndex + 1,
+                    duplicates: prev.duplicates + 1,
+                    currentLabel: `${productData.sku} — ${productData.name}`,
+                  }
+                : prev
+            );
+            continue;
+          }
+
           try {
             const vr = await fetch('/next_api/product-variants', {
               method: 'POST',
@@ -987,13 +1130,13 @@ export default function ProdutosPage() {
               body: JSON.stringify({ tenant_id: finalTenantId, id: baseProductId, has_variations: true }),
             }).catch(() => {});
 
+            if (variantLabelLower) existingLabels.add(variantLabelLower);
             console.log(`🧩 Variação criada/atualizada para SKU ${productData.sku}: ${variantLabel}`);
             setImportProgress((prev) =>
               prev
                 ? {
                     ...prev,
                     processed: rowIndex + 1,
-                    duplicates: prev.duplicates + 1,
                     variantsCreated: prev.variantsCreated + 1,
                     currentLabel: `${productData.sku} — ${productData.name}`,
                   }

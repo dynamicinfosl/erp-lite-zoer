@@ -135,6 +135,8 @@ export default function PDVPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPriceTiers, setSelectedPriceTiers] = useState<Array<{ name: string; price: number; price_type_id?: number }>>([]);
+  const [selectedVariants, setSelectedVariants] = useState<Array<{ id: number; label: string; name?: string | null; sale_price?: number | null }>>([]);
+  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
   
   // Novos estados para funcionalidades avançadas
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -387,13 +389,17 @@ export default function PDVPage() {
     try {
       if (!tenant?.id) {
         setSelectedProduct({ ...product, quantity: 1, discount: 0 });
+        setSelectedVariants([]);
+        setSelectedVariantId(null);
         return;
       }
-      const res = await fetch(
+      
+      // Carregar price tiers
+      const resTiers = await fetch(
         `/next_api/product-price-tiers?tenant_id=${encodeURIComponent(tenant.id)}&product_id=${encodeURIComponent(String(product.id))}`
       );
-      const json = await res.json().catch(() => ({}));
-      const tiersRaw = Array.isArray(json?.data) ? json.data : [];
+      const jsonTiers = await resTiers.json().catch(() => ({}));
+      const tiersRaw = Array.isArray(jsonTiers?.data) ? jsonTiers.data : [];
       const tiers = tiersRaw
         .map((t: any) => ({
           name: String(t?.price_type?.name || '').trim(),
@@ -403,6 +409,24 @@ export default function PDVPage() {
         .filter((t: any) => t.name && Number.isFinite(t.price) && t.price > 0);
 
       setSelectedPriceTiers(tiers);
+
+      // Carregar variações do produto
+      const resVariants = await fetch(
+        `/next_api/product-variants?tenant_id=${encodeURIComponent(tenant.id)}&product_id=${encodeURIComponent(String(product.id))}`
+      );
+      const jsonVariants = await resVariants.json().catch(() => ({}));
+      const variantsRaw = Array.isArray(jsonVariants?.data) ? jsonVariants.data : [];
+      const variants = variantsRaw
+        .map((v: any) => ({
+          id: Number(v?.id),
+          label: String(v?.label || '').trim(),
+          name: v?.name ?? null,
+          sale_price: v?.sale_price ?? null,
+        }))
+        .filter((v: any) => Number.isFinite(v.id) && v.id > 0 && v.label);
+      
+      setSelectedVariants(variants);
+      setSelectedVariantId(null);
 
       // Se existir "Valor Varejo", usar como padrão; senão usa o primeiro tier; senão cai no preço do produto
       const varejo = tiers.find((t: any) => String(t.name).toLowerCase().includes('varejo'));
@@ -423,6 +447,8 @@ export default function PDVPage() {
     } catch {
       // fallback: seleciona com preço padrão
       setSelectedPriceTiers([]);
+      setSelectedVariants([]);
+      setSelectedVariantId(null);
       setSelectedProduct({ ...product, quantity: 1, discount: 0 });
     }
   };
@@ -430,6 +456,8 @@ export default function PDVPage() {
   const clearSelection = () => {
     setSelectedProduct(null);
     setSelectedPriceTiers([]);
+    setSelectedVariants([]);
+    setSelectedVariantId(null);
     setSearchTerm('');
   };
 
@@ -1049,22 +1077,22 @@ export default function PDVPage() {
 
           {/* Cards superiores removidos conforme solicitação */}
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="xl:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div className="xl:col-span-2 space-y-4">
               <Card className="border border-slate-200 bg-slate-50/80 dark:bg-slate-900/60 backdrop-blur rounded-xl">
-                <CardHeader className="pb-0 bg-gradient-to-r from-[#0f1f3b] via-[#162a4d] to-[#0f1f3b] text-white rounded-t-xl">
-                  <CardTitle className="text-sm sm:text-base text-white font-semibold tracking-wide">
+                <CardHeader className="pb-2 bg-gradient-to-r from-[#0f1f3b] via-[#162a4d] to-[#0f1f3b] text-white rounded-t-xl">
+                  <CardTitle className="text-xs sm:text-sm text-white font-semibold tracking-wide">
                     Localizar um produto/serviço abaixo
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-4">
-                  <div className="grid grid-cols-1 md:grid-cols-[1fr_200px_56px] gap-3">
+                <CardContent className="pt-3">
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_48px] gap-2">
                     <Input
                       id="search-input"
                       placeholder="Digite o código ou o nome"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="text-lg h-12 rounded-xl bg-white/70 dark:bg-slate-900/50 border border-slate-300/60 dark:border-slate-700/70 focus-visible:ring-blue-500/40"
+                      className="text-sm h-10 rounded-xl bg-white/70 dark:bg-slate-900/50 border border-slate-300/60 dark:border-slate-700/70 focus-visible:ring-blue-500/40"
                     />
                     <OverlaySelect
                       value={''}
@@ -1075,30 +1103,30 @@ export default function PDVPage() {
                         { value: 'active', label: 'Ativo' },
                         { value: 'inactive', label: 'Inativo' },
                       ]}
-                      className="w-full"
+                      className="w-full h-10"
                     />
-                    <Button variant="outline" size="lg" className="px-0 rounded-xl border-blue-400/40">
-                      <Barcode className="h-5 w-5" />
+                    <Button variant="outline" size="sm" className="px-0 rounded-xl border-blue-400/40 h-10">
+                      <Barcode className="h-4 w-4" />
                     </Button>
                   </div>
 
                   {!loading && searchTerm && (
-                    <div className="mt-3 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                          <div className="max-h-72 overflow-y-auto bg-white dark:bg-slate-900">
+                    <div className="mt-2 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                          <div className="max-h-40 overflow-y-auto bg-white dark:bg-slate-900">
                         {filteredProducts.length === 0 && (
-                          <div className="p-3 text-sm text-muted-foreground">Nenhum produto encontrado.</div>
+                          <div className="p-2 text-xs text-muted-foreground">Nenhum produto encontrado.</div>
                         )}
                         {filteredProducts.map((product) => (
                           <div
                             key={product.id}
-                            className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer border-b last:border-b-0 flex items-center justify-between"
+                            className="p-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer border-b last:border-b-0 flex items-center justify-between"
                             onClick={() => selectProduct(product)}
                           >
-                            <div>
-                              <p className="font-medium text-slate-800 dark:text-slate-100">{product.name}</p>
-                              <p className="text-sm text-muted-foreground">Código: {product.code}</p>
+                            <div className="flex-1 min-w-0 pr-2">
+                              <p className="font-medium text-sm text-slate-800 dark:text-slate-100 truncate">{product.name}</p>
+                              <p className="text-xs text-muted-foreground">Cód: {product.code}</p>
                             </div>
-                            <p className="font-semibold text-blue-600">R$ {product.price.toFixed(2)}</p>
+                            <p className="font-semibold text-sm text-blue-600 whitespace-nowrap">R$ {product.price.toFixed(2)}</p>
                           </div>
                         ))}
                       </div>
@@ -1109,114 +1137,165 @@ export default function PDVPage() {
             </CardContent>
           </Card>
 
-              <Card className="juga-card min-h-[400px]">
-                <CardContent className="p-6">
+              <Card className="juga-card">
+                <CardContent className="p-4">
                   {selectedProduct ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="flex items-center justify-center">
-                        <div className="w-full max-w-sm aspect-square bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-700">
-                          <Package className="h-20 w-20 text-gray-400" />
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs font-medium text-muted-foreground uppercase">Código</Label>
+                          <p className="text-sm font-semibold text-heading mt-1">{selectedProduct.code}</p>
+                        </div>
+                        <div>
+                          <Label className="text-xs font-medium text-muted-foreground uppercase">Valor Total</Label>
+                          <div className="mt-1 p-2 bg-gray-50 dark:bg-gray-900 rounded-md border text-center">
+                            <span className="text-lg font-bold text-primary">R$ {calculateItemTotal(selectedProduct).toFixed(2)}</span>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="space-y-4">
-                <div>
-                          <Label className="text-sm font-medium text-muted-foreground uppercase">Código</Label>
-                          <p className="text-lg font-semibold text-heading">{selectedProduct.code}</p>
-                </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground uppercase">Quantidade</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={selectedProduct.quantity}
+                          onChange={(e) =>
+                            setSelectedProduct({
+                              ...selectedProduct,
+                              quantity: Math.max(1, parseInt(e.target.value) || 1),
+                            })
+                          }
+                          className="mt-1 h-9"
+                        />
+                      </div>
 
-                <div>
-                          <Label className="text-sm font-medium text-muted-foreground uppercase">Quantidade</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={selectedProduct.quantity}
-                            onChange={(e) =>
-                              setSelectedProduct({
-                                ...selectedProduct,
-                                quantity: Math.max(1, parseInt(e.target.value) || 1),
-                              })
-                            }
-                            className="mt-1"
-                          />
-                  </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground uppercase">Valor Unitário</Label>
+                        <Input 
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={selectedProduct.price}
+                          onChange={(e) => {
+                            const newPrice = Math.max(0, parseFloat(e.target.value) || 0);
+                            setSelectedProduct({
+                              ...selectedProduct,
+                              price: newPrice,
+                            });
+                          }}
+                          className="mt-1 h-9"
+                          placeholder="0.00"
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {selectedProduct.price > 0 ? `R$ ${selectedProduct.price.toFixed(2)}` : 'Digite o valor'}
+                          {(selectedProduct as any).price_type_name && ` • Tabela: ${(selectedProduct as any).price_type_name}`}
+                        </p>
+                      </div>
 
+                      {selectedVariants.length > 0 && (
                         <div>
-                          <Label className="text-sm font-medium text-muted-foreground uppercase">Valor Unitário</Label>
-                          <Input value={`R$ ${selectedProduct.price.toFixed(2)}`} disabled className="mt-1 bg-gray-50 dark:bg-gray-900" />
-                          {(selectedProduct as any).price_type_name && (
+                          <Label className="text-xs font-medium text-muted-foreground uppercase">Variação do Produto</Label>
+                          <Select
+                            value={selectedVariantId ? String(selectedVariantId) : ''}
+                            onValueChange={(value) => {
+                              const variantId = Number(value);
+                              const variant = selectedVariants.find((v) => v.id === variantId);
+                              if (variant) {
+                                setSelectedVariantId(variantId);
+                                // Se a variação tem preço, aplicar; senão mantém o preço atual
+                                if (variant.sale_price !== null && variant.sale_price !== undefined && variant.sale_price > 0) {
+                                  setSelectedProduct({
+                                    ...selectedProduct,
+                                    price: variant.sale_price,
+                                  });
+                                }
+                              } else {
+                                setSelectedVariantId(null);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="mt-1 h-9">
+                              <SelectValue placeholder="Selecione uma variação (opcional)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">Nenhuma variação</SelectItem>
+                              {selectedVariants.map((v) => (
+                                <SelectItem key={v.id} value={String(v.id)}>
+                                  {v.label}
+                                  {v.sale_price !== null && v.sale_price !== undefined && v.sale_price > 0
+                                    ? ` — R$ ${v.sale_price.toFixed(2)}`
+                                    : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {selectedVariantId && (
                             <p className="mt-1 text-xs text-muted-foreground">
-                              Tabela: {(selectedProduct as any).price_type_name}
+                              Variação selecionada: {selectedVariants.find((v) => v.id === selectedVariantId)?.label}
                             </p>
                           )}
-                </div>
+                        </div>
+                      )}
 
-                        {selectedPriceTiers.length > 1 && (
-                          <div>
-                            <Label className="text-sm font-medium text-muted-foreground uppercase">Variação de valor</Label>
-                            <Select
-                              value={String((selectedProduct as any)?.price_type_id || '')}
-                              onValueChange={(value) => {
-                                const tier = selectedPriceTiers.find((t) => String(t.price_type_id) === String(value));
-                                if (!tier) return;
-                                setSelectedProduct({
-                                  ...selectedProduct,
-                                  price: tier.price,
-                                  price_type_id: tier.price_type_id as any,
-                                  price_type_name: tier.name as any,
-                                } as any);
-                              }}
-                            >
-                              <SelectTrigger className="mt-1">
-                                <SelectValue placeholder="Selecione..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {selectedPriceTiers.map((t) => (
-                                  <SelectItem key={`${t.price_type_id}-${t.name}`} value={String(t.price_type_id)}>
-                                    {t.name} — R$ {t.price.toFixed(2)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-
-                <div>
-                          <Label className="text-sm font-medium text-muted-foreground uppercase">Desconto (%)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={selectedProduct.discount}
-                            onChange={(e) =>
+                      {selectedPriceTiers.length > 1 && (
+                        <div>
+                          <Label className="text-xs font-medium text-muted-foreground uppercase">Variação de valor</Label>
+                          <Select
+                            value={String((selectedProduct as any)?.price_type_id || '')}
+                            onValueChange={(value) => {
+                              const tier = selectedPriceTiers.find((t) => String(t.price_type_id) === String(value));
+                              if (!tier) return;
                               setSelectedProduct({
                                 ...selectedProduct,
-                                discount: Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)),
-                              })
-                            }
-                            className="mt-1"
-                          />
-                </div>
+                                price: tier.price,
+                                price_type_id: tier.price_type_id as any,
+                                price_type_name: tier.name as any,
+                              } as any);
+                            }}
+                          >
+                            <SelectTrigger className="mt-1 h-9">
+                              <SelectValue placeholder="Selecione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {selectedPriceTiers.map((t) => (
+                                <SelectItem key={`${t.price_type_id}-${t.name}`} value={String(t.price_type_id)}>
+                                  {t.name} — R$ {t.price.toFixed(2)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
 
-                <div>
-                          <Label className="text-sm font-medium text-muted-foreground uppercase">Valor Total</Label>
-                          <div className="mt-1 p-3 bg-gray-50 dark:bg-gray-900 rounded-md border text-center">
-                            <span className="text-xl font-bold text-primary">R$ {calculateItemTotal(selectedProduct).toFixed(2)}</span>
-                          </div>
-                  </div>
-                </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground uppercase">Desconto (%)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={selectedProduct.discount}
+                          onChange={(e) =>
+                            setSelectedProduct({
+                              ...selectedProduct,
+                              discount: Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)),
+                            })
+                          }
+                          className="mt-1 h-9"
+                        />
+                      </div>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-center h-full min-h-[300px]">
+                    <div className="flex items-center justify-center py-8">
                       <div className="text-center">
-                        <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                        <p className="text-muted-foreground">Selecione um produto para visualizar</p>
+                        <Package className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Selecione um produto para visualizar</p>
                       </div>
                     </div>
                   )}
 
-                  <div className="mt-6 pt-6 border-t">
-                    <Button className="w-full juga-gradient text-white h-12" disabled={!selectedProduct} onClick={addSelectedToCart}>
+                  <div className="mt-4 pt-4 border-t">
+                    <Button className="w-full juga-gradient text-white h-10 text-sm" disabled={!selectedProduct} onClick={addSelectedToCart}>
                       ADICIONAR PRODUTO/ITEM
                     </Button>
               </div>

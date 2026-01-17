@@ -36,6 +36,7 @@ import {
   Wrench,
   ChevronDown,
   Tag,
+  Layers,
   CreditCard,
   Building2,
   RotateCcw,
@@ -81,6 +82,7 @@ const menuGroups = [
         subItems: [
           { title: 'Lista de Produtos', url: '/produtos', icon: Package },
           { title: 'Valores de Venda', url: '/produtos/valores-venda', icon: Tag },
+          { title: 'Variações', url: '/produtos/variacoes', icon: Layers },
         ]
       },
       { 

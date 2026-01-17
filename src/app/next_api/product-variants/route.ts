@@ -19,8 +19,28 @@ export async function GET(request: NextRequest) {
     if (!tenant_id) {
       return NextResponse.json({ error: 'tenant_id é obrigatório' }, { status: 400 });
     }
+
+    // Modo resumo: sem product_id retorna { product_id, count } para a UI listar apenas produtos com variações
     if (!product_id) {
-      return NextResponse.json({ error: 'product_id é obrigatório' }, { status: 400 });
+      const { data, error } = await supabaseAdmin
+        .from('product_variants')
+        .select('product_id')
+        .eq('tenant_id', tenant_id);
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+      const counts = new Map<number, number>();
+      for (const r of (data || []) as any[]) {
+        const pid = Number((r as any)?.product_id);
+        if (!Number.isFinite(pid) || pid <= 0) continue;
+        counts.set(pid, (counts.get(pid) || 0) + 1);
+      }
+
+      const summary = Array.from(counts.entries())
+        .map(([product_id, count]) => ({ product_id, count }))
+        .sort((a, b) => b.count - a.count);
+
+      return NextResponse.json({ success: true, data: summary });
     }
 
     const pid = Number(product_id);
@@ -51,18 +71,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const {
-      tenant_id,
-      product_id,
-      label,
-      name,
-      barcode,
-      unit,
-      sale_price,
-      cost_price,
-      stock_quantity,
-      is_active,
-    } = body || {};
+    const { tenant_id, product_id, label, name, barcode, unit, sale_price, cost_price, stock_quantity, is_active } =
+      body || {};
 
     if (!tenant_id) {
       return NextResponse.json({ error: 'tenant_id é obrigatório' }, { status: 400 });
@@ -90,11 +100,7 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    // Upsert: (tenant_id, product_id, lower(label)) é único no banco. Aqui usamos insert+onConflict no Postgres:
-    // Como o onConflict precisa bater exatamente no índice, vamos usar upsert com colunas reais
-    // e manter label sempre igual ao input do usuário.
-    // OBS: Supabase não permite onConflict com expressão (lower(label)),
-    // então fazemos um fluxo: tenta buscar por lower(label), e depois update/insert.
+    // Upsert via fluxo manual (ilike) porque o índice é em lower(label)
     const { data: existing, error: findErr } = await supabaseAdmin
       .from('product_variants')
       .select('id')
@@ -126,6 +132,79 @@ export async function POST(request: NextRequest) {
       .single();
     if (insErr) return NextResponse.json({ error: insErr.message }, { status: 400 });
     return NextResponse.json({ success: true, data: inserted });
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: 'Erro interno do servidor', message: e?.message || 'Erro desconhecido' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { tenant_id, id, ...rest } = body || {};
+
+    if (!tenant_id) {
+      return NextResponse.json({ error: 'tenant_id é obrigatório' }, { status: 400 });
+    }
+    const vid = Number(id);
+    if (!Number.isFinite(vid) || vid <= 0) {
+      return NextResponse.json({ error: 'id inválido' }, { status: 400 });
+    }
+
+    const payload: any = { updated_at: new Date().toISOString() };
+    if (rest.label !== undefined) payload.label = String(rest.label || '').trim();
+    if (rest.name !== undefined) payload.name = rest.name ? String(rest.name).trim() : null;
+    if (rest.barcode !== undefined) payload.barcode = rest.barcode ? String(rest.barcode).trim() : null;
+    if (rest.unit !== undefined) payload.unit = rest.unit ? String(rest.unit).trim() : null;
+    if (rest.sale_price !== undefined) payload.sale_price = rest.sale_price === null ? null : Number(rest.sale_price);
+    if (rest.cost_price !== undefined) payload.cost_price = rest.cost_price === null ? null : Number(rest.cost_price);
+    if (rest.stock_quantity !== undefined) {
+      payload.stock_quantity = Number.isFinite(Number(rest.stock_quantity)) ? Number(rest.stock_quantity) : 0;
+    }
+    if (rest.is_active !== undefined) payload.is_active = Boolean(rest.is_active);
+
+    if (payload.label !== undefined && !payload.label) {
+      return NextResponse.json({ error: 'label não pode ser vazio' }, { status: 400 });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('product_variants')
+      .update(payload)
+      .eq('tenant_id', tenant_id)
+      .eq('id', vid)
+      .select()
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ success: true, data });
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: 'Erro interno do servidor', message: e?.message || 'Erro desconhecido' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const tenant_id = searchParams.get('tenant_id');
+    const id = searchParams.get('id');
+
+    if (!tenant_id) {
+      return NextResponse.json({ error: 'tenant_id é obrigatório' }, { status: 400 });
+    }
+    const vid = Number(id);
+    if (!Number.isFinite(vid) || vid <= 0) {
+      return NextResponse.json({ error: 'id inválido' }, { status: 400 });
+    }
+
+    const { error } = await supabaseAdmin.from('product_variants').delete().eq('tenant_id', tenant_id).eq('id', vid);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ success: true });
   } catch (e: any) {
     return NextResponse.json(
       { error: 'Erro interno do servidor', message: e?.message || 'Erro desconhecido' },
