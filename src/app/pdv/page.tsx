@@ -368,8 +368,22 @@ export default function PDVPage() {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [addSelectedToCart]); // Incluir addSelectedToCart nas dependências
 
+  // Função para normalizar texto removendo acentos
+  const normalizeText = (text: string): string => {
+    return String(text || '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .trim();
+  };
+
   const filteredProducts = useMemo(() => {
     if (loading) return [];
+    if (!searchTerm.trim()) return [];
+    
+    const normalizedSearch = normalizeText(searchTerm);
+    const isNumericSearch = /^\d+$/.test(normalizedSearch);
+    
     return products
       .map((product, index) => ({
         id: product.id || index + 1,
@@ -377,11 +391,45 @@ export default function PDVPage() {
         price: Number(product.sale_price || product.cost_price || 0),
         code: product.sku || product.barcode || String(product.id || index + 1),
       }))
-      .filter(
-        (product) =>
-          product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          product.code.toLowerCase().includes(searchTerm.toLowerCase()),
-      );
+      .map((product) => {
+        const normalizedName = normalizeText(product.name);
+        const normalizedCode = normalizeText(product.code);
+
+        const codeStarts = normalizedCode.startsWith(normalizedSearch);
+        const codeIncludes = normalizedCode.includes(normalizedSearch);
+        const nameIncludes = normalizedName.includes(normalizedSearch);
+
+        // Score menor = aparece antes
+        const score = codeStarts ? 0 : codeIncludes ? 1 : nameIncludes ? 2 : 3;
+
+        return {
+          ...product,
+          _score: score,
+          _codeStarts: codeStarts,
+          _codeIncludes: codeIncludes,
+          _nameIncludes: nameIncludes,
+        };
+      })
+      .filter((product) => {
+        // Quando for numérico: aceita código começa/contém e nome contém, mas prioriza "começa" no sort
+        if (isNumericSearch) {
+          return product._codeStarts || product._codeIncludes || product._nameIncludes;
+        }
+
+        // Quando for texto: mantém busca por código que começa OU nome que contém
+        return product._codeStarts || product._nameIncludes;
+      })
+      .sort((a, b) => {
+        // Quando for numérico, garantir que códigos que começam apareçam primeiro
+        if (isNumericSearch) {
+          if (a._score !== b._score) return a._score - b._score;
+        }
+        // Desempate estável para não "pular" muito a lista
+        const codeCmp = String(a.code).localeCompare(String(b.code), 'pt-BR', { numeric: true, sensitivity: 'base' });
+        if (codeCmp !== 0) return codeCmp;
+        return String(a.name).localeCompare(String(b.name), 'pt-BR', { numeric: true, sensitivity: 'base' });
+      })
+      .map(({ _score, _codeStarts, _codeIncludes, _nameIncludes, ...rest }) => rest);
   }, [loading, products, searchTerm]); // Dependências estáveis
 
   const selectProduct = async (product: { id: number; name: string; price: number; code: string }) => {
@@ -1159,13 +1207,34 @@ export default function PDVPage() {
                         <Input
                           type="number"
                           min="1"
-                          value={selectedProduct.quantity}
-                          onChange={(e) =>
-                            setSelectedProduct({
-                              ...selectedProduct,
-                              quantity: Math.max(1, parseInt(e.target.value) || 1),
-                            })
-                          }
+                          value={selectedProduct.quantity === 0 ? '' : selectedProduct.quantity}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Permitir campo vazio temporariamente para edição manual
+                            if (value === '' || value === '0') {
+                              setSelectedProduct({
+                                ...selectedProduct,
+                                quantity: 0,
+                              });
+                              return;
+                            }
+                            const numValue = parseInt(value);
+                            if (!isNaN(numValue) && numValue >= 0) {
+                              setSelectedProduct({
+                                ...selectedProduct,
+                                quantity: Math.max(1, numValue),
+                              });
+                            }
+                          }}
+                          onBlur={(e) => {
+                            // Garantir valor mínimo ao perder foco
+                            if (!selectedProduct.quantity || selectedProduct.quantity < 1) {
+                              setSelectedProduct({
+                                ...selectedProduct,
+                                quantity: 1,
+                              });
+                            }
+                          }}
                           className="mt-1 h-9"
                         />
                       </div>
@@ -1176,13 +1245,33 @@ export default function PDVPage() {
                           type="number"
                           step="0.01"
                           min="0"
-                          value={selectedProduct.price}
+                          value={selectedProduct.price === 0 ? '' : selectedProduct.price || ''}
                           onChange={(e) => {
-                            const newPrice = Math.max(0, parseFloat(e.target.value) || 0);
-                            setSelectedProduct({
-                              ...selectedProduct,
-                              price: newPrice,
-                            });
+                            const value = e.target.value;
+                            // Permitir campo vazio temporariamente para edição manual
+                            if (value === '' || value === '0') {
+                              setSelectedProduct({
+                                ...selectedProduct,
+                                price: 0,
+                              });
+                              return;
+                            }
+                            const numValue = parseFloat(value);
+                            if (!isNaN(numValue) && numValue >= 0) {
+                              setSelectedProduct({
+                                ...selectedProduct,
+                                price: numValue,
+                              });
+                            }
+                          }}
+                          onBlur={(e) => {
+                            // Garantir valor mínimo ao perder foco
+                            if (!selectedProduct.price || selectedProduct.price < 0) {
+                              setSelectedProduct({
+                                ...selectedProduct,
+                                price: 0,
+                              });
+                            }
                           }}
                           className="mt-1 h-9"
                           placeholder="0.00"
@@ -1274,14 +1363,41 @@ export default function PDVPage() {
                           type="number"
                           min="0"
                           max="100"
-                          value={selectedProduct.discount}
-                          onChange={(e) =>
-                            setSelectedProduct({
-                              ...selectedProduct,
-                              discount: Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)),
-                            })
-                          }
+                          value={selectedProduct.discount === 0 ? '' : selectedProduct.discount || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Permitir campo vazio temporariamente para edição manual
+                            if (value === '' || value === '0') {
+                              setSelectedProduct({
+                                ...selectedProduct,
+                                discount: 0,
+                              });
+                              return;
+                            }
+                            const numValue = parseFloat(value);
+                            if (!isNaN(numValue) && numValue >= 0) {
+                              setSelectedProduct({
+                                ...selectedProduct,
+                                discount: Math.min(100, Math.max(0, numValue)),
+                              });
+                            }
+                          }}
+                          onBlur={(e) => {
+                            // Garantir valor válido ao perder foco
+                            if (selectedProduct.discount === undefined || selectedProduct.discount < 0) {
+                              setSelectedProduct({
+                                ...selectedProduct,
+                                discount: 0,
+                              });
+                            } else if (selectedProduct.discount > 100) {
+                              setSelectedProduct({
+                                ...selectedProduct,
+                                discount: 100,
+                              });
+                            }
+                          }}
                           className="mt-1 h-9"
+                          placeholder="0"
                         />
                       </div>
                     </div>
