@@ -249,8 +249,8 @@ export function SaleConfirmationModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-2 sm:p-4">
-      <Card className="w-full max-w-2xl bg-white shadow-2xl border-0 rounded-xl max-h-[95vh]">
-        <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-t-xl p-3 sm:p-4">
+      <Card className="w-full max-w-2xl bg-white shadow-2xl border-0 rounded-xl max-h-[95vh] flex flex-col">
+        <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-t-xl p-3 sm:p-4 flex-shrink-0">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6" />
             <div>
@@ -262,218 +262,224 @@ export function SaleConfirmationModal({
           </div>
         </CardHeader>
         
-        <CardContent className="p-3 sm:p-4">
-          {/* Resumo da Venda */}
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            
-            {/* Informações da Venda */}
-            <div className="space-y-1.5">
-              <h3 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5">
-                <Receipt className="h-3.5 w-3.5" />
-                Detalhes
-              </h3>
+        <CardContent className="p-3 sm:p-4 flex flex-col flex-1 min-h-0 overflow-hidden">
+          {/* Área scrollável */}
+          <div className="flex-1 overflow-y-auto pr-1 space-y-3">
+            {/* Resumo da Venda */}
+            <div className="grid grid-cols-2 gap-3">
               
-              <div className="space-y-1 text-xs text-gray-600">
-                <div className="flex items-center gap-1.5">
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] px-1.5 py-0">
-                    #{saleData.numero}
-                  </Badge>
-                </div>
+              {/* Informações da Venda */}
+              <div className="space-y-1.5">
+                <h3 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5">
+                  <Receipt className="h-3.5 w-3.5" />
+                  Detalhes
+                </h3>
                 
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="h-3 w-3 text-gray-500 flex-shrink-0" />
-                  <span className="truncate">{formatDate(saleData.data_venda)}</span>
-                </div>
-                
-                <div className="flex items-center gap-1.5">
-                  <User className="h-3 w-3 text-gray-500 flex-shrink-0" />
-                  <span className="truncate">{saleData.cliente}</span>
-                </div>
-                
-                <div className="flex items-center gap-1.5">
-                  <CreditCard className="h-3 w-3 text-gray-500 flex-shrink-0" />
-                  <span className="truncate">{saleData.forma_pagamento.toUpperCase()}</span>
+                <div className="space-y-1 text-xs text-gray-600">
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] px-1.5 py-0">
+                      #{saleData.numero}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="h-3 w-3 text-gray-500 flex-shrink-0" />
+                    <span className="truncate">{formatDate(saleData.data_venda)}</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-1.5">
+                    <User className="h-3 w-3 text-gray-500 flex-shrink-0" />
+                    <span className="truncate">{saleData.cliente}</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-1.5">
+                    <CreditCard className="h-3 w-3 text-gray-500 flex-shrink-0" />
+                    <span className="truncate">{saleData.forma_pagamento.toUpperCase()}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Resumo Financeiro */}
-            <div className="space-y-1.5">
-              <h3 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5">
-                <DollarSign className="h-3.5 w-3.5" />
-                Financeiro
-              </h3>
-              
-              <div className="bg-gray-50 rounded-lg p-2 space-y-1">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-600">Itens:</span>
-                  <span className="font-medium">{saleData.itens.length}</span>
-                </div>
+              {/* Resumo Financeiro */}
+              <div className="space-y-1.5">
+                <h3 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5">
+                  <DollarSign className="h-3.5 w-3.5" />
+                  Financeiro
+                </h3>
                 
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-600">Total:</span>
-                  <span className="font-bold text-sm text-green-600">
-                    {formatCurrency(saleData.total)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Lista de Itens */}
-          <div className="mb-3">
-            <h3 className="font-semibold text-gray-800 text-sm mb-1.5">Itens Vendidos</h3>
-            <div className="bg-gray-50 rounded-lg p-2">
-              <div className="space-y-1">
-                {saleData.itens.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center text-xs">
-                    <div className="flex-1 min-w-0 pr-2">
-                      <span className="font-medium truncate block">{item.name}</span>
-                      <span className="text-gray-500 text-[10px]">
-                        Qtd: {item.quantity.toFixed(2)}
-                      </span>
-                    </div>
-                    <span className="font-medium text-gray-700 flex-shrink-0 text-xs">
-                      {formatCurrency(item.subtotal)}
+                <div className="bg-gray-50 rounded-lg p-2 space-y-1">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-600">Itens:</span>
+                    <span className="font-medium">{saleData.itens.length}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-600">Total:</span>
+                    <span className="font-bold text-sm text-green-600">
+                      {formatCurrency(saleData.total)}
                     </span>
                   </div>
-                ))}
+                </div>
               </div>
+            </div>
+
+            {/* Lista de Itens com scroll */}
+            <div>
+              <h3 className="font-semibold text-gray-800 text-sm mb-1.5">Itens Vendidos</h3>
+              <div className="bg-gray-50 rounded-lg p-2 max-h-[300px] overflow-y-auto">
+                <div className="space-y-1">
+                  {saleData.itens.map((item, index) => (
+                    <div key={index} className="flex justify-between items-center text-xs">
+                      <div className="flex-1 min-w-0 pr-2">
+                        <span className="font-medium truncate block">{item.name}</span>
+                        <span className="text-gray-500 text-[10px]">
+                          Qtd: {item.quantity.toFixed(2)}
+                        </span>
+                      </div>
+                      <span className="font-medium text-gray-700 flex-shrink-0 text-xs">
+                        {formatCurrency(item.subtotal)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Mini seção: Entrega */}
+            <div className="rounded-lg border border-gray-200 bg-white p-2.5">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-800 text-sm">Entrega</h3>
+                  <p className="text-[10px] text-gray-500">
+                    Marque para que essa venda apareça na lista de entregas e possa entrar em um romaneio.
+                  </p>
+                </div>
+                <label className="flex items-center gap-1.5 text-xs font-medium whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={isDelivery}
+                    onChange={(e) => setIsDelivery(e.target.checked)}
+                    disabled={!canConfigureDelivery}
+                    className="w-3.5 h-3.5"
+                  />
+                  É entrega
+                </label>
+              </div>
+
+              {isDelivery && (
+                <div className="mt-2 space-y-2">
+                  <div className="text-[10px] text-gray-600">
+                    <strong>Cliente:</strong> {saleData.cliente}
+                    {!saleData.customer_id && (
+                      <span className="ml-1 text-red-600">
+                        (selecione um cliente cadastrado)
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <span className="text-xs font-medium text-gray-700 block">Entregador (opcional)</span>
+                    <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+                      <SelectTrigger className="w-full h-8 text-xs">
+                        <SelectValue placeholder={driversLoading ? 'Carregando...' : drivers.length === 0 ? 'Nenhum entregador cadastrado' : 'Selecione um entregador (opcional)'} />
+                      </SelectTrigger>
+                      <SelectContent className="z-[10000] max-h-[200px] overflow-y-auto">
+                        <SelectItem value="" className="text-xs">
+                          Sem entregador
+                        </SelectItem>
+                        {drivers.length === 0 && !driversLoading ? (
+                          <div className="px-2 py-1.5 text-xs text-gray-400 text-center">
+                            Nenhum entregador cadastrado
+                          </div>
+                        ) : driversLoading ? (
+                          <div className="px-2 py-1.5 text-xs text-gray-400 text-center">
+                            Carregando...
+                          </div>
+                        ) : (
+                          drivers.map((d) => (
+                            <SelectItem key={d.id} value={String(d.id)} className="text-xs">
+                              {d.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex justify-end gap-1.5 pt-1">
+                    <Button 
+                      variant="outline" 
+                      onClick={loadDrivers} 
+                      disabled={driversLoading}
+                      className="text-xs h-7 px-2"
+                    >
+                      Atualizar
+                    </Button>
+                    <Button
+                      onClick={saveDeliveryConfig}
+                      className="bg-amber-600 hover:bg-amber-700 text-white text-xs h-7 px-2"
+                      disabled={savingDelivery || !canConfigureDelivery}
+                    >
+                      {savingDelivery ? 'Salvando...' : 'Salvar'}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Mini seção: Entrega */}
-          <div className="mb-3 rounded-lg border border-gray-200 bg-white p-2.5">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-800 text-sm">Entrega</h3>
-                <p className="text-[10px] text-gray-500">
-                  Marque para que essa venda apareça na lista de entregas e possa entrar em um romaneio.
-                </p>
-              </div>
-              <label className="flex items-center gap-1.5 text-xs font-medium whitespace-nowrap">
-                <input
-                  type="checkbox"
-                  checked={isDelivery}
-                  onChange={(e) => setIsDelivery(e.target.checked)}
-                  disabled={!canConfigureDelivery}
-                  className="w-3.5 h-3.5"
-                />
-                É entrega
-              </label>
+          {/* Botões fixos no final */}
+          <div className="flex-shrink-0 pt-3 border-t space-y-2">
+            {/* Botões de Ação */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
+              {onPrintA4 && (
+                <Button
+                  onClick={onPrintA4}
+                  className="bg-green-600 hover:bg-green-700 text-white font-semibold py-1.5 text-xs"
+                >
+                  <FileText className="h-3.5 w-3.5 mr-1" />
+                  <span className="hidden sm:inline">A4</span>
+                  <span className="sm:hidden">A4</span>
+                </Button>
+              )}
+              <Button
+                onClick={onPrintReceipt}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1.5 text-xs"
+              >
+                <Printer className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden sm:inline">Cupom</span>
+                <span className="sm:hidden">Cupom</span>
+              </Button>
+              
+              {onEmitirNota && (
+                <Button
+                  onClick={onEmitirNota}
+                  className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1.5 text-xs"
+                >
+                  <FileText className="h-3.5 w-3.5 mr-1" />
+                  <span className="hidden sm:inline">NFe</span>
+                  <span className="sm:hidden">NFe</span>
+                </Button>
+              )}
+              
+              <Button
+                onClick={onNewSale}
+                variant="outline"
+                className="border-2 border-green-600 text-green-600 hover:bg-green-50 font-semibold py-1.5 text-xs col-span-2 sm:col-span-1"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Nova Venda
+              </Button>
             </div>
 
-            {isDelivery && (
-              <div className="mt-2 space-y-2">
-                <div className="text-[10px] text-gray-600">
-                  <strong>Cliente:</strong> {saleData.cliente}
-                  {!saleData.customer_id && (
-                    <span className="ml-1 text-red-600">
-                      (selecione um cliente cadastrado)
-                    </span>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <span className="text-xs font-medium text-gray-700 block">Entregador (opcional)</span>
-                  <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
-                    <SelectTrigger className="w-full h-8 text-xs">
-                      <SelectValue placeholder={driversLoading ? 'Carregando...' : drivers.length === 0 ? 'Nenhum entregador cadastrado' : 'Selecione um entregador (opcional)'} />
-                    </SelectTrigger>
-                    <SelectContent className="z-[10000] max-h-[200px] overflow-y-auto">
-                      <SelectItem value="" className="text-xs">
-                        Sem entregador
-                      </SelectItem>
-                      {drivers.length === 0 && !driversLoading ? (
-                        <div className="px-2 py-1.5 text-xs text-gray-400 text-center">
-                          Nenhum entregador cadastrado
-                        </div>
-                      ) : driversLoading ? (
-                        <div className="px-2 py-1.5 text-xs text-gray-400 text-center">
-                          Carregando...
-                        </div>
-                      ) : (
-                        drivers.map((d) => (
-                          <SelectItem key={d.id} value={String(d.id)} className="text-xs">
-                            {d.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex justify-end gap-1.5 pt-1">
-                  <Button 
-                    variant="outline" 
-                    onClick={loadDrivers} 
-                    disabled={driversLoading}
-                    className="text-xs h-7 px-2"
-                  >
-                    Atualizar
-                  </Button>
-                  <Button
-                    onClick={saveDeliveryConfig}
-                    className="bg-amber-600 hover:bg-amber-700 text-white text-xs h-7 px-2"
-                    disabled={savingDelivery || !canConfigureDelivery}
-                  >
-                    {savingDelivery ? 'Salvando...' : 'Salvar'}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Botões de Ação */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
-            {onPrintA4 && (
+            {/* Botão Fechar */}
+            <div className="flex justify-center">
               <Button
-                onClick={onPrintA4}
-                className="bg-green-600 hover:bg-green-700 text-white font-semibold py-1.5 text-xs"
+                onClick={onClose}
+                variant="ghost"
+                className="text-gray-500 hover:text-gray-700 text-xs h-7"
               >
-                <FileText className="h-3.5 w-3.5 mr-1" />
-                <span className="hidden sm:inline">A4</span>
-                <span className="sm:hidden">A4</span>
+                Fechar
               </Button>
-            )}
-            <Button
-              onClick={onPrintReceipt}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1.5 text-xs"
-            >
-              <Printer className="h-3.5 w-3.5 mr-1" />
-              <span className="hidden sm:inline">Cupom</span>
-              <span className="sm:hidden">Cupom</span>
-            </Button>
-            
-            {onEmitirNota && (
-              <Button
-                onClick={onEmitirNota}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1.5 text-xs"
-              >
-                <FileText className="h-3.5 w-3.5 mr-1" />
-                <span className="hidden sm:inline">NFe</span>
-                <span className="sm:hidden">NFe</span>
-              </Button>
-            )}
-            
-            <Button
-              onClick={onNewSale}
-              variant="outline"
-              className="border-2 border-green-600 text-green-600 hover:bg-green-50 font-semibold py-1.5 text-xs col-span-2 sm:col-span-1"
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              Nova Venda
-            </Button>
-          </div>
-
-          {/* Botão Fechar */}
-          <div className="flex justify-center mt-2">
-            <Button
-              onClick={onClose}
-              variant="ghost"
-              className="text-gray-500 hover:text-gray-700 text-xs h-7"
-            >
-              Fechar
-            </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
