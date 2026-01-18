@@ -151,40 +151,61 @@ export function DeliveryManifestCupomLayout({
     <div className="receipt-container">
       <style jsx global>{`
         @media print {
-          @page {
-            size: 80mm auto;
-            margin: 0;
-          }
           body {
             margin: 0;
             padding: 0;
+            font-size: ${baseFontSize}px;
+            line-height: 1.2;
             background: white;
           }
+          
+          .receipt-container {
+            width: 80mm !important;
+            max-width: 80mm !important;
+            margin: 0 auto !important;
+            padding: 3mm !important;
+            font-family: 'Courier New', monospace !important;
+            font-size: ${baseFontSize}px !important;
+            line-height: 1.2 !important;
+            background: white;
+          }
+          
           .no-print {
             display: none !important;
           }
-          .receipt-container {
-            width: 80mm;
-            margin: 0 auto;
-            padding: 8mm;
-            background: white;
-            font-family: 'Courier New', monospace;
-            font-size: ${baseFontSize}px;
-            line-height: 1.4;
-            font-weight: 500;
+          
+          /* Aumenta contraste/espessura da fonte no conteúdo interno */
+          .receipt-container td,
+          .receipt-container .info-item,
+          .receipt-container .footer-note,
+          .receipt-container .signature-line {
+            font-weight: 600;
+            color: #000 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
         }
         @media screen {
           .receipt-container {
             width: 80mm;
+            max-width: 80mm;
             margin: 20px auto;
-            padding: 8mm;
-            background: white;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 10px;
+            border: 1px solid #ddd;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
             font-family: 'Courier New', monospace;
             font-size: ${baseFontSize}px;
-            line-height: 1.4;
-            font-weight: 500;
+            line-height: 1.3;
+            background: white;
+          }
+          
+          /* Mantém o corpo mais forte também na visualização de tela */
+          .receipt-container td,
+          .receipt-container .info-item,
+          .receipt-container .footer-note,
+          .receipt-container .signature-line {
+            font-weight: 600;
+            color: #000;
           }
         }
         .receipt-container {
