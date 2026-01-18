@@ -1313,26 +1313,35 @@ export default function PDVPage() {
                       <div>
                         <Label className="text-xs font-medium text-muted-foreground uppercase">Quantidade</Label>
                         <Input
-                          type="number"
-                          min="1"
-                          value={selectedProduct.quantity === 0 ? '' : selectedProduct.quantity}
+                          type="text"
+                          inputMode="numeric"
+                          value={selectedProduct.quantity === 0 || selectedProduct.quantity === undefined ? '' : String(selectedProduct.quantity).replace(/^0+/, '') || ''}
                           onChange={(e) => {
-                            const value = e.target.value;
-                            // Permitir campo vazio temporariamente para edição manual
-                            if (value === '' || value === '0') {
+                            let value = e.target.value;
+                            // Remover caracteres não numéricos exceto vazio
+                            value = value.replace(/[^\d]/g, '');
+                            // Remover zeros à esquerda
+                            value = value.replace(/^0+/, '') || '';
+                            
+                            if (value === '') {
                               setSelectedProduct({
                                 ...selectedProduct,
                                 quantity: 0,
                               });
                               return;
                             }
-                            const numValue = parseInt(value);
-                            if (!isNaN(numValue) && numValue >= 0) {
+                            
+                            const numValue = parseInt(value, 10);
+                            if (!isNaN(numValue) && numValue > 0) {
                               setSelectedProduct({
                                 ...selectedProduct,
-                                quantity: Math.max(1, numValue),
+                                quantity: numValue,
                               });
                             }
+                          }}
+                          onFocus={(e) => {
+                            // Selecionar todo o texto ao focar para facilitar edição
+                            e.target.select();
                           }}
                           onBlur={(e) => {
                             // Garantir valor mínimo ao perder foco
@@ -1344,19 +1353,34 @@ export default function PDVPage() {
                             }
                           }}
                           className="mt-1 h-9"
+                          placeholder="1"
                         />
                       </div>
 
                       <div>
                         <Label className="text-xs font-medium text-muted-foreground uppercase">Valor Unitário</Label>
                         <Input 
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={selectedProduct.price === 0 ? '' : selectedProduct.price || ''}
+                          type="text"
+                          inputMode="decimal"
+                          value={selectedProduct.price === 0 || selectedProduct.price === undefined ? '' : String(selectedProduct.price).replace(/^0+/, '') || ''}
                           onChange={(e) => {
-                            const value = e.target.value;
-                            // Permitir campo vazio temporariamente para edição manual
+                            let value = e.target.value;
+                            // Permitir apenas números, ponto e vírgula (substituir vírgula por ponto)
+                            value = value.replace(',', '.').replace(/[^\d.]/g, '');
+                            // Remover múltiplos pontos
+                            const parts = value.split('.');
+                            if (parts.length > 2) {
+                              value = parts[0] + '.' + parts.slice(1).join('');
+                            }
+                            // Limitar a 2 casas decimais
+                            if (parts.length === 2 && parts[1].length > 2) {
+                              value = parts[0] + '.' + parts[1].substring(0, 2);
+                            }
+                            // Remover zeros à esquerda (mas manter se for apenas "0.")
+                            if (value.length > 1 && value.startsWith('0') && value[1] !== '.') {
+                              value = value.replace(/^0+/, '') || '';
+                            }
+                            
                             if (value === '' || value === '0') {
                               setSelectedProduct({
                                 ...selectedProduct,
@@ -1364,6 +1388,7 @@ export default function PDVPage() {
                               });
                               return;
                             }
+                            
                             const numValue = parseFloat(value);
                             if (!isNaN(numValue) && numValue >= 0) {
                               setSelectedProduct({
@@ -1372,8 +1397,12 @@ export default function PDVPage() {
                               });
                             }
                           }}
+                          onFocus={(e) => {
+                            // Selecionar todo o texto ao focar para facilitar edição
+                            e.target.select();
+                          }}
                           onBlur={(e) => {
-                            // Garantir valor mínimo ao perder foco
+                            // Garantir valor válido ao perder foco
                             if (!selectedProduct.price || selectedProduct.price < 0) {
                               setSelectedProduct({
                                 ...selectedProduct,
@@ -1468,13 +1497,27 @@ export default function PDVPage() {
                       <div>
                         <Label className="text-xs font-medium text-muted-foreground uppercase">Desconto (%)</Label>
                         <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={selectedProduct.discount === 0 ? '' : selectedProduct.discount || ''}
+                          type="text"
+                          inputMode="decimal"
+                          value={selectedProduct.discount === 0 || selectedProduct.discount === undefined ? '' : String(selectedProduct.discount).replace(/^0+/, '') || ''}
                           onChange={(e) => {
-                            const value = e.target.value;
-                            // Permitir campo vazio temporariamente para edição manual
+                            let value = e.target.value;
+                            // Permitir apenas números, ponto e vírgula (substituir vírgula por ponto)
+                            value = value.replace(',', '.').replace(/[^\d.]/g, '');
+                            // Remover múltiplos pontos
+                            const parts = value.split('.');
+                            if (parts.length > 2) {
+                              value = parts[0] + '.' + parts.slice(1).join('');
+                            }
+                            // Limitar a 2 casas decimais
+                            if (parts.length === 2 && parts[1].length > 2) {
+                              value = parts[0] + '.' + parts[1].substring(0, 2);
+                            }
+                            // Remover zeros à esquerda (mas manter se for apenas "0.")
+                            if (value.length > 1 && value.startsWith('0') && value[1] !== '.') {
+                              value = value.replace(/^0+/, '') || '';
+                            }
+                            
                             if (value === '' || value === '0') {
                               setSelectedProduct({
                                 ...selectedProduct,
@@ -1482,6 +1525,7 @@ export default function PDVPage() {
                               });
                               return;
                             }
+                            
                             const numValue = parseFloat(value);
                             if (!isNaN(numValue) && numValue >= 0) {
                               setSelectedProduct({
@@ -1489,6 +1533,10 @@ export default function PDVPage() {
                                 discount: Math.min(100, Math.max(0, numValue)),
                               });
                             }
+                          }}
+                          onFocus={(e) => {
+                            // Selecionar todo o texto ao focar para facilitar edição
+                            e.target.select();
                           }}
                           onBlur={(e) => {
                             // Garantir valor válido ao perder foco
@@ -1564,7 +1612,38 @@ export default function PDVPage() {
                                 <Button variant="outline" size="sm" onClick={() => updateQuantity(item.id, item.quantity - 1, item.variant_id)}>
                                   <Minus className="h-3 w-3" />
                                 </Button>
-                                <span className="w-8 text-center font-medium">{item.quantity}</span>
+                                <Input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={item.quantity || ''}
+                                  onChange={(e) => {
+                                    let value = e.target.value;
+                                    // Remover caracteres não numéricos
+                                    value = value.replace(/[^\d]/g, '');
+                                    // Remover zeros à esquerda
+                                    value = value.replace(/^0+/, '') || '';
+                                    
+                                    if (value === '') {
+                                      updateQuantity(item.id, 0, item.variant_id);
+                                      return;
+                                    }
+                                    
+                                    const numValue = parseInt(value, 10);
+                                    if (!isNaN(numValue) && numValue > 0) {
+                                      updateQuantity(item.id, numValue, item.variant_id);
+                                    }
+                                  }}
+                                  onFocus={(e) => {
+                                    e.target.select();
+                                  }}
+                                  onBlur={(e) => {
+                                    if (!item.quantity || item.quantity < 1) {
+                                      updateQuantity(item.id, 1, item.variant_id);
+                                    }
+                                  }}
+                                  className="w-12 h-8 text-center text-sm font-medium p-0"
+                                  style={{ textAlign: 'center' }}
+                                />
                                 <Button variant="outline" size="sm" onClick={() => updateQuantity(item.id, item.quantity + 1, item.variant_id)}>
                                   <Plus className="h-3 w-3" />
                                 </Button>
