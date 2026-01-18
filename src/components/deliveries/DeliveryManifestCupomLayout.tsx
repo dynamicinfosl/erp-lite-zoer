@@ -151,22 +151,32 @@ export function DeliveryManifestCupomLayout({
     <div className="receipt-container">
       <style jsx global>{`
         @media print {
+          @page {
+            /* Evita “papel demais” e reduz margens do navegador */
+            margin: 0;
+          }
           body {
             margin: 0;
             padding: 0;
             font-size: ${baseFontSize}px;
-            line-height: 1.2;
+            line-height: 1.15;
             background: white;
           }
           
           .receipt-container {
-            width: 80mm !important;
-            max-width: 80mm !important;
-            margin: 0 auto !important;
-            padding: 3mm !important;
+            /*
+              Muitos drivers de bobina 80mm têm área imprimível real ~72–76mm.
+              Usar 76mm reduz risco de corte (principalmente na coluna QTD).
+            */
+            width: 76mm !important;
+            max-width: 76mm !important;
+            margin: 0 !important;
+            /* Menos margem interna (principalmente à esquerda) para não “sumir” QTD */
+            padding: 2mm 1.5mm !important;
+            box-sizing: border-box !important;
             font-family: 'Courier New', monospace !important;
             font-size: ${baseFontSize}px !important;
-            line-height: 1.2 !important;
+            line-height: 1.15 !important;
             background: white;
           }
           
@@ -183,6 +193,34 @@ export function DeliveryManifestCupomLayout({
             color: #000 !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+          }
+
+          /* Lista de produtos em formato de tabela (mesmo padrão do cupom balcão) */
+          .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+          }
+          .items-table th,
+          .items-table td {
+            padding: 1px 2px;
+            text-align: left;
+            border: none;
+            border-bottom: 1px dashed #666;
+            vertical-align: top;
+          }
+          .items-table th {
+            font-weight: 700;
+            border-bottom: 1px solid #333;
+          }
+          .items-table .col-name {
+            width: auto;
+            word-break: break-word;
+          }
+          .items-table .col-qty {
+            width: 14mm;
+            text-align: right;
+            white-space: nowrap;
           }
         }
         @media screen {
@@ -206,6 +244,33 @@ export function DeliveryManifestCupomLayout({
           .receipt-container .signature-line {
             font-weight: 600;
             color: #000;
+          }
+
+          .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+          }
+          .items-table th,
+          .items-table td {
+            padding: 1px 2px;
+            text-align: left;
+            border: none;
+            border-bottom: 1px dashed #999;
+            vertical-align: top;
+          }
+          .items-table th {
+            font-weight: 700;
+            border-bottom: 1px solid #333;
+          }
+          .items-table .col-name {
+            width: auto;
+            word-break: break-word;
+          }
+          .items-table .col-qty {
+            width: 14mm;
+            text-align: right;
+            white-space: nowrap;
           }
         }
         .receipt-container {
@@ -340,12 +405,22 @@ export function DeliveryManifestCupomLayout({
           </div>
         ) : (
           <div className="items">
-            {consolidatedProducts.map((it, i) => (
-              <div key={`${it.name}-${i}`} className="item">
-                <span>{it.name}</span>
-                <span>{formatUnits(it.qty)}</span>
-              </div>
-            ))}
+            <table className="items-table">
+              <thead>
+                <tr>
+                  <th className="col-name">PRODUTO</th>
+                  <th className="col-qty">QTD</th>
+                </tr>
+              </thead>
+              <tbody>
+                {consolidatedProducts.map((it, i) => (
+                  <tr key={`${it.name}-${i}`}>
+                    <td className="col-name">{it.name}</td>
+                    <td className="col-qty">{formatUnits(it.qty)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
