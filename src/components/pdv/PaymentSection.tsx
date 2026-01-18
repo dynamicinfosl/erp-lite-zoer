@@ -326,17 +326,17 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
             </Card>
 
             {/* ITENS DA COMPRA */}
-            <Card className="bg-white shadow-lg border-0 rounded-xl">
-              <CardHeader className="bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-t-xl p-4">
+            <Card className="bg-white shadow-lg border-0 rounded-xl flex flex-col">
+              <CardHeader className="bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-t-xl p-4 flex-shrink-0">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <ShoppingCart className="h-5 w-5" />
                   ITENS DA COMPRA
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-4">
-                <div className="overflow-x-auto">
+              <CardContent className="p-4 flex-1 overflow-hidden flex flex-col">
+                <div className="overflow-x-auto overflow-y-auto max-h-64 flex-1">
                   <table className="w-full">
-                    <thead>
+                    <thead className="sticky top-0 bg-white z-10">
                       <tr className="border-b border-gray-200">
                         <th className="text-left py-2 px-2 font-semibold text-gray-700 text-sm">Qtd.</th>
                         <th className="text-left py-2 px-2 font-semibold text-gray-700 text-sm">Nome</th>

@@ -118,6 +118,15 @@ interface CaixaOperation {
   usuario: string;
 }
 
+interface PendingSale {
+  id: string;
+  cart: PDVItem[];
+  customerName: string;
+  customerId: number | null;
+  total: number;
+  createdAt: string;
+}
+
 export default function PDVPage() {
   const { user, tenant, signOut } = useSimpleAuth();
   const { scope, branchId } = useBranch();
@@ -198,7 +207,47 @@ export default function PDVPage() {
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [lastSaleData, setLastSaleData] = useState<any>(null);
   const [deliveryQuickOpen, setDeliveryQuickOpen] = useState(false);
+  const [pendingSales, setPendingSales] = useState<PendingSale[]>([]);
+  const [showPendingSalesDialog, setShowPendingSalesDialog] = useState(false);
+  const [restoredSaleId, setRestoredSaleId] = useState<string | null>(null);
   
+  // Funções para gerenciar vendas em espera no localStorage
+  const getPendingSalesKey = useCallback(() => {
+    const tenantId = tenant?.id || 'no-tenant';
+    return `pdv.pendingSales.${tenantId}`;
+  }, [tenant?.id]);
+
+  const loadPendingSales = useCallback(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const key = getPendingSalesKey();
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setPendingSales(parsed);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar vendas em espera:', error);
+    }
+  }, [getPendingSalesKey]);
+
+  const savePendingSales = useCallback((sales: PendingSale[]) => {
+    try {
+      if (typeof window === 'undefined') return;
+      const key = getPendingSalesKey();
+      localStorage.setItem(key, JSON.stringify(sales));
+      setPendingSales(sales);
+    } catch (error) {
+      console.error('Erro ao salvar vendas em espera:', error);
+    }
+  }, [getPendingSalesKey]);
+
+  // Carregar vendas em espera ao montar o componente
+  useEffect(() => {
+    loadPendingSales();
+  }, [loadPendingSales]);
+
   const addSelectedToCart = useCallback(() => {
     if (!selectedProduct) return;
 
@@ -607,10 +656,6 @@ export default function PDVPage() {
     setSearchTerm('');
   };
 
-  const cancelSelection = () => {
-    clearSelection();
-  };
-
   const removeFromCart = useCallback((productId: number, variantId?: number | null) => {
     setCart((prevCart) => {
       if (variantId) {
@@ -645,11 +690,82 @@ export default function PDVPage() {
   const total = useMemo(() => cart.reduce((sum, item) => sum + calculateItemTotal(item), 0), [cart, calculateItemTotal]); // Dependências estáveis
 
   const clearCart = useCallback(() => {
+    // Se há uma venda restaurada e o carrinho está sendo esvaziado, remover a venda restaurada
+    if (restoredSaleId) {
+      const updatedPendingSales = pendingSales.filter(sale => sale.id !== restoredSaleId);
+      savePendingSales(updatedPendingSales);
+      setRestoredSaleId(null);
+    }
+    
     setCart([]);
     setSelectedProduct(null);
     setCustomerName('');
     setSelectedCustomerId(null);
+    setSelectedVariantId(null);
+    setSelectedVariants([]);
+    setSelectedPriceTiers([]);
+    setSearchTerm('');
+  }, [restoredSaleId, pendingSales, savePendingSales]);
+
+  // Função para cancelar seleção e limpar carrinho
+  const cancelSelection = useCallback(() => {
+    // Se há uma venda restaurada, removê-la ao cancelar
+    if (restoredSaleId) {
+      const updatedPendingSales = pendingSales.filter(sale => sale.id !== restoredSaleId);
+      savePendingSales(updatedPendingSales);
+      setRestoredSaleId(null);
+    }
+    clearSelection();
+    // Limpar carrinho diretamente sem depender da função clearCart
+    setCart([]);
+    setSelectedProduct(null);
+    setCustomerName('');
+    setSelectedCustomerId(null);
+    setSelectedVariantId(null);
+    setSelectedVariants([]);
+    setSelectedPriceTiers([]);
+    setSearchTerm('');
+  }, [restoredSaleId, pendingSales, savePendingSales]);
+
+  // Função para colocar venda em espera
+  const putSaleOnHold = useCallback(() => {
+    if (cart.length === 0) {
+      toast.error('Adicione produtos ao carrinho antes de colocar em espera');
+      return;
+    }
+
+    const pendingSale: PendingSale = {
+      id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      cart: [...cart],
+      customerName: customerName || '',
+      customerId: selectedCustomerId,
+      total: total,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedPendingSales = [...pendingSales, pendingSale];
+    savePendingSales(updatedPendingSales);
+    
+    toast.success('Venda colocada em espera');
+    clearCart();
+  }, [cart, customerName, selectedCustomerId, total, pendingSales, savePendingSales, clearCart]);
+
+  // Função para restaurar uma venda em espera
+  const restorePendingSale = useCallback((pendingSale: PendingSale) => {
+    setCart(pendingSale.cart);
+    setCustomerName(pendingSale.customerName || '');
+    setSelectedCustomerId(pendingSale.customerId);
+    setRestoredSaleId(pendingSale.id); // Rastrear qual venda foi restaurada
+    setShowPendingSalesDialog(false);
+    toast.success('Venda restaurada');
   }, []);
+
+  // Função para remover uma venda em espera
+  const removePendingSale = useCallback((id: string) => {
+    const updatedPendingSales = pendingSales.filter(sale => sale.id !== id);
+    savePendingSales(updatedPendingSales);
+    toast.success('Venda em espera removida');
+  }, [pendingSales, savePendingSales]);
 
   const startNewSale = useCallback(() => {
     clearCart();
@@ -831,6 +947,13 @@ export default function PDVPage() {
         }))
       };
 
+      // Se havia uma venda restaurada, removê-la da lista de vendas em espera
+      if (restoredSaleId) {
+        const updatedPendingSales = pendingSales.filter(sale => sale.id !== restoredSaleId);
+        savePendingSales(updatedPendingSales);
+        setRestoredSaleId(null);
+      }
+
       // Mostrar modal de confirmação
       setLastSaleData(confirmationData);
       setShowConfirmationModal(true);
@@ -840,7 +963,7 @@ export default function PDVPage() {
       console.error('Erro ao finalizar venda:', error);
       toast.error(`Erro ao salvar venda: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
-  }, [total, customerName, paymentMethod, cart, calculateItemTotal, saveTodaySalesLocal, tenant, user?.id, selectedCustomerId, reloadTodaySales, scope, branchId]);
+  }, [total, customerName, paymentMethod, cart, calculateItemTotal, saveTodaySalesLocal, tenant, user?.id, selectedCustomerId, reloadTodaySales, scope, branchId, restoredSaleId, pendingSales, savePendingSales]);
 
   const loadCustomers = useCallback(async () => {
     if (!tenant?.id) {
@@ -1579,7 +1702,18 @@ export default function PDVPage() {
               <Card className="juga-card h-full">
                 <CardContent className="p-0 h-full flex flex-col">
                   <div className="flex-1 p-6">
-                    <h3 className="font-semibold text-lg mb-4 text-heading">Itens do Pedido</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-lg text-heading">Itens do Pedido</h3>
+                      {pendingSales.length > 0 && (
+                        <button
+                          onClick={() => setShowPendingSalesDialog(true)}
+                          className="text-xs text-orange-600 hover:text-orange-700 hover:underline font-medium flex items-center gap-1"
+                        >
+                          <Clock className="h-3 w-3" />
+                          {pendingSales.length} em espera
+                        </button>
+                      )}
+                    </div>
 
                     {cart.length === 0 ? (
                       <div className="text-center py-12 text-muted-foreground">
@@ -1705,11 +1839,12 @@ export default function PDVPage() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-stretch">
                         <Button
-                          className="h-11 w-full px-7 rounded-lg text-white text-xs sm:text-[13px] font-semibold shadow-sm disabled:opacity-100 disabled:saturate-75 disabled:brightness-95 disabled:cursor-not-allowed border border-white/10 bg-gradient-to-br from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors flex items-center justify-center"
-                          onClick={() => selectedProduct && addSelectedToCart()}
-                          disabled={!selectedProduct}
+                          className="h-11 w-full px-7 rounded-lg text-white text-xs sm:text-[13px] font-semibold shadow-sm disabled:opacity-100 disabled:saturate-75 disabled:brightness-95 disabled:cursor-not-allowed border border-white/10 bg-gradient-to-br from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors flex items-center justify-center"
+                          onClick={putSaleOnHold}
+                          disabled={cart.length === 0}
                         >
-                          ADICIONAR
+                          <Clock className="h-4 w-4 mr-2" />
+                          AGUARDAR
                         </Button>
 
                         <Button
@@ -2066,6 +2201,96 @@ export default function PDVPage() {
         onOpenChange={setDeliveryQuickOpen}
         tenantId={tenant?.id || null}
       />
+
+      {/* Dialog de Vendas em Espera */}
+      <Dialog open={showPendingSalesDialog} onOpenChange={setShowPendingSalesDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-orange-600" />
+              Vendas em Espera
+            </DialogTitle>
+            <DialogDescription>
+              Selecione uma venda para restaurar ou continuar editando
+            </DialogDescription>
+          </DialogHeader>
+          
+          {pendingSales.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p>Nenhuma venda em espera</p>
+            </div>
+          ) : (
+            <div className="space-y-3 mt-4">
+              {pendingSales.map((sale) => {
+                const saleDate = new Date(sale.createdAt);
+                const timeAgo = Math.floor((Date.now() - saleDate.getTime()) / 1000 / 60); // minutos
+                const timeAgoText = timeAgo < 1 ? 'Agora' : timeAgo < 60 ? `${timeAgo} min atrás` : `${Math.floor(timeAgo / 60)}h ${timeAgo % 60}min atrás`;
+                
+                return (
+                  <div
+                    key={sale.id}
+                    className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className="text-orange-600 border-orange-600">
+                            {sale.cart.length} {sale.cart.length === 1 ? 'item' : 'itens'}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">{timeAgoText}</span>
+                        </div>
+                        {sale.customerName && (
+                          <p className="text-sm font-medium text-heading">
+                            Cliente: {sale.customerName}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {saleDate.toLocaleString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-primary">
+                          R$ {sale.total.toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => restorePendingSale(sale)}
+                      >
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        Restaurar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => {
+                          if (confirm('Deseja realmente remover esta venda em espera?')) {
+                            removePendingSale(sale.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       </div>
     </TenantPageWrapper>
   );
