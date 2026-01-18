@@ -49,6 +49,7 @@ import {
   Eye,
   DollarSign,
   User,
+  X,
   Calendar,
   Receipt,
   TrendingUp,
@@ -143,18 +144,18 @@ function AutocompleteInput({
       <PopoverContent
         align="start"
         sideOffset={4}
-        className="w-[--radix-popover-trigger-width] p-0 bg-white dark:bg-slate-900 border-2 border-gray-200 dark:border-gray-700 shadow-lg"
+        className="w-[--radix-popover-trigger-width] p-0 bg-white dark:bg-slate-900 border border-border shadow-md"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <div className="max-h-[260px] overflow-auto">
           {filtered.length === 0 ? (
-            <div className="px-3 py-3 text-sm text-muted-foreground bg-gray-50 dark:bg-slate-800">Nenhum resultado encontrado</div>
+            <div className="px-3 py-3 text-sm text-muted-foreground bg-muted/30">Nenhum resultado encontrado</div>
           ) : (
             filtered.map((o) => (
               <button
                 key={o.value}
                 type="button"
-                className="w-full text-left px-3 py-2.5 rounded-none hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-700 dark:hover:text-blue-300 text-sm border-b border-gray-100 dark:border-gray-800 last:border-b-0 transition-colors"
+                className="w-full text-left px-3 py-2.5 rounded-none hover:bg-accent hover:text-accent-foreground text-sm border-b border-border/40 last:border-b-0 transition-colors"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   onPick({ value: o.value, label: o.label });
@@ -162,7 +163,7 @@ function AutocompleteInput({
                 }}
               >
                 <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                  <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   <span className="truncate block font-medium">{o.label}</span>
                 </div>
                 {o.keywords && (
@@ -1472,7 +1473,7 @@ export default function VendasPage() {
 
           {/* Busca Avançada */}
           {showAdvancedSearch && (
-            <Card className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-2 border-blue-200 dark:border-blue-800 shadow-md">
+            <Card className="mt-4 juga-card">
               <CardContent className="pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-2">
@@ -1615,53 +1616,45 @@ export default function VendasPage() {
       </Card>
 
       {/* Tabela */}
-      <Card className="border-2 shadow-lg bg-white dark:bg-slate-900">
-        <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+      <Card className="juga-card">
+        <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5" />
+            <ShoppingCart className="h-5 w-5 text-muted-foreground" />
             Lista de Vendas ({filteredVendas.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-              <p className="text-lg font-medium">Carregando vendas...</p>
-            </div>
+            <div className="text-center py-8 text-muted-foreground">Carregando vendas...</div>
           ) : filteredVendas.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <ShoppingCart className="h-16 w-16 mb-4 opacity-50" />
-              <p className="text-lg font-medium">Nenhuma venda encontrada</p>
-              <p className="text-sm">Tente ajustar os filtros de busca</p>
-            </div>
+            <div className="text-center py-8 text-muted-foreground">Nenhuma venda encontrada</div>
           ) : (
             <div className="overflow-x-auto -mx-4 sm:mx-0">
               <div className="inline-block min-w-full align-middle">
                 <Table>
                 <TableHeader>
-                <TableRow className="bg-gray-50 dark:bg-slate-800">
-                  <TableHead className="w-12 font-semibold">
+                <TableRow>
+                  <TableHead className="w-12">
                     <Checkbox
                       checked={selectedVendas.size === filteredVendas.length && filteredVendas.length > 0}
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
-                  {columnVisibility.numero && <TableHead className="font-semibold">Número</TableHead>}
-                  {columnVisibility.cliente && <TableHead className="font-semibold">Cliente</TableHead>}
-                  {columnVisibility.vendedor && <TableHead className="font-semibold">Vendedor</TableHead>}
-                  <TableHead className="font-semibold">Itens</TableHead>
-                  {columnVisibility.total && <TableHead className="font-semibold">Total</TableHead>}
-                  {columnVisibility.forma_pagamento && <TableHead className="font-semibold">Pagamento</TableHead>}
-                  {columnVisibility.status && <TableHead className="font-semibold">Status</TableHead>}
-                  {columnVisibility.data_venda && <TableHead className="font-semibold">Data</TableHead>}
-                  <TableHead className="font-semibold">Ações</TableHead>
+                  {columnVisibility.numero && <TableHead>Número</TableHead>}
+                  {columnVisibility.cliente && <TableHead>Cliente</TableHead>}
+                  {columnVisibility.vendedor && <TableHead>Vendedor</TableHead>}
+                  <TableHead>Itens</TableHead>
+                  {columnVisibility.total && <TableHead>Total</TableHead>}
+                  {columnVisibility.forma_pagamento && <TableHead>Pagamento</TableHead>}
+                  {columnVisibility.status && <TableHead>Status</TableHead>}
+                  {columnVisibility.data_venda && <TableHead>Data</TableHead>}
+                  <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredVendas.map((venda, index) => (
+                {filteredVendas.map((venda) => (
                   <TableRow 
                     key={venda.id}
-                    className={index % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-gray-50/50 dark:bg-slate-800/50'}
                   >
                     <TableCell>
                       <Checkbox
