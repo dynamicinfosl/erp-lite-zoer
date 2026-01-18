@@ -155,9 +155,13 @@ export function DeliveryManifestCupomLayout({
             /* Evita “papel demais” e reduz margens do navegador */
             margin: 0;
           }
+          html {
+            margin: 0 !important;
+            padding: 0 !important;
+          }
           body {
-            margin: 0;
-            padding: 0;
+            margin: 0 !important;
+            padding: 0 !important;
             font-size: ${baseFontSize}px;
             line-height: 1.15;
             background: white;
@@ -170,6 +174,10 @@ export function DeliveryManifestCupomLayout({
             */
             width: 76mm !important;
             max-width: 76mm !important;
+            /* Fixar no canto para evitar “offset”/margem fantasma à esquerda */
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
             margin: 0 !important;
             /* Menos margem interna (principalmente à esquerda) para não “sumir” QTD */
             padding: 2mm 1.5mm !important;
