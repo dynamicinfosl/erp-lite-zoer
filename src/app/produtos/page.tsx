@@ -261,14 +261,18 @@ export default function ProdutosPage() {
     };
   }, [skuValidationTimeout]);
 
-  const loadProducts = useCallback(async (overrideTenantId?: string) => {
+  const loadProducts = useCallback(async (overrideTenantId?: string, retryCount = 0) => {
     try {
       setLoading(true);
       const currentTenantId = overrideTenantId || tenant?.id;
 
       if (!currentTenantId) {
-        console.warn('⚠️ loadProducts: tenant_id ausente, retornando lista vazia');
+        if (retryCount < 2) {
+          setTimeout(() => loadProducts(overrideTenantId, retryCount + 1), 500);
+          return;
+        }
         setProducts([]);
+        setLoading(false);
         return;
       }
 
@@ -279,26 +283,53 @@ export default function ProdutosPage() {
       
       const url = `/next_api/products?${params.toString()}`;
       
-      console.log(`🔄 Carregando produtos para tenant: ${currentTenantId}`);
-      console.log(`📡 URL da requisição: ${url}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
       
-      const response = await fetch(url);
-      if (!response.ok) {
-        console.error(`❌ Erro na resposta: ${response.status} ${response.statusText}`);
-        throw new Error('Erro ao carregar produtos');
+      try {
+        const response = await fetch(url, {
+          signal: controller.signal,
+          cache: 'no-store',
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`Erro ao carregar produtos: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        const rows = Array.isArray(data?.data) ? data.data : (Array.isArray(data?.rows) ? data.rows : (Array.isArray(data) ? data : []));
+        
+        if (!Array.isArray(rows)) {
+          throw new Error('Resposta da API não é um array');
+        }
+        
+        setProducts(rows);
+        setLoading(false);
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError.name === 'AbortError') {
+          if (retryCount < 2) {
+            setTimeout(() => loadProducts(overrideTenantId, retryCount + 1), 1000);
+            return;
+          }
+        }
+        
+        if (retryCount < 2 && !fetchError.message?.includes('404')) {
+          setTimeout(() => loadProducts(overrideTenantId, retryCount + 1), 1000);
+          return;
+        }
+        
+        setProducts([]);
+        setLoading(false);
+        if (retryCount >= 2) {
+          toast.error('Erro ao carregar produtos. Tente recarregar a página.');
+        }
       }
-      
-      const data = await response.json();
-      console.log(`📊 Dados recebidos:`, data);
-      
-      const rows = Array.isArray(data?.data) ? data.data : (data?.rows || data || []);
-      console.log(`📦 Produtos encontrados: ${rows.length}`);
-      
-      setProducts(rows);
     } catch (error) {
-      console.error('❌ Erro ao carregar produtos:', error);
-      toast.error('Erro ao carregar produtos');
-    } finally {
+      setProducts([]);
       setLoading(false);
     }
   }, [tenant?.id]);

@@ -202,9 +202,21 @@ export default function PDVPage() {
   const addSelectedToCart = useCallback(() => {
     if (!selectedProduct) return;
 
+    const variantId = selectedVariantId;
+    const variantLabel = selectedVariants.find((v) => v.id === variantId)?.label || null;
+    
+    // Criar chave única: product_id + variant_id (ou null se não houver variação)
+    const cartKey = variantId ? `${selectedProduct.id}-${variantId}` : `${selectedProduct.id}-null`;
+
     setCart((prevCart) => {
-      const existingIndex = prevCart.findIndex((item) => item.id === selectedProduct.id);
+      // Buscar item existente usando a chave única (product_id + variant_id)
+      const existingIndex = prevCart.findIndex((item) => {
+        const itemKey = item.variant_id ? `${item.id}-${item.variant_id}` : `${item.id}-null`;
+        return itemKey === cartKey;
+      });
+
       if (existingIndex >= 0) {
+        // Se já existe, apenas incrementa a quantidade
         const updatedCart = [...prevCart];
         updatedCart[existingIndex] = {
           ...updatedCart[existingIndex],
@@ -213,52 +225,110 @@ export default function PDVPage() {
         };
         return updatedCart;
       }
-      return [...prevCart, { ...selectedProduct }];
+
+      // Se não existe, adiciona como novo item
+      const itemName = variantLabel ? `${selectedProduct.name} - ${variantLabel}` : selectedProduct.name;
+      return [...prevCart, { 
+        ...selectedProduct, 
+        name: itemName,
+        variant_id: variantId || null,
+        variant_label: variantLabel || null,
+      }];
     });
 
-    toast.success(`${selectedProduct.name} adicionado ao carrinho`);
+    const displayName = variantLabel ? `${selectedProduct.name} - ${variantLabel}` : selectedProduct.name;
+    toast.success(`${displayName} adicionado ao carrinho`);
     setSelectedProduct(null);
+    setSelectedVariantId(null);
     setSearchTerm('');
-  }, [selectedProduct]);
+  }, [selectedProduct, selectedVariantId, selectedVariants]);
 
   useEffect(() => {
-    const loadProducts = async () => {
+    let cancelled = false;
+    
+    const loadProducts = async (retryCount = 0) => {
       try {
         setLoading(true);
         
-        // Aguardar tenant estar disponível (máximo 2 segundos)
+        // Aguardar tenant estar disponível (máximo 3 segundos)
         let attempts = 0;
-        while (!tenant?.id && attempts < 20) {
+        while (!tenant?.id && attempts < 30 && !cancelled) {
           await new Promise(resolve => setTimeout(resolve, 100));
           attempts++;
         }
         
+        if (cancelled) return;
+        
         if (!tenant?.id) { 
-          console.warn('⚠️ Tenant não disponível após 2 segundos');
-          setProducts([]); 
+          if (retryCount < 2) {
+            // Retry após 500ms
+            setTimeout(() => loadProducts(retryCount + 1), 500);
+            return;
+          }
+          setProducts([]);
+          setLoading(false);
           return; 
         }
 
-        console.log('🔄 Carregando produtos para tenant:', tenant.id);
         const params = new URLSearchParams({ tenant_id: tenant.id });
         // PDV opera em uma filial específica; se estiver em "todas", carregamos sem filtro (fallback)
         if (scope === 'branch' && branchId) params.set('branch_id', String(branchId));
-        const res = await fetch(`/next_api/products?${params.toString()}`);
-        if (!res.ok) throw new Error('Erro ao carregar produtos');
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+        
+        const res = await fetch(`/next_api/products?${params.toString()}`, {
+          signal: controller.signal,
+          cache: 'no-store',
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (cancelled) return;
+        
+        if (!res.ok) {
+          throw new Error(`Erro ao carregar produtos: ${res.status} ${res.statusText}`);
+        }
+        
         const json = await res.json();
-        const data = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
+        if (cancelled) return;
+        
+        const data = Array.isArray(json?.data) ? json.data : (Array.isArray(json?.rows) ? json.rows : (Array.isArray(json) ? json : []));
+        
+        if (!Array.isArray(data)) {
+          throw new Error('Resposta da API não é um array');
+        }
+        
         setProducts(data);
-        console.log('✅ Produtos carregados:', data.length);
-      } catch (error) {
-        console.error('❌ Erro ao carregar produtos:', error);
-        toast.error('Erro ao carregar produtos');
-        setProducts([]);
-      } finally {
         setLoading(false);
+      } catch (error: any) {
+        if (cancelled) return;
+        
+        if (error.name === 'AbortError') {
+          if (retryCount < 2) {
+            setTimeout(() => loadProducts(retryCount + 1), 1000);
+            return;
+          }
+        }
+        
+        if (retryCount < 2 && !error.message?.includes('404')) {
+          setTimeout(() => loadProducts(retryCount + 1), 1000);
+          return;
+        }
+        
+        setProducts([]);
+        setLoading(false);
+        if (retryCount >= 2) {
+          toast.error('Erro ao carregar produtos. Tente recarregar a página.');
+        }
       }
     };
 
     loadProducts();
+    
+    return () => {
+      cancelled = true;
+    };
   }, [tenant?.id, scope, branchId]);
 
   // Função para recarregar vendas do dia
@@ -378,38 +448,51 @@ export default function PDVPage() {
   };
 
   const filteredProducts = useMemo(() => {
-    if (loading) return [];
-    if (!searchTerm.trim()) return [];
+    if (loading || !Array.isArray(products)) return [];
+    if (products.length === 0) return [];
     
     const normalizedSearch = normalizeText(searchTerm);
     const isNumericSearch = /^\d+$/.test(normalizedSearch);
     
-    return products
-      .map((product, index) => ({
+    if (!normalizedSearch) {
+      return products.map((product, index) => ({
         id: product.id || index + 1,
-        name: product.name || 'Produto sem nome',
+        name: String(product.name || 'Produto sem nome').trim(),
         price: Number(product.sale_price || product.cost_price || 0),
-        code: product.sku || product.barcode || String(product.id || index + 1),
-      }))
-      .map((product) => {
-        const normalizedName = normalizeText(product.name);
-        const normalizedCode = normalizeText(product.code);
+        code: String(product.sku || product.barcode || product.id || index + 1).trim(),
+      }));
+    }
+    
+    const mapped = products
+      .map((product, index) => {
+        const name = String(product.name || 'Produto sem nome').trim();
+        const code = String(product.sku || product.barcode || product.id || index + 1).trim();
+        const normalizedName = normalizeText(name);
+        const normalizedCode = normalizeText(code);
 
         const codeStarts = normalizedCode.startsWith(normalizedSearch);
         const codeIncludes = normalizedCode.includes(normalizedSearch);
         const nameIncludes = normalizedName.includes(normalizedSearch);
 
-        // Score menor = aparece antes
+        if (!codeStarts && !codeIncludes && !nameIncludes) {
+          return null;
+        }
+
+        // Score menor = aparece antes (para ordenação crescente)
         const score = codeStarts ? 0 : codeIncludes ? 1 : nameIncludes ? 2 : 3;
 
         return {
-          ...product,
+          id: product.id || index + 1,
+          name,
+          price: Number(product.sale_price || product.cost_price || 0),
+          code,
           _score: score,
           _codeStarts: codeStarts,
           _codeIncludes: codeIncludes,
           _nameIncludes: nameIncludes,
         };
       })
+      .filter((product): product is NonNullable<typeof product> => product !== null)
       .filter((product) => {
         // Quando for numérico: aceita código começa/contém e nome contém, mas prioriza "começa" no sort
         if (isNumericSearch) {
@@ -423,6 +506,9 @@ export default function PDVPage() {
         // Quando for numérico, garantir que códigos que começam apareçam primeiro
         if (isNumericSearch) {
           if (a._score !== b._score) return a._score - b._score;
+        } else {
+          // Para texto, ordenar por score (menor primeiro)
+          if (a._score !== b._score) return a._score - b._score;
         }
         // Desempate estável para não "pular" muito a lista
         const codeCmp = String(a.code).localeCompare(String(b.code), 'pt-BR', { numeric: true, sensitivity: 'base' });
@@ -430,73 +516,85 @@ export default function PDVPage() {
         return String(a.name).localeCompare(String(b.name), 'pt-BR', { numeric: true, sensitivity: 'base' });
       })
       .map(({ _score, _codeStarts, _codeIncludes, _nameIncludes, ...rest }) => rest);
-  }, [loading, products, searchTerm]); // Dependências estáveis
+    
+    return mapped;
+  }, [loading, products, searchTerm]);
 
   const selectProduct = async (product: { id: number; name: string; price: number; code: string }) => {
     // Se o produto tem variações de valor, carregá-las e permitir seleção inline (sem modal)
+    if (!tenant?.id) {
+      setSelectedProduct({ ...product, quantity: 1, discount: 0 });
+      setSelectedVariants([]);
+      setSelectedVariantId(null);
+      setSelectedPriceTiers([]);
+      return;
+    }
+    
+    // Carregar price tiers
+    let tiers: Array<{ name: string; price: number; price_type_id?: number }> = [];
     try {
-      if (!tenant?.id) {
-        setSelectedProduct({ ...product, quantity: 1, discount: 0 });
-        setSelectedVariants([]);
-        setSelectedVariantId(null);
-        return;
-      }
-      
-      // Carregar price tiers
       const resTiers = await fetch(
         `/next_api/product-price-tiers?tenant_id=${encodeURIComponent(tenant.id)}&product_id=${encodeURIComponent(String(product.id))}`
       );
       const jsonTiers = await resTiers.json().catch(() => ({}));
       const tiersRaw = Array.isArray(jsonTiers?.data) ? jsonTiers.data : [];
-      const tiers = tiersRaw
+      tiers = tiersRaw
         .map((t: any) => ({
           name: String(t?.price_type?.name || '').trim(),
           price: Number(t?.price),
           price_type_id: Number(t?.price_type_id),
         }))
         .filter((t: any) => t.name && Number.isFinite(t.price) && t.price > 0);
-
       setSelectedPriceTiers(tiers);
+    } catch (err) {
+      setSelectedPriceTiers([]);
+    }
 
-      // Carregar variações do produto
+    // Carregar variações do produto
+    try {
       const resVariants = await fetch(
         `/next_api/product-variants?tenant_id=${encodeURIComponent(tenant.id)}&product_id=${encodeURIComponent(String(product.id))}`
       );
-      const jsonVariants = await resVariants.json().catch(() => ({}));
-      const variantsRaw = Array.isArray(jsonVariants?.data) ? jsonVariants.data : [];
-      const variants = variantsRaw
-        .map((v: any) => ({
-          id: Number(v?.id),
-          label: String(v?.label || '').trim(),
-          name: v?.name ?? null,
-          sale_price: v?.sale_price ?? null,
-        }))
-        .filter((v: any) => Number.isFinite(v.id) && v.id > 0 && v.label);
-      
-      setSelectedVariants(variants);
-      setSelectedVariantId(null);
-
-      // Se existir "Valor Varejo", usar como padrão; senão usa o primeiro tier; senão cai no preço do produto
-      const varejo = tiers.find((t: any) => String(t.name).toLowerCase().includes('varejo'));
-      const initial = varejo || tiers[0];
-
-      if (initial) {
-        setSelectedProduct({
-          ...product,
-          price: initial.price,
-          quantity: 1,
-          discount: 0,
-          price_type_name: initial.name as any,
-          price_type_id: initial.price_type_id as any,
-        } as any);
+      if (resVariants.ok) {
+        const jsonVariants = await resVariants.json().catch(() => ({}));
+        const variantsRaw = Array.isArray(jsonVariants?.data) ? jsonVariants.data : [];
+        const variants = variantsRaw
+          .map((v: any) => {
+            const label = String(v?.label || v?.name || '').trim();
+            return {
+              id: Number(v?.id),
+              label: label || `Variação ${v?.id}`,
+              name: v?.name ?? null,
+              sale_price: v?.sale_price ?? null,
+            };
+          })
+          .filter((v: any) => Number.isFinite(v.id) && v.id > 0 && v.label && v.label.length > 0);
+        
+        setSelectedVariants(variants);
+        setSelectedVariantId(null);
       } else {
-        setSelectedProduct({ ...product, quantity: 1, discount: 0 });
+        setSelectedVariants([]);
+        setSelectedVariantId(null);
       }
-    } catch {
-      // fallback: seleciona com preço padrão
-      setSelectedPriceTiers([]);
+    } catch (err) {
       setSelectedVariants([]);
       setSelectedVariantId(null);
+    }
+
+    // Se existir "Valor Varejo", usar como padrão; senão usa o primeiro tier; senão cai no preço do produto
+    const varejo = tiers.find((t: any) => String(t.name).toLowerCase().includes('varejo'));
+    const initial = varejo || tiers[0];
+
+    if (initial) {
+      setSelectedProduct({
+        ...product,
+        price: initial.price,
+        quantity: 1,
+        discount: 0,
+        price_type_name: initial.name as any,
+        price_type_id: initial.price_type_id as any,
+      } as any);
+    } else {
       setSelectedProduct({ ...product, quantity: 1, discount: 0 });
     }
   };
@@ -513,21 +611,31 @@ export default function PDVPage() {
     clearSelection();
   };
 
-  const removeFromCart = useCallback((productId: number) => {
-    setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
+  const removeFromCart = useCallback((productId: number, variantId?: number | null) => {
+    setCart((prevCart) => {
+      if (variantId) {
+        return prevCart.filter((item) => !(item.id === productId && item.variant_id === variantId));
+      } else {
+        return prevCart.filter((item) => !(item.id === productId && !item.variant_id));
+      }
+    });
   }, []);
 
-  const updateQuantity = useCallback((productId: number, newQuantity: number) => {
+  const updateQuantity = useCallback((productId: number, newQuantity: number, variantId?: number | null) => {
     if (newQuantity <= 0) {
-      setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
+      removeFromCart(productId, variantId);
     } else {
       setCart((prevCart) =>
-        prevCart.map((item) =>
-          item.id === productId ? { ...item, quantity: newQuantity } : item,
-        ),
+        prevCart.map((item) => {
+          if (variantId) {
+            return item.id === productId && item.variant_id === variantId ? { ...item, quantity: newQuantity } : item;
+          } else {
+            return item.id === productId && !item.variant_id ? { ...item, quantity: newQuantity } : item;
+          }
+        }),
       );
     }
-  }, []);
+  }, [removeFromCart]);
 
   const calculateItemTotal = useCallback((item: PDVItem) => {
     const subtotal = item.price * item.quantity;
@@ -1432,8 +1540,10 @@ export default function PDVPage() {
                       </div>
                     ) : (
                       <div className="space-y-3 max-h-80 overflow-y-auto">
-                        {cart.map((item) => (
-                          <div key={item.id} className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+                        {cart.map((item) => {
+                          const itemKey = item.variant_id ? `${item.id}-${item.variant_id}` : `${item.id}-null`;
+                          return (
+                          <div key={itemKey} className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
                                 <h5 className="font-medium text-sm text-heading">{item.name}</h5>
@@ -1442,7 +1552,7 @@ export default function PDVPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => removeFromCart(item.id)}
+                                onClick={() => removeFromCart(item.id, item.variant_id)}
                                 className="text-red-500 hover:text-red-700 hover:bg-red-50"
                               >
                                 <X className="h-4 w-4" />
@@ -1451,11 +1561,11 @@ export default function PDVPage() {
 
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <Button variant="outline" size="sm" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
+                                <Button variant="outline" size="sm" onClick={() => updateQuantity(item.id, item.quantity - 1, item.variant_id)}>
                                   <Minus className="h-3 w-3" />
                                 </Button>
                                 <span className="w-8 text-center font-medium">{item.quantity}</span>
-                                <Button variant="outline" size="sm" onClick={() => updateQuantity(item.id, item.quantity + 1)}>
+                                <Button variant="outline" size="sm" onClick={() => updateQuantity(item.id, item.quantity + 1, item.variant_id)}>
                                   <Plus className="h-3 w-3" />
                                 </Button>
                               </div>
@@ -1466,7 +1576,8 @@ export default function PDVPage() {
                               </div>
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

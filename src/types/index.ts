@@ -257,6 +257,8 @@ export interface PDVItem {
   code: string
   quantity: number
   discount: number
+  variant_id?: number | null
+  variant_label?: string | null
 }
 
 // Tipos para Dashboard

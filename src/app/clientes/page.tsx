@@ -168,6 +168,9 @@ export default function ClientesPage() {
 
   const loadCustomers = useCallback(async () => {
     let mySeq = 0;
+    let controller: AbortController | null = null;
+    
+    // Wrapper para capturar qualquer erro de abort antes do try/catch
     try {
       const tenantId = tenant?.id;
       if (!tenantId) {
@@ -175,7 +178,7 @@ export default function ClientesPage() {
         return;
       }
 
-      // Evitar “piscar” dados: aguardar BranchContext resolver a branch atual
+      // Evitar "piscar" dados: aguardar BranchContext resolver a branch atual
       // (principalmente quando admin matriz usa branchId da HQ, mas currentBranch ainda não carregou)
       if (branchesEnabled && scope === 'branch' && branchId && !currentBranch) {
         if (branchLoading) {
@@ -197,11 +200,24 @@ export default function ClientesPage() {
       // iniciar nova requisição e cancelar a anterior
       requestSeqRef.current += 1;
       mySeq = requestSeqRef.current;
+      
+      // Cancelar requisição anterior de forma segura
       if (abortRef.current) {
-        try { abortRef.current.abort(); } catch {}
+        try { 
+          abortRef.current.abort();
+        } catch (e) {
+          // Ignorar erros ao abortar controller antigo
+        }
+        abortRef.current = null;
       }
-      const controller = new AbortController();
+      
+      controller = new AbortController();
       abortRef.current = controller;
+
+      // Verificar se já foi cancelado antes de continuar
+      if (controller.signal.aborted) {
+        return;
+      }
 
       setLoading(true);
       
@@ -235,12 +251,42 @@ export default function ClientesPage() {
       console.log(`🔄 Carregando clientes para tenant: ${tenantId}, branch: ${branchId}, scope: ${scope}`);
       console.log(`📡 URL da requisição: ${url}`);
       
-      const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+      // Verificar se foi cancelado antes de fazer o fetch
+      if (!controller || controller.signal.aborted || mySeq !== requestSeqRef.current) {
+        return;
+      }
+      
+      let response: Response;
+      try {
+        response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+      } catch (fetchError: any) {
+        // Se foi abortado durante o fetch, apenas retornar silenciosamente
+        const isAbortError = 
+          fetchError?.name === 'AbortError' ||
+          (typeof fetchError?.message === 'string' && fetchError.message.toLowerCase().includes('aborted')) ||
+          (typeof fetchError?.message === 'string' && fetchError.message.toLowerCase().includes('signal is aborted')) ||
+          !controller ||
+          controller.signal.aborted || 
+          mySeq !== requestSeqRef.current;
+          
+        if (isAbortError) {
+          return;
+        }
+        throw fetchError;
+      }
+      
+      // Verificar novamente após o fetch
+      if (!controller || controller.signal.aborted || mySeq !== requestSeqRef.current) {
+        console.log('⚠️ Resposta antiga ignorada (customers)', { mySeq, current: requestSeqRef.current });
+        return;
+      }
+      
       if (!response.ok) throw new Error('Erro ao carregar clientes');
       
       const data = await response.json();
+      
       // ignorar se já houve outra requisição depois
-      if (mySeq !== requestSeqRef.current) {
+      if (!controller || controller.signal.aborted || mySeq !== requestSeqRef.current) {
         console.log('⚠️ Resposta antiga ignorada (customers)', { mySeq, current: requestSeqRef.current });
         return;
       }
@@ -281,17 +327,30 @@ export default function ClientesPage() {
       console.log(`✅ Clientes mapeados: ${mappedCustomers.length}`);
       setCustomers(mappedCustomers);
     } catch (error) {
+      // Verificar se foi cancelado antes de processar erro
+      if (mySeq !== requestSeqRef.current) {
+        return;
+      }
+      
       // Abort é esperado quando outra requisição começou (não deve aparecer como erro)
       const anyErr = error as any;
       const isAbort =
         anyErr?.name === 'AbortError' ||
         (typeof anyErr?.message === 'string' && anyErr.message.toLowerCase().includes('aborted')) ||
         (typeof anyErr?.message === 'string' && anyErr.message.toLowerCase().includes('signal is aborted')) ||
+        (typeof anyErr?.message === 'string' && anyErr.message.toLowerCase().includes('without reason')) ||
         (typeof DOMException !== 'undefined' && anyErr instanceof DOMException && anyErr.name === 'AbortError');
-      if (isAbort) return;
+      
+      if (isAbort) {
+        // Se foi abortado, apenas retornar sem fazer nada (não mostrar erro)
+        return;
+      }
 
-      console.error('❌ Erro ao carregar clientes:', error);
-      toast.error('Erro ao carregar clientes');
+      // Só mostrar erro se não foi abortado e é a requisição mais recente
+      if (mySeq === requestSeqRef.current) {
+        console.error('❌ Erro ao carregar clientes:', error);
+        toast.error('Erro ao carregar clientes');
+      }
     } finally {
       // Só finalizar loading se esta for a requisição mais recente
       if (mySeq && mySeq !== requestSeqRef.current) return;

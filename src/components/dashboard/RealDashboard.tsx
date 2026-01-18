@@ -60,46 +60,91 @@ export default function RealDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadDashboardData = async () => {
+    let cancelled = false;
+    
+    const loadDashboardData = async (retryCount = 0) => {
       try {
         setLoading(true);
         
-        // Aguardar tenant estar disponível
+        // Aguardar tenant estar disponível (máximo 3 segundos)
         let attempts = 0;
-        while (!tenant?.id && attempts < 20) {
+        while (!tenant?.id && attempts < 30 && !cancelled) {
           await new Promise(resolve => setTimeout(resolve, 100));
           attempts++;
         }
         
+        if (cancelled) return;
+        
         if (!tenant?.id) {
-          console.warn('⚠️ Tenant não disponível para carregar dashboard');
+          if (retryCount < 2) {
+            setTimeout(() => loadDashboardData(retryCount + 1), 500);
+            return;
+          }
           setLoading(false);
           return;
         }
 
-        console.log('🔄 Carregando dados do dashboard para tenant:', tenant.id);
-
-        // ✅ CORREÇÃO: Timeout para evitar loading infinito
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 segundos timeout
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
 
         try {
-          // Carregar dados em paralelo com timeout
+          // Carregar dados em paralelo com timeout e cache desabilitado
+          const fetchOptions = {
+            signal: controller.signal,
+            cache: 'no-store' as RequestCache,
+          };
+          
+          const tz = -new Date().getTimezoneOffset();
+          
+          // Sempre usar branch_scope=all para buscar todos os dados quando não há branch específica
+          const salesUrl = `/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}&tz=${tz}&branch_scope=all`;
+          const productsUrl = `/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}&branch_scope=all`;
+          const customersUrl = `/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}&branch_scope=all`;
+
           const [salesRes, productsRes, customersRes] = await Promise.allSettled([
-            fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}`, { signal: controller.signal }),
-            fetch(`/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`, { signal: controller.signal }),
-            fetch(`/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}`, { signal: controller.signal })
+            fetch(salesUrl, fetchOptions),
+            fetch(productsUrl, fetchOptions),
+            fetch(customersUrl, fetchOptions)
           ]);
 
           clearTimeout(timeoutId);
+          
+          if (cancelled) return;
 
-          const salesData = salesRes.status === 'fulfilled' ? await salesRes.value.json() : { data: [] };
-          const productsData = productsRes.status === 'fulfilled' ? await productsRes.value.json() : { data: [] };
-          const customersData = customersRes.status === 'fulfilled' ? await customersRes.value.json() : { data: [] };
+          // Processar respostas de forma mais robusta
+          let salesData: any = { data: [] };
+          let productsData: any = { data: [] };
+          let customersData: any = { data: [] };
+          
+          if (salesRes.status === 'fulfilled' && salesRes.value.ok) {
+            try {
+              salesData = await salesRes.value.json();
+            } catch (e) {
+              salesData = { data: [] };
+            }
+          }
+          
+          if (productsRes.status === 'fulfilled' && productsRes.value.ok) {
+            try {
+              productsData = await productsRes.value.json();
+            } catch (e) {
+              productsData = { data: [] };
+            }
+          }
+          
+          if (customersRes.status === 'fulfilled' && customersRes.value.ok) {
+            try {
+              customersData = await customersRes.value.json();
+            } catch (e) {
+              customersData = { data: [] };
+            }
+          }
 
-          const sales = Array.isArray(salesData?.data) ? salesData.data : [];
-          const products = Array.isArray(productsData?.data) ? productsData.data : [];
-          const customers = Array.isArray(customersData?.data) ? customersData.data : [];
+          if (cancelled) return;
+
+          const sales = Array.isArray(salesData?.data) ? salesData.data : (Array.isArray(salesData?.sales) ? salesData.sales : (Array.isArray(salesData) ? salesData : []));
+          const products = Array.isArray(productsData?.data) ? productsData.data : (Array.isArray(productsData?.rows) ? productsData.rows : (Array.isArray(productsData) ? productsData : []));
+          const customers = Array.isArray(customersData?.data) ? customersData.data : (Array.isArray(customersData?.rows) ? customersData.rows : (Array.isArray(customersData) ? customersData : []));
 
           // Calcular totais
           const totalSales = sales.reduce((sum: number, sale: any) => sum + parseFloat(sale.total_amount || sale.final_amount || 0), 0);
@@ -117,6 +162,8 @@ export default function RealDashboard() {
             user: sale.customer_name || 'Cliente Avulso',
           }));
 
+          if (cancelled) return;
+
           setData({
             sales: Array.isArray(sales) ? sales : [],
             products: Array.isArray(products) ? products : [],
@@ -128,16 +175,22 @@ export default function RealDashboard() {
             recentSales: Array.isArray(recentSales) ? recentSales : []
           });
 
-          console.log('✅ Dashboard carregado:', { 
-            vendas: sales.length, 
-            produtos: products.length, 
-            clientes: customers.length,
-            totalVendas: totalSales 
-          });
-
-        } catch (fetchError) {
-          console.log('⚠️ Timeout ou erro ao carregar dados, usando dados vazios');
-          // Usar dados vazios mas válidos para manter o design
+          setLoading(false);
+        } catch (fetchError: any) {
+          if (cancelled) return;
+          
+          if (fetchError.name === 'AbortError') {
+            if (retryCount < 2) {
+              setTimeout(() => loadDashboardData(retryCount + 1), 1000);
+              return;
+            }
+          }
+          
+          if (retryCount < 2 && !fetchError.message?.includes('404')) {
+            setTimeout(() => loadDashboardData(retryCount + 1), 1000);
+            return;
+          }
+          
           setData({
             sales: [],
             products: [],
@@ -148,11 +201,11 @@ export default function RealDashboard() {
             monthlySales: generateMonthlyData([]),
             recentSales: []
           });
+          setLoading(false);
         }
 
       } catch (error) {
-        console.error('❌ Erro ao carregar dashboard:', error);
-        // Em caso de erro, usar dados vazios
+        if (cancelled) return;
         setData({
           sales: [],
           products: [],
@@ -163,12 +216,15 @@ export default function RealDashboard() {
           monthlySales: generateMonthlyData([]),
           recentSales: []
         });
-      } finally {
         setLoading(false);
       }
     };
 
     loadDashboardData();
+    
+    return () => {
+      cancelled = true;
+    };
   }, [tenant?.id]);
 
   // Gerar dados mensais baseado nas vendas reais (semestre atual)
