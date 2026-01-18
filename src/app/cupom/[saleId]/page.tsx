@@ -295,7 +295,7 @@ export default function ReceiptPage() {
           }
           
           th, td {
-            padding: 2px 3px;
+            padding: 4px 5px;
             text-align: left;
             border: none;
             border-bottom: 1px dashed #666;
@@ -304,6 +304,7 @@ export default function ReceiptPage() {
           th {
             font-weight: bold;
             border-bottom: 1px solid #333;
+            padding: 5px 5px;
           }
           
           .company-header {
@@ -311,6 +312,13 @@ export default function ReceiptPage() {
             margin-bottom: 8px;
             padding-bottom: 5px;
             border-bottom: 1px dashed #333;
+          }
+          
+          .company-header div {
+            font-weight: 600 !important;
+            color: #000 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           
           .section-title {
@@ -380,7 +388,7 @@ export default function ReceiptPage() {
           }
           
           th, td {
-            padding: 3px 4px;
+            padding: 4px 5px;
             text-align: left;
             border: none;
             border-bottom: 1px dashed #999;
@@ -389,6 +397,7 @@ export default function ReceiptPage() {
           th {
             font-weight: bold;
             border-bottom: 1px solid #333;
+            padding: 5px 5px;
           }
           
           .company-header {
@@ -396,6 +405,11 @@ export default function ReceiptPage() {
             margin-bottom: 10px;
             padding-bottom: 8px;
             border-bottom: 1px dashed #333;
+          }
+          
+          .company-header div {
+            font-weight: 600 !important;
+            color: #000 !important;
           }
           
           .section-title {
@@ -453,22 +467,22 @@ export default function ReceiptPage() {
             {companyData.name.toUpperCase()}
           </div>
           {couponSettings.showAddress && buildCompanyAddress(companyData) && (
-            <div style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
+            <div style={{ fontSize: `${couponSettings.fontSize}px`, fontWeight: '600' }}>
               {buildCompanyAddress(companyData)}
             </div>
           )}
           {couponSettings.showAddress && buildCompanyCityState(companyData) && (
-            <div style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
+            <div style={{ fontSize: `${couponSettings.fontSize}px`, fontWeight: '600' }}>
               {buildCompanyCityState(companyData)}
             </div>
           )}
           {couponSettings.showPhone && companyData.phone && (
-            <div style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
+            <div style={{ fontSize: `${couponSettings.fontSize}px`, fontWeight: '600' }}>
               Tel: {companyData.phone}
             </div>
           )}
           {couponSettings.showEmail && companyData.email && (
-            <div style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
+            <div style={{ fontSize: `${couponSettings.fontSize}px`, fontWeight: '600' }}>
               {companyData.email}
             </div>
           )}
