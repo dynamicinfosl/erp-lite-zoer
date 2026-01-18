@@ -104,18 +104,26 @@ function AutocompleteInput({
 }) {
   const [open, setOpen] = useState(false);
 
-  const normalizedQuery = (value || '').toLowerCase().trim();
+  // Função para normalizar texto removendo acentos
+  const normalizeText = (text: string): string => {
+    return String(text || '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase();
+  };
+
+  const normalizedQuery = normalizeText(value || '');
   const filtered = useMemo(() => {
     if (!normalizedQuery) return options.slice(0, 30);
     const out = options.filter((o) => {
-      const hay = `${o.label} ${o.keywords || ''}`.toLowerCase();
-      return hay.includes(normalizedQuery);
+      const hay = `${o.label} ${o.keywords || ''}`;
+      return normalizeText(hay).includes(normalizedQuery);
     });
     return out.slice(0, 30);
   }, [options, normalizedQuery]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open && filtered.length > 0} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Input
           value={value}
@@ -135,25 +143,33 @@ function AutocompleteInput({
       <PopoverContent
         align="start"
         sideOffset={4}
-        className="w-[--radix-popover-trigger-width] p-1"
+        className="w-[--radix-popover-trigger-width] p-0 bg-white dark:bg-slate-900 border-2 border-gray-200 dark:border-gray-700 shadow-lg"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <div className="max-h-[260px] overflow-auto">
           {filtered.length === 0 ? (
-            <div className="px-2 py-2 text-sm text-muted-foreground">Nenhum resultado</div>
+            <div className="px-3 py-3 text-sm text-muted-foreground bg-gray-50 dark:bg-slate-800">Nenhum resultado encontrado</div>
           ) : (
             filtered.map((o) => (
               <button
                 key={o.value}
                 type="button"
-                className="w-full text-left px-2 py-2 rounded-sm hover:bg-accent hover:text-accent-foreground text-sm"
+                className="w-full text-left px-3 py-2.5 rounded-none hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-700 dark:hover:text-blue-300 text-sm border-b border-gray-100 dark:border-gray-800 last:border-b-0 transition-colors"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   onPick({ value: o.value, label: o.label });
                   setOpen(false);
                 }}
               >
-                <span className="truncate block">{o.label}</span>
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                  <span className="truncate block font-medium">{o.label}</span>
+                </div>
+                {o.keywords && (
+                  <div className="text-xs text-muted-foreground mt-0.5 ml-6 truncate">
+                    {o.keywords.trim()}
+                  </div>
+                )}
               </button>
             ))
           )}
@@ -214,11 +230,61 @@ export default function VendasPage() {
     status: '',
     forma_pagamento: '',
     vendedor: '',
+    cliente: '',
     data_inicio: '',
     data_fim: '',
     valor_min: '',
     valor_max: ''
   });
+
+  // Lista de clientes para autocomplete
+  const [customersList, setCustomersList] = useState<QuickCustomer[]>([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+
+  // Função para normalizar texto removendo acentos
+  const normalizeText = (text: string): string => {
+    return String(text || '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase();
+  };
+
+  // Carregar lista de clientes
+  const loadCustomers = useCallback(async () => {
+    if (!tenant?.id) {
+      setCustomersList([]);
+      return;
+    }
+    try {
+      setLoadingCustomers(true);
+      const res = await fetch(`/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}&limit=1000`);
+      if (res.ok) {
+        const json = await res.json();
+        const rows = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
+        const list = Array.isArray(rows) ? rows : [];
+        const customers = list
+          .filter((c: any) => c.id && c.name)
+          .map((c: any) => ({
+            id: Number(c.id),
+            name: String(c.name || ''),
+            document: c.document || null,
+            phone: c.phone || null,
+          }));
+        setCustomersList(customers);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error);
+      setCustomersList([]);
+    } finally {
+      setLoadingCustomers(false);
+    }
+  }, [tenant?.id]);
+
+  useEffect(() => {
+    if (showAdvancedSearch) {
+      loadCustomers();
+    }
+  }, [showAdvancedSearch, loadCustomers]);
 
   const loadVendas = useCallback(async () => {
     try {
@@ -390,15 +456,37 @@ export default function VendasPage() {
   // Filtrar vendas
   // Se não houver filtro de status ou filtro de status diferente de 'cancelada', excluir canceladas da visualização padrão
   const filteredVendas = vendas.filter(venda => {
-    const matchesSearch = venda.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         venda.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (venda.vendedor && venda.vendedor.toLowerCase().includes(searchTerm.toLowerCase()));
+    // Busca flexível (ignora acentos)
+    const normalizedSearch = normalizeText(searchTerm);
+    const matchesSearch = !normalizedSearch || 
+                         normalizeText(venda.numero).includes(normalizedSearch) ||
+                         normalizeText(venda.cliente).includes(normalizedSearch) ||
+                         (venda.vendedor && normalizeText(venda.vendedor).includes(normalizedSearch));
 
     const matchesAdvanced = (!advancedFilters.status || venda.status === advancedFilters.status) &&
                            (!advancedFilters.forma_pagamento || venda.forma_pagamento === advancedFilters.forma_pagamento) &&
-                           (!advancedFilters.vendedor || venda.vendedor?.toLowerCase().includes(advancedFilters.vendedor.toLowerCase())) &&
+                           (!advancedFilters.vendedor || normalizeText(venda.vendedor || '').includes(normalizeText(advancedFilters.vendedor))) &&
+                           (!advancedFilters.cliente || normalizeText(venda.cliente).includes(normalizeText(advancedFilters.cliente))) &&
                            (!advancedFilters.valor_min || venda.total >= parseFloat(advancedFilters.valor_min)) &&
                            (!advancedFilters.valor_max || venda.total <= parseFloat(advancedFilters.valor_max));
+
+    // Filtro de período
+    if (advancedFilters.data_inicio || advancedFilters.data_fim) {
+      const vendaDate = new Date(venda.data_venda);
+      vendaDate.setHours(0, 0, 0, 0);
+      
+      if (advancedFilters.data_inicio) {
+        const inicioDate = new Date(advancedFilters.data_inicio);
+        inicioDate.setHours(0, 0, 0, 0);
+        if (vendaDate < inicioDate) return false;
+      }
+      
+      if (advancedFilters.data_fim) {
+        const fimDate = new Date(advancedFilters.data_fim);
+        fimDate.setHours(23, 59, 59, 999);
+        if (vendaDate > fimDate) return false;
+      }
+    }
 
     // Se não há filtro de status específico, excluir canceladas
     // Se há filtro de status 'cancelada', incluir apenas canceladas
@@ -1384,66 +1472,151 @@ export default function VendasPage() {
 
           {/* Busca Avançada */}
           {showAdvancedSearch && (
-            <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                <select 
-                  className="px-3 py-2 border rounded-md bg-background text-foreground border-input"
-                  value={advancedFilters.status}
-                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))}
-                >
-                  <option value="">Todos os status</option>
-                  <option value="pendente">Pendente</option>
-                  <option value="paga">Paga</option>
-                  <option value="cancelada">Cancelada</option>
-                </select>
-                <select 
-                  className="px-3 py-2 border rounded-md bg-background text-foreground border-input"
-                  value={advancedFilters.forma_pagamento}
-                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, forma_pagamento: e.target.value }))}
-                >
-                  <option value="">Todas as formas</option>
-                  <option value="dinheiro">Dinheiro</option>
-                  <option value="cartao_debito">Cartão Débito</option>
-                  <option value="cartao_credito">Cartão Crédito</option>
-                  <option value="pix">PIX</option>
-                  <option value="boleto">Boleto</option>
-                </select>
-                <Input
-                  placeholder="Vendedor..."
-                  value={advancedFilters.vendedor}
-                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, vendedor: e.target.value }))}
-                />
-                <Input
-                  type="date"
-                  placeholder="Data início..."
-                  value={advancedFilters.data_inicio}
-                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, data_inicio: e.target.value }))}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="Valor mínimo..."
-                  value={advancedFilters.valor_min}
-                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, valor_min: e.target.value }))}
-                />
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="Valor máximo..."
-                  value={advancedFilters.valor_max}
-                  onChange={(e) => setAdvancedFilters(prev => ({ ...prev, valor_max: e.target.value }))}
-                />
-              </div>
-            </div>
+            <Card className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-2 border-blue-200 dark:border-blue-800 shadow-md">
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="filter-status" className="text-sm font-medium">Status</Label>
+                    <Select 
+                      value={advancedFilters.status}
+                      onValueChange={(value) => setAdvancedFilters(prev => ({ ...prev, status: value }))}
+                    >
+                      <SelectTrigger id="filter-status" className="bg-white dark:bg-slate-900">
+                        <SelectValue placeholder="Todos os status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Todos os status</SelectItem>
+                        <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="paga">Paga</SelectItem>
+                        <SelectItem value="cancelada">Cancelada</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="filter-pagamento" className="text-sm font-medium">Forma de Pagamento</Label>
+                    <Select 
+                      value={advancedFilters.forma_pagamento}
+                      onValueChange={(value) => setAdvancedFilters(prev => ({ ...prev, forma_pagamento: value }))}
+                    >
+                      <SelectTrigger id="filter-pagamento" className="bg-white dark:bg-slate-900">
+                        <SelectValue placeholder="Todas as formas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Todas as formas</SelectItem>
+                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                        <SelectItem value="cartao_debito">Cartão Débito</SelectItem>
+                        <SelectItem value="cartao_credito">Cartão Crédito</SelectItem>
+                        <SelectItem value="pix">PIX</SelectItem>
+                        <SelectItem value="boleto">Boleto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="filter-cliente" className="text-sm font-medium">Cliente</Label>
+                    <AutocompleteInput
+                      value={advancedFilters.cliente}
+                      onChange={(v) => setAdvancedFilters(prev => ({ ...prev, cliente: v }))}
+                      onPick={(opt) => setAdvancedFilters(prev => ({ ...prev, cliente: opt.label }))}
+                      placeholder="Digite o nome do cliente..."
+                      disabled={loadingCustomers}
+                      options={customersList.map(c => ({
+                        value: String(c.id),
+                        label: c.name,
+                        keywords: [c.document, c.phone].filter(Boolean).join(' ')
+                      }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="filter-vendedor" className="text-sm font-medium">Vendedor</Label>
+                    <Input
+                      id="filter-vendedor"
+                      placeholder="Digite o nome do vendedor..."
+                      value={advancedFilters.vendedor}
+                      onChange={(e) => setAdvancedFilters(prev => ({ ...prev, vendedor: e.target.value }))}
+                      className="bg-white dark:bg-slate-900"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="filter-data-inicio" className="text-sm font-medium">Data Início</Label>
+                    <Input
+                      id="filter-data-inicio"
+                      type="date"
+                      value={advancedFilters.data_inicio}
+                      onChange={(e) => setAdvancedFilters(prev => ({ ...prev, data_inicio: e.target.value }))}
+                      className="bg-white dark:bg-slate-900"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="filter-data-fim" className="text-sm font-medium">Data Fim</Label>
+                    <Input
+                      id="filter-data-fim"
+                      type="date"
+                      value={advancedFilters.data_fim}
+                      onChange={(e) => setAdvancedFilters(prev => ({ ...prev, data_fim: e.target.value }))}
+                      className="bg-white dark:bg-slate-900"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="filter-valor-min" className="text-sm font-medium">Valor Mínimo</Label>
+                    <Input
+                      id="filter-valor-min"
+                      type="number"
+                      step="0.01"
+                      placeholder="R$ 0,00"
+                      value={advancedFilters.valor_min}
+                      onChange={(e) => setAdvancedFilters(prev => ({ ...prev, valor_min: e.target.value }))}
+                      className="bg-white dark:bg-slate-900"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="filter-valor-max" className="text-sm font-medium">Valor Máximo</Label>
+                    <Input
+                      id="filter-valor-max"
+                      type="number"
+                      step="0.01"
+                      placeholder="R$ 0,00"
+                      value={advancedFilters.valor_max}
+                      onChange={(e) => setAdvancedFilters(prev => ({ ...prev, valor_max: e.target.value }))}
+                      className="bg-white dark:bg-slate-900"
+                    />
+                  </div>
+
+                  <div className="space-y-2 flex items-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => setAdvancedFilters({
+                        status: '',
+                        forma_pagamento: '',
+                        vendedor: '',
+                        cliente: '',
+                        data_inicio: '',
+                        data_fim: '',
+                        valor_min: '',
+                        valor_max: ''
+                      })}
+                      className="w-full"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Limpar Filtros
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </CardContent>
       </Card>
 
       {/* Tabela */}
-      <Card className="juga-card">
-        <CardHeader>
+      <Card className="border-2 shadow-lg bg-white dark:bg-slate-900">
+        <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
           <CardTitle className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5" />
             Lista de Vendas ({filteredVendas.length})
@@ -1451,33 +1624,45 @@ export default function VendasPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">Carregando vendas...</div>
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+              <p className="text-lg font-medium">Carregando vendas...</p>
+            </div>
+          ) : filteredVendas.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <ShoppingCart className="h-16 w-16 mb-4 opacity-50" />
+              <p className="text-lg font-medium">Nenhuma venda encontrada</p>
+              <p className="text-sm">Tente ajustar os filtros de busca</p>
+            </div>
           ) : (
             <div className="overflow-x-auto -mx-4 sm:mx-0">
               <div className="inline-block min-w-full align-middle">
                 <Table>
                 <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
+                <TableRow className="bg-gray-50 dark:bg-slate-800">
+                  <TableHead className="w-12 font-semibold">
                     <Checkbox
                       checked={selectedVendas.size === filteredVendas.length && filteredVendas.length > 0}
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
-                  {columnVisibility.numero && <TableHead>Número</TableHead>}
-                  {columnVisibility.cliente && <TableHead>Cliente</TableHead>}
-                  {columnVisibility.vendedor && <TableHead>Vendedor</TableHead>}
-                  <TableHead>Itens</TableHead>
-                  {columnVisibility.total && <TableHead>Total</TableHead>}
-                  {columnVisibility.forma_pagamento && <TableHead>Pagamento</TableHead>}
-                  {columnVisibility.status && <TableHead>Status</TableHead>}
-                  {columnVisibility.data_venda && <TableHead>Data</TableHead>}
-                  <TableHead>Ações</TableHead>
+                  {columnVisibility.numero && <TableHead className="font-semibold">Número</TableHead>}
+                  {columnVisibility.cliente && <TableHead className="font-semibold">Cliente</TableHead>}
+                  {columnVisibility.vendedor && <TableHead className="font-semibold">Vendedor</TableHead>}
+                  <TableHead className="font-semibold">Itens</TableHead>
+                  {columnVisibility.total && <TableHead className="font-semibold">Total</TableHead>}
+                  {columnVisibility.forma_pagamento && <TableHead className="font-semibold">Pagamento</TableHead>}
+                  {columnVisibility.status && <TableHead className="font-semibold">Status</TableHead>}
+                  {columnVisibility.data_venda && <TableHead className="font-semibold">Data</TableHead>}
+                  <TableHead className="font-semibold">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredVendas.map((venda) => (
-                  <TableRow key={venda.id}>
+                {filteredVendas.map((venda, index) => (
+                  <TableRow 
+                    key={venda.id}
+                    className={index % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-gray-50/50 dark:bg-slate-800/50'}
+                  >
                     <TableCell>
                       <Checkbox
                         checked={selectedVendas.has(venda.id)}
