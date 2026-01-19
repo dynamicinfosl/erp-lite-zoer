@@ -181,6 +181,16 @@ GET https://www.jugasistemas.com.br/api/v1/customers?search=joao&limit=10
 - Buscar dados de um cliente existente
 - Listar clientes para confirmação
 
+**Dica importante:** 
+- Se você buscar pelo nome completo e não encontrar resultados, **tente buscar novamente apenas pelo primeiro nome**
+- Exemplo: Se buscar "João Silva" e não encontrar, tente buscar apenas "João"
+- Isso ajuda quando o cliente pode estar cadastrado apenas com o primeiro nome ou com sobrenome diferente
+
+**Dica importante:** 
+- Se você buscar pelo nome completo e não encontrar resultados, **tente buscar novamente apenas pelo primeiro nome**
+- Exemplo: Se buscar "João Silva" e não encontrar, tente buscar apenas "João"
+- Isso ajuda quando o cliente pode estar cadastrado apenas com o primeiro nome ou com sobrenome diferente
+
 ---
 
 ### ➕ 3. Criar Cliente
@@ -530,7 +540,8 @@ Body: { "customer_name": "Carlos Oliveira", "sale_type": "entrega", "delivery_ad
 
 ### 2. **Verificar/Cadastrar Cliente**
    - Se o cliente mencionar nome/telefone, busque na lista de clientes
-   - Se não encontrar, crie um novo cliente
+   - **Se não encontrar pelo nome completo, tente buscar novamente apenas pelo primeiro nome**
+   - Se não encontrar mesmo assim, crie um novo cliente
    - Se encontrar mas faltar dados (ex: endereço para entrega), edite o cliente
 
 ### 3. **Buscar Produtos**
