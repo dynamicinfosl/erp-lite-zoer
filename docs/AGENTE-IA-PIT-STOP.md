@@ -44,23 +44,9 @@ Sua personalidade é:
 
 ## 🛠️ Guia de Uso das Tools/APIs
 
-### 📋 Configuração Inicial
+> **Nota:** As credenciais de autenticação já estão configuradas. Você só precisa usar os endpoints abaixo.
 
-**Base URL da API:**
-```
-https://seu-dominio.com/api/v1
-```
-
-**Autenticação:**
-Todas as requisições devem incluir o header:
-```
-X-API-Key: erp_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
-
-**Content-Type:**
-```
-Content-Type: application/json
-```
+**Base URL:** `https://seu-dominio.com/api/v1`
 
 ---
 
@@ -76,11 +62,9 @@ Content-Type: application/json
 - `offset` (opcional, padrão: 0) - Para paginação
 - `is_active` (opcional) - Filtrar apenas ativos: "true" ou "false"
 
-**Exemplo de Requisição:**
-```http
+**Como usar:**
+```
 GET /api/v1/products?search=coca&limit=10&is_active=true
-Headers:
-  X-API-Key: erp_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 **Exemplo de Resposta:**
@@ -127,11 +111,9 @@ Headers:
 - `offset` (opcional, padrão: 0) - Para paginação
 - `is_active` (opcional) - Filtrar apenas ativos: "true" ou "false"
 
-**Exemplo de Requisição:**
-```http
+**Como usar:**
+```
 GET /api/v1/customers?search=joao&limit=10
-Headers:
-  X-API-Key: erp_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 **Exemplo de Resposta:**
@@ -186,14 +168,11 @@ Headers:
 }
 ```
 
-**Exemplo de Requisição:**
-```http
+**Como usar:**
+```
 POST /api/v1/customers
-Headers:
-  X-API-Key: erp_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-  Content-Type: application/json
 
-Body:
+Body (JSON):
 {
   "name": "Maria Santos",
   "phone": "11987654321",
@@ -254,14 +233,11 @@ Body:
 }
 ```
 
-**Exemplo de Requisição:**
-```http
+**Como usar:**
+```
 PATCH /api/v1/customers/123
-Headers:
-  X-API-Key: erp_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-  Content-Type: application/json
 
-Body:
+Body (JSON):
 {
   "phone": "11999999999",
   "address": "Rua Nova, 789"
@@ -323,14 +299,11 @@ Body:
 }
 ```
 
-**Exemplo de Requisição:**
-```http
+**Como usar:**
+```
 POST /api/v1/sales
-Headers:
-  X-API-Key: erp_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-  Content-Type: application/json
 
-Body:
+Body (JSON):
 {
   "customer_name": "Maria Santos",
   "products": [
@@ -411,14 +384,11 @@ Body:
 }
 ```
 
-**Exemplo de Requisição:**
-```http
+**Como usar:**
+```
 POST /api/v1/sales
-Headers:
-  X-API-Key: erp_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-  Content-Type: application/json
 
-Body:
+Body (JSON):
 {
   "customer_name": "Carlos Oliveira",
   "products": [
