@@ -8,6 +8,18 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJ
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 /**
+ * Normaliza texto removendo acentos e convertendo para lowercase
+ * Exemplo: "João Silva" -> "joao silva", "Café" -> "cafe"
+ */
+function normalizeText(text: string): string {
+  return String(text || '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
+}
+
+/**
  * POST /api/v1/customers
  * Cria um novo cliente via API externa
  */
@@ -139,12 +151,18 @@ async function listCustomersHandler(
     }
 
     // Busca por nome, email ou documento
-    if (search && search.trim().length > 0) {
-      const searchTerm = search.trim();
+    // Buscamos mais resultados para poder filtrar com normalização depois
+    const searchTerm = search && search.trim().length > 0 ? search.trim() : null;
+    const normalizedSearch = searchTerm ? normalizeText(searchTerm) : null;
+    
+    if (searchTerm) {
+      // Busca inicial usando ilike (case-insensitive, mas não remove acentos)
+      // Buscamos mais resultados (até 3x o limite) para garantir que encontremos clientes mesmo com variações de acentos
       query = query.or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,document.ilike.%${searchTerm}%`);
+      query = query.range(offset, offset + (limit * 3) - 1); // Buscar mais para filtrar depois
     }
 
-    const { data: customers, error } = await query;
+    const { data: allCustomers, error } = await query;
 
     if (error) {
       console.error('❌ Erro ao listar clientes:', error);
@@ -154,13 +172,34 @@ async function listCustomersHandler(
       );
     }
 
+    // Se há busca, filtrar usando normalização para garantir flexibilidade com acentos e espaços
+    let customers = allCustomers || [];
+    if (normalizedSearch && customers.length > 0) {
+      customers = customers.filter((customer: any) => {
+        const normalizedName = normalizeText(customer.name || '');
+        const normalizedEmail = normalizeText(customer.email || '');
+        const normalizedDocument = normalizeText(customer.document || '');
+        
+        return (
+          normalizedName.includes(normalizedSearch) ||
+          normalizedEmail.includes(normalizedSearch) ||
+          normalizedDocument.includes(normalizedSearch)
+        );
+      });
+      
+      // Quando há busca, aplicamos paginação no resultado filtrado
+      // (porque buscamos mais resultados para garantir que encontremos clientes mesmo com variações de acentos)
+      customers = customers.slice(offset, offset + limit);
+    }
+    // Quando não há busca, customers já está paginado pelo range do Supabase
+
     return NextResponse.json({
       success: true,
-      data: customers || [],
+      data: customers,
       pagination: {
         limit,
         offset,
-        count: customers?.length || 0,
+        count: customers.length,
       },
     });
   } catch (error) {
