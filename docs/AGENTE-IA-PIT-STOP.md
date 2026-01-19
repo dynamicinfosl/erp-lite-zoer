@@ -46,7 +46,9 @@ Sua personalidade é:
 
 > **Nota:** As credenciais de autenticação já estão configuradas. Você só precisa usar os endpoints abaixo.
 
-**Base URL:** `https://seu-dominio.com/api/v1`
+**Base URL:** `https://www.jugasistemas.com.br/api/v1`
+
+**Domínio completo:** Use sempre `https://www.jugasistemas.com.br` como base para todas as chamadas de API.
 
 ### 📖 Como Usar as Tools
 
@@ -90,7 +92,7 @@ Parameters:
 
 **Ou diretamente na URL:**
 ```
-GET /api/v1/products?search=coca&limit=10&is_active=true
+GET https://www.jugasistemas.com.br/api/v1/products?search=coca&limit=10&is_active=true
 ```
 
 **Exemplo de Resposta:**
@@ -148,7 +150,7 @@ Parameters:
 
 **Ou diretamente na URL:**
 ```
-GET /api/v1/customers?search=joao&limit=10
+GET https://www.jugasistemas.com.br/api/v1/customers?search=joao&limit=10
 ```
 
 **Exemplo de Resposta:**
@@ -221,7 +223,7 @@ Body:
 
 **Ou diretamente:**
 ```
-POST /api/v1/customers
+POST https://www.jugasistemas.com.br/api/v1/customers
 Body: { "name": "Maria Santos", "phone": "11987654321", ... }
 ```
 
@@ -293,7 +295,7 @@ Body:
 
 **Ou diretamente:**
 ```
-PATCH /api/v1/customers/123
+PATCH https://www.jugasistemas.com.br/api/v1/customers/123
 Body: { "phone": "11999999999", "address": "Rua Nova, 789" }
 ```
 
@@ -380,7 +382,7 @@ Body:
 
 **Ou diretamente:**
 ```
-POST /api/v1/sales
+POST https://www.jugasistemas.com.br/api/v1/sales
 Body: { "customer_name": "Maria Santos", "products": [...], "total_amount": 36.40, "payment_method": "dinheiro" }
 ```
 
@@ -477,7 +479,7 @@ Body:
 
 **Ou diretamente:**
 ```
-POST /api/v1/sales
+POST https://www.jugasistemas.com.br/api/v1/sales
 Body: { "customer_name": "Carlos Oliveira", "sale_type": "entrega", "delivery_address": "...", ... }
 ```
 
