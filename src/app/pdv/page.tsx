@@ -212,6 +212,22 @@ export default function PDVPage() {
   const [showPendingSalesDialog, setShowPendingSalesDialog] = useState(false);
   const [restoredSaleId, setRestoredSaleId] = useState<string | null>(null);
   
+  // Estados para cadastro de novo cliente
+  const [showAddCustomerDialog, setShowAddCustomerDialog] = useState(false);
+  const [isRegisteringCustomer, setIsRegisteringCustomer] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    document: '',
+    city: '',
+    address: '',
+    neighborhood: '',
+    state: '',
+    zipcode: '',
+    type: 'PF' as 'PF' | 'PJ',
+  });
+  
   // Funções para gerenciar vendas em espera no localStorage
   const getPendingSalesKey = useCallback(() => {
     const tenantId = tenant?.id || 'no-tenant';
@@ -1009,6 +1025,61 @@ export default function PDVPage() {
     setCustomerPickerOpen(false);
     toast.success(`Cliente selecionado: ${c.name}`);
   }, []);
+
+  const handleAddCustomer = async () => {
+    if (!tenant?.id) {
+      toast.error('Tenant não disponível');
+      return;
+    }
+
+    if (!newCustomer.name) {
+      toast.error('O nome do cliente é obrigatório');
+      return;
+    }
+
+    setIsRegisteringCustomer(true);
+    try {
+      const response = await fetch('/next_api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newCustomer,
+          tenant_id: tenant.id,
+          branch_id: scope === 'branch' && branchId ? branchId : null,
+          status: 'active'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
+        throw new Error(errorData.error || 'Erro ao adicionar cliente');
+      }
+
+      const result = await response.json();
+      const createdCustomer = result.data || result;
+
+      await loadCustomers();
+      selectCustomer(createdCustomer);
+      setShowAddCustomerDialog(false);
+      setNewCustomer({
+        name: '',
+        email: '',
+        phone: '',
+        document: '',
+        city: '',
+        address: '',
+        neighborhood: '',
+        state: '',
+        zipcode: '',
+        type: 'PF',
+      });
+      toast.success('Cliente cadastrado e selecionado com sucesso!');
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao cadastrar cliente');
+    } finally {
+      setIsRegisteringCustomer(false);
+    }
+  };
 
   const clearCustomer = useCallback(() => {
     setSelectedCustomerId(null);
@@ -2024,69 +2095,320 @@ export default function PDVPage() {
 
       {/* Seletor de Cliente */}
       <Dialog open={customerPickerOpen} onOpenChange={setCustomerPickerOpen}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Selecionar Cliente</DialogTitle>
-            <DialogDescription>
-              Escolha um cliente cadastrado (necessário para entregas usando o endereço do cliente).
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Input
-              placeholder="Buscar por nome, telefone, documento..."
-              value={customerSearch}
-              onChange={(e) => setCustomerSearch(e.target.value)}
-            />
-            <Button variant="outline" onClick={loadCustomers} disabled={customersLoading} className="gap-2">
-              <RefreshCw className={`h-4 w-4 ${customersLoading ? 'animate-spin' : ''}`} />
-              Atualizar
-            </Button>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl">
+          <div className="bg-juga-gradient p-6 text-white shrink-0">
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <DialogTitle className="text-2xl font-bold flex items-center gap-2 text-white">
+                    <User className="h-6 w-6" />
+                    Selecionar Cliente
+                  </DialogTitle>
+                  <DialogDescription className="text-blue-100 mt-1">
+                    Pesquise ou cadastre um novo cliente para a venda.
+                  </DialogDescription>
+                </div>
+                <Button 
+                  onClick={() => {
+                    setCustomerPickerOpen(false);
+                    setShowAddCustomerDialog(true);
+                  }}
+                  className="bg-white text-blue-600 hover:bg-blue-50 font-bold gap-2 shadow-lg border-none"
+                >
+                  <Plus className="h-5 w-5" />
+                  Novo Cliente
+                </Button>
+              </div>
+            </DialogHeader>
           </div>
 
-          <div className="max-h-[60vh] overflow-y-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Telefone</TableHead>
-                  <TableHead>Endereço</TableHead>
-                  <TableHead className="text-right">Ação</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {!customersLoading &&
-                  (Array.isArray(customers) ? customers : [])
-                    .filter((c) => {
-                      const s = customerSearch.trim().toLowerCase();
-                      if (!s) return true;
-                      return `${c.name || ''} ${c.phone || ''} ${c.document || ''}`
-                        .toLowerCase()
-                        .includes(s);
-                    })
-                    .map((c) => (
-                      <TableRow key={c.id}>
-                        <TableCell className="font-medium">{c.name}</TableCell>
-                        <TableCell>{c.phone || '—'}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {[c.address, c.neighborhood, c.city, c.state, c.zipcode].filter(Boolean).join(' - ') || '—'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button size="sm" onClick={() => selectCustomer(c)}>
-                            Selecionar
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-              </TableBody>
-            </Table>
-
-            {customersLoading && (
-              <div className="text-center py-8 text-muted-foreground">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100 mx-auto mb-3" />
-                <p>Carregando clientes...</p>
+          <div className="p-6 space-y-4 flex-1 overflow-hidden flex flex-col">
+            <div className="flex gap-2 shrink-0">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  placeholder="Pesquisar por nome, telefone ou CPF/CNPJ..."
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  className="pl-10 h-12 text-lg shadow-sm focus-visible:ring-blue-500"
+                  autoFocus
+                />
               </div>
-            )}
+              <Button 
+                variant="outline" 
+                onClick={loadCustomers} 
+                disabled={customersLoading} 
+                className="h-12 px-6 gap-2 border-2 hover:border-blue-500 hover:text-blue-600 transition-colors"
+              >
+                <RefreshCw className={`h-5 w-5 ${customersLoading ? 'animate-spin' : ''}`} />
+                {customersLoading ? 'Carregando...' : 'Atualizar'}
+              </Button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto rounded-xl border-2 border-gray-100 dark:border-gray-800 shadow-inner bg-gray-50/50 dark:bg-gray-900/50 min-h-[300px]">
+              <Table>
+                <TableHeader className="bg-white dark:bg-gray-950 sticky top-0 z-10 shadow-sm">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-[40%] font-bold text-gray-700 dark:text-gray-300">Cliente</TableHead>
+                    <TableHead className="w-[20%] font-bold text-gray-700 dark:text-gray-300">Contato</TableHead>
+                    <TableHead className="w-[30%] font-bold text-gray-700 dark:text-gray-300">Localização</TableHead>
+                    <TableHead className="w-[10%] text-right font-bold text-gray-700 dark:text-gray-300">Ação</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {customersLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="h-64 text-center">
+                        <div className="flex flex-col items-center justify-center gap-3">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600" />
+                          <p className="text-muted-foreground font-medium">Buscando clientes...</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    (() => {
+                      const s = customerSearch.trim().toLowerCase();
+                      const filtered = (Array.isArray(customers) ? customers : [])
+                        .filter((c) => {
+                          if (!s) return true;
+                          return `${c.name || ''} ${c.phone || ''} ${c.document || ''}`
+                            .toLowerCase()
+                            .includes(s);
+                        });
+
+                      if (filtered.length === 0) {
+                        return (
+                          <TableRow>
+                            <TableCell colSpan={4} className="h-64 text-center">
+                              <div className="flex flex-col items-center justify-center gap-4 py-8">
+                                <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-full">
+                                  <Users className="h-12 w-12 text-blue-500" />
+                                </div>
+                                <div>
+                                  <p className="text-xl font-bold text-gray-800 dark:text-gray-200">Nenhum cliente encontrado</p>
+                                  <p className="text-muted-foreground mt-1">Não encontramos resultados para "{customerSearch}"</p>
+                                </div>
+                                <Button 
+                                  onClick={() => {
+                                    setCustomerPickerOpen(false);
+                                    setNewCustomer(prev => ({ ...prev, name: customerSearch }));
+                                    setShowAddCustomerDialog(true);
+                                  }}
+                                  className="juga-gradient text-white px-8 h-12 font-bold gap-2 shadow-lg"
+                                >
+                                  <Plus className="h-5 w-5" />
+                                  Cadastrar "{customerSearch}"
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
+
+                      return filtered.map((c) => (
+                        <TableRow key={c.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors group cursor-pointer" onClick={() => selectCustomer(c)}>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-bold text-lg group-hover:text-blue-600 transition-colors">{c.name}</span>
+                              <span className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                                <FileText className="h-3 w-3" />
+                                {c.document || 'Sem documento'}
+                                <Badge variant="outline" className="ml-2 text-[10px] py-0 h-4 uppercase">
+                                  {c.type || 'PF'}
+                                </Badge>
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2 text-sm">
+                                <Phone className="h-3.5 w-3.5 text-blue-500" />
+                                {c.phone || '—'}
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Mail className="h-3.5 w-3.5" />
+                                {c.email || '—'}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-sm max-w-[200px] truncate">
+                              <Package className="h-4 w-4 text-gray-400 shrink-0" />
+                              <span>{[c.neighborhood, c.city].filter(Boolean).join(' - ') || '—'}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate pl-6">
+                              {c.address || 'Endereço não informado'}
+                            </p>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button size="icon" variant="ghost" className="rounded-full hover:bg-blue-600 hover:text-white transition-all shadow-sm group-hover:scale-110">
+                              <Check className="h-5 w-5" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ));
+                    })()
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-gray-50 dark:bg-gray-950 border-t flex justify-end shrink-0">
+            <Button variant="ghost" onClick={() => setCustomerPickerOpen(false)} className="font-medium">
+              Cancelar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cadastro de Novo Cliente */}
+      <Dialog open={showAddCustomerDialog} onOpenChange={setShowAddCustomerDialog}>
+        <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto p-0 border-none shadow-2xl">
+          <div className="juga-gradient p-6 text-white shrink-0 sticky top-0 z-10">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold flex items-center gap-2 text-white">
+                <Plus className="h-6 w-6" />
+                Cadastrar Novo Cliente
+              </DialogTitle>
+              <DialogDescription className="text-blue-100">
+                Preencha os dados abaixo para cadastrar o cliente rapidamente.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="p-8 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="new-cust-name" className="text-sm font-bold flex items-center gap-1">
+                  Nome Completo <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="new-cust-name"
+                  placeholder="Ex: João da Silva"
+                  value={newCustomer.name}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                  className="h-11 focus-visible:ring-blue-500 border-gray-300"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-cust-type" className="text-sm font-bold">Tipo de Cliente</Label>
+                <Select
+                  value={newCustomer.type}
+                  onValueChange={(v: 'PF' | 'PJ') => setNewCustomer({ ...newCustomer, type: v })}
+                >
+                  <SelectTrigger id="new-cust-type" className="h-11 border-gray-300">
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PF">Pessoa Física (CPF)</SelectItem>
+                    <SelectItem value="PJ">Pessoa Jurídica (CNPJ)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-cust-doc" className="text-sm font-bold">Documento (CPF/CNPJ)</Label>
+                <Input
+                  id="new-cust-doc"
+                  placeholder="000.000.000-00"
+                  value={newCustomer.document}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, document: e.target.value })}
+                  className="h-11 border-gray-300"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-cust-phone" className="text-sm font-bold">Telefone / WhatsApp</Label>
+                <Input
+                  id="new-cust-phone"
+                  placeholder="(00) 00000-0000"
+                  value={newCustomer.phone}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                  className="h-11 border-gray-300"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-cust-email" className="text-sm font-bold">E-mail</Label>
+                <Input
+                  id="new-cust-email"
+                  type="email"
+                  placeholder="cliente@exemplo.com"
+                  value={newCustomer.email}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                  className="h-11 border-gray-300"
+                />
+              </div>
+
+              <div className="space-y-4 md:col-span-2 pt-2">
+                <div className="flex items-center gap-2 text-blue-600 font-bold border-b pb-2 mb-4">
+                  <Package className="h-5 w-5" />
+                  Endereço e Localização
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="new-cust-address" className="text-sm font-medium text-gray-700">Rua / Logradouro</Label>
+                    <Input
+                      id="new-cust-address"
+                      placeholder="Ex: Av. Brasil, 123"
+                      value={newCustomer.address}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
+                      className="h-11 border-gray-200"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="new-cust-neighborhood" className="text-sm font-medium text-gray-700">Bairro</Label>
+                    <Input
+                      id="new-cust-neighborhood"
+                      placeholder="Ex: Centro"
+                      value={newCustomer.neighborhood}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, neighborhood: e.target.value })}
+                      className="h-11 border-gray-200"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="new-cust-city" className="text-sm font-medium text-gray-700">Cidade</Label>
+                    <Input
+                      id="new-cust-city"
+                      placeholder="Ex: São Paulo"
+                      value={newCustomer.city}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, city: e.target.value })}
+                      className="h-11 border-gray-200"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 bg-gray-50 dark:bg-gray-950 border-t flex flex-col-reverse sm:flex-row gap-3 justify-end sticky bottom-0 z-10">
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowAddCustomerDialog(false)}
+              className="font-bold h-12 px-6"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleAddCustomer} 
+              disabled={isRegisteringCustomer}
+              className="juga-gradient text-white font-bold h-12 px-8 min-w-[150px] shadow-lg"
+            >
+              {isRegisteringCustomer ? (
+                <>
+                  <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                  Cadastrando...
+                </>
+              ) : (
+                'Salvar e Selecionar'
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
