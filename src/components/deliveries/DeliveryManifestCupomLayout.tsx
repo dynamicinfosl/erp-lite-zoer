@@ -151,38 +151,22 @@ export function DeliveryManifestCupomLayout({
     <div className="receipt-container">
       <style jsx global>{`
         @media print {
-          @page {
-            /* Evita “papel demais” e reduz margens do navegador */
-            margin: 0;
-          }
-          html {
-            margin: 0 !important;
-            padding: 0 !important;
-          }
           body {
-            margin: 0 !important;
-            padding: 0 !important;
+            margin: 0;
+            padding: 0;
             font-size: ${baseFontSize}px;
-            line-height: 1.15;
+            line-height: 1.2;
             background: white;
           }
           
           .receipt-container {
-            /*
-              Muitos drivers de bobina 80mm têm área imprimível real ~72–76mm.
-              Usar 76mm reduz risco de corte (principalmente na coluna QTD).
-            */
-            width: 76mm !important;
-            max-width: 76mm !important;
-            /* Fixar no canto para evitar “offset”/margem fantasma à esquerda */
-            /* Removido position: fixed para permitir quebra de página correta */
+            width: 80mm !important;
+            max-width: 80mm !important;
             margin: 0 auto !important;
-            /* Menos margem interna (principalmente à esquerda) para não “sumir” QTD */
-            padding: 2mm 1.5mm !important;
-            box-sizing: border-box !important;
+            padding: 3mm !important;
             font-family: 'Courier New', monospace !important;
             font-size: ${baseFontSize}px !important;
-            line-height: 1.15 !important;
+            line-height: 1.2 !important;
             background: white;
           }
           
@@ -205,28 +189,19 @@ export function DeliveryManifestCupomLayout({
           .items-table {
             width: 100%;
             border-collapse: collapse;
-            table-layout: fixed;
-            page-break-inside: auto;
+            font-size: ${baseFontSize - 2}px;
           }
           .items-table th,
           .items-table td {
-            padding: 1px 2px;
+            padding: 4px 5px;
             text-align: left;
             border: none;
             border-bottom: 1px dashed #666;
-            vertical-align: top;
-            /* Evitar quebra de página dentro de células */
-            page-break-inside: avoid;
-            break-inside: avoid;
-          }
-          .items-table tr {
-            /* Evitar quebra de página no meio de uma linha */
-            page-break-inside: avoid;
-            break-inside: avoid;
           }
           .items-table th {
-            font-weight: 700;
+            font-weight: bold;
             border-bottom: 1px solid #333;
+            padding: 5px 5px;
           }
           .items-table .col-name {
             width: auto;
@@ -238,24 +213,53 @@ export function DeliveryManifestCupomLayout({
             white-space: nowrap;
           }
           
-          /* Evitar quebra de página em elementos importantes */
-          .header {
-            page-break-inside: avoid;
-            break-inside: avoid;
+          .company-header {
+            text-align: center;
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+            border-bottom: 1px dashed #333;
           }
-          .section {
-            page-break-inside: avoid;
-            break-inside: avoid;
-            page-break-after: auto;
+          
+          .company-header div {
+            font-weight: 600 !important;
+            color: #000 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
-          .stop {
-            page-break-inside: avoid;
-            break-inside: avoid;
+          
+          .section-title {
+            font-weight: bold;
+            margin-top: 8px;
+            margin-bottom: 4px;
+            padding: 2px 0;
+            text-align: center;
+            border-top: 1px dashed #333;
+            border-bottom: 1px dashed #333;
           }
-          .footer {
-            page-break-inside: avoid;
-            break-inside: avoid;
-            page-break-before: auto;
+          
+          .info-item {
+            padding: 1px 0;
+            font-size: ${baseFontSize - 2}px;
+          }
+          
+          .signature-line {
+            margin-top: 15px;
+            padding-top: 2px;
+            border-top: 1px dashed #333;
+            text-align: center;
+          }
+          
+          .footer-note {
+            text-align: center;
+            font-size: ${baseFontSize - 3}px;
+            margin-top: 10px;
+            padding-top: 5px;
+            border-top: 1px dashed #333;
+          }
+          
+          .dashed-line {
+            border-top: 1px dashed #666;
+            margin: 5px 0;
           }
         }
         @media screen {

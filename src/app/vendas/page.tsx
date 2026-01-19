@@ -258,7 +258,15 @@ export default function VendasPage() {
     }
     try {
       setLoadingCustomers(true);
-      const res = await fetch(`/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}&limit=1000`);
+      const params = new URLSearchParams({
+        tenant_id: tenant.id,
+        limit: '1000',
+      });
+      // Respeitar contexto Matriz/Filial para garantir que a lista venha sempre
+      if (scope === 'all') params.set('branch_scope', 'all');
+      if (scope === 'branch' && branchId) params.set('branch_id', String(branchId));
+
+      const res = await fetch(`/next_api/customers?${params.toString()}`, { cache: 'no-store' });
       if (res.ok) {
         const json = await res.json();
         const rows = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
@@ -279,7 +287,7 @@ export default function VendasPage() {
     } finally {
       setLoadingCustomers(false);
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, scope, branchId]);
 
   useEffect(() => {
     if (showAdvancedSearch) {
@@ -1303,7 +1311,7 @@ export default function VendasPage() {
   // Renderizar componente
   return (
     <TenantPageWrapper>
-      <div className="space-y-6">
+      <div className="space-y-6 p-4 sm:p-6 bg-juga-surface-elevated min-h-screen">
       {/* Header */}
       <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div className="space-y-1">
@@ -1633,7 +1641,7 @@ export default function VendasPage() {
               <div className="inline-block min-w-full align-middle">
                 <Table>
                 <TableHeader>
-                <TableRow>
+                <TableRow className="bg-muted/40">
                   <TableHead className="w-12">
                     <Checkbox
                       checked={selectedVendas.size === filteredVendas.length && filteredVendas.length > 0}
@@ -1655,6 +1663,7 @@ export default function VendasPage() {
                 {filteredVendas.map((venda) => (
                   <TableRow 
                     key={venda.id}
+                    className="hover:bg-muted/30"
                   >
                     <TableCell>
                       <Checkbox
