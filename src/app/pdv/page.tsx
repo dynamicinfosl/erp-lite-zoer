@@ -146,6 +146,7 @@ export default function PDVPage() {
   const [selectedPriceTiers, setSelectedPriceTiers] = useState<Array<{ name: string; price: number; price_type_id?: number }>>([]);
   const [selectedVariants, setSelectedVariants] = useState<Array<{ id: number; label: string; name?: string | null; sale_price?: number | null }>>([]);
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
+  const [priceInputValue, setPriceInputValue] = useState<string>('');
   
   // Novos estados para funcionalidades avançadas
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -473,6 +474,7 @@ export default function PDVPage() {
             e.preventDefault();
             setSelectedProduct(null);
             setSearchTerm('');
+            setPriceInputValue('');
             break;
         }
       }
@@ -576,6 +578,7 @@ export default function PDVPage() {
       setSelectedVariants([]);
       setSelectedVariantId(null);
       setSelectedPriceTiers([]);
+      setPriceInputValue(product.price > 0 ? product.price.toFixed(2).replace('.', ',') : '');
       return;
     }
     
@@ -643,8 +646,10 @@ export default function PDVPage() {
         price_type_name: initial.name as any,
         price_type_id: initial.price_type_id as any,
       } as any);
+      setPriceInputValue(initial.price > 0 ? initial.price.toFixed(2).replace('.', ',') : '');
     } else {
       setSelectedProduct({ ...product, quantity: 1, discount: 0 });
+      setPriceInputValue(product.price > 0 ? product.price.toFixed(2).replace('.', ',') : '');
     }
   };
 
@@ -654,6 +659,7 @@ export default function PDVPage() {
     setSelectedVariants([]);
     setSelectedVariantId(null);
     setSearchTerm('');
+    setPriceInputValue('');
   };
 
   const removeFromCart = useCallback((productId: number, variantId?: number | null) => {
@@ -703,6 +709,7 @@ export default function PDVPage() {
     setSelectedCustomerId(null);
     setSelectedVariantId(null);
     setSelectedVariants([]);
+    setPriceInputValue('');
     setSelectedPriceTiers([]);
     setSearchTerm('');
   }, [restoredSaleId, pendingSales, savePendingSales]);
@@ -723,6 +730,7 @@ export default function PDVPage() {
     setSelectedCustomerId(null);
     setSelectedVariantId(null);
     setSelectedVariants([]);
+    setPriceInputValue('');
     setSelectedPriceTiers([]);
     setSearchTerm('');
   }, [restoredSaleId, pendingSales, savePendingSales]);
@@ -1485,35 +1493,46 @@ export default function PDVPage() {
                         <Input 
                           type="text"
                           inputMode="decimal"
-                          value={selectedProduct.price === 0 || selectedProduct.price === undefined ? '' : String(selectedProduct.price).replace(/^0+/, '') || ''}
+                          value={priceInputValue}
                           onChange={(e) => {
                             let value = e.target.value;
-                            // Permitir apenas números, ponto e vírgula (substituir vírgula por ponto)
-                            value = value.replace(',', '.').replace(/[^\d.]/g, '');
-                            // Remover múltiplos pontos
-                            const parts = value.split('.');
-                            if (parts.length > 2) {
-                              value = parts[0] + '.' + parts.slice(1).join('');
+                            
+                            // Permitir apenas números, vírgula e ponto
+                            value = value.replace(/[^\d,.]/g, '');
+                            
+                            // Substituir ponto por vírgula (padrão brasileiro)
+                            value = value.replace(/\./g, ',');
+                            
+                            // Remover múltiplas vírgulas (manter apenas a primeira)
+                            const commaIndex = value.indexOf(',');
+                            if (commaIndex !== -1) {
+                              const beforeComma = value.substring(0, commaIndex + 1);
+                              const afterComma = value.substring(commaIndex + 1).replace(/,/g, '');
+                              value = beforeComma + afterComma;
                             }
-                            // Limitar a 2 casas decimais
+                            
+                            // Limitar a 2 casas decimais após a vírgula
+                            const parts = value.split(',');
                             if (parts.length === 2 && parts[1].length > 2) {
-                              value = parts[0] + '.' + parts[1].substring(0, 2);
+                              value = parts[0] + ',' + parts[1].substring(0, 2);
                             }
-                            // Remover zeros à esquerda (mas manter se for apenas "0.")
-                            if (value.length > 1 && value.startsWith('0') && value[1] !== '.') {
+                            
+                            // Remover zeros à esquerda (mas manter se for apenas "0,")
+                            if (value.length > 1 && value.startsWith('0') && value[1] !== ',') {
                               value = value.replace(/^0+/, '') || '';
                             }
                             
-                            if (value === '' || value === '0') {
+                            // Atualizar o estado local (string formatada)
+                            setPriceInputValue(value);
+                            
+                            // Converter para número e atualizar o produto
+                            const numValue = parseFloat(value.replace(',', '.'));
+                            if (value === '' || value === '0' || value === '0,') {
                               setSelectedProduct({
                                 ...selectedProduct,
                                 price: 0,
                               });
-                              return;
-                            }
-                            
-                            const numValue = parseFloat(value);
-                            if (!isNaN(numValue) && numValue >= 0) {
+                            } else if (!isNaN(numValue) && numValue >= 0) {
                               setSelectedProduct({
                                 ...selectedProduct,
                                 price: numValue,
@@ -1525,16 +1544,21 @@ export default function PDVPage() {
                             e.target.select();
                           }}
                           onBlur={(e) => {
-                            // Garantir valor válido ao perder foco
-                            if (!selectedProduct.price || selectedProduct.price < 0) {
+                            // Garantir valor válido ao perder foco e formatar
+                            const numValue = parseFloat(priceInputValue.replace(',', '.'));
+                            if (!priceInputValue || isNaN(numValue) || numValue < 0) {
                               setSelectedProduct({
                                 ...selectedProduct,
                                 price: 0,
                               });
+                              setPriceInputValue('');
+                            } else {
+                              // Formatar com 2 casas decimais ao perder foco
+                              setPriceInputValue(numValue.toFixed(2).replace('.', ','));
                             }
                           }}
                           className="mt-1 h-9"
-                          placeholder="0.00"
+                          placeholder="0,00"
                         />
                         <p className="mt-1 text-xs text-muted-foreground">
                           {selectedProduct.price > 0 ? `R$ ${selectedProduct.price.toFixed(2)}` : 'Digite o valor'}
@@ -1558,6 +1582,7 @@ export default function PDVPage() {
                                     ...selectedProduct,
                                     price: variant.sale_price,
                                   });
+                                  setPriceInputValue(variant.sale_price.toFixed(2).replace('.', ','));
                                 }
                               } else {
                                 setSelectedVariantId(null);
@@ -1601,6 +1626,7 @@ export default function PDVPage() {
                                 price_type_id: tier.price_type_id as any,
                                 price_type_name: tier.name as any,
                               } as any);
+                              setPriceInputValue(tier.price > 0 ? tier.price.toFixed(2).replace('.', ',') : '');
                             }}
                           >
                             <SelectTrigger className="mt-1 h-9">
