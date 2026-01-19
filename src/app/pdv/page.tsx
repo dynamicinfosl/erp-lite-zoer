@@ -75,6 +75,8 @@ import {
   Building2,
   UserCog,
   LogOut,
+  Phone,
+  Mail,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
