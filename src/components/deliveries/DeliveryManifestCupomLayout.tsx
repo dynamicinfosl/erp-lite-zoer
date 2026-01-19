@@ -175,10 +175,8 @@ export function DeliveryManifestCupomLayout({
             width: 76mm !important;
             max-width: 76mm !important;
             /* Fixar no canto para evitar “offset”/margem fantasma à esquerda */
-            position: fixed !important;
-            left: 0 !important;
-            top: 0 !important;
-            margin: 0 !important;
+            /* Removido position: fixed para permitir quebra de página correta */
+            margin: 0 auto !important;
             /* Menos margem interna (principalmente à esquerda) para não “sumir” QTD */
             padding: 2mm 1.5mm !important;
             box-sizing: border-box !important;
@@ -208,6 +206,7 @@ export function DeliveryManifestCupomLayout({
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            page-break-inside: auto;
           }
           .items-table th,
           .items-table td {
@@ -216,6 +215,14 @@ export function DeliveryManifestCupomLayout({
             border: none;
             border-bottom: 1px dashed #666;
             vertical-align: top;
+            /* Evitar quebra de página dentro de células */
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .items-table tr {
+            /* Evitar quebra de página no meio de uma linha */
+            page-break-inside: avoid;
+            break-inside: avoid;
           }
           .items-table th {
             font-weight: 700;
@@ -229,6 +236,26 @@ export function DeliveryManifestCupomLayout({
             width: 14mm;
             text-align: right;
             white-space: nowrap;
+          }
+          
+          /* Evitar quebra de página em elementos importantes */
+          .header {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .section {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            page-break-after: auto;
+          }
+          .stop {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .footer {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            page-break-before: auto;
           }
         }
         @media screen {

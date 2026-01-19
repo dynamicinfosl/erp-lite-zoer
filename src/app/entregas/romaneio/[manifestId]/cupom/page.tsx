@@ -37,11 +37,8 @@ export default function RomaneioCupomPage() {
     load();
   }, [tenant?.id, manifestId]);
 
-  useEffect(() => {
-    if (!loading && data) {
-      setTimeout(() => window.print(), 500);
-    }
-  }, [loading, data]);
+  // Removido impressão automática para evitar duplicação
+  // O usuário pode usar o botão "Imprimir Cupom" quando necessário
 
   if (loading) {
     return (
