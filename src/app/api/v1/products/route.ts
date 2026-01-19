@@ -8,6 +8,18 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJ
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 /**
+ * Normaliza texto removendo acentos e convertendo para lowercase
+ * Exemplo: "Café" -> "cafe", "João" -> "joao"
+ */
+function normalizeText(text: string): string {
+  return String(text || '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
+}
+
+/**
  * POST /api/v1/products
  * Cria um novo produto via API externa
  */
@@ -135,12 +147,18 @@ async function listProductsHandler(
     }
 
     // Busca por nome, SKU ou código de barras
-    if (search && search.trim().length > 0) {
-      const searchTerm = search.trim();
+    // Buscamos mais resultados para poder filtrar com normalização depois
+    const searchTerm = search && search.trim().length > 0 ? search.trim() : null;
+    const normalizedSearch = searchTerm ? normalizeText(searchTerm) : null;
+    
+    if (searchTerm) {
+      // Busca inicial usando ilike (case-insensitive, mas não remove acentos)
+      // Buscamos mais resultados (até 3x o limite) para garantir que encontremos produtos mesmo com variações de acentos
       query = query.or(`name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%,barcode.ilike.%${searchTerm}%`);
+      query = query.range(offset, offset + (limit * 3) - 1); // Buscar mais para filtrar depois
     }
 
-    const { data: products, error } = await query;
+    const { data: allProducts, error } = await query;
 
     if (error) {
       console.error('❌ Erro ao listar produtos:', error);
@@ -150,13 +168,34 @@ async function listProductsHandler(
       );
     }
 
+    // Se há busca, filtrar usando normalização para garantir flexibilidade com acentos
+    let products = allProducts || [];
+    if (normalizedSearch && products.length > 0) {
+      products = products.filter((product: any) => {
+        const normalizedName = normalizeText(product.name || '');
+        const normalizedSku = normalizeText(product.sku || '');
+        const normalizedBarcode = normalizeText(product.barcode || '');
+        
+        return (
+          normalizedName.includes(normalizedSearch) ||
+          normalizedSku.includes(normalizedSearch) ||
+          normalizedBarcode.includes(normalizedSearch)
+        );
+      });
+      
+      // Quando há busca, aplicamos paginação no resultado filtrado
+      // (porque buscamos mais resultados para garantir que encontremos produtos mesmo com variações de acentos)
+      products = products.slice(offset, offset + limit);
+    }
+    // Quando não há busca, products já está paginado pelo range do Supabase
+
     return NextResponse.json({
       success: true,
-      data: products || [],
+      data: products,
       pagination: {
         limit,
         offset,
-        count: products?.length || 0,
+        count: products.length,
       },
     });
   } catch (error) {

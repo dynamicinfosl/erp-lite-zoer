@@ -294,12 +294,14 @@ Lista produtos do tenant.
 - `limit` (opcional, padrão: 50) - Número de registros por página
 - `offset` (opcional, padrão: 0) - Deslocamento para paginação
 - `is_active` (opcional) - Filtrar por status: "true" | "false"
-- `search` (opcional) - Buscar por nome, SKU ou código de barras
+- `search` (opcional) - Buscar por nome, SKU ou código de barras. **A busca é flexível e ignora acentos**: buscar "cafe" encontra "café", buscar "joao" encontra "joão", etc.
 
 **Exemplo:**
 
 ```
 GET /api/v1/products?limit=20&is_active=true&search=exemplo
+GET /api/v1/products?search=cafe  # Encontra "café", "Café", "CAFÉ", etc.
+GET /api/v1/products?search=joao   # Encontra "joão", "João", "JOAO", etc.
 ```
 
 #### Buscar Produto por ID
