@@ -217,12 +217,13 @@ Lista clientes do tenant.
 - `limit` (opcional, padrão: 50) - Número de registros por página
 - `offset` (opcional, padrão: 0) - Deslocamento para paginação
 - `is_active` (opcional) - Filtrar por status: "true" | "false"
-- `search` (opcional) - Buscar por nome, email ou documento
+- `search` (opcional) - Buscar por nome, email ou documento. **A busca é flexível e ignora acentos**: buscar "joao" encontra "joão", buscar "maria" encontra "maría", etc.
 
 **Exemplo:**
 
 ```
-GET /api/v1/customers?limit=20&is_active=true&search=joão
+GET /api/v1/customers?limit=20&is_active=true&search=joao
+GET /api/v1/customers?search=joao silva  # Encontra "João Silva", "JOAO SILVA", etc.
 ```
 
 #### Buscar Cliente por ID
