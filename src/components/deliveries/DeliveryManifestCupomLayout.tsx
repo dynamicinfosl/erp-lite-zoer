@@ -151,23 +151,29 @@ export function DeliveryManifestCupomLayout({
     <div className="receipt-container">
       <style jsx global>{`
         @media print {
-          body {
+          @page {
             margin: 0;
-            padding: 0;
+            size: 72mm auto;
+          }
+          
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
             font-size: ${baseFontSize}px;
             line-height: 1.2;
             background: white;
           }
           
           .receipt-container {
-            width: 80mm !important;
-            max-width: 80mm !important;
-            margin: 0 auto !important;
-            padding: 3mm !important;
+            width: 72mm !important;
+            max-width: 72mm !important;
+            margin: 0 !important;
+            padding: 1.5mm 2mm !important;
             font-family: 'Courier New', monospace !important;
             font-size: ${baseFontSize}px !important;
             line-height: 1.2 !important;
             background: white;
+            box-sizing: border-box !important;
           }
           
           .no-print {
@@ -187,13 +193,14 @@ export function DeliveryManifestCupomLayout({
 
           /* Lista de produtos em formato de tabela (mesmo padrão do cupom balcão) */
           .items-table {
-            width: 100%;
+            width: 100% !important;
             border-collapse: collapse;
             font-size: ${baseFontSize - 2}px;
+            table-layout: auto;
           }
           .items-table th,
           .items-table td {
-            padding: 4px 5px;
+            padding: 2px 1px;
             text-align: left;
             border: none;
             border-bottom: 1px dashed #666;
@@ -201,16 +208,19 @@ export function DeliveryManifestCupomLayout({
           .items-table th {
             font-weight: bold;
             border-bottom: 1px solid #333;
-            padding: 5px 5px;
+            padding: 3px 1px;
           }
           .items-table .col-name {
             width: auto;
             word-break: break-word;
+            padding-right: 3px;
           }
           .items-table .col-qty {
-            width: 14mm;
+            width: 18mm;
+            min-width: 18mm;
             text-align: right;
             white-space: nowrap;
+            padding-left: 2px;
           }
           
           .company-header {
