@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 import { Button } from '@/components/ui/button';
@@ -712,13 +712,11 @@ export default function PDVPage() {
   const total = useMemo(() => cart.reduce((sum, item) => sum + calculateItemTotal(item), 0), [cart, calculateItemTotal]); // Dependências estáveis
 
   const clearCart = useCallback(() => {
-    // Se há uma venda restaurada e o carrinho está sendo esvaziado, remover a venda restaurada
-    if (restoredSaleId) {
-      const updatedPendingSales = pendingSales.filter(sale => sale.id !== restoredSaleId);
-      savePendingSales(updatedPendingSales);
-      setRestoredSaleId(null);
-    }
-    
+    // Limpar carrinho NÃO deve apagar venda em espera.
+    // A venda em espera só deve ser removida quando a venda restaurada for FINALIZADA
+    // (ver finalizeSale) ou removida manualmente pelo usuário.
+    if (restoredSaleId) setRestoredSaleId(null);
+
     setCart([]);
     setSelectedProduct(null);
     setCustomerName('');
@@ -728,16 +726,12 @@ export default function PDVPage() {
     setPriceInputValue('');
     setSelectedPriceTiers([]);
     setSearchTerm('');
-  }, [restoredSaleId, pendingSales, savePendingSales]);
+  }, [restoredSaleId]);
 
   // Função para cancelar seleção e limpar carrinho
   const cancelSelection = useCallback(() => {
-    // Se há uma venda restaurada, removê-la ao cancelar
-    if (restoredSaleId) {
-      const updatedPendingSales = pendingSales.filter(sale => sale.id !== restoredSaleId);
-      savePendingSales(updatedPendingSales);
-      setRestoredSaleId(null);
-    }
+    // Cancelar não deve remover a venda em espera; apenas interrompe a edição.
+    if (restoredSaleId) setRestoredSaleId(null);
     clearSelection();
     // Limpar carrinho diretamente sem depender da função clearCart
     setCart([]);
@@ -749,7 +743,7 @@ export default function PDVPage() {
     setPriceInputValue('');
     setSelectedPriceTiers([]);
     setSearchTerm('');
-  }, [restoredSaleId, pendingSales, savePendingSales]);
+  }, [restoredSaleId]);
 
   // Função para colocar venda em espera
   const putSaleOnHold = useCallback(() => {
@@ -1235,6 +1229,7 @@ export default function PDVPage() {
     // Limpar carrinho e fechar modal
     clearCart();
     setShowConfirmationModal(false);
+    setLastSaleData(null);
   };
 
   const handlePrintA4 = () => {
@@ -1246,6 +1241,7 @@ export default function PDVPage() {
     // Limpar carrinho e fechar modal
     clearCart();
     setShowConfirmationModal(false);
+    setLastSaleData(null);
   };
 
   // Função para imprimir cupom do histórico
@@ -1265,6 +1261,7 @@ export default function PDVPage() {
     clearCart();
     setShowConfirmationModal(false);
     setPaymentMethod('dinheiro');
+    setLastSaleData(null);
   };
 
   const handleCloseConfirmation = () => {
@@ -1273,6 +1270,7 @@ export default function PDVPage() {
     setShowConfirmationModal(false);
     setPaymentMethod('dinheiro');
     setSearchTerm('');
+    setLastSaleData(null);
     toast.success('Carrinho limpo. Pronto para nova venda!');
   };
 
@@ -1282,15 +1280,20 @@ export default function PDVPage() {
       // Limpar carrinho e fechar modal
       clearCart();
       setShowConfirmationModal(false);
+      setLastSaleData(null);
     }
   };
 
-  // Limpar carrinho automaticamente quando o modal fechar por qualquer motivo
+  // Limpar carrinho automaticamente SOMENTE quando o modal ACABAR de fechar.
+  // (evita limpar carrinho depois ao restaurar uma venda em espera enquanto lastSaleData ainda existe)
+  const prevShowConfirmationModalRef = useRef<boolean>(showConfirmationModal);
   useEffect(() => {
-    if (!showConfirmationModal && lastSaleData) {
-      // Modal foi fechado e havia uma venda confirmada - limpar carrinho
+    const prev = prevShowConfirmationModalRef.current;
+    prevShowConfirmationModalRef.current = showConfirmationModal;
+    if (prev && !showConfirmationModal && lastSaleData) {
       clearCart();
       setPaymentMethod('dinheiro');
+      setLastSaleData(null);
     }
   }, [showConfirmationModal, lastSaleData, clearCart]);
 
