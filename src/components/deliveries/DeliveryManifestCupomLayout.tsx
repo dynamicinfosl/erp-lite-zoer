@@ -151,29 +151,21 @@ export function DeliveryManifestCupomLayout({
     <div className="receipt-container">
       <style jsx global>{`
         @media print {
-          @page {
-            margin: 0;
-            size: 72mm auto;
-          }
-          
           body {
-            margin: 0 !important;
-            padding: 0 !important;
+            margin: 0;
+            padding: 0;
             font-size: ${baseFontSize}px;
             line-height: 1.2;
-            background: white;
           }
           
           .receipt-container {
-            width: 72mm !important;
-            max-width: 72mm !important;
-            margin: 0 !important;
-            padding: 1.5mm 2mm !important;
+            width: 80mm !important;
+            max-width: 80mm !important;
+            margin: 0 auto !important;
+            padding: 3mm !important;
             font-family: 'Courier New', monospace !important;
             font-size: ${baseFontSize}px !important;
             line-height: 1.2 !important;
-            background: white;
-            box-sizing: border-box !important;
           }
           
           .no-print {
@@ -193,34 +185,34 @@ export function DeliveryManifestCupomLayout({
 
           /* Lista de produtos em formato de tabela (mesmo padrão do cupom balcão) */
           .items-table {
-            width: 100% !important;
+            width: 100%;
             border-collapse: collapse;
             font-size: ${baseFontSize - 2}px;
-            table-layout: auto;
           }
+          
           .items-table th,
           .items-table td {
-            padding: 2px 1px;
+            padding: 4px 5px;
             text-align: left;
             border: none;
             border-bottom: 1px dashed #666;
           }
+          
           .items-table th {
             font-weight: bold;
             border-bottom: 1px solid #333;
-            padding: 3px 1px;
+            padding: 5px 5px;
           }
+          
           .items-table .col-name {
-            width: auto;
+            width: 70%;
             word-break: break-word;
-            padding-right: 3px;
           }
+          
           .items-table .col-qty {
-            width: 18mm;
-            min-width: 18mm;
+            width: 30%;
             text-align: right;
             white-space: nowrap;
-            padding-left: 2px;
           }
           
           .company-header {
@@ -271,6 +263,68 @@ export function DeliveryManifestCupomLayout({
             border-top: 1px dashed #666;
             margin: 5px 0;
           }
+          
+          .header {
+            text-align: center;
+            border-bottom: 1px dashed #333;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+          }
+          
+          .company-name {
+            font-weight: bold;
+            font-size: ${baseFontSize + 2}px;
+            margin-bottom: 4px;
+          }
+          
+          .title {
+            font-weight: bold;
+            font-size: ${baseFontSize + 1}px;
+            margin: 6px 0;
+          }
+          
+          .meta {
+            font-size: ${baseFontSize - 1}px;
+            margin: 4px 0;
+            font-weight: 600;
+          }
+          
+          .section {
+            margin-top: 8px;
+            border-top: 1px dashed #333;
+            padding-top: 6px;
+          }
+          
+          .stop {
+            margin-top: 6px;
+            padding: 4px 0;
+            border-bottom: 1px dashed #666;
+          }
+          
+          .stop-customer {
+            font-weight: bold;
+            font-size: ${baseFontSize - 1}px;
+          }
+          
+          .stop-sale {
+            font-size: ${baseFontSize - 1}px;
+            margin-top: 2px;
+            font-weight: 600;
+          }
+          
+          .footer {
+            margin-top: 12px;
+            padding-top: 8px;
+            border-top: 1px dashed #333;
+            text-align: center;
+            font-size: ${baseFontSize - 1}px;
+            font-weight: 600;
+          }
+          
+          .divider {
+            border-top: 1px dashed #666;
+            margin: 6px 0;
+          }
         }
         @media screen {
           .receipt-container {
@@ -298,59 +352,39 @@ export function DeliveryManifestCupomLayout({
           .items-table {
             width: 100%;
             border-collapse: collapse;
-            table-layout: fixed;
+            font-size: ${baseFontSize - 1}px;
           }
+          
           .items-table th,
           .items-table td {
-            padding: 1px 2px;
+            padding: 4px 5px;
             text-align: left;
             border: none;
             border-bottom: 1px dashed #999;
-            vertical-align: top;
           }
+          
           .items-table th {
-            font-weight: 700;
+            font-weight: bold;
             border-bottom: 1px solid #333;
+            padding: 5px 5px;
           }
+          
           .items-table .col-name {
-            width: auto;
+            width: 70%;
             word-break: break-word;
           }
+          
           .items-table .col-qty {
-            width: 14mm;
+            width: 30%;
             text-align: right;
             white-space: nowrap;
           }
         }
+        /* Estilos globais para tela e impressão */
         .receipt-container {
           color: #000 !important;
         }
         .receipt-container * {
-          color: #000 !important;
-        }
-        .header {
-          text-align: center;
-          border-bottom: 1px dashed #000;
-          padding-bottom: 8px;
-          margin-bottom: 8px;
-          color: #000 !important;
-        }
-        .company-name {
-          font-weight: bold;
-          font-size: ${baseFontSize + 3}px;
-          margin-bottom: 4px;
-          color: #000 !important;
-        }
-        .title {
-          font-weight: bold;
-          font-size: ${baseFontSize + 1}px;
-          margin: 6px 0;
-          color: #000 !important;
-        }
-        .meta {
-          font-size: ${baseFontSize + 1}px;
-          margin: 4px 0;
-          font-weight: bold;
           color: #000 !important;
         }
         .meta strong {
@@ -358,73 +392,10 @@ export function DeliveryManifestCupomLayout({
           opacity: 1 !important;
           font-weight: bold;
         }
-        .section {
-          margin-top: 8px;
-          border-top: 1px dashed #000;
-          padding-top: 6px;
-        }
-        .section-title {
-          font-weight: bold;
-          font-size: ${baseFontSize + 1}px;
-          margin-bottom: 4px;
-          text-align: center;
-          color: #000 !important;
-        }
-        .stop {
-          margin-top: 6px;
-          padding: 4px 0;
-          border-bottom: 1px dashed #000;
-          color: #000 !important;
-        }
-        .stop-customer {
-          font-weight: bold;
-          font-size: ${baseFontSize + 1}px;
-          color: #000 !important;
-        }
-        .stop-address {
-          font-size: ${baseFontSize + 1}px;
-          color: #000 !important;
-          margin-top: 2px;
-          font-weight: bold;
-        }
-        .stop-sale {
-          font-size: ${baseFontSize + 1}px;
-          color: #000 !important;
-          margin-top: 2px;
-          font-weight: bold;
-        }
         .stop-sale strong {
           color: #000 !important;
           opacity: 1 !important;
           font-weight: bold;
-        }
-        .items {
-          margin-top: 4px;
-          font-size: ${baseFontSize + 1}px;
-          color: #000 !important;
-        }
-        .item {
-          display: flex;
-          justify-content: space-between;
-          margin: 2px 0;
-          font-weight: bold;
-          color: #000 !important;
-        }
-        .item span {
-          color: #000 !important;
-        }
-        .footer {
-          margin-top: 12px;
-          padding-top: 8px;
-          border-top: 1px dashed #000;
-          text-align: center;
-          font-size: ${baseFontSize + 1}px;
-          font-weight: bold;
-          color: #000 !important;
-        }
-        .divider {
-          border-top: 1px dashed #000;
-          margin: 6px 0;
         }
       `}</style>
 
