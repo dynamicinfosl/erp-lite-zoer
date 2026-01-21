@@ -35,7 +35,8 @@ export function AppLayout({ children }: AppLayoutProps) {
       '/admin/login',  // Página de login do admin sem sidebar
       '/admin-test',   // Página de teste do admin sem sidebar
       '/trial-expirado',  // Página de trial expirado sem sidebar
-      '/cupom'  // Página de cupom sem sidebar (página pública de impressão)
+      '/cupom',  // Página de cupom sem sidebar (página pública de impressão)
+      '/entregas/romaneio'  // Páginas de romaneio (cupom e A4) sem sidebar
     ];
     
     // Páginas de admin NÃO devem usar o AppLayout (elas têm seu próprio layout)

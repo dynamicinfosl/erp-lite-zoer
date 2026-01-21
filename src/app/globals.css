@@ -320,3 +320,49 @@ html { font-size: var(--font-size); scroll-behavior: smooth; }
 .dark [data-sidebar="sidebar"] [data-sidebar="menu-button"][data-active="true"] svg {
   color: rgba(255, 255, 255, 1) !important;
 }
+
+/* Regras globais para impressão - ocultar todos os elementos de layout */
+@media print {
+  /* Ocultar sidebars, menus, headers fixos, etc */
+  [data-sidebar],
+  [data-sidebar="sidebar"],
+  [data-sidebar="trigger"],
+  [class*="Sidebar"],
+  [class*="sidebar"],
+  [class*="Sheet"],
+  [class*="MobileHeader"],
+  nav,
+  header:not(.receipt-container header),
+  aside,
+  [class*="fixed"],
+  [class*="sticky"]:not(.receipt-container),
+  button:not(.no-print),
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+    position: absolute !important;
+    left: -9999px !important;
+    opacity: 0 !important;
+    height: 0 !important;
+    width: 0 !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Reset completo do body para impressão */
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+  
+  /* Garantir que apenas o receipt-container seja visível */
+  .receipt-container {
+    position: relative !important;
+    margin: 0 auto !important;
+    left: auto !important;
+    right: auto !important;
+    transform: none !important;
+  }
+}

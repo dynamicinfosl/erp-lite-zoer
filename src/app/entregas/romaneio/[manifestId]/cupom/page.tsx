@@ -66,28 +66,86 @@ export default function RomaneioCupomPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="no-print p-6 text-center bg-gray-100 sticky top-0 z-10 border-b">
-        <div className="flex items-center justify-center gap-4">
-          <Button onClick={() => router.back()} variant="outline">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
-          </Button>
-          <Button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700">
-            <Printer className="h-4 w-4 mr-2" />
-            Imprimir Cupom
-          </Button>
+    <>
+      <style jsx global>{`
+        @media print {
+          /* Reset completo para impressão */
+          @page {
+            margin: 0;
+            size: auto;
+          }
+          
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            background: white !important;
+            overflow: visible !important;
+          }
+          
+          /* Ocultar TODOS os elementos que não são o cupom */
+          .print-page-wrapper > div:first-child,
+          .no-print,
+          [class*="fixed"],
+          [class*="sticky"],
+          [class*="Sidebar"],
+          [class*="Sheet"],
+          nav,
+          header:not(.receipt-container header),
+          aside,
+          button {
+            display: none !important;
+            visibility: hidden !important;
+            position: absolute !important;
+            left: -9999px !important;
+            opacity: 0 !important;
+            height: 0 !important;
+            width: 0 !important;
+            overflow: hidden !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          
+          /* Garantir que apenas o receipt-container seja visível */
+          .print-page-wrapper {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+            display: block !important;
+          }
+          
+          .print-page-wrapper > .receipt-container {
+            display: block !important;
+            visibility: visible !important;
+            position: relative !important;
+            margin: 0 auto !important;
+          }
+        }
+      `}</style>
+      
+      <div className="min-h-screen bg-white print-page-wrapper">
+        <div className="no-print p-6 text-center bg-gray-100 sticky top-0 z-10 border-b">
+          <div className="flex items-center justify-center gap-4">
+            <Button onClick={() => router.back()} variant="outline">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Voltar
+            </Button>
+            <Button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700">
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir Cupom
+            </Button>
+          </div>
         </div>
-      </div>
 
-      <DeliveryManifestCupomLayout
-        manifest={data.manifest}
-        driver={data.driver}
-        deliveries={data.deliveries || []}
-        sales={data.sales || []}
-        saleItems={data.sale_items || []}
-        companyName="JUGA"
-      />
-    </div>
+        <DeliveryManifestCupomLayout
+          manifest={data.manifest}
+          driver={data.driver}
+          deliveries={data.deliveries || []}
+          sales={data.sales || []}
+          saleItems={data.sale_items || []}
+          companyName="JUGA"
+        />
+      </div>
+    </>
   );
 }

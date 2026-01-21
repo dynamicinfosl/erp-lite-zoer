@@ -151,13 +151,43 @@ export function DeliveryManifestCupomLayout({
     <div className="receipt-container">
       <style jsx global>{`
         @media print {
-          body {
-            margin: 0;
-            padding: 0;
-            font-size: ${baseFontSize}px;
-            line-height: 1.2;
+          /* Reset completo para impressão - remove qualquer interferência de layout */
+          * {
+            box-sizing: border-box;
           }
           
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            overflow: visible !important;
+            font-size: ${baseFontSize}px;
+            line-height: 1.2;
+            background: white !important;
+          }
+          
+          /* Ocultar TODOS os elementos fixos, sticky, sidebars, menus, etc */
+          [class*="fixed"],
+          [class*="sticky"],
+          [class*="sidebar"],
+          [class*="Sidebar"],
+          [class*="Sheet"],
+          [class*="Menu"],
+          [class*="Dropdown"],
+          button:not(.no-print),
+          nav,
+          header:not(.receipt-container header),
+          aside,
+          .no-print {
+            display: none !important;
+            visibility: hidden !important;
+            position: absolute !important;
+            left: -9999px !important;
+            opacity: 0 !important;
+          }
+          
+          /* Container do cupom - centralizado e isolado de interferências */
           .receipt-container {
             width: 80mm !important;
             max-width: 80mm !important;
@@ -166,10 +196,17 @@ export function DeliveryManifestCupomLayout({
             font-family: 'Courier New', monospace !important;
             font-size: ${baseFontSize}px !important;
             line-height: 1.2 !important;
-          }
-          
-          .no-print {
-            display: none !important;
+            position: relative !important;
+            left: auto !important;
+            right: auto !important;
+            top: auto !important;
+            bottom: auto !important;
+            transform: none !important;
+            box-shadow: none !important;
+            border: none !important;
+            background: white !important;
+            display: block !important;
+            visibility: visible !important;
           }
           
           /* Aumenta contraste/espessura da fonte no conteúdo interno */
