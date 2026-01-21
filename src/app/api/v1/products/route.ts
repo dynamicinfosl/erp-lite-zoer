@@ -140,24 +140,26 @@ async function listProductsHandler(
       .from('products')
       .select('*')
       .eq('tenant_id', tenant_id)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .order('created_at', { ascending: false });
 
     // Filtrar por status ativo/inativo
     if (is_active !== null && is_active !== undefined) {
       query = query.eq('is_active', is_active === 'true');
     }
 
-    // Busca por nome, SKU ou código de barras
-    // Buscamos mais resultados para poder filtrar com normalização depois
+    // Busca por nome, SKU ou código de barras com normalização flexível
+    // Normalizamos o termo de busca para remover acentos e tornar case-insensitive
     const searchTerm = search && search.trim().length > 0 ? search.trim() : null;
     const normalizedSearch = searchTerm ? normalizeText(searchTerm) : null;
     
+    // Se há busca, buscamos mais produtos (até 500) para garantir que encontremos todos os possíveis matches
+    // mesmo com diferenças de acentuação, e depois filtramos usando normalização no código
     if (searchTerm) {
-      // Busca inicial usando ilike (case-insensitive, mas não remove acentos)
-      // Buscamos mais resultados (até 3x o limite) para garantir que encontremos produtos mesmo com variações de acentos
-      query = query.or(`name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%,barcode.ilike.%${searchTerm}%`);
-      query = query.range(offset, offset + (limit * 3) - 1); // Buscar mais para filtrar depois
+      // Buscar mais produtos para garantir cobertura completa (busca flexível)
+      query = query.range(0, 499); // Buscar até 500 produtos para filtrar depois
+    } else {
+      // Quando não há busca, aplicar paginação diretamente no banco
+      query = query.range(offset, offset + limit - 1);
     }
 
     const { data: allProducts, error } = await query;
@@ -171,6 +173,7 @@ async function listProductsHandler(
     }
 
     // Se há busca, filtrar usando normalização para garantir flexibilidade com acentos
+    // Isso permite encontrar "Convenção" quando buscar "convencao" (sem acento)
     let products = allProducts || [];
     if (normalizedSearch && products.length > 0) {
       products = products.filter((product: any) => {
@@ -178,6 +181,7 @@ async function listProductsHandler(
         const normalizedSku = normalizeText(product.sku || '');
         const normalizedBarcode = normalizeText(product.barcode || '');
         
+        // Busca flexível: verifica se o termo normalizado está contido em qualquer campo normalizado
         return (
           normalizedName.includes(normalizedSearch) ||
           normalizedSku.includes(normalizedSearch) ||
@@ -185,8 +189,21 @@ async function listProductsHandler(
         );
       });
       
-      // Quando há busca, aplicamos paginação no resultado filtrado
-      // (porque buscamos mais resultados para garantir que encontremos produtos mesmo com variações de acentos)
+      // Ordenar resultados: produtos que começam com o termo aparecem primeiro
+      products = products.sort((a: any, b: any) => {
+        const aName = normalizeText(a.name || '');
+        const bName = normalizeText(b.name || '');
+        const aStarts = aName.startsWith(normalizedSearch);
+        const bStarts = bName.startsWith(normalizedSearch);
+        
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        
+        // Se ambos começam ou não começam, ordenar alfabeticamente
+        return aName.localeCompare(bName, 'pt-BR');
+      });
+      
+      // Aplicar paginação no resultado filtrado
       products = products.slice(offset, offset + limit);
     }
     // Quando não há busca, products já está paginado pelo range do Supabase
