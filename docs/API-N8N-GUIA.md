@@ -231,6 +231,61 @@ Esta seção mostra exemplos simples e diretos de cada endpoint, sem necessidade
 - `offset`: Para paginação (padrão: 0)
 - `search`: Buscar por nome, SKU ou código de barras
 - `is_active`: Filtrar por status (`true` ou `false`)
+- `include_variants`: Incluir variações do produto (`true` ou `false`, padrão: `false`)
+- `include_price_tiers`: Incluir tipos de preço do produto (`true` ou `false`, padrão: `false`)
+
+**Exemplo com variações e tipos de preço**:
+```
+GET https://seu-dominio.com/api/v1/products?search=coca&include_variants=true&include_price_tiers=true
+```
+
+**Resposta com variações e tipos de preço**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 456,
+      "name": "Coca-Cola 2L",
+      "sku": "COCA-2L",
+      "sale_price": 8.90,
+      "variants": [
+        {
+          "id": 12,
+          "label": "LIMAO",
+          "name": "Coca-Cola 2L Limão",
+          "sale_price": 9.50,
+          "stock_quantity": 20
+        }
+      ],
+      "price_tiers": [
+        {
+          "id": 3,
+          "price": 8.90,
+          "price_type_id": 1,
+          "price_type": {
+            "id": 1,
+            "name": "Varejo",
+            "slug": "varejo",
+            "is_active": true
+          }
+        },
+        {
+          "id": 4,
+          "price": 7.50,
+          "price_type_id": 2,
+          "price_type": {
+            "id": 2,
+            "name": "Atacado",
+            "slug": "atacado",
+            "is_active": true
+          }
+        }
+      ]
+    }
+  ]
+}
+```
 
 ---
 
@@ -241,7 +296,7 @@ Esta seção mostra exemplos simples e diretos de cada endpoint, sem necessidade
 - **URL**: `https://seu-dominio.com/api/v1/products/456`
 - **Authentication**: `ERP API Key`
 
-**Resposta**:
+**Resposta** (inclui automaticamente variações e tipos de preço):
 ```json
 {
   "success": true,
@@ -250,10 +305,34 @@ Esta seção mostra exemplos simples e diretos de cada endpoint, sem necessidade
     "name": "Notebook Dell",
     "sku": "NOTE-001",
     "sale_price": 3299.90,
+    "variants": [
+      {
+        "id": 12,
+        "label": "16GB RAM",
+        "name": "Notebook Dell 16GB",
+        "sale_price": 3599.90,
+        "stock_quantity": 5
+      }
+    ],
+    "price_tiers": [
+      {
+        "id": 3,
+        "price": 3299.90,
+        "price_type_id": 1,
+        "price_type": {
+          "id": 1,
+          "name": "Varejo",
+          "slug": "varejo",
+          "is_active": true
+        }
+      }
+    ],
     ...
   }
 }
 ```
+
+**Nota**: Ao buscar um produto específico por ID, as variações (`variants`) e tipos de preço (`price_tiers`) são incluídos automaticamente na resposta.
 
 ---
 
@@ -287,6 +366,31 @@ Esta seção mostra exemplos simples e diretos de cada endpoint, sem necessidade
     "notes": "Venda realizada na loja física"
   }
   ```
+
+**Campos opcionais nos produtos**:
+- `variant_id` (integer): ID da variação do produto (ex: cor, tamanho). Use quando o produto tiver variações cadastradas.
+- `price_type_id` (integer): ID do tipo de preço usado (ex: Varejo, Atacado, Promocional). Use quando o produto tiver tabelas de preço diferentes.
+
+**Exemplo com variação e tipo de preço**:
+```json
+{
+  "customer_name": "João Silva",
+  "products": [
+    {
+      "product_id": 456,
+      "name": "Camiseta Polo",
+      "price": 89.90,
+      "quantity": 2,
+      "variant_id": 12,
+      "price_type_id": 3
+    }
+  ],
+  "total_amount": 179.80,
+  "payment_method": "pix",
+  "sale_type": "balcao"
+}
+```
+*Nota: `variant_id` e `price_type_id` são opcionais. Se não fornecidos, a venda será registrada sem essas informações.*
 
 **Resposta**:
 ```json
@@ -413,7 +517,87 @@ Esta seção mostra exemplos simples e diretos de cada endpoint, sem necessidade
 
 ---
 
-### 9. Listar Vendas
+### 9. Criar Venda com Variações e Tipos de Preço
+
+**Objetivo**: Criar uma venda especificando a variação do produto (ex: cor, tamanho) e o tipo de preço usado (ex: Varejo, Atacado).
+
+**Quando usar**:
+- Quando o produto tem variações cadastradas (ex: Camiseta - Tamanho P, M, G)
+- Quando o produto tem diferentes tabelas de preço (ex: Varejo R$ 100, Atacado R$ 80)
+
+**Nó HTTP Request**:
+- **Method**: `POST`
+- **URL**: `https://seu-dominio.com/api/v1/sales`
+- **Authentication**: `ERP API Key`
+- **Content-Type**: `application/json`
+- **Body** (JSON):
+  ```json
+  {
+    "customer_name": "Maria Santos",
+    "products": [
+      {
+        "product_id": 456,
+        "name": "Camiseta Polo",
+        "price": 89.90,
+        "quantity": 2,
+        "variant_id": 12,
+        "price_type_id": 3
+      }
+    ],
+    "total_amount": 179.80,
+    "payment_method": "pix",
+    "sale_type": "balcao"
+  }
+  ```
+
+**Campos dos produtos**:
+- `variant_id` (integer, opcional): ID da variação do produto. Use quando o produto tiver variações cadastradas (ex: cor, tamanho, modelo).
+- `price_type_id` (integer, opcional): ID do tipo de preço usado. Use quando o produto tiver tabelas de preço diferentes (ex: Varejo, Atacado, Promocional).
+
+**Exemplo completo com múltiplos produtos**:
+```json
+{
+  "customer_name": "João Silva",
+  "products": [
+    {
+      "product_id": 456,
+      "name": "Camiseta Polo - Azul - G",
+      "price": 89.90,
+      "quantity": 1,
+      "variant_id": 12,
+      "price_type_id": 1
+    },
+    {
+      "product_id": 456,
+      "name": "Camiseta Polo - Vermelha - M",
+      "price": 89.90,
+      "quantity": 1,
+      "variant_id": 15,
+      "price_type_id": 1
+    },
+    {
+      "product_id": 789,
+      "name": "Calça Jeans",
+      "price": 149.90,
+      "quantity": 1,
+      "price_type_id": 2
+    }
+  ],
+  "total_amount": 329.70,
+  "payment_method": "cartao_credito",
+  "sale_type": "balcao"
+}
+```
+
+**Notas importantes**:
+- `variant_id` e `price_type_id` são **opcionais**. Se não fornecidos, a venda será registrada normalmente.
+- O `price` fornecido deve corresponder ao tipo de preço selecionado (`price_type_id`).
+- O sistema não valida automaticamente se o `variant_id` pertence ao `product_id` ou se o `price_type_id` existe. Certifique-se de enviar valores válidos.
+- Esses campos são salvos na tabela `sale_items` para rastreabilidade e relatórios.
+
+---
+
+### 10. Listar Vendas
 
 **Nó HTTP Request**:
 - **Method**: `GET`
@@ -446,7 +630,7 @@ Esta seção mostra exemplos simples e diretos de cada endpoint, sem necessidade
 
 ---
 
-### 10. Criar Cliente em Filial Específica
+### 11. Criar Cliente em Filial Específica
 
 **Nó HTTP Request**:
 - **Method**: `POST`
@@ -482,7 +666,7 @@ Esta seção mostra exemplos simples e diretos de cada endpoint, sem necessidade
 
 ---
 
-### 11. Listar Clientes com Paginação
+### 12. Listar Clientes com Paginação
 
 **Nó HTTP Request**:
 - **Method**: `GET`
@@ -494,7 +678,7 @@ Esta seção mostra exemplos simples e diretos de cada endpoint, sem necessidade
 
 ---
 
-### 12. Listar Produtos com Filtros
+### 13. Listar Produtos com Filtros
 
 **Nó HTTP Request**:
 - **Method**: `GET`
@@ -508,7 +692,7 @@ Esta seção mostra exemplos simples e diretos de cada endpoint, sem necessidade
 
 ---
 
-### 13. Buscar Vendas por Nome, Telefone ou CPF
+### 14. Buscar Vendas por Nome, Telefone ou CPF
 
 **Nó HTTP Request**:
 - **Method**: `GET`
@@ -543,7 +727,7 @@ Esta seção mostra exemplos simples e diretos de cada endpoint, sem necessidade
 
 ---
 
-### 14. Transformar Venda em Entrega
+### 15. Transformar Venda em Entrega
 
 **Nó HTTP Request**:
 - **Method**: `PATCH`
@@ -601,7 +785,7 @@ Esta seção mostra exemplos simples e diretos de cada endpoint, sem necessidade
 
 ---
 
-### 15. Atualizar Dados do Cliente
+### 16. Atualizar Dados do Cliente
 
 **Nó HTTP Request**:
 - **Method**: `PATCH`
@@ -679,7 +863,9 @@ Esta seção mostra exemplos simples e diretos de cada endpoint, sem necessidade
          {
            "name": "{{ $json.product_name }}",
            "price": {{ $json.product_price }},
-           "quantity": {{ $json.quantity }}
+           "quantity": {{ $json.quantity }},
+           "variant_id": {{ $json.variant_id }},
+           "price_type_id": {{ $json.price_type_id }}
          }
        ],
        "total_amount": {{ $json.total }},
@@ -687,6 +873,7 @@ Esta seção mostra exemplos simples e diretos de cada endpoint, sem necessidade
        "sale_type": "balcao"
      }
      ```
+     *Nota: `variant_id` e `price_type_id` são opcionais. Use apenas se o produto tiver variações ou tipos de preço cadastrados.*
 
 **Resposta de Sucesso**:
 ```json

@@ -217,6 +217,16 @@ async function createSaleHandler(request: NextRequest) {
       if (product.id !== null && product.id !== undefined) {
         itemData.product_id = product.id;
       }
+
+      // Adicionar variant_id se fornecido (variação do produto)
+      if (product.variant_id !== null && product.variant_id !== undefined) {
+        itemData.variant_id = product.variant_id;
+      }
+
+      // Adicionar price_type_id se fornecido (tipo de preço usado)
+      if (product.price_type_id !== null && product.price_type_id !== undefined) {
+        itemData.price_type_id = product.price_type_id;
+      }
       
       return itemData;
     });

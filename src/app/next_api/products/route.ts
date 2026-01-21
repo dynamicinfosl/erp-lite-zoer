@@ -296,6 +296,8 @@ async function listProductsHandler(request: NextRequest) {
     const sku = searchParams.get('sku');
     const branch_id = searchParams.get('branch_id');
     const branch_scope = searchParams.get('branch_scope'); // 'all' | 'branch'
+    const include_variants = searchParams.get('include_variants') === 'true';
+    const include_price_tiers = searchParams.get('include_price_tiers') === 'true';
 
     console.log(`📦 GET /products - tenant_id: ${tenant_id}, sku: ${sku}, branch_id: ${branch_id}, scope: ${branch_scope}`);
 
@@ -433,6 +435,78 @@ async function listProductsHandler(request: NextRequest) {
       }
       return p;
     });
+
+    // Se solicitado, incluir variações e tipos de preço para cada produto
+    if (include_variants || include_price_tiers) {
+      const productIds = mappedRows.map((p: any) => Number(p.id)).filter((id: number) => Number.isFinite(id) && id > 0);
+      
+      if (productIds.length > 0) {
+        // Buscar variações se solicitado
+        let variantsMap: Record<number, any[]> = {};
+        if (include_variants) {
+          const { data: variants, error: variantsError } = await supabaseAdmin
+            .from('product_variants')
+            .select('*')
+            .eq('tenant_id', tenant_id)
+            .in('product_id', productIds)
+            .eq('is_active', true)
+            .order('id', { ascending: true });
+          
+          if (!variantsError && variants) {
+            for (const variant of variants as any[]) {
+              const pid = Number(variant.product_id);
+              if (!variantsMap[pid]) variantsMap[pid] = [];
+              variantsMap[pid].push({
+                id: variant.id,
+                label: variant.label,
+                name: variant.name,
+                barcode: variant.barcode,
+                unit: variant.unit,
+                sale_price: variant.sale_price,
+                cost_price: variant.cost_price,
+                stock_quantity: variant.stock_quantity,
+              });
+            }
+          }
+        }
+
+        // Buscar tipos de preço se solicitado
+        let priceTiersMap: Record<number, any[]> = {};
+        if (include_price_tiers) {
+          const { data: tiers, error: tiersError } = await supabaseAdmin
+            .from('product_price_tiers')
+            .select('id, product_id, price, price_type_id, price_type:product_price_types(id,name,slug,is_active)')
+            .eq('tenant_id', tenant_id)
+            .in('product_id', productIds)
+            .order('price_type_id', { ascending: true });
+          
+          if (!tiersError && tiers) {
+            for (const tier of tiers as any[]) {
+              const pid = Number(tier.product_id);
+              if (!priceTiersMap[pid]) priceTiersMap[pid] = [];
+              priceTiersMap[pid].push({
+                id: tier.id,
+                price: Number(tier.price),
+                price_type_id: Number(tier.price_type_id),
+                price_type: tier.price_type ? {
+                  id: Number(tier.price_type.id),
+                  name: String(tier.price_type.name),
+                  slug: String(tier.price_type.slug),
+                  is_active: Boolean(tier.price_type.is_active),
+                } : null,
+              });
+            }
+          }
+        }
+
+        // Adicionar variações e tipos de preço aos produtos
+        mappedRows = mappedRows.map((product: any) => ({
+          ...product,
+          ...(include_variants && { variants: variantsMap[Number(product.id)] || [] }),
+          ...(include_price_tiers && { price_tiers: priceTiersMap[Number(product.id)] || [] }),
+        }));
+      }
+    }
 
     // Log para debug
     if (sku) {

@@ -59,9 +59,52 @@ async function getProductHandler(
       );
     }
 
+    // Buscar variações do produto
+    const { data: variants, error: variantsError } = await supabaseAdmin
+      .from('product_variants')
+      .select('*')
+      .eq('tenant_id', tenant_id)
+      .eq('product_id', productIdNum)
+      .eq('is_active', true)
+      .order('id', { ascending: true });
+
+    // Buscar tipos de preço do produto
+    const { data: tiers, error: tiersError } = await supabaseAdmin
+      .from('product_price_tiers')
+      .select('id, product_id, price, price_type_id, price_type:product_price_types(id,name,slug,is_active)')
+      .eq('tenant_id', tenant_id)
+      .eq('product_id', productIdNum)
+      .order('price_type_id', { ascending: true });
+
+    // Montar resposta com variações e tipos de preço
+    const productWithDetails = {
+      ...product,
+      variants: variantsError ? [] : (variants || []).map((v: any) => ({
+        id: v.id,
+        label: v.label,
+        name: v.name,
+        barcode: v.barcode,
+        unit: v.unit,
+        sale_price: v.sale_price,
+        cost_price: v.cost_price,
+        stock_quantity: v.stock_quantity,
+      })),
+      price_tiers: tiersError ? [] : (tiers || []).map((t: any) => ({
+        id: t.id,
+        price: Number(t.price),
+        price_type_id: Number(t.price_type_id),
+        price_type: t.price_type ? {
+          id: Number(t.price_type.id),
+          name: String(t.price_type.name),
+          slug: String(t.price_type.slug),
+          is_active: Boolean(t.price_type.is_active),
+        } : null,
+      })),
+    };
+
     return NextResponse.json({
       success: true,
-      data: product,
+      data: productWithDetails,
     });
   } catch (error) {
     console.error('❌ Erro no handler de busca de produto:', error);

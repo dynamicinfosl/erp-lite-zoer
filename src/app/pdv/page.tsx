@@ -822,7 +822,9 @@ export default function PDVPage() {
         price: item.price,
         quantity: item.quantity,
         discount: item.discount || 0,
-        subtotal: calculateItemTotal(item)
+        subtotal: calculateItemTotal(item),
+        variant_id: (item as any).variant_id || null,
+        price_type_id: (item as any).price_type_id || null,
       }));
 
       console.log('📦 Produtos preparados:', productsArray.length, productsArray);

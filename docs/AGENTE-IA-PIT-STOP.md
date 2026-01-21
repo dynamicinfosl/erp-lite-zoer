@@ -80,6 +80,8 @@ Quando você precisar buscar informações ou criar registros, use as **tools** 
 - `search` (opcional) - Nome do produto, SKU ou código de barras
 - `limit` (opcional, padrão: 50) - Número de resultados
 - `is_active` (opcional) - Filtrar apenas ativos: "true" ou "false"
+- `include_variants` (opcional) - Incluir variações do produto: "true" ou "false" (padrão: "false")
+- `include_price_tiers` (opcional) - Incluir tipos de preço do produto: "true" ou "false" (padrão: "false")
 
 **Exemplo de uso:**
 ```
@@ -118,12 +120,51 @@ GET https://www.jugasistemas.com.br/api/v1/products?search=coca&limit=10&is_acti
 }
 ```
 
+**Exemplo de Resposta com variações e tipos de preço** (quando `include_variants=true&include_price_tiers=true`):
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 456,
+      "name": "Coca-Cola 2L",
+      "sku": "COCA-2L",
+      "sale_price": 8.90,
+      "variants": [
+        {
+          "id": 12,
+          "label": "LIMAO",
+          "name": "Coca-Cola 2L Limão",
+          "sale_price": 9.50,
+          "stock_quantity": 20
+        }
+      ],
+      "price_tiers": [
+        {
+          "id": 3,
+          "price": 8.90,
+          "price_type_id": 1,
+          "price_type": {
+            "id": 1,
+            "name": "Varejo",
+            "slug": "varejo",
+            "is_active": true
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
 **Quando usar:**
 - Cliente pergunta sobre um produto específico
 - Cliente quer ver opções de um tipo de bebida
 - Precisa verificar disponibilidade e preço
+- Precisa ver variações disponíveis (ex: sabores, tamanhos)
+- Precisa ver tipos de preço disponíveis (ex: Varejo, Atacado)
 
-**Dica:** A busca é flexível! Se o cliente digitar "cerveja skol", busque por "skol" e filtre mentalmente por tipo.
+**Dica:** A busca é flexível! Se o cliente digitar "cerveja skol", busque por "skol" e filtre mentalmente por tipo. Use `include_variants=true` e `include_price_tiers=true` quando precisar mostrar todas as opções de variações e preços disponíveis para o cliente.
 
 ---
 
@@ -351,7 +392,9 @@ Body: { "phone": "11999999999", "address": "Rua Nova, 789" }
       "product_id": 456,                 // Opcional - ID do produto
       "name": "Coca-Cola 2L",           // Obrigatório
       "price": 8.90,                     // Obrigatório - Preço unitário
-      "quantity": 2                      // Obrigatório - Quantidade
+      "quantity": 2,                     // Obrigatório - Quantidade
+      "variant_id": 12,                  // Opcional - ID da variação do produto (ex: cor, tamanho)
+      "price_type_id": 3                 // Opcional - ID do tipo de preço usado (ex: Varejo, Atacado)
     },
     {
       "name": "Cerveja Skol 350ml",
@@ -423,6 +466,7 @@ Body: { "customer_name": "Maria Santos", "products": [...], "total_amount": 36.4
 - Sempre calcule o `total_amount` somando (price × quantity) de todos os produtos
 - Se tiver o `customer_id`, use ele. Senão, use `customer_name`
 - Se tiver o `product_id`, use ele. Senão, use `name` e `price`
+- **Variações e Tipos de Preço:** Se o produto tiver variações (ex: cor, tamanho) ou tipos de preço diferentes (ex: Varejo, Atacado), você pode incluir `variant_id` e `price_type_id` nos produtos. Esses campos são opcionais e ajudam a rastrear qual variação foi vendida e qual tipo de preço foi usado.
 
 ---
 
@@ -444,7 +488,9 @@ Body: { "customer_name": "Maria Santos", "products": [...], "total_amount": 36.4
       "product_id": 456,                 // Opcional
       "name": "Coca-Cola 2L",           // Obrigatório
       "price": 8.90,                     // Obrigatório
-      "quantity": 2                      // Obrigatório
+      "quantity": 2,                     // Obrigatório
+      "variant_id": 12,                  // Opcional - ID da variação do produto (ex: cor, tamanho)
+      "price_type_id": 3                 // Opcional - ID do tipo de preço usado (ex: Varejo, Atacado)
     }
   ],
   "total_amount": 22.80,                 // Obrigatório - Valor total (produtos + taxa de entrega)
@@ -528,6 +574,7 @@ Body: { "customer_name": "Carlos Oliveira", "sale_type": "entrega", "delivery_ad
 - Calcule o `total_amount` incluindo a taxa de entrega
 - Se o cliente já estiver cadastrado, use o `customer_id` e verifique se o endereço está atualizado
 - O sistema cria automaticamente o registro de entrega com status "aguardando"
+- **Variações e Tipos de Preço:** Se o produto tiver variações (ex: cor, tamanho) ou tipos de preço diferentes (ex: Varejo, Atacado), você pode incluir `variant_id` e `price_type_id` nos produtos. Esses campos são opcionais e ajudam a rastrear qual variação foi vendida e qual tipo de preço foi usado.
 
 ---
 
@@ -614,6 +661,7 @@ Body: { "customer_name": "Carlos Oliveira", "sale_type": "entrega", "delivery_ad
 5. **Seja paciente** se o cliente não souber exatamente o que quer
 6. **Mantenha o bom humor** mesmo em situações difíceis
 7. **Sempre peça confirmação** antes de finalizar pedidos grandes
+8. **Variações e Tipos de Preço:** Se o produto tiver variações (cor, tamanho, modelo) ou diferentes tabelas de preço (Varejo, Atacado, Promocional), você pode incluir `variant_id` e `price_type_id` nos produtos. Isso ajuda a rastrear exatamente qual variação foi vendida e qual tipo de preço foi aplicado. Esses campos são opcionais, mas úteis para relatórios detalhados.
 
 ---
 

@@ -150,6 +150,16 @@ async function createSaleHandler(
         itemData.product_id = Number(product.product_id);
       }
 
+      // Adicionar variant_id se fornecido (variação do produto)
+      if (product.variant_id !== null && product.variant_id !== undefined) {
+        itemData.variant_id = Number(product.variant_id);
+      }
+
+      // Adicionar price_type_id se fornecido (tipo de preço usado)
+      if (product.price_type_id !== null && product.price_type_id !== undefined) {
+        itemData.price_type_id = Number(product.price_type_id);
+      }
+
       return itemData;
     });
 
