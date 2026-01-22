@@ -415,8 +415,8 @@ function ProdutoVariacoesContent() {
       </Card>
 
       <Dialog open={managerOpen} onOpenChange={(open) => setManagerOpen(open)}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Gerenciar variações</DialogTitle>
             <DialogDescription>
               {selectedProduct ? (
@@ -430,7 +430,7 @@ function ProdutoVariacoesContent() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto space-y-4 pr-2">
             <div className="rounded-lg border p-4">
               <div className="flex items-center justify-between gap-2 mb-3">
                 <div className="font-semibold">Nova variação</div>
@@ -539,7 +539,7 @@ function ProdutoVariacoesContent() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button variant="outline" onClick={() => setManagerOpen(false)}>
               Fechar
             </Button>
@@ -621,7 +621,21 @@ function ProdutoVariacoesContent() {
             </div>
             <div>
               <Label>Preço</Label>
-              <Input value={editDraft.sale_price} onChange={(e) => setEditDraft((p) => ({ ...p, sale_price: e.target.value }))} />
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={editDraft.sale_price}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Permite números, ponto decimal e vírgula (converte vírgula para ponto)
+                  const cleaned = value.replace(',', '.').replace(/[^\d.]/g, '');
+                  // Permite apenas um ponto decimal
+                  const parts = cleaned.split('.');
+                  const formatted = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : cleaned;
+                  setEditDraft((p) => ({ ...p, sale_price: formatted }));
+                }}
+                placeholder="Ex.: 12.50"
+              />
             </div>
             <div>
               <Label>Estoque</Label>
