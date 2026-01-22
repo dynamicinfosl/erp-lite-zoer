@@ -8,8 +8,7 @@ SELECT
   name as produto_nome,
   sku,
   stock_quantity as estoque,
-  is_active,
-  has_variations
+  is_active
 FROM products
 WHERE tenant_id = '132b42a6-6355-4418-996e-de7eb33f6e34'
   AND LOWER(name) LIKE '%gatorade%'
@@ -40,7 +39,6 @@ SELECT
   id,
   name,
   sku,
-  has_variations,
   (SELECT COUNT(*) FROM product_variants WHERE product_id = 1564) as total_variacoes
 FROM products
 WHERE id = 1564 AND tenant_id = '132b42a6-6355-4418-996e-de7eb33f6e34'
@@ -52,7 +50,6 @@ SELECT
   id,
   name,
   sku,
-  has_variations,
   (SELECT COUNT(*) FROM product_variants WHERE product_id = 1566) as total_variacoes
 FROM products
 WHERE id = 1566 AND tenant_id = '132b42a6-6355-4418-996e-de7eb33f6e34';
