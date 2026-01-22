@@ -77,20 +77,26 @@ Quando você precisar buscar informações ou criar registros, use as **tools** 
 **Descrição:** Busca produtos no catálogo. A busca é **flexível e ignora acentos**, então buscar "cafe" encontra "café", buscar "joao" encontra "joão", etc.
 
 **Parâmetros da Tool:**
-- `search` (opcional) - Nome do produto, SKU ou código de barras
+- `search` (opcional) - Nome do produto, SKU ou código de barras. **Busca flexível**: ignora acentos e diferenças de maiúsculas/minúsculas (ex: buscar "convencao" encontra "Convenção")
 - `limit` (opcional, padrão: 50) - Número de resultados
 - `is_active` (opcional) - Filtrar apenas ativos: "true" ou "false"
-- `include_variants` (opcional) - Incluir variações do produto: "true" ou "false" (padrão: "false")
-- `include_price_tiers` (opcional) - Incluir tipos de preço do produto: "true" ou "false" (padrão: "false")
+
+**Nota importante**: A busca é **flexível** e ignora acentos e diferenças de maiúsculas/minúsculas. Por exemplo:
+- Buscar "convencao" encontra "Convenção"
+- Buscar "CONVENCAO" encontra "Convenção"
+- Buscar "convenção" encontra "Convenção"
+
+**Variações e Tipos de Preço**: Todos os produtos retornam automaticamente com `variants` (variações) e `price_tiers` (tipos de preço) quando disponíveis. Se o produto não tiver variações ou tipos de preço, esses campos retornam como arrays vazios.
 
 **Exemplo de uso:**
 ```
 Tool: search_products
 Parameters:
-  search: "coca"
+  search: "convencao"
   limit: 10
   is_active: "true"
 ```
+*Busca "convencao" (sem acento) e encontra produtos como "Convenção"*
 
 **Ou diretamente na URL:**
 ```
@@ -109,7 +115,9 @@ GET https://www.jugasistemas.com.br/api/v1/products?search=coca&limit=10&is_acti
       "barcode": "7891234567890",
       "sale_price": 8.90,
       "stock_quantity": 50,
-      "is_active": true
+      "is_active": true,
+      "variants": [],
+      "price_tiers": []
     }
   ],
   "pagination": {
@@ -119,8 +127,9 @@ GET https://www.jugasistemas.com.br/api/v1/products?search=coca&limit=10&is_acti
   }
 }
 ```
+*Nota: `variants` e `price_tiers` sempre são retornados, mesmo que sejam arrays vazios se o produto não tiver variações ou tipos de preço.*
 
-**Exemplo de Resposta com variações e tipos de preço** (quando `include_variants=true&include_price_tiers=true`):
+**Exemplo de Resposta** (sempre inclui variações e tipos de preço quando disponíveis):
 ```json
 {
   "success": true,
@@ -161,10 +170,10 @@ GET https://www.jugasistemas.com.br/api/v1/products?search=coca&limit=10&is_acti
 - Cliente pergunta sobre um produto específico
 - Cliente quer ver opções de um tipo de bebida
 - Precisa verificar disponibilidade e preço
-- Precisa ver variações disponíveis (ex: sabores, tamanhos)
-- Precisa ver tipos de preço disponíveis (ex: Varejo, Atacado)
+- Precisa ver variações disponíveis (ex: sabores, tamanhos) - **sempre incluídas automaticamente**
+- Precisa ver tipos de preço disponíveis (ex: Varejo, Atacado) - **sempre incluídos automaticamente**
 
-**Dica:** A busca é flexível! Se o cliente digitar "cerveja skol", busque por "skol" e filtre mentalmente por tipo. Use `include_variants=true` e `include_price_tiers=true` quando precisar mostrar todas as opções de variações e preços disponíveis para o cliente.
+**Dica:** A busca é **flexível** e ignora acentos! Se o cliente digitar "convencao" (sem acento), você encontrará produtos como "Convenção". Se o cliente digitar "cerveja skol", busque por "skol" e filtre mentalmente por tipo. As variações e tipos de preço são sempre retornados automaticamente na resposta, então você pode mostrar todas as opções disponíveis para o cliente sem precisar fazer requisições adicionais.
 
 ---
 

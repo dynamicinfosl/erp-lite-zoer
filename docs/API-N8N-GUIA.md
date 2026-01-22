@@ -229,17 +229,23 @@ Esta seção mostra exemplos simples e diretos de cada endpoint, sem necessidade
 **Parâmetros de Query**:
 - `limit`: Número de registros (padrão: 50)
 - `offset`: Para paginação (padrão: 0)
-- `search`: Buscar por nome, SKU ou código de barras
+- `search`: Buscar por nome, SKU ou código de barras (busca flexível: ignora acentos e diferenças de maiúsculas/minúsculas)
 - `is_active`: Filtrar por status (`true` ou `false`)
-- `include_variants`: Incluir variações do produto (`true` ou `false`, padrão: `false`)
-- `include_price_tiers`: Incluir tipos de preço do produto (`true` ou `false`, padrão: `false`)
 
-**Exemplo com variações e tipos de preço**:
-```
-GET https://seu-dominio.com/api/v1/products?search=coca&include_variants=true&include_price_tiers=true
-```
+**Nota importante**: A busca é **flexível** e ignora acentos e diferenças de maiúsculas/minúsculas. Por exemplo:
+- Buscar "convencao" encontra "Convenção"
+- Buscar "CONVENCAO" encontra "Convenção"
+- Buscar "convenção" encontra "Convenção"
 
-**Resposta com variações e tipos de preço**:
+**Variações e Tipos de Preço**: Todos os produtos retornam automaticamente com `variants` (variações) e `price_tiers` (tipos de preço) quando disponíveis. Se o produto não tiver variações ou tipos de preço, esses campos retornam como arrays vazios.
+
+**Exemplo de busca flexível**:
+```
+GET https://seu-dominio.com/api/v1/products?search=convencao
+```
+*Busca "convencao" (sem acento) e encontra produtos como "Convenção"*
+
+**Resposta (sempre inclui variações e tipos de preço quando disponíveis)**:
 ```json
 {
   "success": true,
