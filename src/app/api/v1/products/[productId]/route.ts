@@ -59,13 +59,12 @@ async function getProductHandler(
       );
     }
 
-    // Buscar variações do produto
+    // Buscar variações do produto (sem filtrar por is_active para retornar todas)
     const { data: variants, error: variantsError } = await supabaseAdmin
       .from('product_variants')
       .select('*')
       .eq('tenant_id', tenant_id)
       .eq('product_id', productIdNum)
-      .eq('is_active', true)
       .order('id', { ascending: true });
 
     // Buscar tipos de preço do produto

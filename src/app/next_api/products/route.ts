@@ -385,10 +385,9 @@ async function listProductsHandler(request: NextRequest) {
               const pid = Number(p.id);
               if (Number.isFinite(pid) && pid in sumByProduct) {
                 p.stock_quantity = sumByProduct[pid];
-              } else {
-                // se não tiver registro em product_stocks, considerar 0 para visão agregada
-                p.stock_quantity = 0;
               }
+              // Se não tiver registro em product_stocks, manter o valor original de stock_quantity da tabela products
+              // (não sobrescrever para 0, pois pode ter estoque negativo)
             }
           }
         } else if (branch_id) {
@@ -411,7 +410,12 @@ async function listProductsHandler(request: NextRequest) {
               for (const p of rows as any[]) {
                 const pid = Number(p.id);
                 if (!Number.isFinite(pid)) continue;
-                p.stock_quantity = pid in qtyByProduct ? qtyByProduct[pid] : 0;
+                // Se houver registro em product_stocks para esta filial, usar esse valor
+                // Caso contrário, manter o valor original de stock_quantity da tabela products
+                if (pid in qtyByProduct) {
+                  p.stock_quantity = qtyByProduct[pid];
+                }
+                // Se não houver registro, manter o valor original (não sobrescrever para 0)
               }
             }
           }
@@ -440,19 +444,26 @@ async function listProductsHandler(request: NextRequest) {
     const productIds = mappedRows.map((p: any) => Number(p.id)).filter((id: number) => Number.isFinite(id) && id > 0);
     
     if (productIds.length > 0) {
-      // Buscar variações de todos os produtos
+      // Buscar variações de todos os produtos (sem filtrar por is_active para retornar todas)
       const { data: variants, error: variantsError } = await supabaseAdmin
         .from('product_variants')
         .select('*')
         .eq('tenant_id', tenant_id)
         .in('product_id', productIds)
-        .eq('is_active', true)
         .order('id', { ascending: true });
       
       const variantsMap: Record<number, any[]> = {};
+      if (variantsError) {
+        console.error('❌ Erro ao buscar variações:', variantsError);
+      }
       if (!variantsError && variants) {
+        console.log(`📦 Buscando variações para ${productIds.length} produtos, encontradas ${variants.length} variações`);
         for (const variant of variants as any[]) {
           const pid = Number(variant.product_id);
+          if (!Number.isFinite(pid) || pid <= 0) {
+            console.warn('⚠️ Variação com product_id inválido:', variant);
+            continue;
+          }
           if (!variantsMap[pid]) variantsMap[pid] = [];
           variantsMap[pid].push({
             id: variant.id,
@@ -463,8 +474,10 @@ async function listProductsHandler(request: NextRequest) {
             sale_price: variant.sale_price,
             cost_price: variant.cost_price,
             stock_quantity: variant.stock_quantity,
+            is_active: variant.is_active,
           });
         }
+        console.log(`✅ Variações mapeadas para ${Object.keys(variantsMap).length} produtos`);
       }
 
       // Buscar tipos de preço de todos os produtos
@@ -495,11 +508,22 @@ async function listProductsHandler(request: NextRequest) {
       }
 
       // Adicionar variações e tipos de preço aos produtos (sempre, mesmo que vazios)
-      mappedRows = mappedRows.map((product: any) => ({
-        ...product,
-        variants: variantsMap[Number(product.id)] || [],
-        price_tiers: priceTiersMap[Number(product.id)] || [],
-      }));
+      mappedRows = mappedRows.map((product: any) => {
+        const pid = Number(product.id);
+        const productVariants = variantsMap[pid] || [];
+        const productPriceTiers = priceTiersMap[pid] || [];
+        
+        // Log para debug se produto tem variações mas não foram encontradas
+        if (productVariants.length === 0 && productPriceTiers.length > 0) {
+          console.log(`⚠️ Produto ${pid} (${product.name}) tem tipos de preço mas não tem variações mapeadas`);
+        }
+        
+        return {
+          ...product,
+          variants: productVariants,
+          price_tiers: productPriceTiers,
+        };
+      });
     } else {
       // Se não há produtos, garantir que cada produto tenha arrays vazios
       mappedRows = mappedRows.map((product: any) => ({
