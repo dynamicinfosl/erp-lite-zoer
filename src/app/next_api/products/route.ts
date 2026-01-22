@@ -17,6 +17,16 @@ function slugify(input: string): string {
     .slice(0, 80);
 }
 
+function normalizeText(text: string): string {
+  return String(text || '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '') // Remove acentos (á -> a, é -> e, etc)
+    .replace(/ç/g, 'c') // Converte cedilha (ç -> c)
+    .replace(/Ç/g, 'c') // Converte cedilha maiúscula (Ç -> c)
+    .toLowerCase()
+    .trim();
+}
+
 // Handler original para criar produto
 async function createProductHandler(request: NextRequest) {
   try {
@@ -457,13 +467,10 @@ async function listProductsHandler(request: NextRequest) {
         console.error('❌ Erro ao buscar variações:', variantsError);
       }
       if (!variantsError && variants) {
-        console.log(`📦 Buscando variações para ${productIds.length} produtos, encontradas ${variants.length} variações`);
         for (const variant of variants as any[]) {
           const pid = Number(variant.product_id);
-          if (!Number.isFinite(pid) || pid <= 0) {
-            console.warn('⚠️ Variação com product_id inválido:', variant);
-            continue;
-          }
+          if (!Number.isFinite(pid) || pid <= 0) continue;
+          
           if (!variantsMap[pid]) variantsMap[pid] = [];
           variantsMap[pid].push({
             id: variant.id,
@@ -477,7 +484,6 @@ async function listProductsHandler(request: NextRequest) {
             is_active: variant.is_active,
           });
         }
-        console.log(`✅ Variações mapeadas para ${Object.keys(variantsMap).length} produtos`);
       }
 
       // Buscar tipos de preço de todos os produtos
@@ -512,11 +518,6 @@ async function listProductsHandler(request: NextRequest) {
         const pid = Number(product.id);
         const productVariants = variantsMap[pid] || [];
         const productPriceTiers = priceTiersMap[pid] || [];
-        
-        // Log para debug se produto tem variações mas não foram encontradas
-        if (productVariants.length === 0 && productPriceTiers.length > 0) {
-          console.log(`⚠️ Produto ${pid} (${product.name}) tem tipos de preço mas não tem variações mapeadas`);
-        }
         
         return {
           ...product,

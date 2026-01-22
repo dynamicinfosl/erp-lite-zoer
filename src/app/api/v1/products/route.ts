@@ -211,6 +211,46 @@ async function listProductsHandler(
     }
     // Quando não há busca, products já está paginado pelo range do Supabase
 
+    // Se há busca, também buscar produtos que tenham variações correspondentes
+    if (normalizedSearch) {
+      // Buscar variações que correspondam ao termo de busca
+      const { data: matchingVariants, error: variantSearchError } = await supabaseAdmin
+        .from('product_variants')
+        .select('product_id, label, name')
+        .eq('tenant_id', tenant_id);
+      
+      if (!variantSearchError && matchingVariants) {
+        // Filtrar variações que correspondam à busca normalizada
+        const variantProductIds = matchingVariants
+          .filter((v: any) => {
+            const normalizedLabel = normalizeText(v.label || '');
+            const normalizedName = normalizeText(v.name || '');
+            return normalizedLabel.includes(normalizedSearch) || normalizedName.includes(normalizedSearch);
+          })
+          .map((v: any) => Number(v.product_id))
+          .filter((id: number) => Number.isFinite(id) && id > 0);
+        
+        // Buscar produtos "pai" que têm essas variações
+        if (variantProductIds.length > 0) {
+          const { data: parentProducts, error: parentError } = await supabaseAdmin
+            .from('products')
+            .select('*')
+            .eq('tenant_id', tenant_id)
+            .in('id', variantProductIds);
+          
+          if (!parentError && parentProducts) {
+            // Adicionar produtos pai aos resultados (evitando duplicatas)
+            const existingIds = new Set(products.map((p: any) => Number(p.id)));
+            for (const parent of parentProducts) {
+              if (!existingIds.has(Number(parent.id))) {
+                products.push(parent);
+              }
+            }
+          }
+        }
+      }
+    }
+    
     // Sempre incluir variações e tipos de preço para cada produto quando disponíveis
     const productIds = products.map((p: any) => Number(p.id)).filter((id: number) => Number.isFinite(id) && id > 0);
     
@@ -228,13 +268,10 @@ async function listProductsHandler(
         console.error('❌ Erro ao buscar variações:', variantsError);
       }
       if (!variantsError && variants) {
-        console.log(`📦 Buscando variações para ${productIds.length} produtos, encontradas ${variants.length} variações`);
         for (const variant of variants as any[]) {
           const pid = Number(variant.product_id);
-          if (!Number.isFinite(pid) || pid <= 0) {
-            console.warn('⚠️ Variação com product_id inválido:', variant);
-            continue;
-          }
+          if (!Number.isFinite(pid) || pid <= 0) continue;
+          
           if (!variantsMap[pid]) variantsMap[pid] = [];
           variantsMap[pid].push({
             id: variant.id,
@@ -248,7 +285,6 @@ async function listProductsHandler(
             is_active: variant.is_active,
           });
         }
-        console.log(`✅ Variações mapeadas para ${Object.keys(variantsMap).length} produtos`);
       }
 
       // Buscar tipos de preço de todos os produtos
@@ -284,26 +320,12 @@ async function listProductsHandler(
         const productVariants = variantsMap[pid] || [];
         const productPriceTiers = priceTiersMap[pid] || [];
         
-        // Log para debug: verificar produtos com variações e estoque negativo
-        if (productVariants.length > 0) {
-          console.log(`📦 Produto ${pid} (${product.name}) - Estoque: ${product.stock_quantity}, Variações: ${productVariants.length}`);
-        }
-        
-        // Log para debug se produto tem variações mas não foram encontradas
-        if (productVariants.length === 0 && productPriceTiers.length > 0) {
-          console.log(`⚠️ Produto ${pid} (${product.name}) tem tipos de preço mas não tem variações mapeadas`);
-        }
-        
         return {
           ...product,
           variants: productVariants,
           price_tiers: productPriceTiers,
         };
       });
-      
-      // Log final: quantos produtos têm variações
-      const productsWithVariants = products.filter((p: any) => (p.variants || []).length > 0);
-      console.log(`✅ Total de produtos retornados: ${products.length}, produtos com variações: ${productsWithVariants.length}`);
     } else {
       // Se não há produtos, garantir que cada produto tenha arrays vazios
       products = products.map((product: any) => ({
