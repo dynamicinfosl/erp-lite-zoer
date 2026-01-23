@@ -56,19 +56,58 @@ async function createSaleHandler(
       );
     }
 
+    // Validação: Para vendas de entrega, cliente é obrigatório
+    if (sale_type === 'entrega') {
+      if (!customer_id && !customer_name) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Cliente é obrigatório para vendas de entrega. É necessário fornecer customer_id ou customer_name' 
+          },
+          { status: 400 }
+        );
+      }
+      
+      // Verificar se customer_name não é "Cliente Avulso" ou vazio
+      if (!customer_id && (!customer_name || customer_name.trim() === '' || customer_name.trim().toLowerCase() === 'cliente avulso')) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Não é permitido criar venda de entrega sem cliente especificado. É necessário fornecer um customer_id válido ou um customer_name diferente de "Cliente Avulso"' 
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Buscar dados do cliente se customer_id for fornecido (para usar endereço cadastrado)
     let customerData: any = null;
     if (customer_id) {
       const { data: customer, error: customerError } = await supabaseAdmin
         .from('customers')
-        .select('address, neighborhood, city, state, zipcode, phone')
+        .select('id, name, address, neighborhood, city, state, zipcode, phone')
         .eq('id', Number(customer_id))
         .eq('tenant_id', tenant_id)
         .single();
 
-      if (!customerError && customer) {
+      if (customerError || !customer) {
+        // Se é venda de entrega e o cliente não foi encontrado, retornar erro
+        if (sale_type === 'entrega') {
+          return NextResponse.json(
+            { 
+              success: false, 
+              error: `Cliente não encontrado. O customer_id fornecido (${customer_id}) não existe no sistema.` 
+            },
+            { status: 400 }
+          );
+        }
+        // Para vendas de balcão, apenas logar o erro mas continuar
+        console.warn('⚠️ Cliente não encontrado:', customer_id, customerError);
+      } else {
         customerData = customer;
         console.log('✅ Dados do cliente encontrados:', {
+          id: customer.id,
+          name: customer.name,
           hasAddress: !!customer.address,
           hasNeighborhood: !!customer.neighborhood,
           hasPhone: !!customer.phone,
@@ -98,7 +137,9 @@ async function createSaleHandler(
       sale_type: sale_type || 'balcao',
       sale_number: saleNumber,
       customer_id: customer_id || null,
-      customer_name: customer_name || 'Cliente Avulso',
+      customer_name: sale_type === 'entrega' 
+        ? (customer_name || (customerData?.name || 'Cliente não especificado'))
+        : (customer_name || 'Cliente Avulso'),
       total_amount: parseFloat(String(total_amount)),
       discount_amount: 0,
       final_amount: parseFloat(String(total_amount)),
@@ -199,7 +240,7 @@ async function createSaleHandler(
         tenant_id,
         user_id: '00000000-0000-0000-0000-000000000000',
         sale_id: sale.id,
-        customer_name: customer_name || 'Cliente Avulso',
+        customer_name: customer_name || (customerData?.name || 'Cliente não especificado'),
         delivery_address: finalDeliveryAddress || 'Endereço não informado', // Usar valor padrão se não houver endereço
         neighborhood: finalNeighborhood || null,
         phone: finalPhone || null,
