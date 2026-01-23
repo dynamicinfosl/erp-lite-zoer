@@ -10,6 +10,7 @@ import { usePathname } from 'next/navigation';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { TrialProtection } from '@/components/TrialProtection';
 import { AuthFallback } from '@/components/AuthFallback';
+import { ApiSaleNotification } from '@/components/notifications/ApiSaleNotification';
 // Removidos componentes que podem causar problemas
 
 interface AppLayoutProps {
@@ -20,7 +21,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const [isClient, setIsClient] = useState(false);
   const [forceStopLoading, setForceStopLoading] = useState(false);
-  const { user, loading } = useSimpleAuth();
+  const { user, loading, tenant } = useSimpleAuth();
 
   useEffect(() => {
     setIsClient(true);
@@ -163,6 +164,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
         </main>
       </SidebarInset>
+      {user && tenant && <ApiSaleNotification tenantId={tenant.id} />}
     </SidebarProvider>
   );
 }

@@ -415,11 +415,12 @@ async function listSalesHandler(request: NextRequest) {
       } else {
         console.log(`✅ Itens encontrados: ${items?.length || 0}`);
         
-        // Agrupar itens por sale_id (garantir que seja número)
-        const itemsBySaleId: Record<number, any[]> = {};
+        // Agrupar itens por sale_id (usar string para garantir compatibilidade)
+        const itemsBySaleId: Record<string, any[]> = {};
         (items || []).forEach((item: any) => {
-          const saleId = Number(item.sale_id);
-          if (!isNaN(saleId)) {
+          // Converter sale_id para string para garantir compatibilidade
+          const saleId = String(item.sale_id || '');
+          if (saleId) {
             if (!itemsBySaleId[saleId]) {
               itemsBySaleId[saleId] = [];
             }
@@ -433,7 +434,8 @@ async function listSalesHandler(request: NextRequest) {
         
         // Adicionar itens a cada venda
         data = data.map((sale: any) => {
-          const saleId = Number(sale.id);
+          // Converter sale.id para string para garantir compatibilidade
+          const saleId = String(sale.id || '');
           const saleItems = itemsBySaleId[saleId] || [];
           console.log(`📦 Venda ${sale.sale_number} (ID: ${saleId}): ${saleItems.length} itens`);
           if (saleItems.length > 0) {

@@ -83,6 +83,7 @@ interface Sale {
   status: 'pendente' | 'paga' | 'cancelada';
   data_venda: string;
   observacoes?: string;
+  sale_source?: string | null;
 }
 
 type QuickCustomer = { id: number; name: string; document?: string | null; phone?: string | null };
@@ -413,7 +414,16 @@ export default function VendasPage() {
       
       // Mapear vendas para o formato esperado
       const mapped: Sale[] = (data || []).map((s: any, i: number) => {
-        const items = Array.isArray(s.items) ? s.items : [];
+        // Garantir que items seja um array válido
+        let items = Array.isArray(s.items) ? s.items : [];
+        
+        // Se não tem items mas tem sale_id, tentar buscar (para vendas da API que podem não ter vindo com items)
+        if (items.length === 0 && s.id) {
+          // Os items já deveriam vir da API, mas se não vieram, deixar vazio
+          // A API já busca os items e adiciona ao objeto da venda
+          items = [];
+        }
+        
         console.log(`📦 Venda ${i + 1} (${s.sale_number}): ${items.length} itens`, items);
         
         return {
@@ -422,12 +432,12 @@ export default function VendasPage() {
           cliente: s.customer?.name ?? s.customer_name ?? s.cliente ?? 'Cliente Avulso',
           customer_id: s.customer_id ?? s.customer?.id ?? null,
           vendedor: s.seller_name ?? s.vendedor ?? '',
-          // Se os itens vierem junto com a venda, usar; caso contrário, deixar vazio
+          // Mapear itens corretamente - garantir que product_name seja usado
           itens: items.map((it: any) => ({
             produto: it.product?.name ?? it.product_name ?? it.produto ?? 'Produto',
             quantidade: Number(it.quantity ?? it.quantidade ?? 1),
             preco_unitario: Number(it.unit_price ?? it.price ?? it.preco_unitario ?? 0),
-            subtotal: Number(it.total_price ?? it.subtotal ?? (Number(it.quantity ?? 1) * Number(it.unit_price ?? it.price ?? 0))),
+            subtotal: Number(it.total_price ?? it.subtotal ?? (Number(it.quantity ?? it.quantidade ?? 1) * Number(it.unit_price ?? it.price ?? it.preco_unitario ?? 0))),
           })),
           subtotal: Number(s.subtotal ?? s.total_amount ?? s.total ?? 0),
           desconto: Number(s.discount_amount ?? s.desconto ?? 0),
@@ -444,6 +454,7 @@ export default function VendasPage() {
           })(),
           data_venda: s.created_at ?? s.sold_at ?? s.data_venda ?? new Date().toISOString(),
           observacoes: s.notes ?? s.observacoes ?? '',
+          sale_source: s.sale_source ?? null,
         };
       });
       
@@ -1673,7 +1684,14 @@ export default function VendasPage() {
                     </TableCell>
                     {columnVisibility.numero && (
                       <TableCell className="font-mono text-sm font-medium">
-                        {venda.numero}
+                        <div className="flex items-center gap-2">
+                          {venda.numero}
+                          {venda.sale_source === 'api' && (
+                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                              API
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                     )}
                     {columnVisibility.cliente && (
