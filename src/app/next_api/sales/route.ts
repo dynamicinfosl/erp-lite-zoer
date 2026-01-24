@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { withPlanValidation } from '@/lib/plan-middleware';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImV4cCI6MjA3MjU5Mzc0M30.NBHrAlv8RPxu1QhLta76Uoh6Bc_OnqhfVydy8_TX6GQ';
+// IMPORTANTE: este endpoint precisa do service_role para conseguir ler sale_items mesmo com RLS habilitado.
+// Se cair no anon key, a listagem de itens tende a vir vazia (0 itens).
+const supabaseServiceKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10';
 
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -400,25 +407,51 @@ async function listSalesHandler(request: NextRequest) {
     }
     
     // Buscar itens de venda para cada venda
+    // Importante: IDs podem ser number OU string/UUID, então trabalhamos sempre com string para compatibilidade.
     if (data && data.length > 0) {
-      const saleIds = data.map((sale: any) => sale.id);
+      const saleIds = (data || [])
+        .map((sale: any) => sale?.id)
+        .filter((id: any) => id !== null && id !== undefined && String(id).trim() !== '');
+
       console.log(`🔍 Buscando itens para ${saleIds.length} vendas...`);
-      
-      const { data: items, error: itemsError } = await supabaseAdmin
-        .from('sale_items')
-        .select('*')
-        .in('sale_id', saleIds);
-      
-      if (itemsError) {
-        console.error('❌ Erro ao buscar itens de venda:', itemsError);
-        // Continuar mesmo com erro, apenas sem itens
+
+      if (saleIds.length === 0) {
+        console.warn('⚠️ Nenhum ID de venda válido encontrado para buscar itens');
       } else {
-        console.log(`✅ Itens encontrados: ${items?.length || 0}`);
-        
+        // Supabase/PostgREST costuma aplicar limite (~1000) por request.
+        // Se buscarmos itens de centenas de vendas numa única query, os itens das vendas mais recentes podem ficar fora.
+        // Então buscamos em LOTES (chunks) por sale_id para garantir que venha tudo.
+        const chunkSize = 10; // conservador para evitar estourar o limite de linhas
+        const chunks: string[][] = [];
+        for (let i = 0; i < saleIds.length; i += chunkSize) {
+          chunks.push(saleIds.slice(i, i + chunkSize).map((x: any) => String(x)));
+        }
+
+        let allItems: any[] = [];
+        for (const chunk of chunks) {
+          const { data: chunkItems, error: chunkError } = await supabaseAdmin
+            .from('sale_items')
+            .select('sale_id, product_id, variant_id, price_type_id, product_name, unit_price, quantity, subtotal, total_price')
+            .in('sale_id', chunk);
+
+          if (chunkError) {
+            console.error('❌ Erro ao buscar itens de venda (chunk):', chunkError, { chunkSize: chunk.length });
+            continue;
+          }
+
+          const count = chunkItems?.length || 0;
+          if (count >= 1000) {
+            console.warn('⚠️ Chunk retornou 1000 itens (pode estar truncado). Considere reduzir chunkSize.', { chunkSize: chunk.length });
+          }
+
+          allItems = allItems.concat(chunkItems || []);
+        }
+
+        console.log(`✅ Itens encontrados (total): ${allItems.length}`);
+
         // Agrupar itens por sale_id (usar string para garantir compatibilidade)
         const itemsBySaleId: Record<string, any[]> = {};
-        (items || []).forEach((item: any) => {
-          // Converter sale_id para string para garantir compatibilidade
+        allItems.forEach((item: any) => {
           const saleId = String(item.sale_id || '');
           if (saleId) {
             if (!itemsBySaleId[saleId]) {
@@ -429,21 +462,17 @@ async function listSalesHandler(request: NextRequest) {
             console.warn(`⚠️ sale_id inválido no item:`, item.sale_id, item);
           }
         });
-        
+
         console.log(`📊 Itens agrupados por sale_id:`, Object.keys(itemsBySaleId).length, 'vendas com itens');
-        
+
         // Adicionar itens a cada venda
         data = data.map((sale: any) => {
-          // Converter sale.id para string para garantir compatibilidade
           const saleId = String(sale.id || '');
           const saleItems = itemsBySaleId[saleId] || [];
           console.log(`📦 Venda ${sale.sale_number} (ID: ${saleId}): ${saleItems.length} itens`);
-          if (saleItems.length > 0) {
-            console.log(`   Primeiro item:`, saleItems[0]);
-          }
           return {
             ...sale,
-            items: saleItems
+            items: saleItems,
           };
         });
       }
@@ -459,10 +488,16 @@ async function listSalesHandler(request: NextRequest) {
     console.log('✅ [SALES API] Preparando resposta...');
     if (today === 'true') {
       console.log(`✅ [SALES API] Retornando ${data?.length || 0} vendas no formato 'sales'`);
-      return NextResponse.json({ success: true, sales: data });
+      return NextResponse.json(
+        { success: true, sales: data },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
     } else {
       console.log(`✅ [SALES API] Retornando ${data?.length || 0} vendas no formato 'data'`);
-      return NextResponse.json({ success: true, data: data });
+      return NextResponse.json(
+        { success: true, data: data },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
     }
 
   } catch (error) {

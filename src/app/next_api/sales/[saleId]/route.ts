@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10';
 
@@ -78,12 +81,87 @@ export async function GET(
     
     console.log('✅ Itens encontrados:', items?.length || 0, items);
 
+    // Buscar dados do cliente se customer_id estiver presente
+    // (muitas vendas de balcão antigas podem ter só customer_name, então tem fallback por nome abaixo)
+    let customerData: any = null;
+    if (sale.customer_id) {
+      console.log('🔍 Buscando dados do cliente:', sale.customer_id);
+      const { data: customer, error: customerError } = await supabaseAdmin
+        .from('customers')
+        .select('id, name, address, neighborhood, city, state, zipcode, phone, document')
+        .eq('id', Number(sale.customer_id))
+        .eq('tenant_id', sale.tenant_id)
+        .single();
+
+      if (!customerError && customer) {
+        customerData = customer;
+        console.log('✅ Dados do cliente encontrados:', {
+          id: customer.id,
+          name: customer.name,
+          hasAddress: !!customer.address,
+          hasNeighborhood: !!customer.neighborhood,
+        });
+      } else {
+        console.warn('⚠️ Cliente não encontrado:', sale.customer_id, customerError);
+      }
+    }
+
+    // Fallback: se não tem customer_id na venda, tentar achar o cliente pelo nome
+    // (melhora cupom de balcão com endereço quando o cliente está cadastrado)
+    if (!customerData && sale.tenant_id && sale.customer_name) {
+      const name = String(sale.customer_name || '').trim();
+      const isAvulso = name.length === 0 || name.toLowerCase() === 'cliente avulso';
+      if (!isAvulso) {
+        console.log('🔎 Fallback: buscando cliente por nome:', name);
+
+        // 1) tentar match “exato” (sem curingas)
+        let { data: customerByName, error: byNameError } = await supabaseAdmin
+          .from('customers')
+          .select('id, name, address, neighborhood, city, state, zipcode, phone, document')
+          .eq('tenant_id', sale.tenant_id)
+          .ilike('name', name)
+          .limit(1);
+
+        // 2) se não achar, tentar match parcial (mais tolerante)
+        if ((!byNameError && (!customerByName || customerByName.length === 0)) && name.length >= 3) {
+          const pattern = `%${name}%`;
+          console.log('🔎 Fallback: tentando match parcial:', pattern);
+          const res = await supabaseAdmin
+            .from('customers')
+            .select('id, name, address, neighborhood, city, state, zipcode, phone, document')
+            .eq('tenant_id', sale.tenant_id)
+            .ilike('name', pattern)
+            .limit(1);
+          customerByName = res.data as any;
+          byNameError = res.error as any;
+        }
+
+        if (!byNameError && customerByName && customerByName.length > 0) {
+          customerData = customerByName[0];
+          console.log('✅ Cliente encontrado por nome (fallback):', { id: customerData.id, name: customerData.name });
+        } else {
+          console.warn('⚠️ Fallback por nome não encontrou cliente:', byNameError);
+        }
+      }
+    }
+
     // Formatar dados da venda
     const saleData = {
       id: sale.id,
       sale_number: sale.sale_number,
       customer_name: sale.customer_name,
       customer_id: sale.customer_id,
+      customer: customerData ? {
+        id: customerData.id,
+        name: customerData.name,
+        address: customerData.address,
+        neighborhood: customerData.neighborhood,
+        city: customerData.city,
+        state: customerData.state,
+        zipcode: customerData.zipcode,
+        phone: customerData.phone,
+        document: customerData.document,
+      } : null,
       seller_name: sale.seller_name,
       total_amount: sale.total_amount,
       final_amount: sale.final_amount,
@@ -96,6 +174,7 @@ export async function GET(
       notes: sale.notes,
       tenant_id: sale.tenant_id,
       sale_source: sale.sale_source,
+      sale_type: sale.sale_type,
       items: items?.map(item => ({
         product_name: item.product_name,
         quantity: item.quantity,
@@ -105,7 +184,10 @@ export async function GET(
     };
 
     console.log('✅ Retornando dados da venda:', saleData);
-    return NextResponse.json({ success: true, data: saleData });
+    return NextResponse.json(
+      { success: true, data: saleData },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
 
   } catch (error) {
     console.error('Erro no handler de busca:', error);

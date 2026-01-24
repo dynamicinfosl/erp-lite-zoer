@@ -360,7 +360,7 @@ export default function VendasPage() {
       
       // Buscar todas as vendas do tenant (sem filtrar por sale_source na API)
       // O filtro será feito no frontend para incluir vendas antigas sem sale_source
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) {
         const errorText = await res.text();
         console.error('❌ Erro na resposta da API:', res.status, errorText);

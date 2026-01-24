@@ -23,6 +23,52 @@ function normalizeText(text: string): string {
 }
 
 /**
+ * Levenshtein com "early exit" para ficar rápido.
+ * Retorna true se a distância <= maxDist.
+ */
+function levenshteinWithin(a: string, b: string, maxDist: number): boolean {
+  if (maxDist < 0) return false;
+  if (a === b) return true;
+  if (!a || !b) return Math.max(a.length, b.length) <= maxDist;
+
+  // Garantir que a seja a menor (otimiza memória)
+  if (a.length > b.length) {
+    const tmp = a;
+    a = b;
+    b = tmp;
+  }
+
+  const la = a.length;
+  const lb = b.length;
+  if (lb - la > maxDist) return false;
+
+  const prev = new Array<number>(la + 1);
+  const curr = new Array<number>(la + 1);
+  for (let i = 0; i <= la; i++) prev[i] = i;
+
+  for (let j = 1; j <= lb; j++) {
+    curr[0] = j;
+    let rowMin = curr[0];
+    const bj = b.charCodeAt(j - 1);
+
+    for (let i = 1; i <= la; i++) {
+      const cost = a.charCodeAt(i - 1) === bj ? 0 : 1;
+      const del = prev[i] + 1;
+      const ins = curr[i - 1] + 1;
+      const sub = prev[i - 1] + cost;
+      const val = del < ins ? (del < sub ? del : sub) : (ins < sub ? ins : sub);
+      curr[i] = val;
+      if (val < rowMin) rowMin = val;
+    }
+
+    if (rowMin > maxDist) return false;
+    for (let i = 0; i <= la; i++) prev[i] = curr[i];
+  }
+
+  return prev[la] <= maxDist;
+}
+
+/**
  * POST /api/v1/products
  * Cria um novo produto via API externa
  */
@@ -139,6 +185,54 @@ async function listProductsHandler(
     const include_variants = searchParams.get('include_variants') === 'true';
     const include_price_tiers = searchParams.get('include_price_tiers') === 'true';
 
+    // Split por palavras e remove termos “fracos” para melhorar flexibilidade:
+    // Ex.: "cliper limao" deve encontrar "Cliper ... (cola com limao)"
+    const stopWords = new Set(['de', 'da', 'do', 'das', 'dos', 'com', 'e']);
+    const searchTerm = search && search.trim().length > 0 ? search.trim() : null;
+    const normalizedSearch = searchTerm ? normalizeText(searchTerm) : null;
+    const tokens = normalizedSearch
+      ? normalizedSearch
+          .split(/\s+/)
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0 && !stopWords.has(t))
+      : [];
+
+    const tokenMaxDist = (t: string) => {
+      // tolerância por tamanho (bem conservadora pra não trazer coisa demais)
+      const n = t.length;
+      if (n <= 2) return 0;
+      if (n <= 5) return 1;
+      if (n <= 9) return 2;
+      return 3;
+    };
+
+    const addMatches = (tokenSets: Record<string, Set<number>>, productId: number, haystack: string) => {
+      const normalizedHaystack = haystack; // já vem normalizado
+      // separar em "palavras" pra fuzzy match (evita comparar contra a frase inteira)
+      const words = normalizedHaystack.split(/[^a-z0-9]+/g).filter((w) => w.length > 0);
+
+      for (const t of tokens) {
+        // match exato (rápido)
+        if (normalizedHaystack.includes(t)) {
+          tokenSets[t].add(productId);
+          continue;
+        }
+
+        // match fuzzy: se alguma palavra for "parecida" com o token
+        const maxDist = tokenMaxDist(t);
+        if (maxDist <= 0) continue;
+
+        // heurística: só compara palavras com tamanho parecido
+        for (const w of words) {
+          if (Math.abs(w.length - t.length) > maxDist) continue;
+          if (levenshteinWithin(w, t, maxDist)) {
+            tokenSets[t].add(productId);
+            break;
+          }
+        }
+      }
+    };
+
     let query = supabaseAdmin
       .from('products')
       .select('*')
@@ -150,22 +244,131 @@ async function listProductsHandler(
       query = query.eq('is_active', is_active === 'true');
     }
 
-    // Busca por nome, SKU ou código de barras com normalização flexível
-    // Normalizamos o termo de busca para remover acentos e tornar case-insensitive
-    const searchTerm = search && search.trim().length > 0 ? search.trim() : null;
-    const normalizedSearch = searchTerm ? normalizeText(searchTerm) : null;
-    
-    // Se há busca, buscamos mais produtos (até 500) para garantir que encontremos todos os possíveis matches
-    // mesmo com diferenças de acentuação, e depois filtramos usando normalização no código
-    if (searchTerm) {
-      // Buscar mais produtos para garantir cobertura completa (busca flexível)
-      query = query.range(0, 499); // Buscar até 500 produtos para filtrar depois
-    } else {
-      // Quando não há busca, aplicar paginação diretamente no banco
-      query = query.range(offset, offset + limit - 1);
-    }
+    // Busca flexível (multi-termos):
+    // - Divide em palavras e faz AND entre elas.
+    // - Cada palavra pode bater no produto OU em qualquer variação do produto.
+    //   Ex.: "cliper limao" encontra produto "Cliper ..." com variação "cola com limao".
+    // - Faz varredura em páginas para não depender só dos mais recentes.
+    let allProducts: any[] = [];
+    let error: any = null;
+    if (tokens.length > 0) {
+      const tokenSets: Record<string, Set<number>> = Object.fromEntries(tokens.map((t) => [t, new Set<number>()]));
 
-    const { data: allProducts, error } = await query;
+      // 1) Varredura de produtos (name/sku/barcode)
+      const pageSize = 500;
+      const maxPages = 20; // até 10k produtos (ajustável)
+      let scanned = 0;
+      for (let page = 0; page < maxPages; page++) {
+        const { data: pageRows, error: pageError } = await query
+          .order('name', { ascending: true })
+          .range(scanned, scanned + pageSize - 1);
+
+        if (pageError) {
+          error = pageError;
+          break;
+        }
+        const rows = Array.isArray(pageRows) ? pageRows : [];
+        if (rows.length === 0) break;
+
+        for (const product of rows) {
+          const pid = Number(product.id);
+          if (!Number.isFinite(pid) || pid <= 0) continue;
+          const normalizedName = normalizeText(product.name || '');
+          const normalizedSku = normalizeText(product.sku || '');
+          const normalizedBarcode = normalizeText(product.barcode || '');
+          const haystack = `${normalizedName} ${normalizedSku} ${normalizedBarcode}`;
+          addMatches(tokenSets, pid, haystack);
+        }
+
+        scanned += pageSize;
+      }
+
+      // 2) Varredura de variações (label/name/barcode) para complementar matches por token
+      try {
+        const variantPageSize = 1000;
+        const maxVariantPages = 10; // até 10k variações (ajustável)
+        let vScanned = 0;
+        for (let page = 0; page < maxVariantPages; page++) {
+          const { data: pageVariants, error: vErr } = await supabaseAdmin
+            .from('product_variants')
+            .select('product_id, label, name, barcode')
+            .eq('tenant_id', tenant_id)
+            .order('id', { ascending: true })
+            .range(vScanned, vScanned + variantPageSize - 1);
+
+          if (vErr) {
+            console.warn('⚠️ Erro ao varrer variações para busca flexível (ignorado):', vErr);
+            break;
+          }
+
+          const vars = Array.isArray(pageVariants) ? pageVariants : [];
+          if (vars.length === 0) break;
+
+          for (const v of vars) {
+            const pid = Number(v.product_id);
+            if (!Number.isFinite(pid) || pid <= 0) continue;
+            const haystack = `${normalizeText(v.label || '')} ${normalizeText(v.name || '')} ${normalizeText(v.barcode || '')}`;
+            addMatches(tokenSets, pid, haystack);
+          }
+
+          vScanned += variantPageSize;
+        }
+      } catch (e) {
+        console.warn('⚠️ Falha ao varrer variações para busca flexível (ignorado):', e);
+      }
+
+      // 3) Interseção: o produto precisa bater TODOS os tokens (em qualquer combinação produto/variação)
+      // Se o usuário digitar uma palavra "errada" a mais, isso poderia zerar os resultados.
+      // Então fazemos relaxamento automático: tenta 100% das palavras; se não achar, tenta N-1, etc.
+      const counts = new Map<number, number>();
+      for (const t of tokens) {
+        const setForToken = tokenSets[t] || new Set<number>();
+        for (const id of setForToken) {
+          counts.set(id, (counts.get(id) || 0) + 1);
+        }
+      }
+
+      let required = tokens.length;
+      let ids: number[] = [];
+      while (required > 0) {
+        ids = Array.from(counts.entries())
+          .filter(([, c]) => c >= required)
+          .map(([id]) => id);
+        if (ids.length > 0) break;
+        required -= 1;
+      }
+
+      // Evitar retorno gigantesco quando required relaxa demais
+      if (ids.length > 2000) ids = ids.slice(0, 2000);
+
+      if (ids.length === 0) {
+        allProducts = [];
+      } else {
+        // Buscar produtos finais por IDs (chunk para evitar limite do .in)
+        const chunkSize = 200;
+        const fetched: any[] = [];
+        for (let i = 0; i < ids.length; i += chunkSize) {
+          const chunk = ids.slice(i, i + chunkSize);
+          const { data: chunkProducts, error: pErr } = await supabaseAdmin
+            .from('products')
+            .select('*')
+            .eq('tenant_id', tenant_id)
+            .in('id', chunk);
+
+          if (pErr) {
+            error = pErr;
+            break;
+          }
+          fetched.push(...(chunkProducts || []));
+        }
+        allProducts = fetched;
+      }
+    } else {
+      // Sem busca: paginação normal no banco
+      const res = await query.range(offset, offset + limit - 1);
+      allProducts = Array.isArray(res.data) ? res.data : [];
+      error = res.error;
+    }
 
     if (error) {
       console.error('❌ Erro ao listar produtos:', error);
@@ -175,81 +378,27 @@ async function listProductsHandler(
       );
     }
 
-    // Se há busca, filtrar usando normalização para garantir flexibilidade com acentos
-    // Isso permite encontrar "Convenção" quando buscar "convencao" (sem acento)
+    // Se há busca, filtrar/ordenar usando tokens normalizados para garantir flexibilidade
     let products = allProducts || [];
-    if (normalizedSearch && products.length > 0) {
-      products = products.filter((product: any) => {
-        const normalizedName = normalizeText(product.name || '');
-        const normalizedSku = normalizeText(product.sku || '');
-        const normalizedBarcode = normalizeText(product.barcode || '');
-        
-        // Busca flexível: verifica se o termo normalizado está contido em qualquer campo normalizado
-        return (
-          normalizedName.includes(normalizedSearch) ||
-          normalizedSku.includes(normalizedSearch) ||
-          normalizedBarcode.includes(normalizedSearch)
-        );
-      });
-      
-      // Ordenar resultados: produtos que começam com o termo aparecem primeiro
+    if (tokens.length > 0 && products.length > 0) {
+      // Ranking simples: quem dá match no início do nome recebe prioridade
+      const firstToken = tokens[0] || '';
       products = products.sort((a: any, b: any) => {
         const aName = normalizeText(a.name || '');
         const bName = normalizeText(b.name || '');
-        const aStarts = aName.startsWith(normalizedSearch);
-        const bStarts = bName.startsWith(normalizedSearch);
-        
+        const aStarts = firstToken ? aName.startsWith(firstToken) : false;
+        const bStarts = firstToken ? bName.startsWith(firstToken) : false;
         if (aStarts && !bStarts) return -1;
         if (!aStarts && bStarts) return 1;
-        
-        // Se ambos começam ou não começam, ordenar alfabeticamente
         return aName.localeCompare(bName, 'pt-BR');
       });
-      
-      // Aplicar paginação no resultado filtrado
+
       products = products.slice(offset, offset + limit);
     }
     // Quando não há busca, products já está paginado pelo range do Supabase
 
-    // Se há busca, também buscar produtos que tenham variações correspondentes
-    if (normalizedSearch) {
-      // Buscar variações que correspondam ao termo de busca
-      const { data: matchingVariants, error: variantSearchError } = await supabaseAdmin
-        .from('product_variants')
-        .select('product_id, label, name')
-        .eq('tenant_id', tenant_id);
-      
-      if (!variantSearchError && matchingVariants) {
-        // Filtrar variações que correspondam à busca normalizada
-        const variantProductIds = matchingVariants
-          .filter((v: any) => {
-            const normalizedLabel = normalizeText(v.label || '');
-            const normalizedName = normalizeText(v.name || '');
-            return normalizedLabel.includes(normalizedSearch) || normalizedName.includes(normalizedSearch);
-          })
-          .map((v: any) => Number(v.product_id))
-          .filter((id: number) => Number.isFinite(id) && id > 0);
-        
-        // Buscar produtos "pai" que têm essas variações
-        if (variantProductIds.length > 0) {
-          const { data: parentProducts, error: parentError } = await supabaseAdmin
-            .from('products')
-            .select('*')
-            .eq('tenant_id', tenant_id)
-            .in('id', variantProductIds);
-          
-          if (!parentError && parentProducts) {
-            // Adicionar produtos pai aos resultados (evitando duplicatas)
-            const existingIds = new Set(products.map((p: any) => Number(p.id)));
-            for (const parent of parentProducts) {
-              if (!existingIds.has(Number(parent.id))) {
-                products.push(parent);
-              }
-            }
-          }
-        }
-      }
-    }
+    // Observação: a busca por variações já foi incorporada na etapa de interseção por token,
+    // então não é necessário um segundo passo de "parent products".
     
     // Sempre incluir variações e tipos de preço para cada produto quando disponíveis
     const productIds = products.map((p: any) => Number(p.id)).filter((id: number) => Number.isFinite(id) && id > 0);

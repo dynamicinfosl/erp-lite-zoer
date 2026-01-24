@@ -8,6 +8,20 @@ interface SaleData {
   id: string;
   sale_number: string;
   customer_name: string;
+  customer_id?: number | null;
+  customer?: {
+    id: number;
+    name: string;
+    address?: string | null;
+    neighborhood?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zipcode?: string | null;
+    phone?: string | null;
+    document?: string | null;
+  } | null;
+  sale_type?: string;
+  delivery_address?: string | null;
   total_amount: number;
   payment_method: string;
   created_at: string;
@@ -53,7 +67,7 @@ export default function ReceiptPage() {
         console.log('🔍 Buscando venda com ID:', saleId);
         
         // Buscar dados da venda
-        const saleResponse = await fetch(`/next_api/sales/${saleId}`);
+        const saleResponse = await fetch(`/next_api/sales/${saleId}`, { cache: 'no-store' });
         console.log('📡 Resposta da API:', saleResponse.status);
         
         if (!saleResponse.ok) {
@@ -70,7 +84,7 @@ export default function ReceiptPage() {
         // Buscar dados da empresa (tenant) da venda
         if (sale.tenant_id) {
           console.log('🏢 Buscando dados do tenant:', sale.tenant_id);
-          const tenantResponse = await fetch(`/next_api/tenants/${sale.tenant_id}`);
+          const tenantResponse = await fetch(`/next_api/tenants/${sale.tenant_id}`, { cache: 'no-store' });
           
           if (tenantResponse.ok) {
             const tenantResult = await tenantResponse.json();
@@ -212,6 +226,17 @@ export default function ReceiptPage() {
     if (data.city) parts.push(data.city);
     if (data.state) parts.push(data.state);
     return parts.join(' - ');
+  };
+
+  const buildCustomerAddress = (customer: SaleData['customer']) => {
+    if (!customer) return null;
+    const parts = [];
+    if (customer.address) parts.push(customer.address);
+    if (customer.neighborhood) parts.push(customer.neighborhood);
+    if (customer.city) parts.push(customer.city);
+    if (customer.state) parts.push(customer.state);
+    if (customer.zipcode) parts.push(`CEP: ${customer.zipcode}`);
+    return parts.length > 0 ? parts.join(', ') : null;
   };
 
   if (loading) {
@@ -509,6 +534,19 @@ export default function ReceiptPage() {
             <div className="info-item">
               <strong>Cliente:</strong> {saleData.customer_name}
             </div>
+          )}
+          {/* Endereço (prioridade: entrega -> delivery_address; senão endereço cadastrado do cliente) */}
+          {saleData.delivery_address && String(saleData.delivery_address).trim() !== '' ? (
+            <div className="info-item">
+              <strong>Endereço:</strong> {saleData.delivery_address}
+            </div>
+          ) : (
+            saleData.customer &&
+            buildCustomerAddress(saleData.customer) && (
+            <div className="info-item">
+              <strong>Endereço:</strong> {buildCustomerAddress(saleData.customer)}
+            </div>
+            )
           )}
           {couponSettings.showCashier && companyData?.seller_name && (
             <div className="info-item">
