@@ -78,6 +78,45 @@ async function createSaleHandler(
           { status: 400 }
         );
       }
+
+      // Proibir vendas de entrega repetidas: mesma venda (mesmo cliente + mesmo valor) nos últimos 10 minutos
+      const duplicateWindowMinutes = 10;
+      const since = new Date(Date.now() - duplicateWindowMinutes * 60 * 1000).toISOString();
+      const totalAmountNum = parseFloat(String(total_amount));
+
+      let duplicateQuery = supabaseAdmin
+        .from('sales')
+        .select('id, sale_number, created_at')
+        .eq('tenant_id', tenant_id)
+        .eq('sale_type', 'entrega')
+        .eq('sale_source', 'api')
+        .eq('total_amount', totalAmountNum)
+        .gte('created_at', since);
+
+      if (customer_id != null && customer_id !== undefined && customer_id !== '') {
+        duplicateQuery = duplicateQuery.eq('customer_id', Number(customer_id));
+      } else {
+        const nameToMatch = (customer_name || '').trim();
+        if (nameToMatch) {
+          duplicateQuery = duplicateQuery.eq('customer_name', nameToMatch);
+        }
+      }
+
+      const { data: existingSales, error: duplicateError } = await duplicateQuery.limit(1);
+
+      if (!duplicateError && existingSales && existingSales.length > 0) {
+        const existing = existingSales[0];
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Venda de entrega duplicada. Já existe uma venda de entrega para este cliente com o mesmo valor nos últimos 10 minutos.',
+            duplicate_sale_id: existing.id,
+            duplicate_sale_number: existing.sale_number,
+            duplicate_created_at: existing.created_at,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // Buscar dados do cliente se customer_id for fornecido (para usar endereço cadastrado)

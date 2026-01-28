@@ -40,6 +40,7 @@ Em caso de erro:
 - `401` - Não autenticado (API Key inválida ou ausente)
 - `403` - Sem permissão (API Key não tem permissão para a operação)
 - `404` - Recurso não encontrado
+- `409` - Conflito (ex.: venda de entrega duplicada)
 - `500` - Erro interno do servidor
 
 ## Endpoints
@@ -111,6 +112,8 @@ Cria uma nova venda. Quando `sale_type='entrega'`, cria automaticamente o regist
 ```
 
 **Nota:** Quando `sale_type='entrega'`, o sistema cria automaticamente um registro na tabela de entregas com status `'aguardando'`.
+
+**Vendas de entrega repetidas:** Para evitar duplicidade, o sistema **não permite** criar duas vendas de entrega para o mesmo cliente com o mesmo valor total em um intervalo de 10 minutos. Se isso ocorrer, a API retorna status `409` (Conflito) com a mensagem de erro e os dados da venda duplicada (`duplicate_sale_id`, `duplicate_sale_number`, `duplicate_created_at`).
 
 #### Listar Vendas
 
