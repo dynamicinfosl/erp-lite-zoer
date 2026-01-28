@@ -279,6 +279,13 @@ export default function ReceiptPage() {
   const vendorAddressLine1 = buildCompanyAddress(companyData) || (couponSettings.companyAddress || '').trim() || null;
   const vendorAddressLine2 = buildCompanyCityState(companyData) || (couponSettings.companyCity || '').trim() || null;
   const vendorAddressLine1Or2 = !!(vendorAddressLine1 || vendorAddressLine2);
+  const customerAddressLine = buildCustomerAddress(saleData.customer);
+  const deliveryAddressLine = typeof saleData.delivery_address === 'string'
+    ? saleData.delivery_address.trim()
+    : saleData.delivery_address
+      ? String(saleData.delivery_address).trim()
+      : '';
+  const addressToShow = deliveryAddressLine || customerAddressLine;
 
   return (
     <div className="min-h-screen bg-white">
@@ -545,19 +552,10 @@ export default function ReceiptPage() {
             </div>
           )}
           {/* Endereço no cupom (notas de balcão e entrega): prioridade delivery_address, senão endereço do cliente */}
-          {couponSettings.showCustomerAddress && (
-            saleData.delivery_address && String(saleData.delivery_address).trim() !== '' ? (
-              <div className="info-item">
-                <strong>Endereço:</strong> {saleData.delivery_address}
-              </div>
-            ) : (
-              saleData.customer &&
-              buildCustomerAddress(saleData.customer) && (
-                <div className="info-item">
-                  <strong>Endereço:</strong> {buildCustomerAddress(saleData.customer)}
-                </div>
-              )
-            )
+          {couponSettings.showCustomerAddress !== false && addressToShow && (
+            <div className="info-item">
+              <strong>Endereço:</strong> {addressToShow}
+            </div>
           )}
           {couponSettings.showCashier && companyData?.seller_name && (
             <div className="info-item">

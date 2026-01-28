@@ -645,6 +645,7 @@ export default function VendasPage() {
               ...prev,
               cliente: String(data.customer_name || prev.cliente || ''),
               customer_id: data.customer_id ?? null,
+              delivery_address: String(data.delivery_address || ''),
               total: Number(data.total_amount ?? prev.total ?? 0),
               itens: mappedItems,
             }));
@@ -709,6 +710,7 @@ export default function VendasPage() {
       const updateData: any = {
         customer_name: editFormData.cliente,
         customer_id: editFormData.customer_id ?? null,
+        delivery_address: editFormData.delivery_address || '',
         payment_method: editFormData.forma_pagamento,
         status: editFormData.status,
         notes: editFormData.observacoes || '',
@@ -1961,6 +1963,21 @@ export default function VendasPage() {
                     ]}
                   />
                 </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="delivery_address">Endereço do Cliente / Entrega</Label>
+                <Input
+                  id="delivery_address"
+                  type="text"
+                  value={editFormData.delivery_address || ''}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, delivery_address: e.target.value }))}
+                  placeholder="Rua, número, bairro, cidade..."
+                  className="col-span-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Se preenchido, aparece no cupom. Caso contrário, usa o endereço cadastrado do cliente.
+                </p>
               </div>
 
               <div className="grid gap-2">
