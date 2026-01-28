@@ -68,6 +68,7 @@ interface Sale {
   numero: string;
   cliente: string;
   customer_id?: number | null;
+  delivery_address?: string | null;
   vendedor?: string;
   itens: Array<{
     produto: string;
