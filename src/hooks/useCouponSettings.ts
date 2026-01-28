@@ -16,6 +16,8 @@ export interface CouponSettings {
   showTime: boolean;
   showCashier: boolean;
   showCustomer: boolean;
+  /** Mostrar endereço do cliente/entrega no cupom (inclui notas de balcão) */
+  showCustomerAddress: boolean;
   footerText: string;
 }
 
@@ -35,6 +37,7 @@ const defaultSettings: CouponSettings = {
   showTime: true,
   showCashier: true,
   showCustomer: true,
+  showCustomerAddress: true, // endereço do cliente/entrega no cupom (balcão e entrega)
   footerText: 'Obrigado pela preferência!',
 };
 

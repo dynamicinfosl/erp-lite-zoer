@@ -276,6 +276,10 @@ export default function ReceiptPage() {
     );
   }
 
+  const vendorAddressLine1 = buildCompanyAddress(companyData) || (couponSettings.companyAddress || '').trim() || null;
+  const vendorAddressLine2 = buildCompanyCityState(companyData) || (couponSettings.companyCity || '').trim() || null;
+  const vendorAddressLine1Or2 = !!(vendorAddressLine1 || vendorAddressLine2);
+
   return (
     <div className="min-h-screen bg-white">
       {/* Estilos para impressão */}
@@ -486,20 +490,25 @@ export default function ReceiptPage() {
 
       {/* Cupom */}
       <div className="receipt-container">
-        {/* Cabeçalho da Empresa - Usando dados reais do perfil da empresa */}
+        {/* Cabeçalho da Empresa - Nome e endereço do vendedor (estabelecimento) */}
         <div className="company-header">
           <div style={{ fontSize: `${couponSettings.fontSize + 2}px`, fontWeight: 'bold', marginBottom: '3px' }}>
             {companyData.name.toUpperCase()}
           </div>
-          {couponSettings.showAddress && buildCompanyAddress(companyData) && (
-            <div style={{ fontSize: `${couponSettings.fontSize}px`, fontWeight: '600' }}>
-              {buildCompanyAddress(companyData)}
-            </div>
-          )}
-          {couponSettings.showAddress && buildCompanyCityState(companyData) && (
-            <div style={{ fontSize: `${couponSettings.fontSize}px`, fontWeight: '600' }}>
-              {buildCompanyCityState(companyData)}
-            </div>
+          {/* Endereço do vendedor: dados do tenant (Perfil da Empresa) ou fallback das Configurações do Cupom */}
+          {(couponSettings.showAddress !== false) && vendorAddressLine1Or2 && (
+            <>
+              {vendorAddressLine1 ? (
+                <div style={{ fontSize: `${couponSettings.fontSize}px`, fontWeight: '600' }}>
+                  {vendorAddressLine1}
+                </div>
+              ) : null}
+              {vendorAddressLine2 ? (
+                <div style={{ fontSize: `${couponSettings.fontSize}px`, fontWeight: '600' }}>
+                  {vendorAddressLine2}
+                </div>
+              ) : null}
+            </>
           )}
           {couponSettings.showPhone && companyData.phone && (
             <div style={{ fontSize: `${couponSettings.fontSize}px`, fontWeight: '600' }}>
@@ -535,17 +544,19 @@ export default function ReceiptPage() {
               <strong>Cliente:</strong> {saleData.customer_name}
             </div>
           )}
-          {/* Endereço (prioridade: entrega -> delivery_address; senão endereço cadastrado do cliente) */}
-          {saleData.delivery_address && String(saleData.delivery_address).trim() !== '' ? (
-            <div className="info-item">
-              <strong>Endereço:</strong> {saleData.delivery_address}
-            </div>
-          ) : (
-            saleData.customer &&
-            buildCustomerAddress(saleData.customer) && (
-            <div className="info-item">
-              <strong>Endereço:</strong> {buildCustomerAddress(saleData.customer)}
-            </div>
+          {/* Endereço no cupom (notas de balcão e entrega): prioridade delivery_address, senão endereço do cliente */}
+          {couponSettings.showCustomerAddress && (
+            saleData.delivery_address && String(saleData.delivery_address).trim() !== '' ? (
+              <div className="info-item">
+                <strong>Endereço:</strong> {saleData.delivery_address}
+              </div>
+            ) : (
+              saleData.customer &&
+              buildCustomerAddress(saleData.customer) && (
+                <div className="info-item">
+                  <strong>Endereço:</strong> {buildCustomerAddress(saleData.customer)}
+                </div>
+              )
             )
           )}
           {couponSettings.showCashier && companyData?.seller_name && (
