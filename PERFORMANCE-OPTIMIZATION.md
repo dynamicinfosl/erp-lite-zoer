@@ -135,11 +135,15 @@ Execute no Supabase SQL Editor:
 ```bash
 # 1. Acesse o Supabase Dashboard
 # 2. Vá em SQL Editor
-# 3. Cole o conteúdo de scripts/performance-indexes.sql
+# 3. Cole o conteúdo de scripts/performance-indexes-safe.sql ⚠️ USE A VERSÃO SAFE
 # 4. Execute (Run)
 ```
 
-**IMPORTANTE:** Execute este script o mais rápido possível para resolver o problema de lentidão nas queries.
+**⚠️ IMPORTANTE - Use performance-indexes-safe.sql:**
+- Verifica se tabelas e colunas existem antes de criar índices
+- Não interrompe se alguma tabela/coluna estiver faltando
+- Mostra mensagens claras de sucesso/erro para cada índice
+- Execute este script o mais rápido possível para resolver o problema de lentidão nas queries.
 
 ### 2. Deploy do Código Otimizado
 
