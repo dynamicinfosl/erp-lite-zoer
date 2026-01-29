@@ -50,7 +50,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
-import * as XLSX from 'xlsx';
+// XLSX carregado dinamicamente para reduzir bundle inicial
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { useBranch } from '@/contexts/BranchContext';
 
@@ -550,6 +550,8 @@ export default function ClientesPage() {
       let headers: string[] = [];
       let rows: any[] = [];
       if (ext === 'xlsx' || ext === 'xls') {
+        // Carregar XLSX dinamicamente apenas quando necessário (otimização de bundle)
+        const XLSX = await import('xlsx');
         const arrayBuffer = await file.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer);
         const sheetName = workbook.SheetNames[0];
@@ -611,6 +613,8 @@ export default function ClientesPage() {
       let headers: string[] = [];
       let rows: any[] = [];
       if (ext === 'xlsx' || ext === 'xls') {
+        // Carregar XLSX dinamicamente apenas quando necessário (otimização de bundle)
+        const XLSX = await import('xlsx');
         const arrayBuffer = await file.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer);
         const sheetName = workbook.SheetNames[0];

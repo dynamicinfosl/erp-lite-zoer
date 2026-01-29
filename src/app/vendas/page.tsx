@@ -473,51 +473,53 @@ export default function VendasPage() {
     loadVendas();
   }, [loadVendas]);
 
-  // Filtrar vendas
+  // Filtrar vendas (otimizado com useMemo)
   // Se não houver filtro de status ou filtro de status diferente de 'cancelada', excluir canceladas da visualização padrão
-  const filteredVendas = vendas.filter(venda => {
-    // Busca flexível (ignora acentos)
-    const normalizedSearch = normalizeText(searchTerm);
-    const matchesSearch = !normalizedSearch || 
-                         normalizeText(venda.numero).includes(normalizedSearch) ||
-                         normalizeText(venda.cliente).includes(normalizedSearch) ||
-                         (venda.vendedor && normalizeText(venda.vendedor).includes(normalizedSearch));
+  const filteredVendas = React.useMemo(() => {
+    return vendas.filter(venda => {
+      // Busca flexível (ignora acentos)
+      const normalizedSearch = normalizeText(searchTerm);
+      const matchesSearch = !normalizedSearch || 
+                           normalizeText(venda.numero).includes(normalizedSearch) ||
+                           normalizeText(venda.cliente).includes(normalizedSearch) ||
+                           (venda.vendedor && normalizeText(venda.vendedor).includes(normalizedSearch));
 
-    const matchesAdvanced = (!advancedFilters.status || venda.status === advancedFilters.status) &&
-                           (!advancedFilters.forma_pagamento || venda.forma_pagamento === advancedFilters.forma_pagamento) &&
-                           (!advancedFilters.vendedor || normalizeText(venda.vendedor || '').includes(normalizeText(advancedFilters.vendedor))) &&
-                           (!advancedFilters.cliente || normalizeText(venda.cliente).includes(normalizeText(advancedFilters.cliente))) &&
-                           (!advancedFilters.valor_min || venda.total >= parseFloat(advancedFilters.valor_min)) &&
-                           (!advancedFilters.valor_max || venda.total <= parseFloat(advancedFilters.valor_max));
+      const matchesAdvanced = (!advancedFilters.status || venda.status === advancedFilters.status) &&
+                             (!advancedFilters.forma_pagamento || venda.forma_pagamento === advancedFilters.forma_pagamento) &&
+                             (!advancedFilters.vendedor || normalizeText(venda.vendedor || '').includes(normalizeText(advancedFilters.vendedor))) &&
+                             (!advancedFilters.cliente || normalizeText(venda.cliente).includes(normalizeText(advancedFilters.cliente))) &&
+                             (!advancedFilters.valor_min || venda.total >= parseFloat(advancedFilters.valor_min)) &&
+                             (!advancedFilters.valor_max || venda.total <= parseFloat(advancedFilters.valor_max));
 
-    // Filtro de período
-    if (advancedFilters.data_inicio || advancedFilters.data_fim) {
-      const vendaDate = new Date(venda.data_venda);
-      vendaDate.setHours(0, 0, 0, 0);
-      
-      if (advancedFilters.data_inicio) {
-        const inicioDate = new Date(advancedFilters.data_inicio);
-        inicioDate.setHours(0, 0, 0, 0);
-        if (vendaDate < inicioDate) return false;
+      // Filtro de período
+      if (advancedFilters.data_inicio || advancedFilters.data_fim) {
+        const vendaDate = new Date(venda.data_venda);
+        vendaDate.setHours(0, 0, 0, 0);
+        
+        if (advancedFilters.data_inicio) {
+          const inicioDate = new Date(advancedFilters.data_inicio);
+          inicioDate.setHours(0, 0, 0, 0);
+          if (vendaDate < inicioDate) return false;
+        }
+        
+        if (advancedFilters.data_fim) {
+          const fimDate = new Date(advancedFilters.data_fim);
+          fimDate.setHours(23, 59, 59, 999);
+          if (vendaDate > fimDate) return false;
+        }
       }
-      
-      if (advancedFilters.data_fim) {
-        const fimDate = new Date(advancedFilters.data_fim);
-        fimDate.setHours(23, 59, 59, 999);
-        if (vendaDate > fimDate) return false;
+
+      // Se não há filtro de status específico, excluir canceladas
+      // Se há filtro de status 'cancelada', incluir apenas canceladas
+      // Se há filtro de outro status, excluir canceladas
+      if (!advancedFilters.status) {
+        // Sem filtro: excluir canceladas da visualização padrão
+        if (venda.status === 'cancelada') return false;
       }
-    }
 
-    // Se não há filtro de status específico, excluir canceladas
-    // Se há filtro de status 'cancelada', incluir apenas canceladas
-    // Se há filtro de outro status, excluir canceladas
-    if (!advancedFilters.status) {
-      // Sem filtro: excluir canceladas da visualização padrão
-      if (venda.status === 'cancelada') return false;
-    }
-
-    return matchesSearch && matchesAdvanced;
-  });
+      return matchesSearch && matchesAdvanced;
+    });
+  }, [vendas, searchTerm, advancedFilters]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -576,16 +578,18 @@ export default function VendasPage() {
     );
   };
 
-  // Calcular estatísticas
-  const vendasPagas = vendas.filter(v => v.status === 'paga');
-  const faturamentoTotal = vendasPagas.reduce((acc, v) => acc + v.total, 0);
-  const stats = {
-    totalVendas: vendas.length,
-    vendasPagas: vendasPagas.length,
-    vendasPendentes: vendas.filter(v => v.status === 'pendente').length,
-    faturamento: faturamentoTotal,
-    ticketMedio: vendasPagas.length > 0 ? faturamentoTotal / vendasPagas.length : 0
-  };
+  // Calcular estatísticas (otimizado com useMemo)
+  const stats = React.useMemo(() => {
+    const vendasPagas = vendas.filter(v => v.status === 'paga');
+    const faturamentoTotal = vendasPagas.reduce((acc, v) => acc + v.total, 0);
+    return {
+      totalVendas: vendas.length,
+      vendasPagas: vendasPagas.length,
+      vendasPendentes: vendas.filter(v => v.status === 'pendente').length,
+      faturamento: faturamentoTotal,
+      ticketMedio: vendasPagas.length > 0 ? faturamentoTotal / vendasPagas.length : 0
+    };
+  }, [vendas]);
 
   // Funções de ação
   const handleVerDetalhes = (venda: Sale) => {
