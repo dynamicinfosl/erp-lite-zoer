@@ -702,15 +702,14 @@ export default function PerfilEmpresaPage() {
             className="min-w-[120px] bg-green-600 hover:bg-green-700"
           >
             {saving ? (
-              <>
+              <div className="flex items-center">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Salvando...
-              </>
+                <span>Salvando...</span>
+              </div>
             ) : (
-              <>
-                <span>✓</span>
-                Atualizar
-              </>
+              <div className="flex items-center">
+                <span>✓ Atualizar</span>
+              </div>
             )}
           </Button>
         </div>

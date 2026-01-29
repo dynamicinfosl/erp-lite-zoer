@@ -684,6 +684,14 @@ export default function ConfiguracoesPage() {
                       onCheckedChange={(checked) => updateCouponSettings({showCustomer: checked})}
                     />
                   </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label>Mostrar Endereço (cliente/entrega)</Label>
+                    <Switch
+                      checked={couponSettings.showCustomerAddress !== false}
+                      onCheckedChange={(checked) => updateCouponSettings({showCustomerAddress: checked})}
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>

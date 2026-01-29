@@ -256,6 +256,10 @@ export async function PUT(
     if (body.payment_method !== undefined) updateData.payment_method = body.payment_method;
     if (body.status !== undefined) updateData.status = body.status;
     if (body.notes !== undefined) updateData.notes = body.notes;
+    if (body.delivery_address !== undefined) {
+      const addr = String(body.delivery_address || '').trim();
+      updateData.delivery_address = addr.length > 0 ? addr : null;
+    }
     // Se vier total_amount explicitamente e não vier products, respeitar.
     // Se vier products, o total será recalculado a partir dos itens (mais confiável).
     const hasProductsArray = Array.isArray(body?.products);
@@ -311,7 +315,6 @@ export async function PUT(
           subtotal: subtotal,
           total_price: subtotal,
           created_at: now,
-          updated_at: now,
         };
         if (p.id !== null && Number.isFinite(p.id)) itemData.product_id = p.id;
         return itemData;
