@@ -126,15 +126,13 @@ async function listCustomersHandler(request: NextRequest) {
     // - Se branch_id fornecido (filial ou matriz visitando filial): retorna clientes daquela filial
     let query;
     
-    // 🚀 OTIMIZAÇÃO: Select apenas campos necessários
-    const selectFields = 'id, tenant_id, name, email, phone, document, address, neighborhood, city, state, zipcode, is_active, notes, created_at_branch_id, created_at, updated_at';
-    
+    // Select de clientes (usando * para compatibilidade com schema variável)
     if (branch_scope === 'all') {
       // Matriz vê apenas clientes cadastrados na matriz (created_at_branch_id IS NULL)
       // Não mostra clientes cadastrados em filiais por padrão
       query = supabaseAdmin
         .from('customers')
-        .select(selectFields)
+        .select('*')
         .eq('tenant_id', tenant_id)
         .is('created_at_branch_id', null); // ✅ Apenas clientes da matriz
       console.log(`🔍 [Matriz] Buscando clientes cadastrados na matriz`);
@@ -164,14 +162,14 @@ async function listCustomersHandler(request: NextRequest) {
           customerIds.length > 0
             ? supabaseAdmin
                 .from('customers')
-                .select(selectFields)
+                .select('*')
                 .eq('tenant_id', tenant_id)
                 .in('id', customerIds)
             : Promise.resolve({ data: null, error: null }),
           // Query 2: Clientes cadastrados nesta filial
           supabaseAdmin
             .from('customers')
-            .select(selectFields)
+            .select('*')
             .eq('tenant_id', tenant_id)
             .eq('created_at_branch_id', bid)
         ]);
@@ -208,7 +206,7 @@ async function listCustomersHandler(request: NextRequest) {
       // Fallback: retornar todos (compatibilidade com código antigo)
       query = supabaseAdmin
         .from('customers')
-        .select(selectFields)
+        .select('*')
         .eq('tenant_id', tenant_id);
       console.log(`🔍 [Fallback] Buscando todos os clientes do tenant`);
     }

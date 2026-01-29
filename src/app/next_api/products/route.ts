@@ -324,14 +324,12 @@ async function listProductsHandler(request: NextRequest) {
     //   O estoque será separado por filial via product_stocks
     let query;
     
-    // 🚀 OTIMIZAÇÃO: Select apenas campos necessários (não select('*'))
-    const selectFields = 'id, tenant_id, sku, name, description, sale_price, cost_price, stock_quantity, is_active, status, category, brand, unit, barcode, min_stock_quantity, max_stock_quantity, created_at, updated_at';
-    
+    // Select de produtos (usando * para compatibilidade com schema variável)
     if (branch_scope === 'all') {
       // Matriz vê todos os produtos
       query = supabaseAdmin
         .from('products')
-        .select(selectFields)
+        .select('*')
         .eq('tenant_id', tenant_id);
       console.log(`🔍 [Matriz] Buscando todos os produtos do tenant`);
     } else if (branch_id) {
@@ -341,7 +339,7 @@ async function listProductsHandler(request: NextRequest) {
       if (Number.isFinite(bid) && bid > 0) {
         query = supabaseAdmin
           .from('products')
-          .select(selectFields)
+          .select('*')
           .eq('tenant_id', tenant_id);
         console.log(`🔍 [Filial ${bid}] Buscando todos os produtos do tenant (compartilhados automaticamente)`);
       } else {
@@ -351,7 +349,7 @@ async function listProductsHandler(request: NextRequest) {
       // Fallback: retornar todos (compatibilidade com código antigo)
       query = supabaseAdmin
         .from('products')
-        .select(selectFields)
+        .select('*')
         .eq('tenant_id', tenant_id);
       console.log(`🔍 [Fallback] Buscando todos os produtos do tenant`);
     }
