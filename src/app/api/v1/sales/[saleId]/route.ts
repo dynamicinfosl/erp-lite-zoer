@@ -9,8 +9,9 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 /**
  * PATCH /api/v1/sales/[saleId]
- * Transforma uma venda de balcão em venda de entrega
- * Cria automaticamente o registro de entrega se não existir
+ * Edita uma venda via API externa.
+ * Só é permitido editar vendas que ainda NÃO foram para o romaneio (entrega sem manifest_id).
+ * Também permite transformar venda de balcão em entrega (cria registro de entrega se não existir).
  */
 async function updateSaleHandler(
   request: NextRequest,
@@ -40,6 +41,10 @@ async function updateSaleHandler(
     const body = await request.json();
     const {
       sale_type,
+      customer_name,
+      total_amount,
+      final_amount,
+      payment_method,
       delivery_address,
       delivery_neighborhood,
       delivery_phone,
@@ -67,6 +72,24 @@ async function updateSaleHandler(
       return NextResponse.json(
         { success: false, error: 'Venda não encontrada' },
         { status: 404 }
+      );
+    }
+
+    // Bloquear edição se a venda já estiver em um romaneio (entrega vinculada a um manifesto)
+    const { data: deliveryForSale } = await supabaseAdmin
+      .from('deliveries')
+      .select('id, manifest_id')
+      .eq('sale_id', saleIdNum)
+      .eq('tenant_id', tenant_id)
+      .maybeSingle();
+
+    if (deliveryForSale?.manifest_id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Esta venda não pode ser editada pois a entrega já está vinculada a um romaneio. Só é permitido editar vendas que ainda não foram para o romaneio.',
+        },
+        { status: 403 }
       );
     }
 
@@ -108,14 +131,13 @@ async function updateSaleHandler(
         sale_type: 'entrega',
         updated_at: new Date().toISOString(),
       };
-
-      if (delivery_address) {
-        updateData.delivery_address = delivery_address;
-      }
-
-      if (notes !== undefined) {
-        updateData.notes = notes;
-      }
+      if (delivery_address !== undefined) updateData.delivery_address = delivery_address;
+      if (notes !== undefined) updateData.notes = notes;
+      if (customer_name !== undefined) updateData.customer_name = customer_name;
+      if (total_amount !== undefined) updateData.total_amount = parseFloat(String(total_amount));
+      if (final_amount !== undefined) updateData.final_amount = parseFloat(String(final_amount));
+      if (total_amount !== undefined && final_amount === undefined) updateData.final_amount = parseFloat(String(total_amount));
+      if (payment_method !== undefined) updateData.payment_method = payment_method;
 
       const { error: updateError } = await supabaseAdmin
         .from('sales')
@@ -147,7 +169,7 @@ async function updateSaleHandler(
           tenant_id,
           user_id: '00000000-0000-0000-0000-000000000000',
           sale_id: saleIdNum,
-          customer_name: sale.customer_name || 'Cliente Avulso',
+          customer_name: customer_name ?? sale.customer_name ?? 'Cliente Avulso',
           delivery_address: finalDeliveryAddress || 'Endereço não informado',
           neighborhood: finalNeighborhood || null,
           phone: finalPhone || null,
@@ -179,14 +201,16 @@ async function updateSaleHandler(
         const deliveryUpdate: any = {
           updated_at: new Date().toISOString(),
         };
-
+        if (customer_name !== undefined) {
+          deliveryUpdate.customer_name = customer_name;
+        }
         if (finalDeliveryAddress) {
           deliveryUpdate.delivery_address = finalDeliveryAddress;
         }
-        if (finalNeighborhood) {
+        if (finalNeighborhood !== undefined) {
           deliveryUpdate.neighborhood = finalNeighborhood;
         }
-        if (finalPhone) {
+        if (finalPhone !== undefined) {
           deliveryUpdate.phone = finalPhone;
         }
         if (delivery_fee !== undefined) {
@@ -223,17 +247,20 @@ async function updateSaleHandler(
       });
     }
 
-    // Para outros tipos de atualização (não transformar em entrega)
+    // Para outros tipos de atualização (edição geral, não transformar em entrega)
     const updateData: any = {
       updated_at: new Date().toISOString(),
     };
-
-    if (sale_type) {
-      updateData.sale_type = sale_type;
+    if (sale_type !== undefined) updateData.sale_type = sale_type;
+    if (notes !== undefined) updateData.notes = notes;
+    if (customer_name !== undefined) updateData.customer_name = customer_name;
+    if (total_amount !== undefined) {
+      updateData.total_amount = parseFloat(String(total_amount));
+      updateData.final_amount = parseFloat(String(total_amount));
     }
-    if (notes !== undefined) {
-      updateData.notes = notes;
-    }
+    if (final_amount !== undefined) updateData.final_amount = parseFloat(String(final_amount));
+    if (payment_method !== undefined) updateData.payment_method = payment_method;
+    if (delivery_address !== undefined) updateData.delivery_address = delivery_address;
 
     const { data: updatedSale, error: updateError } = await supabaseAdmin
       .from('sales')

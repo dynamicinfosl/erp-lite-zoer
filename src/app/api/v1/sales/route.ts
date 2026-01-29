@@ -78,28 +78,29 @@ async function createSaleHandler(
           { status: 400 }
         );
       }
+    }
 
-      // Proibir vendas de entrega repetidas: mesma venda (mesmo cliente + mesmo valor) nos últimos 10 minutos
+    // Proibir vendas repetidas (balcão e entrega): mesmo cliente + mesmo valor nos últimos 10 minutos
+    const hasCustomerId = customer_id != null && customer_id !== undefined && customer_id !== '';
+    const customerNameTrimmed = (customer_name || '').trim();
+    const hasCustomerName = customerNameTrimmed && customerNameTrimmed.toLowerCase() !== 'cliente avulso';
+    if (hasCustomerId || hasCustomerName) {
       const duplicateWindowMinutes = 10;
       const since = new Date(Date.now() - duplicateWindowMinutes * 60 * 1000).toISOString();
       const totalAmountNum = parseFloat(String(total_amount));
 
       let duplicateQuery = supabaseAdmin
         .from('sales')
-        .select('id, sale_number, created_at')
+        .select('id, sale_number, sale_type, created_at')
         .eq('tenant_id', tenant_id)
-        .eq('sale_type', 'entrega')
         .eq('sale_source', 'api')
         .eq('total_amount', totalAmountNum)
         .gte('created_at', since);
 
-      if (customer_id != null && customer_id !== undefined && customer_id !== '') {
+      if (hasCustomerId) {
         duplicateQuery = duplicateQuery.eq('customer_id', Number(customer_id));
       } else {
-        const nameToMatch = (customer_name || '').trim();
-        if (nameToMatch) {
-          duplicateQuery = duplicateQuery.eq('customer_name', nameToMatch);
-        }
+        duplicateQuery = duplicateQuery.eq('customer_name', customerNameTrimmed);
       }
 
       const { data: existingSales, error: duplicateError } = await duplicateQuery.limit(1);
@@ -109,9 +110,10 @@ async function createSaleHandler(
         return NextResponse.json(
           {
             success: false,
-            error: 'Venda de entrega duplicada. Já existe uma venda de entrega para este cliente com o mesmo valor nos últimos 10 minutos.',
+            error: 'Venda duplicada. Já existe uma venda para este cliente com o mesmo valor nos últimos 10 minutos.',
             duplicate_sale_id: existing.id,
             duplicate_sale_number: existing.sale_number,
+            duplicate_sale_type: existing.sale_type,
             duplicate_created_at: existing.created_at,
           },
           { status: 409 }
