@@ -235,10 +235,13 @@ export function ApiKeyManagement() {
   const availablePermissions = [
     { value: 'sales:create', label: 'Criar Vendas' },
     { value: 'sales:read', label: 'Listar Vendas' },
+    { value: 'sales:update', label: 'Editar Vendas' },
     { value: 'customers:create', label: 'Criar Clientes' },
     { value: 'customers:read', label: 'Listar Clientes' },
+    { value: 'customers:update', label: 'Editar Clientes' },
     { value: 'products:create', label: 'Criar Produtos' },
     { value: 'products:read', label: 'Listar Produtos' },
+    { value: 'products:update', label: 'Editar Produtos' },
   ];
 
   const togglePermission = (permission: string) => {
