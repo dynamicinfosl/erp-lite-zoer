@@ -141,14 +141,77 @@ export default function EntregasPage() {
     loadManifests();
   }, [tenant?.id, loadDeliveries, loadDrivers, loadManifests]);
 
+  // Carregar clientes de cada romaneio
+  useEffect(() => {
+    if (manifests.length === 0 || !tenant?.id) return;
+    
+    const loadManifestCustomers = async () => {
+      const customersMap = new Map<string, string[]>();
+      
+      for (const manifest of manifests) {
+        const deliveriesInManifest = safeDeliveries.filter(
+          d => d.manifest_id === manifest.id
+        );
+        const customerNames = deliveriesInManifest.map(d => d.customer_name);
+        customersMap.set(manifest.id, customerNames);
+      }
+      
+      setManifestCustomers(customersMap);
+    };
+    
+    loadManifestCustomers();
+  }, [manifests, safeDeliveries, tenant?.id]);
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'todos' | 'aguardando' | 'em_rota' | 'entregue' | 'cancelada'>('todos');
+  const [dateFilter, setDateFilter] = useState<'hoje' | 'ontem' | 'semana' | 'todos'>('hoje');
+  const [manifestSearch, setManifestSearch] = useState('');
+  const [manifestDateFilter, setManifestDateFilter] = useState<'hoje' | 'ontem' | 'semana' | 'todos'>('hoje');
+  const [deletingDelivery, setDeletingDelivery] = useState<number | null>(null);
+  const [showDeleteDeliveryDialog, setShowDeleteDeliveryDialog] = useState(false);
+  const [deliveryToDelete, setDeliveryToDelete] = useState<Delivery | null>(null);
+  const [manifestCustomers, setManifestCustomers] = useState<Map<string, string[]>>(new Map());
 
   const safeDeliveries = useMemo(() => Array.isArray(deliveries) ? deliveries : [], [deliveries]);
+  
+  const isToday = (date: string) => {
+    const today = new Date();
+    const checkDate = new Date(date);
+    return checkDate.toDateString() === today.toDateString();
+  };
+  
+  const isYesterday = (date: string) => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const checkDate = new Date(date);
+    return checkDate.toDateString() === yesterday.toDateString();
+  };
+  
+  const isThisWeek = (date: string) => {
+    const today = new Date();
+    const checkDate = new Date(date);
+    const weekAgo = new Date(today);
+    weekAgo.setDate(today.getDate() - 7);
+    return checkDate >= weekAgo && checkDate <= today;
+  };
+  
   const filtered = safeDeliveries.filter((d) => {
     const matchesSearch = `${d.id} ${d.customer_name} ${d.delivery_address}`.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'todos' ? true : d.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    
+    let matchesDate = true;
+    if (dateFilter === 'hoje') {
+      matchesDate = isToday(d.created_at);
+    } else if (dateFilter === 'ontem') {
+      matchesDate = isYesterday(d.created_at);
+    } else if (dateFilter === 'semana') {
+      matchesDate = isThisWeek(d.created_at);
+    }
+    
+    // Não mostrar entregas de vendas canceladas
+    const isNotCancelled = d.status !== 'cancelada';
+    
+    return matchesSearch && matchesStatus && matchesDate && isNotCancelled;
   });
 
   const isSelectableForManifest = useCallback((d: Delivery) => {
@@ -492,6 +555,37 @@ export default function EntregasPage() {
     }
   };
 
+  const handleDeleteDelivery = (delivery: Delivery) => {
+    setDeliveryToDelete(delivery);
+    setShowDeleteDeliveryDialog(true);
+  };
+
+  const confirmDeleteDelivery = async () => {
+    if (!deliveryToDelete) return;
+    
+    try {
+      setDeletingDelivery(deliveryToDelete.id);
+      const res = await fetch(`/next_api/deliveries?id=${deliveryToDelete.id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `HTTP ${res.status}`);
+      }
+      
+      toast.success('Entrega excluída com sucesso');
+      await loadDeliveries();
+      setShowDeleteDeliveryDialog(false);
+      setDeliveryToDelete(null);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Erro ao excluir entrega');
+    } finally {
+      setDeletingDelivery(null);
+    }
+  };
+
   // Buscar entregas disponíveis para edição
   const availableDeliveries = useMemo(() => {
     return safeDeliveries.filter((d) => 
@@ -538,6 +632,25 @@ export default function EntregasPage() {
     return { emRota, aguardando, entregues, total };
   }, [safeDeliveries]);
 
+  const filteredManifests = useMemo(() => {
+    return manifests.filter((m) => {
+      const matchesSearch = manifestSearch === '' || 
+        `${m.manifest_number || ''} ${m.id}`.toLowerCase().includes(manifestSearch.toLowerCase()) ||
+        (m.driver_id && driverNameById.get(Number(m.driver_id))?.toLowerCase().includes(manifestSearch.toLowerCase()));
+      
+      let matchesDate = true;
+      if (manifestDateFilter === 'hoje') {
+        matchesDate = isToday(m.created_at);
+      } else if (manifestDateFilter === 'ontem') {
+        matchesDate = isYesterday(m.created_at);
+      } else if (manifestDateFilter === 'semana') {
+        matchesDate = isThisWeek(m.created_at);
+      }
+      
+      return matchesSearch && matchesDate;
+    });
+  }, [manifests, manifestSearch, manifestDateFilter, driverNameById]);
+
   return (
     <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
       {/* Header - Responsivo */}
@@ -565,6 +678,17 @@ export default function EntregasPage() {
               <SelectItem value="em_rota">Em rota</SelectItem>
               <SelectItem value="entregue">Entregues</SelectItem>
               <SelectItem value="cancelada">Canceladas</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={dateFilter} onValueChange={(value: any) => setDateFilter(value)}>
+            <SelectTrigger className="w-full sm:w-[180px] bg-transparent border border-white dark:border-white text-foreground shadow-none hover:bg-transparent focus:outline-none focus:ring-0">
+              <SelectValue placeholder="Filtrar por data" />
+            </SelectTrigger>
+            <SelectContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-lg">
+              <SelectItem value="hoje">Hoje</SelectItem>
+              <SelectItem value="ontem">Ontem</SelectItem>
+              <SelectItem value="semana">Esta semana</SelectItem>
+              <SelectItem value="todos">Todas as datas</SelectItem>
             </SelectContent>
           </Select>
           <Button 
