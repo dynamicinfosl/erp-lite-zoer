@@ -91,28 +91,40 @@ END $$;
 -- ============================================
 -- DELIVERIES - Índices essenciais
 -- ============================================
+-- NOTA: Tabela deliveries não existe neste ambiente
+-- Os índices serão criados apenas se a tabela existir
 
--- Índice para relacionamento com vendas
-CREATE INDEX IF NOT EXISTS idx_deliveries_sale_id 
-ON deliveries(sale_id);
-
--- Índice para status
-CREATE INDEX IF NOT EXISTS idx_deliveries_status 
-ON deliveries(status);
-
--- Índice para manifest_id (romaneio)
 DO $$ 
 BEGIN
     IF EXISTS (
-        SELECT 1 FROM information_schema.columns 
+        SELECT 1 FROM information_schema.tables 
         WHERE table_schema = 'public' 
-        AND table_name = 'deliveries' 
-        AND column_name = 'manifest_id'
+        AND table_name = 'deliveries'
     ) THEN
-        CREATE INDEX IF NOT EXISTS idx_deliveries_manifest_id 
-        ON deliveries(manifest_id)
-        WHERE manifest_id IS NOT NULL;
-        RAISE NOTICE '✅ idx_deliveries_manifest_id criado';
+        -- Índice para relacionamento com vendas
+        CREATE INDEX IF NOT EXISTS idx_deliveries_sale_id 
+        ON deliveries(sale_id);
+        RAISE NOTICE '✅ idx_deliveries_sale_id criado';
+        
+        -- Índice para status
+        CREATE INDEX IF NOT EXISTS idx_deliveries_status 
+        ON deliveries(status);
+        RAISE NOTICE '✅ idx_deliveries_status criado';
+        
+        -- Índice para manifest_id (romaneio)
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public' 
+            AND table_name = 'deliveries' 
+            AND column_name = 'manifest_id'
+        ) THEN
+            CREATE INDEX IF NOT EXISTS idx_deliveries_manifest_id 
+            ON deliveries(manifest_id)
+            WHERE manifest_id IS NOT NULL;
+            RAISE NOTICE '✅ idx_deliveries_manifest_id criado';
+        END IF;
+    ELSE
+        RAISE NOTICE '⚠️ Tabela deliveries não existe - índices não criados';
     END IF;
 END $$;
 
@@ -198,7 +210,7 @@ SELECT
 FROM pg_indexes
 WHERE schemaname = 'public'
     AND indexname LIKE 'idx_%'
-    AND tablename IN ('sales', 'sale_items', 'customers', 'deliveries', 'products', 'delivery_manifests');
+    AND tablename IN ('sales', 'sale_items', 'customers', 'products', 'delivery_manifests');
 
 -- Listar índices criados
 SELECT 
@@ -208,5 +220,5 @@ SELECT
 FROM pg_indexes
 WHERE schemaname = 'public'
     AND indexname LIKE 'idx_%'
-    AND tablename IN ('sales', 'sale_items', 'customers', 'deliveries', 'products', 'delivery_manifests')
+    AND tablename IN ('sales', 'sale_items', 'customers', 'products', 'delivery_manifests')
 ORDER BY tablename, indexname;
