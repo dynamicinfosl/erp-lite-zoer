@@ -2962,17 +2962,6 @@ export default function PDVPage() {
         tenantId={tenant?.id || null}
       />
 
-      {/* Modal de Fechamento de Caixa */}
-      {/* Modal de Abertura de Caixa */}
-      <CashOpeningModal
-        isOpen={showCashOpeningModal}
-        onClose={() => setShowCashOpeningModal(false)}
-        onConfirm={handleCashOpening}
-        operatorName={user?.email || user?.id?.toString() || 'Operador'}
-        hasOpenSession={!!cashSessionId}
-      />
-
-      {/* Modal de Fechamento de Caixa */}
       {/* Modal de Abertura de Caixa */}
       <CashOpeningModal
         isOpen={showCashOpeningModal}
@@ -2982,6 +2971,7 @@ export default function PDVPage() {
         existingOpenSession={!!cashSessionId}
       />
 
+      {/* Modal de Fechamento de Caixa */}
       <CashClosingModal
         isOpen={showCashClosingModal}
         onClose={() => setShowCashClosingModal(false)}
