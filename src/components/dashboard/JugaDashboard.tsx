@@ -15,7 +15,8 @@ import {
   Plus,
   ArrowRight,
   FileText,
-  Download
+  Download,
+  Calendar
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -34,6 +35,13 @@ interface DashboardStats {
   totalCustomers: number;
   totalProducts: number;
   totalOrders: number;
+  todaySalesAmount: number;
+  todaySalesCount: number;
+  weekSalesAmount: number;
+  weekSalesCount: number;
+  weekLabel: string;
+  monthSalesAmount: number;
+  monthSalesCount: number;
   monthlyGrowth: number;
   customerGrowth: number;
   productGrowth: number;
@@ -90,11 +98,19 @@ export default function JugaDashboard() {
     totalCustomers: 0,
     totalProducts: 0,
     totalOrders: 0,
+    todaySalesAmount: 0,
+    todaySalesCount: 0,
+    weekSalesAmount: 0,
+    weekSalesCount: 0,
+    weekLabel: 'Semana 1',
+    monthSalesAmount: 0,
+    monthSalesCount: 0,
     monthlyGrowth: 0,
     customerGrowth: 0,
     productGrowth: 0,
     orderGrowth: 0
   });
+  const [salesCardView, setSalesCardView] = useState<'day' | 'week' | 'month'>('day');
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -169,6 +185,7 @@ export default function JugaDashboard() {
     let cancelled = false;
     
     const loadDashboardData = async (retryCount = 0) => {
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
       try {
         setLoading(true);
         
@@ -206,6 +223,13 @@ export default function JugaDashboard() {
             totalCustomers: 0,
             totalProducts: 0,
             totalOrders: 0,
+            todaySalesAmount: 0,
+            todaySalesCount: 0,
+            weekSalesAmount: 0,
+            weekSalesCount: 0,
+            weekLabel: 'Semana 1',
+            monthSalesAmount: 0,
+            monthSalesCount: 0,
             monthlyGrowth: 0,
             customerGrowth: 0,
             productGrowth: 0,
@@ -217,7 +241,7 @@ export default function JugaDashboard() {
         }
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+        timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
 
         try {
           // Carregar dados em paralelo com cache desabilitado para garantir dados atualizados
@@ -294,6 +318,57 @@ export default function JugaDashboard() {
             sum + parseFloat(sale.total_amount || sale.final_amount || 0), 0
           );
 
+          const nowLocal = new Date();
+          const startOfDay = new Date(nowLocal.getFullYear(), nowLocal.getMonth(), nowLocal.getDate(), 0, 0, 0, 0);
+          const endOfDay = new Date(nowLocal.getFullYear(), nowLocal.getMonth(), nowLocal.getDate(), 23, 59, 59, 999);
+          const todaySales = sales.filter((sale: any) => {
+            if (!sale?.created_at) return false;
+            const saleDate = new Date(sale.created_at);
+            if (isNaN(saleDate.getTime())) return false;
+            return saleDate >= startOfDay && saleDate <= endOfDay;
+          });
+          const todaySalesAmount = todaySales.reduce((sum: number, sale: any) => {
+            const amount = parseFloat(sale.total_amount || sale.final_amount || 0);
+            return sum + (isNaN(amount) ? 0 : amount);
+          }, 0);
+
+          const startOfMonth = new Date(nowLocal.getFullYear(), nowLocal.getMonth(), 1, 0, 0, 0, 0);
+          const endOfMonth = new Date(nowLocal.getFullYear(), nowLocal.getMonth() + 1, 0, 23, 59, 59, 999);
+          const getMondayStart = (date: Date) => {
+            const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+            const day = d.getDay(); // 0=Domingo, 1=Segunda...
+            const diff = day === 0 ? -6 : 1 - day; // voltar para segunda
+            d.setDate(d.getDate() + diff);
+            return d;
+          };
+          const monthWeekStart = getMondayStart(startOfMonth);
+          const currentWeekStart = getMondayStart(nowLocal);
+          const currentWeekIndex = Math.floor((currentWeekStart.getTime() - monthWeekStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+          const weekLabel = `Semana ${currentWeekIndex}`;
+          const weekStart = currentWeekStart;
+          const weekEnd = new Date(currentWeekStart.getTime() + 7 * 24 * 60 * 60 * 1000 - 1);
+          const weekSales = sales.filter((sale: any) => {
+            if (!sale?.created_at) return false;
+            const saleDate = new Date(sale.created_at);
+            if (isNaN(saleDate.getTime())) return false;
+            return saleDate >= weekStart && saleDate <= weekEnd;
+          });
+          const weekSalesAmount = weekSales.reduce((sum: number, sale: any) => {
+            const amount = parseFloat(sale.total_amount || sale.final_amount || 0);
+            return sum + (isNaN(amount) ? 0 : amount);
+          }, 0);
+
+          const monthSales = sales.filter((sale: any) => {
+            if (!sale?.created_at) return false;
+            const saleDate = new Date(sale.created_at);
+            if (isNaN(saleDate.getTime())) return false;
+            return saleDate >= startOfMonth && saleDate <= endOfMonth;
+          });
+          const monthSalesAmount = monthSales.reduce((sum: number, sale: any) => {
+            const amount = parseFloat(sale.total_amount || sale.final_amount || 0);
+            return sum + (isNaN(amount) ? 0 : amount);
+          }, 0);
+
           // Gerar dados mensais
           const monthlyData = generateMonthlyData(sales);
           
@@ -307,6 +382,13 @@ export default function JugaDashboard() {
             totalCustomers: customers.length,
             totalProducts: products.length,
             totalOrders: sales.length,
+            todaySalesAmount,
+            todaySalesCount: todaySales.length,
+            weekSalesAmount,
+            weekSalesCount: weekSales.length,
+            weekLabel,
+            monthSalesAmount,
+            monthSalesCount: monthSales.length,
             monthlyGrowth: 12.5,
             customerGrowth: 8.2,
             productGrowth: 3.1,
@@ -322,10 +404,12 @@ export default function JugaDashboard() {
           if (cancelled) return;
           
           if (fetchError.name === 'AbortError') {
+            // Timeout do fetch: não tratar como erro para evitar ruído no console
             if (retryCount < 2) {
               setTimeout(() => loadDashboardData(retryCount + 1), 1000);
-              return;
             }
+            setLoading(false);
+            return;
           }
           
           if (retryCount < 2 && !fetchError.message?.includes('404')) {
@@ -338,6 +422,13 @@ export default function JugaDashboard() {
             totalCustomers: 0,
             totalProducts: 0,
             totalOrders: 0,
+            todaySalesAmount: 0,
+            todaySalesCount: 0,
+            weekSalesAmount: 0,
+            weekSalesCount: 0,
+            weekLabel: 'Semana 1',
+            monthSalesAmount: 0,
+            monthSalesCount: 0,
             monthlyGrowth: 0,
             customerGrowth: 0,
             productGrowth: 0,
@@ -351,6 +442,8 @@ export default function JugaDashboard() {
       } catch (error) {
         if (cancelled) return;
         setLoading(false);
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
       }
     };
 
@@ -496,25 +589,43 @@ export default function JugaDashboard() {
 
       {/* KPIs Principais */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transition-all duration-300">
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-blue-100">
-                Vendas Totais
+              <CardTitle className="text-sm font-medium text-emerald-100">
+                {salesCardView === 'day' ? 'Vendas (Hoje)' : salesCardView === 'week' ? `Vendas (${stats.weekLabel})` : 'Vendas (Mês)'}
               </CardTitle>
-              <div className="p-2 bg-blue-500/20 rounded-lg backdrop-blur-sm">
-                <DollarSign className="h-5 w-5 text-blue-100" />
-              </div>
+              <button
+                type="button"
+                onClick={() => setSalesCardView((prev) => (prev === 'day' ? 'week' : prev === 'week' ? 'month' : 'day'))}
+                title={salesCardView === 'day' ? 'Ver vendas da semana' : salesCardView === 'week' ? 'Ver vendas do mês' : 'Ver vendas do dia'}
+                className="p-2 bg-emerald-500/20 rounded-lg backdrop-blur-sm hover:bg-emerald-500/30 transition-colors"
+              >
+                <Calendar className="h-5 w-5 text-emerald-100" />
+              </button>
             </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">
-              R$ {stats.totalSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {(salesCardView === 'day'
+                ? stats.todaySalesAmount
+                : salesCardView === 'week'
+                  ? stats.weekSalesAmount
+                  : stats.monthSalesAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
             <div className="flex items-center mt-2">
-              <TrendingUp className="h-4 w-4 text-green-300 mr-1" />
-              <span className="text-sm text-green-200">
-                +{stats.monthlyGrowth}% este mês
+              <span className="text-sm text-emerald-200">
+                {salesCardView === 'day'
+                  ? `${stats.todaySalesCount} venda${stats.todaySalesCount === 1 ? '' : 's'} hoje`
+                  : salesCardView === 'week'
+                    ? `${stats.weekSalesCount} venda${stats.weekSalesCount === 1 ? '' : 's'} na semana`
+                    : `${stats.monthSalesCount} venda${stats.monthSalesCount === 1 ? '' : 's'} no mês`}
+              </span>
+            </div>
+            <div className="flex items-center mt-2">
+              <DollarSign className="h-4 w-4 text-emerald-200 mr-1" />
+              <span className="text-sm text-emerald-200">
+                Total: R$ {stats.totalSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </span>
             </div>
           </CardContent>
@@ -591,6 +702,8 @@ export default function JugaDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        
       </div>
 
       {/* Gráficos */}
