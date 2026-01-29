@@ -174,7 +174,6 @@ export default function PDVPage() {
   const [showCaixaDialog, setShowCaixaDialog] = useState(false);
   const [showCashOpeningModal, setShowCashOpeningModal] = useState(false);
   const [showCashClosingModal, setShowCashClosingModal] = useState(false);
-  const [showCashOpeningModal, setShowCashOpeningModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [closingResult, setClosingResult] = useState<any>(null);
   const [caixaOperationType, setCaixaOperationType] = useState<'sangria' | 'reforco' | 'fechamento'>('sangria');
