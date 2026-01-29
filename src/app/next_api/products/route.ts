@@ -324,11 +324,14 @@ async function listProductsHandler(request: NextRequest) {
     //   O estoque será separado por filial via product_stocks
     let query;
     
+    // 🚀 OTIMIZAÇÃO: Select apenas campos necessários (não select('*'))
+    const selectFields = 'id, tenant_id, sku, name, description, sale_price, cost_price, stock_quantity, is_active, status, category, brand, unit, barcode, min_stock_quantity, max_stock_quantity, created_at, updated_at';
+    
     if (branch_scope === 'all') {
       // Matriz vê todos os produtos
       query = supabaseAdmin
         .from('products')
-        .select('*')
+        .select(selectFields)
         .eq('tenant_id', tenant_id);
       console.log(`🔍 [Matriz] Buscando todos os produtos do tenant`);
     } else if (branch_id) {
@@ -338,7 +341,7 @@ async function listProductsHandler(request: NextRequest) {
       if (Number.isFinite(bid) && bid > 0) {
         query = supabaseAdmin
           .from('products')
-          .select('*')
+          .select(selectFields)
           .eq('tenant_id', tenant_id);
         console.log(`🔍 [Filial ${bid}] Buscando todos os produtos do tenant (compartilhados automaticamente)`);
       } else {
@@ -348,7 +351,7 @@ async function listProductsHandler(request: NextRequest) {
       // Fallback: retornar todos (compatibilidade com código antigo)
       query = supabaseAdmin
         .from('products')
-        .select('*')
+        .select(selectFields)
         .eq('tenant_id', tenant_id);
       console.log(`🔍 [Fallback] Buscando todos os produtos do tenant`);
     }
@@ -454,15 +457,25 @@ async function listProductsHandler(request: NextRequest) {
     const productIds = mappedRows.map((p: any) => Number(p.id)).filter((id: number) => Number.isFinite(id) && id > 0);
     
     if (productIds.length > 0) {
-      // Buscar variações de todos os produtos (sem filtrar por is_active para retornar todas)
-      const { data: variants, error: variantsError } = await supabaseAdmin
-        .from('product_variants')
-        .select('*')
-        .eq('tenant_id', tenant_id)
-        .in('product_id', productIds)
-        .order('id', { ascending: true });
+      // 🚀 OTIMIZAÇÃO: Buscar variações e price_tiers em PARALELO
+      const [variantsResult, tiersResult] = await Promise.all([
+        supabaseAdmin
+          .from('product_variants')
+          .select('id, product_id, label, name, barcode, unit, sale_price, cost_price, stock_quantity, is_active')
+          .eq('tenant_id', tenant_id)
+          .in('product_id', productIds)
+          .order('id', { ascending: true }),
+        supabaseAdmin
+          .from('product_price_tiers')
+          .select('id, product_id, price, price_type_id, price_type:product_price_types(id,name,slug,is_active)')
+          .eq('tenant_id', tenant_id)
+          .in('product_id', productIds)
+          .order('price_type_id', { ascending: true })
+      ]);
       
       const variantsMap: Record<number, any[]> = {};
+      const { data: variants, error: variantsError } = variantsResult;
+      
       if (variantsError) {
         console.error('❌ Erro ao buscar variações:', variantsError);
       }
@@ -486,13 +499,8 @@ async function listProductsHandler(request: NextRequest) {
         }
       }
 
-      // Buscar tipos de preço de todos os produtos
-      const { data: tiers, error: tiersError } = await supabaseAdmin
-        .from('product_price_tiers')
-        .select('id, product_id, price, price_type_id, price_type:product_price_types(id,name,slug,is_active)')
-        .eq('tenant_id', tenant_id)
-        .in('product_id', productIds)
-        .order('price_type_id', { ascending: true });
+      // Processar price tiers
+      const { data: tiers, error: tiersError } = tiersResult;
       
       const priceTiersMap: Record<number, any[]> = {};
       if (!tiersError && tiers) {
@@ -541,7 +549,11 @@ async function listProductsHandler(request: NextRequest) {
       console.log(`✅ GET /products - ${mappedRows.length} produtos encontrados para tenant ${tenant_id}`);
     }
 
-    return NextResponse.json({ success: true, data: mappedRows });
+    // 🚀 OTIMIZAÇÃO: Cache com revalidação (60 segundos para produtos)
+    return NextResponse.json(
+      { success: true, data: mappedRows },
+      { headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=120' } }
+    );
 
   } catch (error) {
     console.error('Erro no handler de listagem:', error);
