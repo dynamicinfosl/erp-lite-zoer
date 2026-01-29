@@ -113,7 +113,13 @@ Cria uma nova venda. Quando `sale_type='entrega'`, cria automaticamente o regist
 
 **Nota:** Quando `sale_type='entrega'`, o sistema cria automaticamente um registro na tabela de entregas com status `'aguardando'`.
 
-**Vendas repetidas:** Para evitar duplicidade, o sistema **não permite** criar duas vendas (balcão ou entrega) para o mesmo cliente com o mesmo valor total em um intervalo de 10 minutos. Se isso ocorrer, a API retorna status `409` (Conflito) com a mensagem de erro e os dados da venda duplicada (`duplicate_sale_id`, `duplicate_sale_number`, `duplicate_sale_type`, `duplicate_created_at`). A verificação só é feita quando o cliente é identificado (`customer_id` ou `customer_name` diferente de "Cliente Avulso").
+**🚫 Proteção contra vendas duplicadas:** Para evitar duplicidade, o sistema **bloqueia** a criação de vendas com as seguintes características idênticas:
+- Mesmo cliente (`customer_id` ou `customer_name`)
+- Mesmo valor total (`total_amount`)
+- Mesmo DIA (00h00 até 23h59)
+- Mesma quantidade de produtos
+
+Se uma tentativa de duplicação for detectada, a API retorna status `409` (Conflito) com a mensagem de erro e os dados da venda duplicada encontrada (`duplicate_sale_id`, `duplicate_sale_number`, `duplicate_sale_type`, `duplicate_created_at`, `duplicate_product_count`). Esta validação só é aplicada quando o cliente é identificado (`customer_id` ou `customer_name` diferente de "Cliente Avulso").
 
 #### Listar Vendas
 
