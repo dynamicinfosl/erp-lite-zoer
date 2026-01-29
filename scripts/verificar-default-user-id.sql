@@ -13,3 +13,4 @@ WHERE table_schema = 'public'
 -- ALTER TABLE cash_sessions ALTER COLUMN user_id DROP DEFAULT;
 
 
+

@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createSuccessResponse, createErrorResponse } from "@/lib/create-response";
 import { requestMiddleware } from "@/lib/api-utils";
+import { 
+  generateSecurityHash, 
+  createCashSessionSnapshot, 
+  validateCashClosingData,
+  type CashSessionData 
+} from "@/lib/cash-session-security";
 
 // Função para validar e obter configuração do Supabase
 function getSupabaseConfig() {
@@ -463,6 +469,12 @@ export const PATCH = requestMiddleware(async (request, context) => {
       'total_supplies',
       'total_supplies_amount',
       'notes',
+      // Campos de auditoria e segurança
+      'security_hash',
+      'closed_by_user_id',
+      'ip_address',
+      'device_info',
+      'closing_snapshot',
       // user_id pode ser atualizado, mas apenas se for UUID válido
     ];
 
@@ -493,6 +505,51 @@ export const PATCH = requestMiddleware(async (request, context) => {
     // Garantir que status seja 'closed' se estiver fechando
     if (body.status === 'closed' && !updateData.closed_at) {
       updateData.closed_at = new Date().toISOString();
+    }
+
+    // Se estiver fechando o caixa, gerar hash de segurança e snapshot
+    if (body.status === 'closed') {
+      // Buscar dados completos da sessão para gerar o hash
+      const { data: sessionData, error: fetchError } = await supabaseAdmin
+        .from('cash_sessions')
+        .select('*')
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (!fetchError && sessionData) {
+        // Combinar dados existentes com os novos dados de fechamento
+        const completeData: CashSessionData = {
+          ...sessionData,
+          ...updateData,
+          closed_at: updateData.closed_at || new Date().toISOString(),
+        };
+
+        // Gerar hash de segurança
+        const securityHash = generateSecurityHash(completeData);
+        updateData.security_hash = securityHash;
+
+        // Criar snapshot
+        const snapshot = createCashSessionSnapshot(completeData, [], []);
+        updateData.closing_snapshot = snapshot;
+
+        // Adicionar informações de auditoria
+        if (body.ip_address) {
+          updateData.ip_address = body.ip_address;
+        }
+        if (body.device_info) {
+          updateData.device_info = body.device_info;
+        }
+        if (body.closed_by_user_id) {
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (typeof body.closed_by_user_id === 'string' && uuidRegex.test(body.closed_by_user_id)) {
+            updateData.closed_by_user_id = body.closed_by_user_id;
+          }
+        }
+
+        console.log('🔒 Hash de segurança gerado:', securityHash);
+        console.log('📸 Snapshot criado');
+      }
     }
 
     console.log('📝 Atualizando sessão de caixa:', {

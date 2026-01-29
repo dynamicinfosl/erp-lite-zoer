@@ -50,3 +50,4 @@ WHERE table_schema = 'public'
   AND column_name = 'user_id';
 
 
+

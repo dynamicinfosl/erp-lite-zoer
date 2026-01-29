@@ -48,3 +48,4 @@ WHERE tenant_id IS NULL
   AND created_at >= CURRENT_DATE;
 
 
+

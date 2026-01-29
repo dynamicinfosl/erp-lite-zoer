@@ -36,3 +36,4 @@ WHERE table_schema = 'public'
 COMMENT ON COLUMN cash_sessions.notes IS 'Observações adicionais sobre a sessão de caixa';
 
 
+

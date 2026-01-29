@@ -48,3 +48,4 @@ WHERE table_schema = 'public'
 -- ALTER TABLE cash_sessions DISABLE ROW LEVEL SECURITY;
 
 
+

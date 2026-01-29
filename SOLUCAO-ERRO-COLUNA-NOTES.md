@@ -177,3 +177,4 @@ ORDER BY column_name;
 - `scripts/create-cash-sessions-table.sql` - Script de criação completa da tabela
 
 
+

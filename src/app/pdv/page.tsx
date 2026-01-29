@@ -88,6 +88,8 @@ import { PaymentSection } from '@/components/pdv/PaymentSection';
 import { SaleConfirmationModal } from '@/components/pdv/SaleConfirmationModal';
 import { DeliveryQuickModal } from '@/components/pdv/DeliveryQuickModal';
 import { CashClosingModal, CashClosingData } from '@/components/pdv/CashClosingModal';
+import { CashClosingSuccessModal } from '@/components/pdv/CashClosingSuccessModal';
+import { getDeviceInfo, formatDeviceInfo } from '@/lib/cash-session-security';
 
 interface MenuItem {
   icon: React.ElementType;
@@ -170,6 +172,8 @@ export default function PDVPage() {
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [showCaixaDialog, setShowCaixaDialog] = useState(false);
   const [showCashClosingModal, setShowCashClosingModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [closingResult, setClosingResult] = useState<any>(null);
   const [caixaOperationType, setCaixaOperationType] = useState<'sangria' | 'reforco' | 'fechamento'>('sangria');
   const [cashSessionId, setCashSessionId] = useState<number | null>(null);
   const [cashSessionOpenedAt, setCashSessionOpenedAt] = useState<string>('');
@@ -1224,10 +1228,14 @@ export default function PDVPage() {
       const differenceOther = closingData.closing_amount_other - expectedOther;
       const totalDifference = differenceCash + differenceCardDebit + differenceCardCredit + differencePix + differenceOther;
 
+      // Coletar informações do dispositivo para auditoria
+      const deviceInfo = getDeviceInfo();
+      const closedAtTime = new Date().toISOString();
+      
       // Preparar dados para salvar
       const closingPayload: any = {
         status: 'closed',
-        closed_at: new Date().toISOString(),
+        closed_at: closedAtTime,
         closed_by: user?.email || user?.id?.toString() || 'Operador',
         closing_amount_cash: closingData.closing_amount_cash,
         closing_amount_card_debit: closingData.closing_amount_card_debit,
@@ -1253,6 +1261,9 @@ export default function PDVPage() {
         total_supplies_amount: totalReforcos,
         notes: closingData.notes,
         difference_reason: closingData.difference_reason,
+        // Adicionar informações de auditoria
+        device_info: formatDeviceInfo(deviceInfo),
+        closed_by_user_id: user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id) ? user.id : undefined,
       };
 
       // Se já existe uma sessão de caixa aberta, atualizar
@@ -1387,6 +1398,43 @@ export default function PDVPage() {
         }
       }
 
+      // Preparar dados para o modal de sucesso
+      const successData = {
+        id: cashSessionId || 0,
+        register_id: '1',
+        opened_at: cashSessionOpenedAt || new Date().toISOString(),
+        closed_at: closedAtTime,
+        opened_by: cashSessionOpenedBy || user?.email || 'Operador',
+        closed_by: user?.email || user?.id?.toString() || 'Operador',
+        opening_amount: caixaInicial,
+        closing_amounts: {
+          cash: closingData.closing_amount_cash,
+          card_debit: closingData.closing_amount_card_debit,
+          card_credit: closingData.closing_amount_card_credit,
+          pix: closingData.closing_amount_pix,
+          other: closingData.closing_amount_other,
+        },
+        expected_amounts: {
+          cash: expectedCash,
+          card_debit: expectedCardDebit,
+          card_credit: expectedCardCredit,
+          pix: expectedPix,
+          other: expectedOther,
+        },
+        differences: {
+          cash: differenceCash,
+          card_debit: differenceCardDebit,
+          card_credit: differenceCardCredit,
+          pix: differencePix,
+          other: differenceOther,
+          total: totalDifference,
+        },
+        total_sales: vendasPagas.length,
+        total_sales_amount: vendasPagas.reduce((sum, v) => sum + v.total, 0),
+        notes: closingData.notes,
+        difference_reason: closingData.difference_reason,
+      };
+
       // Registrar operação de fechamento localmente
       const operation: CaixaOperation = {
         id: Date.now().toString(),
@@ -1399,25 +1447,38 @@ export default function PDVPage() {
       
       setCaixaOperations(prev => [operation, ...prev]);
 
-      // Resetar caixa inicial para próximo período
-      setCaixaInicial(0);
-      setTodaySales([]);
-      
-      // Limpar localStorage de vendas do dia
-      try {
-        if (typeof window !== 'undefined') {
-          const key = getLocalSalesKey();
-          localStorage.removeItem(key);
-        }
-      } catch (e) {
-        console.error('Erro ao limpar vendas do dia:', e);
-      }
+      // Fechar modal de fechamento e abrir modal de sucesso
+      setShowCashClosingModal(false);
+      setClosingResult(successData);
+      setShowSuccessModal(true);
 
     } catch (error) {
       console.error('Erro ao fechar caixa:', error);
       throw error;
     }
-  }, [tenant?.id, todaySales, caixaInicial, caixaOperations, cashSessionId, cashSessionOpenedAt, cashSessionOpenedBy, user, getLocalSalesKey]);
+  }, [tenant?.id, todaySales, caixaInicial, caixaOperations, cashSessionId, cashSessionOpenedAt, cashSessionOpenedBy, user]);
+
+  // Função para fechar o modal de sucesso e limpar os dados
+  const handleCloseSuccessModal = useCallback(() => {
+    setShowSuccessModal(false);
+    setClosingResult(null);
+    
+    // Resetar caixa inicial para próximo período
+    setCaixaInicial(0);
+    setTodaySales([]);
+    
+    // Limpar localStorage de vendas do dia
+    try {
+      if (typeof window !== 'undefined') {
+        const tenantId = tenant?.id || 'default';
+        const today = new Date().toISOString().split('T')[0];
+        const key = `pdv_sales_${tenantId}_${today}`;
+        localStorage.removeItem(key);
+      }
+    } catch (e) {
+      console.error('Erro ao limpar vendas do dia:', e);
+    }
+  }, [tenant?.id]);
   
   const executeCaixaOperation = useCallback((valor: number, descricao: string) => {
     const operation: CaixaOperation = {
@@ -2813,6 +2874,15 @@ export default function PDVPage() {
         tenantId={tenant?.id}
         userId={user?.id?.toString()}
       />
+
+      {/* Modal de Sucesso do Fechamento */}
+      {closingResult && (
+        <CashClosingSuccessModal
+          isOpen={showSuccessModal}
+          onClose={handleCloseSuccessModal}
+          closingData={closingResult}
+        />
+      )}
 
       {/* Dialog de Vendas em Espera */}
       <Dialog open={showPendingSalesDialog} onOpenChange={setShowPendingSalesDialog}>

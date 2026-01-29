@@ -53,3 +53,4 @@ FROM sales
 WHERE created_at >= CURRENT_DATE;
 
 
+

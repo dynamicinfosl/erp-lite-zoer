@@ -100,3 +100,4 @@ Deve retornar:
 - `src/app/next_api/cash-sessions/route.ts` - Validação de UUID adicionada
 
 
+
