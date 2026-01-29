@@ -19,13 +19,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Buscar membership do usuário
-    const { data: membership, error } = await supabaseAdmin
+    // Buscar membership do usuário (pode haver múltiplos, pegar o primeiro ativo)
+    const { data: memberships, error } = await supabaseAdmin
       .from('user_memberships')
       .select('tenant_id, role, branch_id')
       .eq('user_id', user_id)
       .eq('is_active', true)
-      .maybeSingle();
+      .limit(1);
+    
+    const membership = memberships && memberships.length > 0 ? memberships[0] : null;
 
     if (error) {
       console.error('Erro ao buscar membership:', error);

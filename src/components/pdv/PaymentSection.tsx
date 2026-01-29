@@ -510,7 +510,9 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
                   
                   <div className="flex justify-between items-center p-2 bg-blue-50 rounded-lg border-2 border-blue-200">
                     <span className="font-bold text-blue-800 text-sm">TOTAL A PAGAR:</span>
-                    <span className="font-bold text-xl text-blue-600">{formatCurrency(remaining)}</span>
+                    <span className="font-bold text-xl text-blue-600">
+                      {formatCurrency(change > 0 ? 0 : remaining)}
+                    </span>
                   </div>
                 </div>
               </CardContent>
