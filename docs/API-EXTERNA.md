@@ -38,7 +38,7 @@ Em caso de erro:
 - `200` - Sucesso
 - `400` - Erro de validação (dados inválidos)
 - `401` - Não autenticado (API Key inválida ou ausente)
-- `403` - Sem permissão (API Key não tem permissão para a operação)
+- `403` - Sem permissão ou recurso não editável (ex.: venda já vinculada a romaneio)
 - `404` - Recurso não encontrado
 - `409` - Conflito (ex.: venda de entrega duplicada)
 - `500` - Erro interno do servidor
@@ -113,7 +113,13 @@ Cria uma nova venda. Quando `sale_type='entrega'`, cria automaticamente o regist
 
 **Nota:** Quando `sale_type='entrega'`, o sistema cria automaticamente um registro na tabela de entregas com status `'aguardando'`.
 
-**Vendas de entrega repetidas:** Para evitar duplicidade, o sistema **não permite** criar duas vendas de entrega para o mesmo cliente com o mesmo valor total em um intervalo de 10 minutos. Se isso ocorrer, a API retorna status `409` (Conflito) com a mensagem de erro e os dados da venda duplicada (`duplicate_sale_id`, `duplicate_sale_number`, `duplicate_created_at`).
+**🚫 Proteção contra vendas duplicadas:** Para evitar duplicidade, o sistema **bloqueia** a criação de vendas com as seguintes características idênticas:
+- Mesmo cliente (`customer_id` ou `customer_name`)
+- Mesmo valor total (`total_amount`)
+- Mesmo DIA (00h00 até 23h59)
+- Mesma quantidade de produtos
+
+Se uma tentativa de duplicação for detectada, a API retorna status `409` (Conflito) com a mensagem de erro e os dados da venda duplicada encontrada (`duplicate_sale_id`, `duplicate_sale_number`, `duplicate_sale_type`, `duplicate_created_at`, `duplicate_product_count`). Esta validação só é aplicada quando o cliente é identificado (`customer_id` ou `customer_name` diferente de "Cliente Avulso").
 
 #### Listar Vendas
 
@@ -154,6 +160,51 @@ GET /api/v1/sales?limit=20&offset=0&sale_type=entrega
     "offset": 0,
     "count": 1
   }
+}
+```
+
+#### Editar Venda
+
+**PATCH** `/api/v1/sales/{saleId}`
+
+Atualiza uma venda. **Só é permitido editar vendas cuja entrega ainda não foi vinculada a um romaneio.** Se a venda tiver entrega já em um romaneio, a API retorna `403`.
+
+**Permissão necessária:** `sales:update`
+
+**Body (todos os campos opcionais; enviar apenas o que deseja alterar):**
+
+```json
+{
+  "sale_type": "balcao",
+  "customer_name": "João Silva",
+  "total_amount": 59.80,
+  "final_amount": 59.80,
+  "payment_method": "pix",
+  "notes": "Observações atualizadas",
+  "delivery_address": "Rua Nova, 456",
+  "delivery_neighborhood": "Centro",
+  "delivery_phone": "11999999999",
+  "delivery_fee": 5.00
+}
+```
+
+- `sale_type`: alterar tipo da venda (`"balcao"` | `"entrega"`). Se mudar para `"entrega"`, o sistema cria o registro de entrega automaticamente (se não existir).
+- `customer_name`, `total_amount`, `final_amount`, `payment_method`, `notes`: dados da venda.
+- `delivery_address`, `delivery_neighborhood`, `delivery_phone`, `delivery_fee`: aplicam-se à venda e, se for venda de entrega, ao registro de entrega.
+
+**Resposta de sucesso (200):**
+
+- Se a alteração envolver venda de entrega (criação/atualização de entrega), a resposta vem no formato:
+  `{ "success": true, "data": { "sale": { ... }, "delivery": { ... } } }`.
+- Caso contrário, a resposta vem com a venda atualizada diretamente em `data`:
+  `{ "success": true, "data": { "id": 789, "sale_number": "VND-000123", ... } }`.
+
+**Resposta quando a venda já está no romaneio (403):**
+
+```json
+{
+  "success": false,
+  "error": "Esta venda não pode ser editada pois a entrega já está vinculada a um romaneio. Só é permitido editar vendas que ainda não foram para o romaneio."
 }
 ```
 
@@ -375,6 +426,7 @@ As API keys podem ter permissões específicas para limitar o acesso:
 
 - `sales:create` - Criar vendas
 - `sales:read` - Listar vendas
+- `sales:update` - Editar vendas (apenas vendas que ainda não estão no romaneio)
 - `customers:create` - Criar clientes
 - `customers:read` - Listar e buscar clientes
 - `products:create` - Criar produtos

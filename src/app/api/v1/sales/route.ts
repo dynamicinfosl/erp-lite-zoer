@@ -78,44 +78,62 @@ async function createSaleHandler(
           { status: 400 }
         );
       }
+    }
 
-      // Proibir vendas de entrega repetidas: mesma venda (mesmo cliente + mesmo valor) nos últimos 10 minutos
-      const duplicateWindowMinutes = 10;
-      const since = new Date(Date.now() - duplicateWindowMinutes * 60 * 1000).toISOString();
+    // 🚫 PROIBIR VENDAS DUPLICADAS: mesmo cliente + mesmo valor + mesmo dia + mesma quantidade de produtos
+    const hasCustomerId = customer_id != null && customer_id !== undefined && customer_id !== '';
+    const customerNameTrimmed = (customer_name || '').trim();
+    const hasCustomerName = customerNameTrimmed && customerNameTrimmed.toLowerCase() !== 'cliente avulso';
+    
+    if (hasCustomerId || hasCustomerName) {
+      // Janela de validação: início do dia até agora (todo o dia atual)
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const startOfDayISO = startOfDay.toISOString();
       const totalAmountNum = parseFloat(String(total_amount));
+      const productCount = products.length;
 
+      // Buscar vendas do mesmo cliente, mesmo valor, criadas hoje
       let duplicateQuery = supabaseAdmin
         .from('sales')
-        .select('id, sale_number, created_at')
+        .select('id, sale_number, sale_type, created_at')
         .eq('tenant_id', tenant_id)
-        .eq('sale_type', 'entrega')
         .eq('sale_source', 'api')
         .eq('total_amount', totalAmountNum)
-        .gte('created_at', since);
+        .gte('created_at', startOfDayISO);
 
-      if (customer_id != null && customer_id !== undefined && customer_id !== '') {
+      if (hasCustomerId) {
         duplicateQuery = duplicateQuery.eq('customer_id', Number(customer_id));
       } else {
-        const nameToMatch = (customer_name || '').trim();
-        if (nameToMatch) {
-          duplicateQuery = duplicateQuery.eq('customer_name', nameToMatch);
-        }
+        duplicateQuery = duplicateQuery.eq('customer_name', customerNameTrimmed);
       }
 
-      const { data: existingSales, error: duplicateError } = await duplicateQuery.limit(1);
+      const { data: existingSales, error: duplicateError } = await duplicateQuery;
 
       if (!duplicateError && existingSales && existingSales.length > 0) {
-        const existing = existingSales[0];
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Venda de entrega duplicada. Já existe uma venda de entrega para este cliente com o mesmo valor nos últimos 10 minutos.',
-            duplicate_sale_id: existing.id,
-            duplicate_sale_number: existing.sale_number,
-            duplicate_created_at: existing.created_at,
-          },
-          { status: 409 }
-        );
+        // Para cada venda encontrada, verificar se tem a mesma quantidade de produtos
+        for (const existing of existingSales) {
+          const { data: existingItems, error: itemsError } = await supabaseAdmin
+            .from('sale_items')
+            .select('id')
+            .eq('sale_id', existing.id);
+
+          if (!itemsError && existingItems && existingItems.length === productCount) {
+            // Encontrou venda duplicada: mesmo cliente + mesmo valor + mesmo dia + mesma qtd de produtos
+            return NextResponse.json(
+              {
+                success: false,
+                error: 'Venda duplicada detectada. Já existe uma venda para este cliente com o mesmo valor, mesma quantidade de produtos e criada no mesmo dia.',
+                duplicate_sale_id: existing.id,
+                duplicate_sale_number: existing.sale_number,
+                duplicate_sale_type: existing.sale_type,
+                duplicate_created_at: existing.created_at,
+                duplicate_product_count: existingItems.length,
+              },
+              { status: 409 }
+            );
+          }
+        }
       }
     }
 

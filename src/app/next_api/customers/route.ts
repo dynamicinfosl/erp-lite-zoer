@@ -126,6 +126,7 @@ async function listCustomersHandler(request: NextRequest) {
     // - Se branch_id fornecido (filial ou matriz visitando filial): retorna clientes daquela filial
     let query;
     
+    // Select de clientes (usando * para compatibilidade com schema variável)
     if (branch_scope === 'all') {
       // Matriz vê apenas clientes cadastrados na matriz (created_at_branch_id IS NULL)
       // Não mostra clientes cadastrados em filiais por padrão
@@ -151,36 +152,40 @@ async function listCustomersHandler(request: NextRequest) {
           .map((c: any) => Number(c.customer_id))
           .filter((id: number) => Number.isFinite(id) && id > 0);
         
-        // Filial vê: clientes compartilhados + clientes cadastrados nela
-        // Fazer duas queries e combinar resultados
+        // 🚀 OTIMIZAÇÃO: Buscar clientes compartilhados e da filial em PARALELO
         const allCustomers: any[] = [];
         const seenIds = new Set<number>();
         
-        // Query 1: Clientes compartilhados
-        if (customerIds.length > 0) {
-          const sharedResult = await supabaseAdmin
+        // Fazer as duas queries em paralelo
+        const [sharedResult, branchResult] = await Promise.all([
+          // Query 1: Clientes compartilhados
+          customerIds.length > 0
+            ? supabaseAdmin
+                .from('customers')
+                .select('*')
+                .eq('tenant_id', tenant_id)
+                .in('id', customerIds)
+            : Promise.resolve({ data: null, error: null }),
+          // Query 2: Clientes cadastrados nesta filial
+          supabaseAdmin
             .from('customers')
             .select('*')
             .eq('tenant_id', tenant_id)
-            .in('id', customerIds);
-          
-          if (!sharedResult.error && sharedResult.data) {
-            for (const customer of sharedResult.data) {
-              const id = Number(customer.id);
-              if (!seenIds.has(id)) {
-                seenIds.add(id);
-                allCustomers.push(customer);
-              }
+            .eq('created_at_branch_id', bid)
+        ]);
+        
+        // Processar clientes compartilhados
+        if (!sharedResult.error && sharedResult.data) {
+          for (const customer of sharedResult.data) {
+            const id = Number(customer.id);
+            if (!seenIds.has(id)) {
+              seenIds.add(id);
+              allCustomers.push(customer);
             }
           }
         }
         
-        // Query 2: Clientes cadastrados nesta filial
-        const branchResult = await supabaseAdmin
-          .from('customers')
-          .select('*')
-          .eq('tenant_id', tenant_id)
-          .eq('created_at_branch_id', bid);
+        // Processar clientes da filial
         
         if (!branchResult.error && branchResult.data) {
           for (const customer of branchResult.data) {
@@ -217,7 +222,12 @@ async function listCustomersHandler(request: NextRequest) {
     }
 
     console.log(`✅ GET /customers - ${data?.length || 0} clientes encontrados para tenant ${tenant_id}`);
-    return NextResponse.json({ success: true, data });
+    
+    // 🚀 OTIMIZAÇÃO: Cache com revalidação (45 segundos para clientes)
+    return NextResponse.json(
+      { success: true, data },
+      { headers: { 'Cache-Control': 'public, max-age=45, stale-while-revalidate=90' } }
+    );
 
   } catch (error) {
     console.error('Erro no handler de listagem:', error);

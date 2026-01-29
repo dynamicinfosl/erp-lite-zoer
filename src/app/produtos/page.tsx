@@ -68,7 +68,7 @@ import {
   Info
 } from 'lucide-react';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
+// XLSX carregado dinamicamente para reduzir bundle inicial
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { TenantPageWrapper } from '@/components/layout/PageWrapper';
@@ -387,20 +387,22 @@ export default function ProdutosPage() {
     }
   }, []);
 
-  // Filtrar produtos
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()));
+  // Filtrar produtos (otimizado com useMemo)
+  const filteredProducts = React.useMemo(() => {
+    return products.filter(product => {
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesAdvanced = (!advancedFilters.category || product.category?.toLowerCase().includes(advancedFilters.category.toLowerCase())) &&
-                           (!advancedFilters.brand || product.brand?.toLowerCase().includes(advancedFilters.brand.toLowerCase())) &&
-                           (!advancedFilters.minPrice || product.sale_price >= parseFloat(advancedFilters.minPrice)) &&
-                           (!advancedFilters.maxPrice || product.sale_price <= parseFloat(advancedFilters.maxPrice)) &&
-                           (!advancedFilters.status || product.status === advancedFilters.status);
+      const matchesAdvanced = (!advancedFilters.category || product.category?.toLowerCase().includes(advancedFilters.category.toLowerCase())) &&
+                             (!advancedFilters.brand || product.brand?.toLowerCase().includes(advancedFilters.brand.toLowerCase())) &&
+                             (!advancedFilters.minPrice || product.sale_price >= parseFloat(advancedFilters.minPrice)) &&
+                             (!advancedFilters.maxPrice || product.sale_price <= parseFloat(advancedFilters.maxPrice)) &&
+                             (!advancedFilters.status || product.status === advancedFilters.status);
 
-    return matchesSearch && matchesAdvanced;
-  });
+      return matchesSearch && matchesAdvanced;
+    });
+  }, [products, searchTerm, advancedFilters]);
 
   // Adicionar produto
   // Função para verificar se SKU já existe APENAS no tenant atual
@@ -610,6 +612,8 @@ export default function ProdutosPage() {
       let rows: any[] = [];
 
       if (ext === 'xlsx' || ext === 'xls') {
+        // Carregar XLSX dinamicamente apenas quando necessário (otimização de bundle)
+        const XLSX = await import('xlsx');
         const arrayBuffer = await file.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer);
         const sheetName = workbook.SheetNames[0];
@@ -1463,21 +1467,36 @@ export default function ProdutosPage() {
     return iconMap[key] || <Settings2 className="h-4 w-4 mr-3 text-gray-400" />;
   };
 
-  // Calcular estatísticas dos produtos
-  const productStats = {
-    total: Array.isArray(products) ? products.length : 0,
-    active: Array.isArray(products) ? products.filter(p => p.status === 'active').length : 0,
-    inactive: Array.isArray(products) ? products.filter(p => p.status === 'inactive').length : 0,
-    lowStock: Array.isArray(products) ? products.filter(p => p.stock_quantity <= 10).length : 0,
-    outOfStock: Array.isArray(products) ? products.filter(p => p.stock_quantity === 0).length : 0,
-    totalValue: Array.isArray(products) ? products.reduce((acc, p) => acc + (p.sale_price * p.stock_quantity), 0) : 0,
-    avgPrice: Array.isArray(products) && products.length > 0 ? products.reduce((acc, p) => acc + p.sale_price, 0) / products.length : 0,
-    newThisMonth: Array.isArray(products) ? products.filter(p => {
-      const created = new Date(p.created_at);
-      const now = new Date();
-      return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
-    }).length : 0
-  };
+  // Calcular estatísticas dos produtos (otimizado com useMemo)
+  const productStats = React.useMemo(() => {
+    if (!Array.isArray(products)) {
+      return {
+        total: 0,
+        active: 0,
+        inactive: 0,
+        lowStock: 0,
+        outOfStock: 0,
+        totalValue: 0,
+        avgPrice: 0,
+        newThisMonth: 0
+      };
+    }
+    
+    return {
+      total: products.length,
+      active: products.filter(p => p.status === 'active').length,
+      inactive: products.filter(p => p.status === 'inactive').length,
+      lowStock: products.filter(p => p.stock_quantity <= 10).length,
+      outOfStock: products.filter(p => p.stock_quantity === 0).length,
+      totalValue: products.reduce((acc, p) => acc + (p.sale_price * p.stock_quantity), 0),
+      avgPrice: products.length > 0 ? products.reduce((acc, p) => acc + p.sale_price, 0) / products.length : 0,
+      newThisMonth: products.filter(p => {
+        const created = new Date(p.created_at);
+        const now = new Date();
+        return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+      }).length
+    };
+  }, [products]);
 
   return (
     <TenantPageWrapper>

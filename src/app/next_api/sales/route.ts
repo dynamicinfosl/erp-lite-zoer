@@ -306,10 +306,10 @@ async function listSalesHandler(request: NextRequest) {
     console.log(`💰 [SALES API] tz: ${tzParam}`);
     console.log(`💰 [SALES API] URL completa: ${request.url}`);
 
-    // Buscar apenas as vendas (sem JOIN para evitar erro de relacionamento)
+    // Buscar apenas as vendas (select otimizado com apenas campos essenciais)
     let query = supabaseAdmin
       .from('sales')
-      .select('*');
+      .select('id, sale_number, customer_id, customer_name, total_amount, final_amount, discount_amount, payment_method, sale_type, sale_source, status, notes, created_at, updated_at');
 
     // Filtrar por tenant_id se fornecido
     if (tenant_id && tenant_id !== '00000000-0000-0000-0000-000000000000') {
@@ -427,25 +427,28 @@ async function listSalesHandler(request: NextRequest) {
           chunks.push(saleIds.slice(i, i + chunkSize).map((x: any) => String(x)));
         }
 
-        let allItems: any[] = [];
-        for (const chunk of chunks) {
-          const { data: chunkItems, error: chunkError } = await supabaseAdmin
+        // 🚀 OTIMIZAÇÃO: Buscar chunks em PARALELO (não sequencial)
+        const chunkPromises = chunks.map(chunk =>
+          supabaseAdmin
             .from('sale_items')
             .select('sale_id, product_id, variant_id, price_type_id, product_name, unit_price, quantity, subtotal, total_price')
-            .in('sale_id', chunk);
+            .in('sale_id', chunk)
+        );
 
-          if (chunkError) {
-            console.error('❌ Erro ao buscar itens de venda (chunk):', chunkError, { chunkSize: chunk.length });
-            continue;
+        const chunkResults = await Promise.all(chunkPromises);
+        
+        let allItems: any[] = [];
+        chunkResults.forEach((result, index) => {
+          if (result.error) {
+            console.error('❌ Erro ao buscar itens de venda (chunk):', result.error, { chunkIndex: index });
+          } else {
+            const count = result.data?.length || 0;
+            if (count >= 1000) {
+              console.warn('⚠️ Chunk retornou 1000 itens (pode estar truncado). Considere reduzir chunkSize.', { chunkIndex: index });
+            }
+            allItems = allItems.concat(result.data || []);
           }
-
-          const count = chunkItems?.length || 0;
-          if (count >= 1000) {
-            console.warn('⚠️ Chunk retornou 1000 itens (pode estar truncado). Considere reduzir chunkSize.', { chunkSize: chunk.length });
-          }
-
-          allItems = allItems.concat(chunkItems || []);
-        }
+        });
 
         console.log(`✅ Itens encontrados (total): ${allItems.length}`);
 
@@ -486,17 +489,23 @@ async function listSalesHandler(request: NextRequest) {
     
     // Retornar no formato esperado pelo frontend
     console.log('✅ [SALES API] Preparando resposta...');
+    
+    // 🚀 OTIMIZAÇÃO: Cache com revalidação (30 segundos)
+    const cacheHeaders = {
+      'Cache-Control': 'public, max-age=30, stale-while-revalidate=60'
+    };
+    
     if (today === 'true') {
       console.log(`✅ [SALES API] Retornando ${data?.length || 0} vendas no formato 'sales'`);
       return NextResponse.json(
         { success: true, sales: data },
-        { headers: { 'Cache-Control': 'no-store' } },
+        { headers: cacheHeaders },
       );
     } else {
       console.log(`✅ [SALES API] Retornando ${data?.length || 0} vendas no formato 'data'`);
       return NextResponse.json(
         { success: true, data: data },
-        { headers: { 'Cache-Control': 'no-store' } },
+        { headers: cacheHeaders },
       );
     }
 
