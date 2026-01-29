@@ -45,15 +45,45 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   // Função SUPER SIMPLES - Cria tenant local sem depender do banco
   const createDefaultTenant = (userEmail: string) => {
     const userName = userEmail.split('@')[0].replace(/[^a-zA-Z0-9\s]/g, ' ').trim() || 'Meu Negócio';
+    
+    // ✅ BYPASS: admin@erplite.com e mileny@teste.com têm status 'active' ao invés de 'trial'
+    const isAdmin = userEmail === 'admin@erplite.com' || userEmail === 'mileny@teste.com';
+    
     return {
       id: '00000000-0000-0000-0000-000000000000',
       name: userName,
-      status: 'trial',
+      status: isAdmin ? 'active' : 'trial',
     };
   };
 
   // Função SUPER SIMPLES - Cria subscription padrão baseada na data de criação do usuário
-  const createDefaultSubscription = (userCreatedAt?: string) => {
+  const createDefaultSubscription = (userCreatedAt?: string, userEmail?: string) => {
+    // ✅ BYPASS: admin@erplite.com e mileny@teste.com têm plano ilimitado
+    const isAdmin = userEmail === 'admin@erplite.com' || userEmail === 'mileny@teste.com';
+    
+    if (isAdmin) {
+      return {
+        id: 'admin-unlimited',
+        status: 'active',
+        trial_ends_at: null,
+        current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 ano
+        plan: {
+          id: 'admin-plan',
+          name: 'Plano Admin (Ilimitado)',
+          slug: 'admin',
+          price_monthly: 0,
+          price_yearly: 0,
+          features: {},
+          limits: {
+            max_users: 999999,
+            max_customers: 999999,
+            max_products: 999999,
+            max_sales_per_month: 999999
+          }
+        }
+      } as any;
+    }
+    
     // Se não temos a data de criação, usar data atual (fallback)
     const baseDate = userCreatedAt ? new Date(userCreatedAt) : new Date();
     const trialEndsAt = new Date(baseDate.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -80,11 +110,34 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Função para buscar tenant real da conta logada
-  const loadRealTenant = useCallback(async (userId: string) => {
+  const loadRealTenant = useCallback(async (userId: string, userEmail?: string) => {
     try {
-      console.log('🔍 Buscando tenant real para usuário:', userId);
+      console.log('🔍 Buscando tenant real para usuário:', userId, userEmail);
       
-      // ✅ NOVA SOLUÇÃO: Buscar tenant na tabela tenants baseado no user_id
+      // ✅ PRIORIDADE 1: Buscar por user_memberships (relação user -> tenant)
+      try {
+        const { data: membership, error: membershipError } = await supabase
+          .from('user_memberships')
+          .select('tenant_id, tenants(id, name, email)')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (!membershipError && membership?.tenant_id) {
+          const tenantData = Array.isArray(membership.tenants) ? membership.tenants[0] : membership.tenants;
+          console.log('✅ Tenant encontrado via user_memberships:', membership.tenant_id);
+          return {
+            id: membership.tenant_id,
+            name: tenantData?.name || 'Meu Negócio',
+            status: 'trial',
+            email: tenantData?.email,
+          };
+        }
+      } catch (error) {
+        console.log('⚠️ Erro ao buscar membership:', error);
+      }
+
+      // ✅ PRIORIDADE 2: Buscar tenant na tabela tenants onde id = user_id
       try {
         const { data: tenant, error } = await supabase
           .from('tenants')
@@ -92,12 +145,8 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
           .eq('id', userId)
           .maybeSingle();
 
-        if (error) {
-          console.log('⚠️ Erro ao buscar tenant:', error);
-        }
-
-        if (tenant?.id) {
-          console.log('✅ Tenant encontrado na tabela tenants:', tenant.name, tenant.email);
+        if (!error && tenant?.id) {
+          console.log('✅ Tenant encontrado na tabela tenants (id=userId):', tenant.name);
           return {
             id: tenant.id,
             name: tenant.name || 'Meu Negócio',
@@ -109,7 +158,30 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         console.log('⚠️ Erro ao verificar tenant na tabela tenants:', error);
       }
 
-      // Fallback: usar user_id como tenant_id (compatibilidade)
+      // ✅ PRIORIDADE 3: Buscar qualquer tenant associado ao email do usuário
+      if (userEmail) {
+        try {
+          const { data: tenant, error } = await supabase
+            .from('tenants')
+            .select('id, name, email')
+            .eq('email', userEmail)
+            .maybeSingle();
+
+          if (!error && tenant?.id) {
+            console.log('✅ Tenant encontrado por email:', tenant.name);
+            return {
+              id: tenant.id,
+              name: tenant.name || 'Meu Negócio',
+              status: 'trial',
+              email: tenant.email,
+            };
+          }
+        } catch (error) {
+          console.log('⚠️ Erro ao buscar tenant por email:', error);
+        }
+      }
+
+      // Fallback: usar user_id como tenant_id
       console.log('👤 Usando user_id como tenant_id (fallback):', userId);
       return {
         id: userId,
@@ -119,7 +191,6 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
 
     } catch (error) {
       console.error('❌ Erro ao buscar tenant real:', error);
-      // Em caso de erro, usar user_id mesmo assim
       return {
         id: userId,
         name: 'Meu Negócio',
@@ -216,8 +287,8 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
         // Se há usuário logado, buscar tenant real
         if (session?.user && mounted) {
           console.log('👤 Usuário logado, buscando tenant real...');
-          const realTenant = await loadRealTenant(session.user.id);
-          const defaultSubscription = createDefaultSubscription(session.user.created_at);
+          const realTenant = await loadRealTenant(session.user.id, session.user.email);
+          const defaultSubscription = createDefaultSubscription(session.user.created_at, session.user.email);
           
           setTenant(realTenant);
           setSubscription(defaultSubscription);
@@ -261,8 +332,8 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
       
       if (session?.user && mounted) {
         console.log('👤 Auth state change - buscando tenant real...');
-        const realTenant = await loadRealTenant(session.user.id);
-        const defaultSubscription = createDefaultSubscription();
+        const realTenant = await loadRealTenant(session.user.id, session.user.email);
+        const defaultSubscription = createDefaultSubscription(session.user.created_at, session.user.email);
         
         setTenant(realTenant);
         setSubscription(defaultSubscription);
@@ -416,7 +487,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
 
   const refreshTenant = async () => {
     if (user?.id) {
-      const realTenant = await loadRealTenant(user.id);
+      const realTenant = await loadRealTenant(user.id, user.email);
       setTenant(realTenant);
       console.log('✅ Tenant atualizado:', realTenant.name, realTenant.id);
     } else if (user?.email) {
@@ -427,7 +498,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshSubscription = async () => {
-    const defaultSubscription = createDefaultSubscription();
+    const defaultSubscription = createDefaultSubscription(user?.created_at, user?.email);
     setSubscription(defaultSubscription);
     console.log('✅ Subscription atualizada');
   };

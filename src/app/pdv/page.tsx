@@ -87,6 +87,10 @@ import { TenantPageWrapper } from '@/components/layout/PageWrapper';
 import { PaymentSection } from '@/components/pdv/PaymentSection';
 import { SaleConfirmationModal } from '@/components/pdv/SaleConfirmationModal';
 import { DeliveryQuickModal } from '@/components/pdv/DeliveryQuickModal';
+import { CashClosingModal, CashClosingData } from '@/components/pdv/CashClosingModal';
+import { CashClosingSuccessModal } from '@/components/pdv/CashClosingSuccessModal';
+import { CashOpeningModal, CashOpeningData } from '@/components/pdv/CashOpeningModal';
+import { getDeviceInfo, formatDeviceInfo } from '@/lib/cash-session-security';
 
 interface MenuItem {
   icon: React.ElementType;
@@ -168,7 +172,14 @@ export default function PDVPage() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [showCaixaDialog, setShowCaixaDialog] = useState(false);
+  const [showCashOpeningModal, setShowCashOpeningModal] = useState(false);
+  const [showCashClosingModal, setShowCashClosingModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [closingResult, setClosingResult] = useState<any>(null);
   const [caixaOperationType, setCaixaOperationType] = useState<'sangria' | 'reforco' | 'fechamento'>('sangria');
+  const [cashSessionId, setCashSessionId] = useState<number | null>(null);
+  const [cashSessionOpenedAt, setCashSessionOpenedAt] = useState<string>('');
+  const [cashSessionOpenedBy, setCashSessionOpenedBy] = useState<string>('');
   const [todaySales, setTodaySales] = useState<Sale[]>([]);
   // Persistência local do histórico do dia
   const getLocalSalesKey = useCallback(() => {
@@ -512,7 +523,16 @@ export default function PDVPage() {
 
       try {
         const tz = -new Date().getTimezoneOffset();
-        const url = `/next_api/sales?today=true&tenant_id=${encodeURIComponent(tenant.id)}&tz=${tz}`;
+        // ✅ IMPORTANTE: Adicionar branch_scope='all' para buscar todas as vendas do tenant
+        // A API retorna array vazio se não tiver branch_id ou branch_scope
+        const params = new URLSearchParams({
+          today: 'true',
+          tenant_id: tenant.id,
+          tz: tz.toString(),
+          branch_scope: 'all', // Buscar todas as vendas do tenant (sem filtrar por filial)
+          sale_source: 'pdv' // Filtrar apenas vendas do PDV
+        });
+        const url = `/next_api/sales?${params.toString()}`;
         console.log('🔍 [PDV] URL completa da requisição:', url);
         console.log('🔍 [PDV] Timezone offset:', tz);
         console.log('🔍 [PDV] Data/hora atual:', new Date().toISOString());
@@ -570,6 +590,41 @@ export default function PDVPage() {
   useEffect(() => {
     reloadTodaySales();
   }, [reloadTodaySales]);
+
+  // Buscar ou criar sessão de caixa ao abrir o PDV
+  useEffect(() => {
+    const loadCashSession = async () => {
+      if (!tenant?.id) return;
+
+      try {
+        // Buscar sessão aberta
+        const response = await fetch(`/next_api/cash-sessions?status=open&tenant_id=${encodeURIComponent(tenant.id)}`);
+        if (response.ok) {
+          const data = await response.json();
+          const sessions = data.data || data.sales || [];
+          const openSession = sessions.find((s: any) => s.status === 'open');
+          
+          if (openSession) {
+            setCashSessionId(openSession.id);
+            setCashSessionOpenedAt(openSession.opened_at);
+            setCashSessionOpenedBy(openSession.opened_by);
+            setCaixaInicial(parseFloat(openSession.opening_amount || openSession.initial_amount || 0));
+          } else {
+            // Se não houver sessão aberta, inicializar com valores padrão
+            setCashSessionOpenedAt(new Date().toISOString());
+            setCashSessionOpenedBy(user?.email || 'Operador');
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar sessão de caixa:', error);
+        // Inicializar com valores padrão em caso de erro
+        setCashSessionOpenedAt(new Date().toISOString());
+        setCashSessionOpenedBy(user?.email || 'Operador');
+      }
+    };
+
+    loadCashSession();
+  }, [tenant?.id, user?.email]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -1219,10 +1274,400 @@ export default function PDVPage() {
     setShowCaixaDialog(true);
   }, []);
 
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  // Função para abrir modal de abertura de caixa
+  const handleAberturaCaixa = useCallback(() => {
+    // Verificar se já existe um caixa aberto
+    if (cashSessionId) {
+      toast.error('Já existe um caixa aberto!', {
+        description: `Aberto em ${new Date(cashSessionOpenedAt).toLocaleString('pt-BR')} por ${cashSessionOpenedBy}`,
+      });
+      return;
+    }
+    setShowCashOpeningModal(true);
+  }, [cashSessionId, cashSessionOpenedAt, cashSessionOpenedBy]);
+
+  // Função para salvar abertura de caixa na API
+  const handleCashOpening = useCallback(async (openingData: CashOpeningData) => {
+    try {
+      if (!tenant?.id) {
+        throw new Error('Tenant não disponível');
+      }
+
+      // Verificar novamente se não há caixa aberto
+      if (cashSessionId) {
+        throw new Error('Já existe um caixa aberto');
+      }
+
+      // Preparar dados para criar nova sessão
+      const openingPayload: any = {
+        register_id: '1', // ID do caixa/terminal
+        opened_at: new Date().toISOString(),
+        opening_amount: openingData.opening_amount,
+        opened_by: user?.email || user?.id?.toString() || 'Operador',
+        status: 'open',
+        tenant_id: tenant.id,
+        notes: openingData.notes,
+      };
+
+      // Adicionar user_id se for UUID válido
+      if (user?.id) {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(user.id)) {
+          openingPayload.user_id = user.id;
+        }
+      }
+
+      console.log('📤 Criando nova sessão de caixa:', openingPayload);
+
+      const response = await fetch('/next_api/cash-sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(openingPayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao abrir caixa');
+      }
+
+      const result = await response.json();
+      
+      if (result.data?.id) {
+        // Atualizar estados com a nova sessão
+        setCashSessionId(result.data.id);
+        setCashSessionOpenedAt(result.data.opened_at);
+        setCashSessionOpenedBy(result.data.opened_by);
+        setCaixaInicial(openingData.opening_amount);
+
+        // Registrar operação localmente
+        const operation: CaixaOperation = {
+          id: Date.now().toString(),
+          tipo: 'abertura',
+          valor: openingData.opening_amount,
+          descricao: `Abertura de caixa - Valor inicial: ${formatCurrency(openingData.opening_amount)}`,
+          data: new Date().toISOString(),
+          usuario: user?.email || 'Operador',
+        };
+        
+        setCaixaOperations(prev => [operation, ...prev]);
+
+        toast.success('Caixa aberto com sucesso!', {
+          description: `Valor inicial: ${formatCurrency(openingData.opening_amount)}`,
+          duration: 5000,
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao abrir caixa:', error);
+      throw error;
+    }
+  }, [tenant?.id, user, cashSessionId]);
+
   const handleFechamento = useCallback(() => {
-    setCaixaOperationType('fechamento');
-    setShowCaixaDialog(true);
+    setShowCashClosingModal(true);
   }, []);
+
+  // Função para salvar fechamento de caixa na API
+  const handleCashClosing = useCallback(async (closingData: CashClosingData) => {
+    try {
+      if (!tenant?.id) {
+        throw new Error('Tenant não disponível');
+      }
+
+      // Calcular valores esperados
+      const vendasPagas = todaySales.filter(s => s.status === 'paga');
+      const vendasPorMetodo = vendasPagas.reduce((acc, venda) => {
+        const metodo = venda.forma_pagamento || 'dinheiro';
+        if (!acc[metodo]) {
+          acc[metodo] = 0;
+        }
+        acc[metodo] += venda.total;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const totalReforcos = caixaOperations
+        .filter(op => op.tipo === 'reforco')
+        .reduce((sum, op) => sum + op.valor, 0);
+      
+      const totalSangrias = caixaOperations
+        .filter(op => op.tipo === 'sangria')
+        .reduce((sum, op) => sum + op.valor, 0);
+
+      const expectedCash = caixaInicial + (vendasPorMetodo['dinheiro'] || 0) + totalReforcos - totalSangrias;
+      const expectedCardDebit = vendasPorMetodo['cartao_debito'] || 0;
+      const expectedCardCredit = vendasPorMetodo['cartao_credito'] || 0;
+      const expectedPix = vendasPorMetodo['pix'] || 0;
+      const expectedOther = Object.entries(vendasPorMetodo)
+        .filter(([metodo]) => !['dinheiro', 'cartao_debito', 'cartao_credito', 'pix'].includes(metodo))
+        .reduce((sum, [, valor]) => sum + valor, 0);
+
+      // Calcular diferenças
+      const differenceCash = closingData.closing_amount_cash - expectedCash;
+      const differenceCardDebit = closingData.closing_amount_card_debit - expectedCardDebit;
+      const differenceCardCredit = closingData.closing_amount_card_credit - expectedCardCredit;
+      const differencePix = closingData.closing_amount_pix - expectedPix;
+      const differenceOther = closingData.closing_amount_other - expectedOther;
+      const totalDifference = differenceCash + differenceCardDebit + differenceCardCredit + differencePix + differenceOther;
+
+      // Coletar informações do dispositivo para auditoria
+      const deviceInfo = getDeviceInfo();
+      const closedAtTime = new Date().toISOString();
+      
+      // Preparar dados para salvar
+      const closingPayload: any = {
+        status: 'closed',
+        closed_at: closedAtTime,
+        closed_by: user?.email || user?.id?.toString() || 'Operador',
+        closing_amount_cash: closingData.closing_amount_cash,
+        closing_amount_card_debit: closingData.closing_amount_card_debit,
+        closing_amount_card_credit: closingData.closing_amount_card_credit,
+        closing_amount_pix: closingData.closing_amount_pix,
+        closing_amount_other: closingData.closing_amount_other,
+        expected_cash: expectedCash,
+        expected_card_debit: expectedCardDebit,
+        expected_card_credit: expectedCardCredit,
+        expected_pix: expectedPix,
+        expected_other: expectedOther,
+        difference_amount: totalDifference,
+        difference_cash: differenceCash,
+        difference_card_debit: differenceCardDebit,
+        difference_card_credit: differenceCardCredit,
+        difference_pix: differencePix,
+        difference_other: differenceOther,
+        total_sales: vendasPagas.length,
+        total_sales_amount: vendasPagas.reduce((sum, v) => sum + v.total, 0),
+        total_withdrawals: caixaOperations.filter(op => op.tipo === 'sangria').length,
+        total_withdrawals_amount: totalSangrias,
+        total_supplies: caixaOperations.filter(op => op.tipo === 'reforco').length,
+        total_supplies_amount: totalReforcos,
+        notes: closingData.notes,
+        difference_reason: closingData.difference_reason,
+        // Adicionar informações de auditoria
+        device_info: formatDeviceInfo(deviceInfo),
+        closed_by_user_id: user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id) ? user.id : undefined,
+      };
+
+      // Se já existe uma sessão de caixa aberta, atualizar
+      if (cashSessionId) {
+        const updatePayload: any = {
+          ...closingPayload,
+          tenant_id: tenant.id,
+        };
+
+        // ✅ CRÍTICO: Adicionar user_id SOMENTE se for UUID válido
+        if (user?.id) {
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (uuidRegex.test(user.id)) {
+            updatePayload.user_id = user.id;
+          }
+        }
+
+        // ✅ Remover campos que contenham email onde não deveria
+        Object.keys(updatePayload).forEach(key => {
+          const value = updatePayload[key];
+          if (key !== 'opened_by' && key !== 'closed_by' && typeof value === 'string' && value.includes('@')) {
+            console.error(`❌ Removendo campo ${key} do PATCH:`, value);
+            delete updatePayload[key];
+          }
+        });
+
+        console.log('📤 Payload final para atualizar sessão:', JSON.stringify(updatePayload, null, 2));
+
+        const response = await fetch(`/next_api/cash-sessions?id=${cashSessionId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updatePayload),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Erro ao fechar sessão de caixa');
+        }
+      } else {
+        // Criar nova sessão de caixa (caso não exista)
+        // Incluir dados de abertura e fechamento juntos
+        const createPayload: any = {
+          register_id: '1', // ID do caixa/terminal (pode ser configurável)
+          opened_at: cashSessionOpenedAt || new Date().toISOString(),
+          initial_amount: caixaInicial, // Usar initial_amount conforme a API
+          opened_by: cashSessionOpenedBy || user?.email || 'Operador',
+          status: 'closed', // Já criar como fechada
+          tenant_id: tenant.id,
+          // Campos de fechamento
+          closed_at: closingPayload.closed_at,
+          closed_by: closingPayload.closed_by,
+          closing_amount_cash: closingPayload.closing_amount_cash,
+          closing_amount_card_debit: closingPayload.closing_amount_card_debit,
+          closing_amount_card_credit: closingPayload.closing_amount_card_credit,
+          closing_amount_pix: closingPayload.closing_amount_pix,
+          closing_amount_other: closingPayload.closing_amount_other,
+          expected_cash: closingPayload.expected_cash,
+          expected_card_debit: closingPayload.expected_card_debit,
+          expected_card_credit: closingPayload.expected_card_credit,
+          expected_pix: closingPayload.expected_pix,
+          expected_other: closingPayload.expected_other,
+          difference_amount: closingPayload.difference_amount,
+          difference_cash: closingPayload.difference_cash,
+          difference_card_debit: closingPayload.difference_card_debit,
+          difference_card_credit: closingPayload.difference_card_credit,
+          difference_pix: closingPayload.difference_pix,
+          difference_other: closingPayload.difference_other,
+          difference_reason: closingPayload.difference_reason,
+          total_sales: closingPayload.total_sales,
+          total_sales_amount: closingPayload.total_sales_amount,
+          total_withdrawals: closingPayload.total_withdrawals,
+          total_withdrawals_amount: closingPayload.total_withdrawals_amount,
+          total_supplies: closingPayload.total_supplies,
+          total_supplies_amount: closingPayload.total_supplies_amount,
+          notes: closingPayload.notes,
+        };
+
+        // ✅ CRÍTICO: Adicionar user_id SOMENTE se for um UUID válido
+        // Nunca enviar email no campo user_id
+        if (user?.id) {
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (uuidRegex.test(user.id)) {
+            createPayload.user_id = user.id;
+            console.log('✅ user_id válido adicionado:', user.id);
+          } else {
+            console.warn('⚠️ user_id não é UUID válido, não será enviado:', user.id);
+          }
+        }
+
+        // ✅ GARANTIR que não há campos problemáticos
+        // Remover qualquer campo que contenha email onde não deveria
+        Object.keys(createPayload).forEach(key => {
+          const value = createPayload[key];
+          if (key !== 'opened_by' && key !== 'closed_by' && typeof value === 'string' && value.includes('@')) {
+            console.error(`❌ Removendo campo ${key} que contém email:`, value);
+            delete createPayload[key];
+          }
+        });
+
+        console.log('📤 Payload final para criar sessão de caixa:', JSON.stringify(createPayload, null, 2));
+
+        const response = await fetch('/next_api/cash-sessions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(createPayload),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorData: any = {};
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { error: errorText || 'Erro desconhecido' };
+          }
+          console.error('❌ Erro ao criar sessão de caixa:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData,
+            payload: createPayload
+          });
+          throw new Error(errorData.error || errorData.errorMessage || `Erro ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        if (result.data?.id) {
+          setCashSessionId(result.data.id);
+        }
+      }
+
+      // Preparar dados para o modal de sucesso
+      const successData = {
+        id: cashSessionId || 0,
+        register_id: '1',
+        opened_at: cashSessionOpenedAt || new Date().toISOString(),
+        closed_at: closedAtTime,
+        opened_by: cashSessionOpenedBy || user?.email || 'Operador',
+        closed_by: user?.email || user?.id?.toString() || 'Operador',
+        opening_amount: caixaInicial,
+        closing_amounts: {
+          cash: closingData.closing_amount_cash,
+          card_debit: closingData.closing_amount_card_debit,
+          card_credit: closingData.closing_amount_card_credit,
+          pix: closingData.closing_amount_pix,
+          other: closingData.closing_amount_other,
+        },
+        expected_amounts: {
+          cash: expectedCash,
+          card_debit: expectedCardDebit,
+          card_credit: expectedCardCredit,
+          pix: expectedPix,
+          other: expectedOther,
+        },
+        differences: {
+          cash: differenceCash,
+          card_debit: differenceCardDebit,
+          card_credit: differenceCardCredit,
+          pix: differencePix,
+          other: differenceOther,
+          total: totalDifference,
+        },
+        total_sales: vendasPagas.length,
+        total_sales_amount: vendasPagas.reduce((sum, v) => sum + v.total, 0),
+        notes: closingData.notes,
+        difference_reason: closingData.difference_reason,
+      };
+
+      // Registrar operação de fechamento localmente
+      const operation: CaixaOperation = {
+        id: Date.now().toString(),
+        tipo: 'fechamento',
+        valor: totalDifference,
+        descricao: `Fechamento - ${vendasPagas.length} vendas - Diferença: ${formatCurrency(totalDifference)}`,
+        data: new Date().toISOString(),
+        usuario: user?.email || 'Operador',
+      };
+      
+      setCaixaOperations(prev => [operation, ...prev]);
+
+      // Fechar modal de fechamento e abrir modal de sucesso
+      setShowCashClosingModal(false);
+      setClosingResult(successData);
+      setShowSuccessModal(true);
+
+    } catch (error) {
+      console.error('Erro ao fechar caixa:', error);
+      throw error;
+    }
+  }, [tenant?.id, todaySales, caixaInicial, caixaOperations, cashSessionId, cashSessionOpenedAt, cashSessionOpenedBy, user]);
+
+  // Função para fechar o modal de sucesso e limpar os dados
+  const handleCloseSuccessModal = useCallback(() => {
+    setShowSuccessModal(false);
+    setClosingResult(null);
+    
+    // Resetar caixa inicial para próximo período
+    setCaixaInicial(0);
+    setTodaySales([]);
+    
+    // Limpar localStorage de vendas do dia
+    try {
+      if (typeof window !== 'undefined') {
+        const tenantId = tenant?.id || 'default';
+        const today = new Date().toISOString().split('T')[0];
+        const key = `pdv_sales_${tenantId}_${today}`;
+        localStorage.removeItem(key);
+      }
+    } catch (e) {
+      console.error('Erro ao limpar vendas do dia:', e);
+    }
+  }, [tenant?.id]);
   
   const executeCaixaOperation = useCallback(async (valor: number, descricao: string) => {
     if (caixaOperationType === 'fechamento' && currentCashSessionId) {
@@ -1585,6 +2030,15 @@ export default function PDVPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
                   <DropdownMenuLabel className="text-gray-900 dark:text-gray-100 font-semibold">Operações de Caixa</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+                  <DropdownMenuItem 
+                    onClick={handleAberturaCaixa} 
+                    className="cursor-pointer text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 focus:bg-green-50 dark:focus:bg-green-900/20"
+                    disabled={!!cashSessionId}
+                  >
+                    <Wallet className="mr-2 h-4 w-4 text-green-500" />
+                    <span>{cashSessionId ? 'Caixa Já Aberto' : 'Abrir Caixa'}</span>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
                   <DropdownMenuItem onClick={handleSangria} className="cursor-pointer text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800">
                     <MinusCircle className="mr-2 h-4 w-4 text-red-500" />
@@ -2586,7 +3040,6 @@ export default function PDVPage() {
                   <Wallet className="h-6 w-6" />
                   {caixaOperationType === 'sangria' && 'Sangria de Caixa'}
                   {caixaOperationType === 'reforco' && 'Reforço de Caixa'}
-                  {caixaOperationType === 'fechamento' && 'Fechamento de Caixa'}
                 </h2>
                 <button
                   onClick={() => setShowCaixaDialog(false)}
@@ -2604,92 +3057,49 @@ export default function PDVPage() {
                   </div>
                 </div>
 
-                {caixaOperationType !== 'fechamento' ? (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="valor-operacao">Valor *</Label>
-                      <Input
-                        id="valor-operacao"
-                        type="number"
-                        placeholder="0,00"
-                        step="0.01"
-                        min="0"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            const valor = parseFloat((e.target as HTMLInputElement).value);
-                            const descricao = (document.getElementById('descricao-operacao') as HTMLInputElement)?.value || '';
-                            if (valor > 0) {
-                              executeCaixaOperation(valor, descricao);
-                            }
-                          }
-                        }}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="descricao-operacao">Descrição</Label>
-                      <Input
-                        id="descricao-operacao"
-                        placeholder="Motivo da operação (opcional)"
-                      />
-                    </div>
-
-                    <Button
-                      onClick={() => {
-                        const valor = parseFloat((document.getElementById('valor-operacao') as HTMLInputElement)?.value || '0');
+                <div className="space-y-2">
+                  <Label htmlFor="valor-operacao">Valor *</Label>
+                  <Input
+                    id="valor-operacao"
+                    type="number"
+                    placeholder="0,00"
+                    step="0.01"
+                    min="0"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const valor = parseFloat((e.target as HTMLInputElement).value);
                         const descricao = (document.getElementById('descricao-operacao') as HTMLInputElement)?.value || '';
                         if (valor > 0) {
                           executeCaixaOperation(valor, descricao);
-                        } else {
-                          toast.error('Digite um valor válido');
                         }
-                      }}
-                      className="w-full juga-gradient text-white"
-                    >
-                      Confirmar {caixaOperationType === 'sangria' ? 'Sangria' : 'Reforço'}
-                    </Button>
-                  </>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="space-y-2 p-4 bg-muted rounded-lg">
-                      <div className="flex justify-between">
-                        <span className="text-sm">Saldo Inicial:</span>
-                        <span className="font-semibold">R$ {caixaInicial.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-green-600 dark:text-green-400">
-                        <span className="text-sm">Vendas:</span>
-                        <span className="font-semibold">+ R$ {totalVendasDia.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-green-600 dark:text-green-400">
-                        <span className="text-sm">Reforços:</span>
-                        <span className="font-semibold">+ R$ {totalReforcos.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-red-600 dark:text-red-400">
-                        <span className="text-sm">Sangrias:</span>
-                        <span className="font-semibold">- R$ {totalSangrias.toFixed(2)}</span>
-                      </div>
-                      <Separator className="my-2" />
-                      <div className="flex justify-between text-lg">
-                        <span className="font-bold">Saldo Final:</span>
-                        <span className="font-extrabold text-primary">R$ {saldoCaixa.toFixed(2)}</span>
-                      </div>
-                    </div>
+                      }
+                    }}
+                  />
+                </div>
 
-                    <Button
-                      onClick={() => {
-                        executeCaixaOperation(saldoCaixa, `Fechamento - ${todaySales.length} vendas`);
-                        toast.info('Caixa fechado. Iniciando novo período...', {
-                          duration: 5000,
-                        });
-                      }}
-                      className="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white"
-                    >
-                      <Lock className="h-4 w-4 mr-2" />
-                      Confirmar Fechamento
-                    </Button>
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <Label htmlFor="descricao-operacao">Descrição</Label>
+                  <Input
+                    id="descricao-operacao"
+                    placeholder="Motivo da operação (opcional)"
+                  />
+                </div>
+
+                <Button
+                  onClick={() => {
+                    const valor = parseFloat((document.getElementById('valor-operacao') as HTMLInputElement)?.value || '0');
+                    const descricao = (document.getElementById('descricao-operacao') as HTMLInputElement)?.value || '';
+                    if (valor > 0) {
+                      executeCaixaOperation(valor, descricao);
+                    } else {
+                      toast.error('Digite um valor válido');
+                    }
+                  }}
+                  className="w-full juga-gradient text-white"
+                >
+                  Confirmar {caixaOperationType === 'sangria' ? 'Sangria' : 'Reforço'}
+                </Button>
               </div>
             </div>
           </div>
@@ -2712,6 +3122,38 @@ export default function PDVPage() {
         onOpenChange={setDeliveryQuickOpen}
         tenantId={tenant?.id || null}
       />
+
+      {/* Modal de Abertura de Caixa */}
+      <CashOpeningModal
+        isOpen={showCashOpeningModal}
+        onClose={() => setShowCashOpeningModal(false)}
+        onConfirm={handleCashOpening}
+        operatorName={user?.email || user?.id?.toString() || 'Operador'}
+        existingOpenSession={!!cashSessionId}
+      />
+
+      {/* Modal de Fechamento de Caixa */}
+      <CashClosingModal
+        isOpen={showCashClosingModal}
+        onClose={() => setShowCashClosingModal(false)}
+        onConfirm={handleCashClosing}
+        todaySales={todaySales}
+        caixaInicial={caixaInicial}
+        caixaOperations={caixaOperations}
+        openedAt={cashSessionOpenedAt}
+        openedBy={cashSessionOpenedBy}
+        tenantId={tenant?.id}
+        userId={user?.id?.toString()}
+      />
+
+      {/* Modal de Sucesso do Fechamento */}
+      {closingResult && (
+        <CashClosingSuccessModal
+          isOpen={showSuccessModal}
+          onClose={handleCloseSuccessModal}
+          closingData={closingResult}
+        />
+      )}
 
       {/* Dialog de Vendas em Espera */}
       <Dialog open={showPendingSalesDialog} onOpenChange={setShowPendingSalesDialog}>

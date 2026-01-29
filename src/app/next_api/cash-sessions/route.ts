@@ -20,6 +20,16 @@ interface CashSessionQuery {
   user_id?: string;
 }
 
+interface CashSessionBody {
+  register_id?: string;
+  opened_at: string;
+  initial_amount: number;
+  status?: string;
+  notes?: string;
+  tenant_id?: string;
+  user_id?: string;
+}
+
 function isMissingColumnError(message: string, column: string) {
   const m = (message || "").toLowerCase();
   return m.includes("does not exist") && m.includes(`"${column.toLowerCase()}"`);
@@ -34,14 +44,16 @@ export const GET = async (request: NextRequest) => {
     const status = searchParams.get("status") || undefined;
 
     const run = async (opts: { includeTenantId: boolean; includeUserId: boolean }) => {
-      let query = supabaseAdmin.from("cash_sessions").select("*").order("opened_at", { ascending: false });
+      let query = supabaseAdmin
+        .from("cash_sessions")
+        .select("*")
+        .order("opened_at", { ascending: false });
 
       if (status) query = query.eq("status", status);
       if (registerId) query = query.eq("register_id", registerId);
       if (opts.includeUserId && userId) query = query.eq("user_id", userId);
       if (opts.includeTenantId && tenantId) query = query.eq("tenant_id", tenantId);
 
-      // limitar para evitar payload enorme
       const { data, error } = await query.limit(200);
       if (error) throw new Error(error.message);
       return Array.isArray(data) ? data : [];
@@ -52,7 +64,7 @@ export const GET = async (request: NextRequest) => {
       return createSuccessResponse({ data: rows });
     } catch (e: any) {
       const msg = String(e?.message || e || "");
-      // fallback: schemas antigos podem não ter tenant_id/user_id/register_id
+      // fallback: schemas antigos podem não ter tenant_id/user_id
       if (tenantId && isMissingColumnError(msg, "tenant_id")) {
         const rows = await run({ includeTenantId: false, includeUserId: true });
         return createSuccessResponse({ data: rows });
@@ -72,16 +84,6 @@ export const GET = async (request: NextRequest) => {
     });
   }
 };
-
-interface CashSessionBody {
-  register_id?: string;
-  opened_at: string;
-  initial_amount: number;
-  status?: string;
-  notes?: string;
-  tenant_id?: string;
-  user_id?: string;
-}
 
 export const POST = async (request: NextRequest) => {
   try {
@@ -120,15 +122,14 @@ export const POST = async (request: NextRequest) => {
       return createSuccessResponse({ data: created }, 201);
     } catch (e: any) {
       const msg = String(e?.message || e || "");
+      const payload = { ...basePayload };
 
       // fallback: schemas antigos podem não ter tenant_id/user_id/register_id/notes
-      const payload = { ...basePayload };
       if (isMissingColumnError(msg, "tenant_id")) delete payload.tenant_id;
       if (isMissingColumnError(msg, "user_id")) delete payload.user_id;
       if (isMissingColumnError(msg, "register_id")) delete payload.register_id;
       if (isMissingColumnError(msg, "notes")) delete payload.notes;
 
-      // se não mudou nada, propagar erro original
       if (JSON.stringify(payload) === JSON.stringify(basePayload)) throw e;
 
       const created = await tryInsert(payload);
@@ -170,7 +171,6 @@ export const PATCH = async (request: NextRequest) => {
       .single();
 
     if (error) {
-      // fallback: schemas antigos podem não ter notes/closing_amount/closed_at
       const msg = error.message || "";
       const retryPayload = { ...payload };
       if (isMissingColumnError(msg, "closing_amount")) delete retryPayload.closing_amount;
@@ -221,5 +221,4 @@ export const DELETE = async (request: NextRequest) => {
     });
   }
 };
-
 
