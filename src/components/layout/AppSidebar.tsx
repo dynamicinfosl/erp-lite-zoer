@@ -42,6 +42,7 @@ import {
   RotateCcw,
   FileText,
   UsersRound,
+  Wallet,
 } from 'lucide-react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { ENABLE_AUTH } from '@/constants/auth';
@@ -95,7 +96,16 @@ const menuGroups = [
           { title: 'Vendas de Produtos', url: '/vendas-produtos', icon: Package },
         ]
       },
-      { title: 'PDV', url: '/pdv', icon: ShoppingCart, roles: ['admin', 'vendedor'] },
+      {
+        title: 'PDV',
+        url: '/pdv',
+        icon: ShoppingCart,
+        roles: ['admin', 'vendedor'],
+        subItems: [
+          { title: 'Ponto de Venda', url: '/pdv', icon: ShoppingCart },
+          { title: 'Caixas', url: '/pdv/caixas', icon: Wallet },
+        ],
+      },
     ],
   },
   {

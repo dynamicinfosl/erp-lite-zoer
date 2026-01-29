@@ -219,6 +219,10 @@ export default function PDVPage() {
 
   const [caixaOperations, setCaixaOperations] = useState<CaixaOperation[]>([]);
   const [caixaInicial, setCaixaInicial] = useState(0);
+  const [currentCashSessionId, setCurrentCashSessionId] = useState<string | null>(null);
+  const [showOpenCaixaModal, setShowOpenCaixaModal] = useState(false);
+  const [openCaixaInitialAmount, setOpenCaixaInitialAmount] = useState('');
+  const [loadingCashSession, setLoadingCashSession] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<'dinheiro' | 'pix' | 'cartao_debito' | 'cartao_credito' | 'boleto'>('dinheiro');
   const [currentSection, setCurrentSection] = useState<'pdv' | 'payment'>('pdv');
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
@@ -264,6 +268,99 @@ export default function PDVPage() {
   useEffect(() => {
     loadPendingSales();
   }, [loadPendingSales]);
+
+  // Obrigatório: verificar sessão de caixa aberta (abertura obrigatória todo dia)
+  useEffect(() => {
+    if (!tenant?.id) {
+      setLoadingCashSession(false);
+      return;
+    }
+    let cancelled = false;
+    const checkOpenSession = async () => {
+      try {
+        setLoadingCashSession(true);
+        const params = new URLSearchParams({ tenant_id: tenant.id, status: 'open' });
+        const res = await fetch(`/next_api/cash-sessions?${params.toString()}`);
+        if (cancelled) return;
+        if (!res.ok) {
+          setShowOpenCaixaModal(true);
+          setLoadingCashSession(false);
+          return;
+        }
+        const json = await res.json();
+        const data = Array.isArray(json?.data) ? json.data : [];
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const sessionToday = data.find((s: any) => {
+          const opened = s.opened_at ? new Date(s.opened_at) : null;
+          if (!opened) return false;
+          const openedStr = `${opened.getFullYear()}-${String(opened.getMonth() + 1).padStart(2, '0')}-${String(opened.getDate()).padStart(2, '0')}`;
+          const sameDay = openedStr === todayStr;
+          if (user?.id && s.user_id) return sameDay && String(s.user_id) === String(user.id);
+          return sameDay;
+        });
+        if (cancelled) return;
+        if (sessionToday) {
+          setCurrentCashSessionId(String(sessionToday.id));
+          setCaixaInicial(Number(sessionToday.initial_amount) || 0);
+          setShowOpenCaixaModal(false);
+        } else {
+          setShowOpenCaixaModal(true);
+        }
+      } catch (e) {
+        if (!cancelled) setShowOpenCaixaModal(true);
+      } finally {
+        if (!cancelled) setLoadingCashSession(false);
+      }
+    };
+    checkOpenSession();
+    return () => { cancelled = true; };
+  }, [tenant?.id, user?.id]);
+
+  const handleOpenCaixaConfirm = useCallback(async () => {
+    const initial = parseFloat(openCaixaInitialAmount.replace(',', '.')) || 0;
+    if (initial < 0) {
+      toast.error('Valor inicial deve ser maior ou igual a zero.');
+      return;
+    }
+    if (!tenant?.id) {
+      toast.error('Tenant não disponível.');
+      return;
+    }
+    try {
+      const body: Record<string, unknown> = {
+        tenant_id: tenant.id,
+        opened_at: new Date().toISOString(),
+        initial_amount: initial,
+        status: 'open',
+        register_id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `pdv-${Date.now()}`,
+      };
+      if (user?.id) body.user_id = String(user.id);
+      const res = await fetch('/next_api/cash-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err || 'Erro ao abrir caixa');
+      }
+      const json = await res.json();
+      const created = json?.data;
+      if (created?.id) {
+        setCurrentCashSessionId(String(created.id));
+        setCaixaInicial(initial);
+        setShowOpenCaixaModal(false);
+        setOpenCaixaInitialAmount('');
+        toast.success('Caixa aberto com sucesso. Bom trabalho!');
+      } else {
+        throw new Error('Resposta inválida');
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Erro ao abrir caixa');
+    }
+  }, [tenant?.id, user?.id, openCaixaInitialAmount]);
 
   const addSelectedToCart = useCallback(() => {
     if (!selectedProduct) return;
@@ -1127,31 +1224,47 @@ export default function PDVPage() {
     setShowCaixaDialog(true);
   }, []);
   
-  const executeCaixaOperation = useCallback((valor: number, descricao: string) => {
-    const operation: CaixaOperation = {
-      id: Date.now().toString(),
-      tipo: caixaOperationType,
-      valor,
-      descricao,
-      data: new Date().toISOString(),
-      usuario: user?.email || 'Operador',
-    };
-    
-    setCaixaOperations(prev => [operation, ...prev]);
-    
-    const messages = {
-      sangria: `Sangria de R$ ${valor.toFixed(2)} realizada`,
-      reforco: `Reforço de R$ ${valor.toFixed(2)} realizado`,
-      fechamento: `Fechamento do caixa realizado`,
-    };
-    
-    toast.success(messages[caixaOperationType], {
-      description: descricao,
-      duration: 4000,
-    });
-    
+  const executeCaixaOperation = useCallback(async (valor: number, descricao: string) => {
+    if (caixaOperationType === 'fechamento' && currentCashSessionId) {
+      try {
+        const res = await fetch(`/next_api/cash-sessions?id=${encodeURIComponent(currentCashSessionId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            closed_at: new Date().toISOString(),
+            closing_amount: valor,
+            status: 'closed',
+          }),
+        });
+        if (!res.ok) throw new Error('Erro ao fechar caixa na API');
+        setCurrentCashSessionId(null);
+        setCaixaInicial(0);
+        setCaixaOperations([]);
+        toast.success('Caixa fechado com sucesso. Abra o caixa amanhã para continuar.', { duration: 5000 });
+      } catch (e: any) {
+        console.error(e);
+        toast.error(e?.message || 'Erro ao fechar caixa');
+        return;
+      }
+    } else {
+      const operation: CaixaOperation = {
+        id: Date.now().toString(),
+        tipo: caixaOperationType,
+        valor,
+        descricao,
+        data: new Date().toISOString(),
+        usuario: user?.email || 'Operador',
+      };
+      setCaixaOperations(prev => [operation, ...prev]);
+      const messages = {
+        sangria: `Sangria de R$ ${valor.toFixed(2)} realizada`,
+        reforco: `Reforço de R$ ${valor.toFixed(2)} realizado`,
+        fechamento: `Fechamento do caixa realizado`,
+      };
+      toast.success(messages[caixaOperationType], { description: descricao, duration: 4000 });
+    }
     setShowCaixaDialog(false);
-  }, [caixaOperationType, user]);
+  }, [caixaOperationType, user, currentCashSessionId]);
 
   const menuGroups: MenuGroup[] = [
     {
@@ -1323,6 +1436,43 @@ export default function PDVPage() {
 
   return (
     <TenantPageWrapper>
+      {loadingCashSession && (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
+          <RefreshCw className="h-10 w-10 animate-spin" />
+          <p>Verificando sessão de caixa...</p>
+        </div>
+      )}
+      {!loadingCashSession && showOpenCaixaModal && (
+        <Dialog open={true} onOpenChange={() => {}}>
+          <DialogContent className="max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5" />
+                Abrir Caixa
+              </DialogTitle>
+              <DialogDescription>
+                É obrigatório abrir o caixa todo dia para usar o PDV. Informe o valor inicial em dinheiro.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <Label htmlFor="open-caixa-amount">Valor inicial (R$)</Label>
+              <Input
+                id="open-caixa-amount"
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
+                value={openCaixaInitialAmount}
+                onChange={(e) => setOpenCaixaInitialAmount(e.target.value.replace(/[^\d,.-]/g, '').replace(',', '.'))}
+              />
+              <Button className="w-full" onClick={handleOpenCaixaConfirm}>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Abrir Caixa
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+      {!loadingCashSession && !showOpenCaixaModal && (
       <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
         {/* Seleção de variação de preço agora é inline (abaixo do valor unitário) */}
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
@@ -1454,7 +1604,18 @@ export default function PDVPage() {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => router.push('/dashboard')}
+                onClick={() => {
+                  if (currentCashSessionId) {
+                    if (confirm('O caixa ainda está aberto. Deseja fechar o caixa antes de sair?')) {
+                      setCaixaOperationType('fechamento');
+                      setShowCaixaDialog(true);
+                    } else {
+                      router.push('/dashboard');
+                    }
+                  } else {
+                    router.push('/dashboard');
+                  }
+                }}
                 className="flex items-center gap-2"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -2642,6 +2803,7 @@ export default function PDVPage() {
         </DialogContent>
       </Dialog>
       </div>
+      )}
     </TenantPageWrapper>
   );
 }

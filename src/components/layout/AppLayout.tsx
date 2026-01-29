@@ -84,7 +84,8 @@ export function AppLayout({ children }: AppLayoutProps) {
     return trialProtectedPages.some((page) => pathname?.startsWith(page));
   }, [pathname]);
 
-  const isPDV = useMemo(() => pathname?.startsWith('/pdv') ?? false, [pathname]);
+  // Apenas a página do PDV (ponto de venda) fica sem sidebar; /pdv/caixas tem sidebar
+  const isPDVFullScreen = useMemo(() => pathname === '/pdv', [pathname]);
 
   if (shouldHideSidebar) {
     return <main className="min-h-screen w-full">{children}</main>;
@@ -96,7 +97,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   }
 
   if (!ENABLE_AUTH) {
-    if (isClient && isPDV) {
+    if (isClient && isPDVFullScreen) {
       return <main className="min-h-screen w-full">{children}</main>;
     }
 
@@ -146,7 +147,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     );
   }
 
-  if (isPDV) {
+  if (isPDVFullScreen) {
     return <main className="min-h-screen w-full">{children}</main>;
   }
 
