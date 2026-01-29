@@ -89,6 +89,7 @@ import { SaleConfirmationModal } from '@/components/pdv/SaleConfirmationModal';
 import { DeliveryQuickModal } from '@/components/pdv/DeliveryQuickModal';
 import { CashClosingModal, CashClosingData } from '@/components/pdv/CashClosingModal';
 import { CashClosingSuccessModal } from '@/components/pdv/CashClosingSuccessModal';
+import { CashOpeningModal, CashOpeningData } from '@/components/pdv/CashOpeningModal';
 import { getDeviceInfo, formatDeviceInfo } from '@/lib/cash-session-security';
 
 interface MenuItem {
@@ -171,7 +172,9 @@ export default function PDVPage() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [showCaixaDialog, setShowCaixaDialog] = useState(false);
+  const [showCashOpeningModal, setShowCashOpeningModal] = useState(false);
   const [showCashClosingModal, setShowCashClosingModal] = useState(false);
+  const [showCashOpeningModal, setShowCashOpeningModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [closingResult, setClosingResult] = useState<any>(null);
   const [caixaOperationType, setCaixaOperationType] = useState<'sangria' | 'reforco' | 'fechamento'>('sangria');
@@ -1182,6 +1185,96 @@ export default function PDVPage() {
     }).format(value);
   };
 
+  // Função para abrir modal de abertura de caixa
+  const handleAberturaCaixa = useCallback(() => {
+    // Verificar se já existe um caixa aberto
+    if (cashSessionId) {
+      toast.error('Já existe um caixa aberto!', {
+        description: `Aberto em ${new Date(cashSessionOpenedAt).toLocaleString('pt-BR')} por ${cashSessionOpenedBy}`,
+      });
+      return;
+    }
+    setShowCashOpeningModal(true);
+  }, [cashSessionId, cashSessionOpenedAt, cashSessionOpenedBy]);
+
+  // Função para salvar abertura de caixa na API
+  const handleCashOpening = useCallback(async (openingData: CashOpeningData) => {
+    try {
+      if (!tenant?.id) {
+        throw new Error('Tenant não disponível');
+      }
+
+      // Verificar novamente se não há caixa aberto
+      if (cashSessionId) {
+        throw new Error('Já existe um caixa aberto');
+      }
+
+      // Preparar dados para criar nova sessão
+      const openingPayload: any = {
+        register_id: '1', // ID do caixa/terminal
+        opened_at: new Date().toISOString(),
+        opening_amount: openingData.opening_amount,
+        opened_by: user?.email || user?.id?.toString() || 'Operador',
+        status: 'open',
+        tenant_id: tenant.id,
+        notes: openingData.notes,
+      };
+
+      // Adicionar user_id se for UUID válido
+      if (user?.id) {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(user.id)) {
+          openingPayload.user_id = user.id;
+        }
+      }
+
+      console.log('📤 Criando nova sessão de caixa:', openingPayload);
+
+      const response = await fetch('/next_api/cash-sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(openingPayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao abrir caixa');
+      }
+
+      const result = await response.json();
+      
+      if (result.data?.id) {
+        // Atualizar estados com a nova sessão
+        setCashSessionId(result.data.id);
+        setCashSessionOpenedAt(result.data.opened_at);
+        setCashSessionOpenedBy(result.data.opened_by);
+        setCaixaInicial(openingData.opening_amount);
+
+        // Registrar operação localmente
+        const operation: CaixaOperation = {
+          id: Date.now().toString(),
+          tipo: 'abertura',
+          valor: openingData.opening_amount,
+          descricao: `Abertura de caixa - Valor inicial: ${formatCurrency(openingData.opening_amount)}`,
+          data: new Date().toISOString(),
+          usuario: user?.email || 'Operador',
+        };
+        
+        setCaixaOperations(prev => [operation, ...prev]);
+
+        toast.success('Caixa aberto com sucesso!', {
+          description: `Valor inicial: ${formatCurrency(openingData.opening_amount)}`,
+          duration: 5000,
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao abrir caixa:', error);
+      throw error;
+    }
+  }, [tenant?.id, user, cashSessionId]);
+
   const handleFechamento = useCallback(() => {
     setShowCashClosingModal(true);
   }, []);
@@ -1788,6 +1881,15 @@ export default function PDVPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
                   <DropdownMenuLabel className="text-gray-900 dark:text-gray-100 font-semibold">Operações de Caixa</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+                  <DropdownMenuItem 
+                    onClick={handleAberturaCaixa} 
+                    className="cursor-pointer text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 focus:bg-green-50 dark:focus:bg-green-900/20"
+                    disabled={!!cashSessionId}
+                  >
+                    <Wallet className="mr-2 h-4 w-4 text-green-500" />
+                    <span>{cashSessionId ? 'Caixa Já Aberto' : 'Abrir Caixa'}</span>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
                   <DropdownMenuItem onClick={handleSangria} className="cursor-pointer text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800">
                     <MinusCircle className="mr-2 h-4 w-4 text-red-500" />
@@ -2862,6 +2964,25 @@ export default function PDVPage() {
       />
 
       {/* Modal de Fechamento de Caixa */}
+      {/* Modal de Abertura de Caixa */}
+      <CashOpeningModal
+        isOpen={showCashOpeningModal}
+        onClose={() => setShowCashOpeningModal(false)}
+        onConfirm={handleCashOpening}
+        operatorName={user?.email || user?.id?.toString() || 'Operador'}
+        hasOpenSession={!!cashSessionId}
+      />
+
+      {/* Modal de Fechamento de Caixa */}
+      {/* Modal de Abertura de Caixa */}
+      <CashOpeningModal
+        isOpen={showCashOpeningModal}
+        onClose={() => setShowCashOpeningModal(false)}
+        onConfirm={handleCashOpening}
+        operatorName={user?.email || user?.id?.toString() || 'Operador'}
+        existingOpenSession={!!cashSessionId}
+      />
+
       <CashClosingModal
         isOpen={showCashClosingModal}
         onClose={() => setShowCashClosingModal(false)}
