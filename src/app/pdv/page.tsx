@@ -650,7 +650,11 @@ export default function PDVPage() {
             
             // Carregar operações de caixa da sessão
             try {
-              const opsResponse = await fetch(`/next_api/cash-operations?tenant_id=${encodeURIComponent(tenant.id)}&cash_session_id=${encodeURIComponent(openSession.id)}`);
+              const sessionIdStr = typeof openSession.id === 'number' 
+                ? String(openSession.id) 
+                : String(openSession.id).trim();
+              
+              const opsResponse = await fetch(`/next_api/cash-operations?tenant_id=${encodeURIComponent(tenant.id)}&cash_session_id=${encodeURIComponent(sessionIdStr)}`);
               if (opsResponse.ok) {
                 const opsData = await opsResponse.json();
                 const operations = (opsData.data || []).map((op: any) => ({
@@ -1437,12 +1441,16 @@ export default function PDVPage() {
         // Salvar operação de abertura no banco (opcional, pois abertura já está na sessão)
         // Mas vamos salvar para manter histórico completo
         try {
+          const sessionIdStr = typeof result.data.id === 'number' 
+            ? String(result.data.id) 
+            : String(result.data.id).trim();
+          
           await fetch('/next_api/cash-operations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               tenant_id: tenant.id,
-              cash_session_id: result.data.id,
+              cash_session_id: sessionIdStr,
               user_id: user?.id || null,
               operation_type: 'abertura',
               amount: openingData.opening_amount,
@@ -1845,12 +1853,17 @@ export default function PDVPage() {
       // Salvar operação no banco de dados se houver sessão de caixa aberta
       if (currentCashSessionId && tenant?.id && (caixaOperationType === 'sangria' || caixaOperationType === 'reforco')) {
         try {
+          // Converter cashSessionId para string se necessário (pode ser number ou string)
+          const sessionIdStr = typeof currentCashSessionId === 'number' 
+            ? String(currentCashSessionId) 
+            : String(currentCashSessionId).trim();
+          
           const res = await fetch('/next_api/cash-operations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               tenant_id: tenant.id,
-              cash_session_id: currentCashSessionId,
+              cash_session_id: sessionIdStr,
               user_id: user?.id || null,
               operation_type: caixaOperationType,
               amount: valor,

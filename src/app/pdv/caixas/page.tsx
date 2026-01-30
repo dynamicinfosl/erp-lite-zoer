@@ -411,7 +411,11 @@ export default function CaixasPage() {
     // Buscar operações reais do banco de dados
     try {
       if (tenant?.id) {
-        const opsResponse = await fetch(`/next_api/cash-operations?tenant_id=${encodeURIComponent(tenant.id)}&cash_session_id=${encodeURIComponent(session.id)}`, {
+        const sessionIdStr = typeof session.id === 'number' 
+          ? String(session.id) 
+          : String(session.id).trim();
+        
+        const opsResponse = await fetch(`/next_api/cash-operations?tenant_id=${encodeURIComponent(tenant.id)}&cash_session_id=${encodeURIComponent(sessionIdStr)}`, {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',

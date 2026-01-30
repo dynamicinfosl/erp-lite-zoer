@@ -1,10 +1,32 @@
 -- Criar tabela para armazenar operações individuais de caixa (sangrias e reforços)
 -- Execute este script no Supabase SQL Editor
 
+-- Primeiro, garantir que cash_sessions tem tenant_id
+DO $$
+BEGIN
+  -- Verificar se a coluna tenant_id existe em cash_sessions
+  IF NOT EXISTS (
+    SELECT 1 
+    FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'cash_sessions' 
+    AND column_name = 'tenant_id'
+  ) THEN
+    -- Adicionar coluna tenant_id se não existir
+    ALTER TABLE public.cash_sessions 
+    ADD COLUMN tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE;
+    
+    RAISE NOTICE 'Coluna tenant_id adicionada à tabela cash_sessions';
+  ELSE
+    RAISE NOTICE 'Coluna tenant_id já existe em cash_sessions';
+  END IF;
+END $$;
+
+-- Criar tabela cash_operations
 CREATE TABLE IF NOT EXISTS public.cash_operations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  cash_session_id UUID NOT NULL REFERENCES public.cash_sessions(id) ON DELETE CASCADE,
+  cash_session_id BIGINT NOT NULL REFERENCES public.cash_sessions(id) ON DELETE CASCADE,
   user_id UUID,
   operation_type TEXT NOT NULL CHECK (operation_type IN ('sangria', 'reforco', 'abertura', 'fechamento')),
   amount DECIMAL(10,2) NOT NULL,
