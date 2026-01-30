@@ -159,13 +159,18 @@ export async function getUserPermissions(
 }
 
 /**
+ * Tipo para chaves de permissões booleanas (excluindo id, user_id, tenant_id)
+ */
+type PermissionKey = Exclude<keyof UserPermissions, 'id' | 'user_id' | 'tenant_id'>;
+
+/**
  * Verificar se usuário tem uma permissão específica
  * Se não tiver registro de permissões, verifica se é admin/owner (tem todas as permissões)
  */
 export async function checkPermission(
   userId: string,
   tenantId: string,
-  permission: keyof UserPermissions
+  permission: PermissionKey
 ): Promise<boolean> {
   try {
     // Verificar se é admin/owner (tem todas as permissões)
@@ -198,10 +203,12 @@ export async function checkPermission(
       }
 
       // Se for operador sem permissões configuradas, usar padrões restritivos
-      return DEFAULT_OPERATOR_PERMISSIONS[permission] ?? false;
+      const defaultValue = DEFAULT_OPERATOR_PERMISSIONS[permission];
+      return typeof defaultValue === 'boolean' ? defaultValue : false;
     }
 
-    return permissions[permission] ?? false;
+    const permissionValue = permissions[permission];
+    return typeof permissionValue === 'boolean' ? permissionValue : false;
   } catch (error) {
     console.error('[checkPermission] Erro:', error);
     return false; // Em caso de erro, negar acesso
