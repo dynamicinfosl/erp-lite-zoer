@@ -600,8 +600,17 @@ export default function PDVPage() {
         // Buscar sessão aberta
         const response = await fetch(`/next_api/cash-sessions?status=open&tenant_id=${encodeURIComponent(tenant.id)}`);
         if (response.ok) {
-          const data = await response.json();
-          const sessions = data.data || data.sales || [];
+          const json = await response.json();
+          // Respostas do backend podem vir como:
+          // - { success: true, data: { data: [...] } }  (createSuccessResponse)
+          // - { success: true, data: [...] }            (legacy)
+          // - { data: [...] }                           (legacy)
+          const sessions =
+            (Array.isArray(json?.data?.data) ? json.data.data : null) ??
+            (Array.isArray(json?.data) ? json.data : null) ??
+            (Array.isArray(json?.sales) ? json.sales : null) ??
+            (Array.isArray(json?.rows) ? json.rows : null) ??
+            [];
           const openSession = sessions.find((s: any) => s.status === 'open');
           
           if (openSession) {

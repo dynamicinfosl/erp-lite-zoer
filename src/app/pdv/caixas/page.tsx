@@ -65,8 +65,12 @@ export default function CaixasPage() {
       const res = await fetch(`/next_api/cash-sessions?${params.toString()}`);
       if (!res.ok) throw new Error('Erro ao carregar caixas');
       const json = await res.json();
-      const data = Array.isArray(json?.data) ? json.data : [];
-      setSessions(data);
+      const rows =
+        (Array.isArray(json?.data?.data) ? json.data.data : null) ??
+        (Array.isArray(json?.data) ? json.data : null) ??
+        (Array.isArray(json?.rows) ? json.rows : null) ??
+        [];
+      setSessions(rows);
     } catch (e) {
       console.error(e);
       toast.error('Erro ao carregar sessões de caixa');

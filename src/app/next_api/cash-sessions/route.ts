@@ -129,6 +129,12 @@ export const POST = async (request: NextRequest) => {
       if (isMissingColumnError(msg, "user_id")) delete payload.user_id;
       if (isMissingColumnError(msg, "register_id")) delete payload.register_id;
       if (isMissingColumnError(msg, "notes")) delete payload.notes;
+      // fallback: alguns schemas usam opening_amount em vez de initial_amount
+      if (isMissingColumnError(msg, "initial_amount")) {
+        // tentar gravar como opening_amount
+        (payload as any).opening_amount = (payload as any).initial_amount;
+        delete (payload as any).initial_amount;
+      }
 
       if (JSON.stringify(payload) === JSON.stringify(basePayload)) throw e;
 
