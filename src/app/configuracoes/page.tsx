@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -14,7 +14,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Plus, Search, Edit, Trash2, User, Settings, Shield, Key } from 'lucide-react';
 import { UserProfile, Category } from '@/types';
-import { api } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { useCouponSettings } from '@/hooks/useCouponSettings';
 
@@ -50,11 +49,19 @@ export default function ConfiguracoesPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const data = await api.get<UserProfile[]>('/user-profiles');
-      setUsers(data);
-    } catch (error) {
+      const res = await fetch('/next_api/user-profiles', {
+        cache: 'no-store',
+      });
+      const json = await res.json();
+      
+      if (!res.ok || !json.success) {
+        throw new Error(json.errorMessage || 'Erro ao carregar usuários');
+      }
+      
+      setUsers(json.data || []);
+    } catch (error: any) {
       console.error('Erro ao carregar usuários:', error);
-      toast.error('Erro ao carregar usuários');
+      toast.error(error.message || 'Erro ao carregar usuários');
     } finally {
       setLoading(false);
     }
@@ -62,10 +69,19 @@ export default function ConfiguracoesPage() {
 
   const fetchCategories = async () => {
     try {
-      const data = await api.get<Category[]>('/categories');
-      setCategories(data);
-    } catch (error) {
+      const res = await fetch('/next_api/categories', {
+        cache: 'no-store',
+      });
+      const json = await res.json();
+      
+      if (!res.ok || !json.success) {
+        throw new Error(json.errorMessage || 'Erro ao carregar categorias');
+      }
+      
+      setCategories(json.data || []);
+    } catch (error: any) {
       console.error('Erro ao carregar categorias:', error);
+      toast.error(error.message || 'Erro ao carregar categorias');
     }
   };
 
@@ -92,21 +108,55 @@ export default function ConfiguracoesPage() {
     }
 
     try {
-      if (editingUser) {
-        await api.put(`/user-profiles?id=${editingUser.id}`, userFormData);
-        toast.success('Usuário atualizado com sucesso');
-      } else {
-        await api.post('/user-profiles', userFormData);
-        toast.success('Usuário criado com sucesso');
+      const method = editingUser ? 'PUT' : 'POST';
+      const url = editingUser 
+        ? `/next_api/user-profiles?id=${editingUser.id}`
+        : '/next_api/user-profiles';
+      
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userFormData),
+      });
+      
+      const json = await res.json();
+      
+      if (!res.ok || !json.success) {
+        // Se for erro 410 (Gone), redirecionar para página correta
+        if (res.status === 410) {
+          toast.error('Esta funcionalidade foi movida. Redirecionando...', {
+            duration: 3000,
+          });
+          setTimeout(() => {
+            window.location.href = '/configuracoes/usuarios';
+          }, 2000);
+          return;
+        }
+        throw new Error(json.errorMessage || 'Erro ao salvar usuário');
       }
 
+      toast.success('Usuário salvo com sucesso');
       setShowUserDialog(false);
       setEditingUser(null);
       resetUserForm();
       fetchUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar usuário:', error);
-      toast.error('Erro ao salvar usuário');
+      
+      // Se o erro mencionar usar outra página, mostrar mensagem especial
+      if (error.message?.includes('Use a página') || error.message?.includes('foi movida')) {
+        toast.error(error.message, {
+          duration: 5000,
+          action: {
+            label: 'Ir para Usuários',
+            onClick: () => {
+              window.location.href = '/configuracoes/usuarios';
+            },
+          },
+        });
+      } else {
+        toast.error(error.message || 'Erro ao salvar usuário');
+      }
     }
   };
 
@@ -119,21 +169,31 @@ export default function ConfiguracoesPage() {
     }
 
     try {
-      if (editingCategory) {
-        await api.put(`/categories?id=${editingCategory.id}`, categoryFormData);
-        toast.success('Categoria atualizada com sucesso');
-      } else {
-        await api.post('/categories', categoryFormData);
-        toast.success('Categoria criada com sucesso');
+      const method = editingCategory ? 'PUT' : 'POST';
+      const url = editingCategory 
+        ? `/next_api/categories?id=${editingCategory.id}`
+        : '/next_api/categories';
+      
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(categoryFormData),
+      });
+      
+      const json = await res.json();
+      
+      if (!res.ok || !json.success) {
+        throw new Error(json.errorMessage || 'Erro ao salvar categoria');
       }
 
+      toast.success(editingCategory ? 'Categoria atualizada com sucesso' : 'Categoria criada com sucesso');
       setShowCategoryDialog(false);
       setEditingCategory(null);
       resetCategoryForm();
       fetchCategories();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar categoria:', error);
-      toast.error('Erro ao salvar categoria');
+      toast.error(error.message || 'Erro ao salvar categoria');
     }
   };
 
@@ -163,12 +223,21 @@ export default function ConfiguracoesPage() {
     if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
 
     try {
-      await api.delete(`/user-profiles?id=${id}`);
+      const res = await fetch(`/next_api/user-profiles?id=${id}`, {
+        method: 'DELETE',
+      });
+      
+      const json = await res.json();
+      
+      if (!res.ok || !json.success) {
+        throw new Error(json.errorMessage || 'Erro ao excluir usuário');
+      }
+
       toast.success('Usuário excluído com sucesso');
       fetchUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao excluir usuário:', error);
-      toast.error('Erro ao excluir usuário');
+      toast.error(error.message || 'Erro ao excluir usuário');
     }
   };
 
@@ -176,12 +245,21 @@ export default function ConfiguracoesPage() {
     if (!confirm('Tem certeza que deseja excluir esta categoria?')) return;
 
     try {
-      await api.delete(`/categories?id=${id}`);
+      const res = await fetch(`/next_api/categories?id=${id}`, {
+        method: 'DELETE',
+      });
+      
+      const json = await res.json();
+      
+      if (!res.ok || !json.success) {
+        throw new Error(json.errorMessage || 'Erro ao excluir categoria');
+      }
+
       toast.success('Categoria excluída com sucesso');
       fetchCategories();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao excluir categoria:', error);
-      toast.error('Erro ao excluir categoria');
+      toast.error(error.message || 'Erro ao excluir categoria');
     }
   };
 
@@ -251,6 +329,13 @@ export default function ConfiguracoesPage() {
                   <DialogTitle>
                     {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
                   </DialogTitle>
+                  <DialogDescription className="text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md border border-yellow-200 dark:border-yellow-800 mt-2">
+                    ⚠️ <strong>Atenção:</strong> Esta página gerencia perfis antigos do sistema. Para criar usuários do tenant (Admin/Operador) com permissões, use a página{' '}
+                    <a href="/configuracoes/usuarios" className="underline font-semibold hover:text-yellow-800 dark:hover:text-yellow-300">
+                      Usuários do Sistema
+                    </a>
+                    .
+                  </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleUserSubmit} className="space-y-4">
                   <div className="space-y-2">

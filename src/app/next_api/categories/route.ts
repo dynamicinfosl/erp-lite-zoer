@@ -38,9 +38,9 @@ export const GET = requestMiddleware(async (request: NextRequest, context) => {
       status: 500,
     });
   }
-}, true);
+}, false); // Não requer token, usa service role
 
-// POST - criar categoria
+// POST - criar categoria (não requer token, usa service role)
 export const POST = requestMiddleware(async (request: NextRequest, context) => {
   try {
     const body = await validateRequestBody(request);
@@ -78,9 +78,9 @@ export const POST = requestMiddleware(async (request: NextRequest, context) => {
       status: 500,
     });
   }
-}, true);
+}, false); // Não requer token, usa service role
 
-// PUT - atualizar categoria
+// PUT - atualizar categoria (não requer token, usa service role)
 export const PUT = requestMiddleware(async (request: NextRequest, context) => {
   try {
     const { id } = parseQueryParams(request);
@@ -136,9 +136,9 @@ export const PUT = requestMiddleware(async (request: NextRequest, context) => {
       status: 500,
     });
   }
-}, true);
+}, false); // Não requer token, usa service role
 
-// DELETE - excluir categoria
+// DELETE - excluir categoria (não requer token, usa service role)
 export const DELETE = requestMiddleware(async (request: NextRequest, context) => {
   try {
     const { id } = parseQueryParams(request);
@@ -186,4 +186,4 @@ export const DELETE = requestMiddleware(async (request: NextRequest, context) =>
       status: 500,
     });
   }
-}, true);
+}, false); // Não requer token, usa service role

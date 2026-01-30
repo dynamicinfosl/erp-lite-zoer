@@ -62,7 +62,7 @@ function handleSchemaCacheError(
   return { handled: true, missingColumn };
 }
 
-// GET - buscar perfis de usuário
+// GET - buscar perfis de usuário (não requer token, usa service role)
 export const GET = requestMiddleware(async (request: NextRequest, context) => {
   try {
     console.log('🔍 GET /user-profiles - Iniciando busca...');
@@ -117,9 +117,9 @@ export const GET = requestMiddleware(async (request: NextRequest, context) => {
       status: 500,
     });
   }
-}, true);
+}, false); // Não requer token, usa service role
 
-// POST - criar perfil de usuário
+// POST - criar perfil de usuário (não requer token, usa service role)
 export const POST = requestMiddleware(async (request: NextRequest, context) => {
   try {
     const body = await validateRequestBody(request);
@@ -144,7 +144,32 @@ export const POST = requestMiddleware(async (request: NextRequest, context) => {
       });
     }
 
-    // Criar usuário
+    // IMPORTANTE: Esta rota está DEPRECATED
+    // Use /next_api/tenant-users para criar usuários do tenant
+    // Esta rota tenta criar na tabela 'users' antiga que pode não existir mais
+    
+    // Verificar se a tabela 'users' existe (sistema legado)
+    // Se não existir, retornar erro informando para usar a rota correta
+    try {
+      const { error: checkError } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .limit(1);
+      
+      if (checkError && checkError.message?.includes('does not exist')) {
+        return createErrorResponse({
+          errorMessage: "Esta funcionalidade foi movida. Use a página 'Usuários' em Configurações para criar usuários do sistema.",
+          status: 410, // Gone - recurso não está mais disponível
+        });
+      }
+    } catch (checkErr) {
+      return createErrorResponse({
+        errorMessage: "Esta funcionalidade foi movida. Use a página 'Usuários' em Configurações para criar usuários do sistema.",
+        status: 410,
+      });
+    }
+
+    // Criar usuário (código legado - pode não funcionar)
     const userData = {
       email: body.email,
       password: body.password, // Deveria ser hasheada
@@ -159,7 +184,10 @@ export const POST = requestMiddleware(async (request: NextRequest, context) => {
 
     if (userError) {
       console.error('❌ Erro ao criar usuário no Supabase:', userError);
-      throw userError;
+      return createErrorResponse({
+        errorMessage: `Erro ao criar usuário: ${userError.message}. Use a página 'Usuários' em Configurações para criar usuários do sistema.`,
+        status: 500,
+      });
     }
 
     // Criar perfil
@@ -179,20 +207,43 @@ export const POST = requestMiddleware(async (request: NextRequest, context) => {
 
     if (profileError) {
       console.error('❌ Erro ao criar perfil no Supabase:', profileError);
-      throw profileError;
+      
+      // Se o erro for relacionado à tabela users não existir
+      if (profileError.message?.includes('does not exist') || profileError.code === '42P01') {
+        return createErrorResponse({
+          errorMessage: "Esta funcionalidade foi movida. Use a página 'Usuários' em Configurações para criar usuários do sistema.",
+          status: 410, // Gone
+        });
+      }
+      
+      return createErrorResponse({
+        errorMessage: `Erro ao criar perfil: ${profileError.message}. Use a página 'Usuários' em Configurações para criar usuários do sistema.`,
+        status: 500,
+      });
     }
 
     return createSuccessResponse(profile, 201);
   } catch (error) {
     console.error('❌ Erro ao criar perfil:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    
+    // Verificar se é erro de tabela não existir
+    if (errorMessage.includes('does not exist') || errorMessage.includes('42P01')) {
+      return createErrorResponse({
+        errorMessage: "Esta funcionalidade foi movida. Use a página 'Usuários' em Configurações para criar usuários do sistema.",
+        status: 410,
+      });
+    }
+    
     return createErrorResponse({
-      errorMessage: `Erro ao criar perfil de usuário: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+      errorMessage: `Erro ao criar perfil de usuário: ${errorMessage}. Use a página 'Usuários' em Configurações para criar usuários do sistema.`,
       status: 500,
     });
   }
-}, true);
+}, false); // Não requer token, usa service role
 
-// PUT - atualizar perfil de usuário
+// PUT - atualizar perfil de usuário (não requer token, usa service role)
 export const PUT = requestMiddleware(async (request, context) => {
   try {
     const body = await validateRequestBody(request);
@@ -413,9 +464,9 @@ export const PUT = requestMiddleware(async (request, context) => {
       status: 500,
     });
   }
-}, true);
+}, false); // Não requer token, usa service role
 
-// DELETE - excluir perfil de usuário
+// DELETE - excluir perfil de usuário (não requer token, usa service role)
 export const DELETE = requestMiddleware(async (request: NextRequest, context) => {
   try {
     const { id } = parseQueryParams(request);
@@ -463,4 +514,4 @@ export const DELETE = requestMiddleware(async (request: NextRequest, context) =>
       status: 500,
     });
   }
-}, true);
+}, false); // Não requer token, usa service role

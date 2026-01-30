@@ -22,10 +22,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Edit, Trash2, UserPlus, Users, Building2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, UserPlus, Users, Building2, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { useBranch } from '@/contexts/BranchContext';
+import { UserPermissionsEditor } from '@/components/admin/UserPermissionsEditor';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,8 +57,10 @@ export default function TenantUsersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showDialog, setShowDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showPermissionsDialog, setShowPermissionsDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState<TenantUser | null>(null);
   const [editingUser, setEditingUser] = useState<TenantUser | null>(null);
+  const [permissionsUser, setPermissionsUser] = useState<TenantUser | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -70,8 +74,17 @@ export default function TenantUsersPage() {
 
     try {
       setLoading(true);
+      // Adicionar timestamp para evitar cache
+      const timestamp = Date.now();
       const res = await fetch(
-        `/next_api/tenant-users?tenant_id=${encodeURIComponent(tenant.id)}&user_id=${encodeURIComponent(user.id)}`,
+        `/next_api/tenant-users?tenant_id=${encodeURIComponent(tenant.id)}&user_id=${encodeURIComponent(user.id)}&_t=${timestamp}`,
+        {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
+        }
       );
       const json = await res.json();
 
@@ -79,7 +92,13 @@ export default function TenantUsersPage() {
         throw new Error(json.error || 'Erro ao carregar usuários');
       }
 
-      setUsers(json.data || []);
+      const usersData = json.data || [];
+      console.log('[loadUsers] Usuários carregados:', usersData.map((u: TenantUser) => ({
+        email: u.email,
+        role: u.role,
+        name: u.name
+      })));
+      setUsers(usersData);
     } catch (error: any) {
       console.error('Erro ao carregar usuários:', error);
       toast.error(error.message || 'Erro ao carregar usuários');
@@ -95,12 +114,20 @@ export default function TenantUsersPage() {
   const handleOpenDialog = (user?: TenantUser) => {
     if (user) {
       setEditingUser(user);
+      // Mapear role corretamente: se for 'member' (operador), manter como 'member'
+      // Se for 'owner', não pode editar, mas se for 'admin', pode mudar para 'member'
+      const mappedRole = user.role === 'owner' ? 'admin' : user.role;
       setFormData({
         email: user.email,
         password: '',
         name: user.name || '',
-        role: user.role === 'owner' ? 'admin' : user.role,
+        role: mappedRole as 'admin' | 'member',
         branch_ids: user.branches.map((b) => b.branch_id),
+      });
+      console.log('[handleOpenDialog] Usuário selecionado:', {
+        email: user.email,
+        role_original: user.role,
+        role_mapeado: mappedRole
       });
     } else {
       setEditingUser(null);
@@ -108,7 +135,7 @@ export default function TenantUsersPage() {
         email: '',
         password: '',
         name: '',
-        role: 'member',
+        role: 'member', // Padrão: Operador
         branch_ids: [],
       });
     }
@@ -163,7 +190,12 @@ export default function TenantUsersPage() {
           throw new Error(json.error || 'Erro ao atualizar usuário');
         }
 
-        toast.success('Usuário atualizado com sucesso');
+        console.log('[handleSubmit] Usuário atualizado:', {
+          role_enviado: formData.role,
+          resposta: json
+        });
+
+        toast.success(`Usuário atualizado para ${formData.role === 'member' ? 'Operador' : 'Admin'}!`);
       } else {
         // Criar
         if (!user?.id) {
@@ -188,10 +220,16 @@ export default function TenantUsersPage() {
           throw new Error(json.error || 'Erro ao criar usuário');
         }
 
-        toast.success('Usuário criado com sucesso');
+        console.log('[handleSubmit] Usuário criado:', {
+          role_enviado: formData.role,
+          resposta: json
+        });
+
+        toast.success(`Usuário ${formData.role === 'member' ? 'Operador' : 'Admin'} criado com sucesso!`);
       }
 
       handleCloseDialog();
+      // Forçar reload sem cache
       await loadUsers();
     } catch (error: any) {
       console.error('Erro ao salvar usuário:', error);
@@ -342,6 +380,22 @@ export default function TenantUsersPage() {
                             <Edit className="h-4 w-4" />
                             Editar
                           </Button>
+                          {/* Botão Permissões: aparece para todos exceto owners */}
+                          {user.role !== 'owner' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setPermissionsUser(user);
+                                setShowPermissionsDialog(true);
+                              }}
+                              className="gap-1"
+                              title="Configurar permissões"
+                            >
+                              <Settings className="h-4 w-4" />
+                              Permissões
+                            </Button>
+                          )}
                           {user.role !== 'owner' && (
                             <Button
                               variant="ghost"
@@ -365,7 +419,7 @@ export default function TenantUsersPage() {
       </Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingUser ? 'Editar Usuário' : 'Novo Usuário'}</DialogTitle>
             <DialogDescription>
@@ -374,7 +428,126 @@ export default function TenantUsersPage() {
                 : 'Crie um novo usuário para acessar o sistema'}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {editingUser && editingUser.role === 'member' ? (
+            <Tabs defaultValue="info" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="info">Informações</TabsTrigger>
+                <TabsTrigger value="permissions">Permissões</TabsTrigger>
+              </TabsList>
+              <TabsContent value="info" className="mt-4">
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="name">Nome *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="email">Email *</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        required
+                        disabled={!!editingUser}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="role">Perfil *</Label>
+                    <Select
+                      value={formData.role}
+                      onValueChange={(value: 'admin' | 'member') =>
+                        setFormData({ ...formData, role: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="member">Operador</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {branchesEnabled && branches.length > 0 && (
+                    <div>
+                      <Label>Filiais (opcional)</Label>
+                      <div className="space-y-2 mt-2 max-h-48 overflow-y-auto border rounded-md p-3">
+                        {branches.map((branch) => (
+                          <div key={branch.id} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`branch-${branch.id}`}
+                              checked={formData.branch_ids.includes(branch.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setFormData({
+                                    ...formData,
+                                    branch_ids: [...formData.branch_ids, branch.id],
+                                  });
+                                } else {
+                                  setFormData({
+                                    ...formData,
+                                    branch_ids: formData.branch_ids.filter((id) => id !== branch.id),
+                                  });
+                                }
+                              }}
+                              className="rounded border-gray-300"
+                            />
+                            <label
+                              htmlFor={`branch-${branch.id}`}
+                              className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                            >
+                              <Building2 className="h-4 w-4" />
+                              {branch.name}
+                              {branch.is_headquarters && (
+                                <Badge variant="outline" className="text-xs">
+                                  Matriz
+                                </Badge>
+                              )}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Se nenhuma filial for selecionada, o usuário terá acesso à Matriz
+                      </p>
+                    </div>
+                  )}
+
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit">{editingUser ? 'Atualizar' : 'Criar'}</Button>
+                  </DialogFooter>
+                </form>
+              </TabsContent>
+              <TabsContent value="permissions" className="mt-4">
+                {editingUser && tenant?.id && user?.id && (
+                  <UserPermissionsEditor
+                    userId={editingUser.id}
+                    tenantId={tenant.id}
+                    currentUserId={user.id}
+                    userName={editingUser.name}
+                    userEmail={editingUser.email}
+                    onSave={() => {
+                      toast.success('Permissões atualizadas!');
+                    }}
+                  />
+                )}
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="name">Nome *</Label>
@@ -476,13 +649,38 @@ export default function TenantUsersPage() {
               </div>
             )}
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                Cancelar
-              </Button>
-              <Button type="submit">{editingUser ? 'Atualizar' : 'Criar'}</Button>
-            </DialogFooter>
-          </form>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                  Cancelar
+                </Button>
+                <Button type="submit">{editingUser ? 'Atualizar' : 'Criar'}</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Permissões */}
+      <Dialog open={showPermissionsDialog} onOpenChange={setShowPermissionsDialog}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Permissões de Acesso</DialogTitle>
+            <DialogDescription>
+              Configure as permissões de {permissionsUser?.name || permissionsUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          {permissionsUser && tenant?.id && user?.id && (
+            <UserPermissionsEditor
+              userId={permissionsUser.id}
+              tenantId={tenant.id}
+              currentUserId={user.id}
+              userName={permissionsUser.name}
+              userEmail={permissionsUser.email}
+              onSave={() => {
+                setShowPermissionsDialog(false);
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

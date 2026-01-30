@@ -291,6 +291,7 @@ export default function PDVPage() {
       try {
         setLoadingCashSession(true);
         const params = new URLSearchParams({ tenant_id: tenant.id, status: 'open' });
+        if (user?.id) params.set('user_id', String(user.id));
         const res = await fetch(`/next_api/cash-sessions?${params.toString()}`);
         if (cancelled) return;
         if (!res.ok) {
@@ -300,21 +301,20 @@ export default function PDVPage() {
         }
         const json = await res.json();
         const data = Array.isArray(json?.data) ? json.data : [];
-        const today = new Date();
-        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        const sessionToday = data.find((s: any) => {
-          const opened = s.opened_at ? new Date(s.opened_at) : null;
-          if (!opened) return false;
-          const openedStr = `${opened.getFullYear()}-${String(opened.getMonth() + 1).padStart(2, '0')}-${String(opened.getDate()).padStart(2, '0')}`;
-          const sameDay = openedStr === todayStr;
-          if (user?.id && s.user_id) return sameDay && String(s.user_id) === String(user.id);
-          return sameDay;
-        });
+        // Reutilizar sessão já aberta do usuário (só pode haver 1 caixa aberto por usuário)
+        const sessionOpen = data.find((s: any) => !user?.id || String(s.user_id) === String(user.id)) ?? (data[0] ?? null);
         if (cancelled) return;
-        if (sessionToday) {
-          setCurrentCashSessionId(String(sessionToday.id));
-          setCaixaInicial(Number(sessionToday.initial_amount) || 0);
+        if (sessionOpen) {
+          setCurrentCashSessionId(String(sessionOpen.id));
+          setCaixaInicial(Number(sessionOpen.opening_amount ?? sessionOpen.initial_amount) || 0);
+          setCashSessionOpenedAt(sessionOpen.opened_at || new Date().toISOString());
+          setCashSessionOpenedBy(sessionOpen.opened_by || 'Operador');
           setShowOpenCaixaModal(false);
+          console.log('✅ Sessão de caixa carregada:', {
+            id: sessionOpen.id,
+            opened_at: sessionOpen.opened_at,
+            opened_by: sessionOpen.opened_by
+          });
         } else {
           setShowOpenCaixaModal(true);
         }
@@ -345,6 +345,7 @@ export default function PDVPage() {
         initial_amount: initial,
         status: 'open',
         register_id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `pdv-${Date.now()}`,
+        opened_by: user?.email || (user?.id ? String(user.id) : null) || 'Operador',
       };
       if (user?.id) body.user_id = String(user.id);
       const res = await fetch('/next_api/cash-sessions', {
@@ -353,17 +354,29 @@ export default function PDVPage() {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const err = await res.text();
-        throw new Error(err || 'Erro ao abrir caixa');
+        const errText = await res.text();
+        let msg = errText;
+        try {
+          const j = JSON.parse(errText);
+          if (j?.errorMessage) msg = j.errorMessage;
+        } catch (_) {}
+        throw new Error(msg || 'Erro ao abrir caixa');
       }
       const json = await res.json();
       const created = json?.data;
       if (created?.id) {
         setCurrentCashSessionId(String(created.id));
         setCaixaInicial(initial);
+        setCashSessionOpenedAt(created.opened_at || new Date().toISOString());
+        setCashSessionOpenedBy(created.opened_by || user?.email || 'Operador');
         setShowOpenCaixaModal(false);
         setOpenCaixaInitialAmount('');
         toast.success('Caixa aberto com sucesso. Bom trabalho!');
+        console.log('✅ Nova sessão criada:', {
+          id: created.id,
+          opened_at: created.opened_at,
+          opened_by: created.opened_by
+        });
       } else {
         throw new Error('Resposta inválida');
       }
@@ -538,7 +551,13 @@ export default function PDVPage() {
         console.log('🔍 [PDV] Data/hora atual:', new Date().toISOString());
         
         console.log('📤 [PDV] Iniciando requisição fetch...');
-        const response = await fetch(url);
+        const response = await fetch(url, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
+        });
         console.log('📥 [PDV] Resposta recebida!');
         
         console.log('📥 [PDV] Status da resposta:', response.status, response.statusText);
@@ -1078,7 +1097,22 @@ export default function PDVPage() {
         forma_pagamento: paymentMethod,
         data_venda: savedSaleData.created_at || new Date().toISOString(),
         status: 'paga',
+        created_at: savedSaleData.created_at || new Date().toISOString(),
+        itens: cart.map(item => ({
+          produto: item.name,
+          quantidade: item.quantity,
+          preco_unitario: item.price,
+          subtotal: calculateItemTotal(item)
+        }))
       };
+      
+      console.log('📦 Venda local criada:', {
+        id: localSaleData.id,
+        numero: localSaleData.numero,
+        created_at: localSaleData.created_at,
+        total: localSaleData.total,
+        status: localSaleData.status
+      });
       
       // Adicionar venda ao histórico local
       setTodaySales(prev => {
@@ -1390,10 +1424,45 @@ export default function PDVPage() {
       if (!tenant?.id) {
         throw new Error('Tenant não disponível');
       }
+      
+      if (!currentCashSessionId) {
+        throw new Error('Nenhuma sessão de caixa aberta');
+      }
 
-      // Calcular valores esperados
-      const vendasPagas = todaySales.filter(s => s.status === 'paga');
-      const vendasPorMetodo = vendasPagas.reduce((acc, venda) => {
+      // FILTRAR apenas as vendas da sessão atual (após a abertura do caixa)
+      const sessionOpenedAt = cashSessionOpenedAt ? new Date(cashSessionOpenedAt) : null;
+      
+      console.log('🔍 Debug filtro de vendas:', {
+        cashSessionOpenedAt,
+        sessionOpenedAtParsed: sessionOpenedAt,
+        totalVendasDia: todaySales.length,
+        vendasComData: todaySales.filter(s => s.created_at).length,
+        vendasPagas: todaySales.filter(s => s.status === 'paga').length
+      });
+      
+      const vendasDaSessao = sessionOpenedAt 
+        ? todaySales.filter(s => {
+            if (s.status !== 'paga') return false;
+            if (!s.created_at) {
+              console.warn('⚠️ Venda sem created_at:', s.numero);
+              return false; // Ignorar vendas sem data
+            }
+            const saleDate = new Date(s.created_at);
+            const isAfterOpen = saleDate >= sessionOpenedAt;
+            if (!isAfterOpen) {
+              console.log(`❌ Venda ${s.numero} ANTES da abertura:`, {
+                vendaEm: saleDate.toISOString(),
+                aberturaEm: sessionOpenedAt.toISOString()
+              });
+            }
+            return isAfterOpen;
+          })
+        : todaySales.filter(s => s.status === 'paga');
+      
+      console.log(`📊 Vendas da sessão atual: ${vendasDaSessao.length} de ${todaySales.length} vendas do dia`);
+
+      // Calcular valores esperados APENAS das vendas da sessão
+      const vendasPorMetodo = vendasDaSessao.reduce((acc, venda) => {
         const metodo = venda.forma_pagamento || 'dinheiro';
         if (!acc[metodo]) {
           acc[metodo] = 0;
@@ -1451,8 +1520,8 @@ export default function PDVPage() {
         difference_card_credit: differenceCardCredit,
         difference_pix: differencePix,
         difference_other: differenceOther,
-        total_sales: vendasPagas.length,
-        total_sales_amount: vendasPagas.reduce((sum, v) => sum + v.total, 0),
+        total_sales: vendasDaSessao.length,
+        total_sales_amount: vendasDaSessao.reduce((sum, v) => sum + v.total, 0),
         total_withdrawals: caixaOperations.filter(op => op.tipo === 'sangria').length,
         total_withdrawals_amount: totalSangrias,
         total_supplies: caixaOperations.filter(op => op.tipo === 'reforco').length,
@@ -1465,7 +1534,7 @@ export default function PDVPage() {
       };
 
       // Se já existe uma sessão de caixa aberta, atualizar
-      if (cashSessionId) {
+      if (currentCashSessionId) {
         const updatePayload: any = {
           ...closingPayload,
           tenant_id: tenant.id,
@@ -1490,17 +1559,20 @@ export default function PDVPage() {
 
         console.log('📤 Payload final para atualizar sessão:', JSON.stringify(updatePayload, null, 2));
 
-        const response = await fetch(`/next_api/cash-sessions?id=${cashSessionId}`, {
+        const sessionIdForUrl = String(currentCashSessionId).trim();
+        const response = await fetch(`/next_api/cash-sessions?id=${encodeURIComponent(sessionIdForUrl)}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(updatePayload),
+          cache: 'no-store',
         });
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || 'Erro ao fechar sessão de caixa');
+          const msg = errorData.errorMessage || errorData.error || errorData.details || 'Erro ao fechar sessão de caixa';
+          throw new Error(typeof msg === 'string' ? msg : 'Erro ao fechar sessão de caixa');
         }
       } else {
         // Criar nova sessão de caixa (caso não exista)
@@ -1598,7 +1670,7 @@ export default function PDVPage() {
 
       // Preparar dados para o modal de sucesso
       const successData = {
-        id: cashSessionId || 0,
+        id: currentCashSessionId || '',
         register_id: '1',
         opened_at: cashSessionOpenedAt || new Date().toISOString(),
         closed_at: closedAtTime,
@@ -1627,8 +1699,8 @@ export default function PDVPage() {
           other: differenceOther,
           total: totalDifference,
         },
-        total_sales: vendasPagas.length,
-        total_sales_amount: vendasPagas.reduce((sum, v) => sum + v.total, 0),
+        total_sales: vendasDaSessao.length,
+        total_sales_amount: vendasDaSessao.reduce((sum, v) => sum + v.total, 0),
         notes: closingData.notes,
         difference_reason: closingData.difference_reason,
       };
@@ -1638,7 +1710,7 @@ export default function PDVPage() {
         id: Date.now().toString(),
         tipo: 'fechamento',
         valor: totalDifference,
-        descricao: `Fechamento - ${vendasPagas.length} vendas - Diferença: ${formatCurrency(totalDifference)}`,
+        descricao: `Fechamento - ${vendasDaSessao.length} vendas - Diferença: ${formatCurrency(totalDifference)}`,
         data: new Date().toISOString(),
         usuario: user?.email || 'Operador',
       };
@@ -1654,7 +1726,7 @@ export default function PDVPage() {
       console.error('Erro ao fechar caixa:', error);
       throw error;
     }
-  }, [tenant?.id, todaySales, caixaInicial, caixaOperations, cashSessionId, cashSessionOpenedAt, cashSessionOpenedBy, user]);
+  }, [tenant?.id, todaySales, caixaInicial, caixaOperations, currentCashSessionId, cashSessionOpenedAt, cashSessionOpenedBy, user]);
 
   // Função para fechar o modal de sucesso e limpar os dados
   const handleCloseSuccessModal = useCallback(() => {
@@ -1664,6 +1736,11 @@ export default function PDVPage() {
     // Resetar caixa inicial para próximo período
     setCaixaInicial(0);
     setTodaySales([]);
+    setCurrentCashSessionId(null);
+    setCashSessionId(null);
+    setCashSessionOpenedAt('');
+    setCashSessionOpenedBy('');
+    setCaixaOperations([]);
     
     // Limpar localStorage de vendas do dia
     try {
@@ -1681,7 +1758,8 @@ export default function PDVPage() {
   const executeCaixaOperation = useCallback(async (valor: number, descricao: string) => {
     if (caixaOperationType === 'fechamento' && currentCashSessionId) {
       try {
-        const res = await fetch(`/next_api/cash-sessions?id=${encodeURIComponent(currentCashSessionId)}`, {
+        const sessionIdForUrl = typeof currentCashSessionId === 'number' ? currentCashSessionId : String(currentCashSessionId).trim();
+        const res = await fetch(`/next_api/cash-sessions?id=${encodeURIComponent(sessionIdForUrl)}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1689,8 +1767,17 @@ export default function PDVPage() {
             closing_amount: valor,
             status: 'closed',
           }),
+          cache: 'no-store',
         });
-        if (!res.ok) throw new Error('Erro ao fechar caixa na API');
+        if (!res.ok) {
+          const errText = await res.text();
+          let msg = 'Erro ao fechar caixa na API';
+          try {
+            const j = JSON.parse(errText);
+            if (j?.errorMessage) msg = j.errorMessage;
+          } catch (_) {}
+          throw new Error(msg);
+        }
         setCurrentCashSessionId(null);
         setCaixaInicial(0);
         setCaixaOperations([]);
@@ -1865,6 +1952,52 @@ export default function PDVPage() {
       setLastSaleData(null);
     }
   }, [showConfirmationModal, lastSaleData, clearCart]);
+
+  // Filtrar vendas da sessão atual (para o modal de fechamento)
+  const filteredSalesForClosing = React.useMemo(() => {
+    const sessionOpenedAt = cashSessionOpenedAt ? new Date(cashSessionOpenedAt) : null;
+    
+    console.log('🔍 Filtro de vendas para fechamento:', {
+      cashSessionOpenedAt,
+      sessionOpenedAtParsed: sessionOpenedAt,
+      totalVendasHoje: todaySales.length,
+      vendasComData: todaySales.filter(s => s.created_at).length,
+      vendasPagas: todaySales.filter(s => s.status === 'paga').length,
+      primeiraVenda: todaySales[0] ? {
+        numero: todaySales[0].numero,
+        created_at: todaySales[0].created_at,
+        status: todaySales[0].status
+      } : null
+    });
+    
+    if (!sessionOpenedAt) {
+      console.warn('⚠️ Sem data de abertura do caixa, mostrando todas as vendas pagas');
+      return todaySales.filter(s => s.status === 'paga');
+    }
+    
+    const filtered = todaySales.filter(s => {
+      if (s.status !== 'paga') return false;
+      if (!s.created_at) {
+        console.warn('⚠️ Venda sem created_at:', s.numero);
+        return false;
+      }
+      const saleDate = new Date(s.created_at);
+      const isAfter = saleDate >= sessionOpenedAt;
+      
+      if (!isAfter) {
+        console.log(`❌ Venda ${s.numero} ANTES da abertura:`, {
+          vendaEm: saleDate.toISOString(),
+          aberturaEm: sessionOpenedAt.toISOString(),
+          diferenca: (sessionOpenedAt.getTime() - saleDate.getTime()) / 1000 / 60 + ' minutos'
+        });
+      }
+      
+      return isAfter;
+    });
+    
+    console.log(`✅ Vendas filtradas: ${filtered.length} de ${todaySales.length}`);
+    return filtered;
+  }, [todaySales, cashSessionOpenedAt]);
 
   // Se estiver na seção de pagamento, mostrar apenas ela
   if (currentSection === 'payment') {
@@ -2653,7 +2786,7 @@ export default function PDVPage() {
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold flex items-center gap-2">
                   <History className="h-6 w-6" />
-                  Histórico de Vendas - Hoje
+                  Histórico de Vendas - Sessão Atual
                 </h2>
                 <button
                   onClick={() => setShowHistoryDialog(false)}
@@ -2670,7 +2803,7 @@ export default function PDVPage() {
                     <p>Nenhuma venda realizada hoje</p>
                   </div>
                 ) : (
-                  todaySales.map((sale) => (
+                  filteredSalesForClosing.map((sale) => (
                     <Card key={sale.id} className="juga-card hover:shadow-md transition-shadow">
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between gap-4">
@@ -3146,7 +3279,7 @@ export default function PDVPage() {
         isOpen={showCashClosingModal}
         onClose={() => setShowCashClosingModal(false)}
         onConfirm={handleCashClosing}
-        todaySales={todaySales}
+        todaySales={filteredSalesForClosing}
         caixaInicial={caixaInicial}
         caixaOperations={caixaOperations}
         openedAt={cashSessionOpenedAt}

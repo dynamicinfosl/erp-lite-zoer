@@ -57,6 +57,11 @@ async function getCurrentUserPermissions(user_id?: string) {
 
 // GET - listar usuários do tenant
 export async function GET(request: NextRequest) {
+  // Desabilitar cache
+  const headers = new Headers();
+  headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  headers.set('Pragma', 'no-cache');
+  headers.set('Expires', '0');
   try {
     const { searchParams } = new URL(request.url);
     const tenant_id = searchParams.get('tenant_id');
@@ -103,11 +108,91 @@ export async function GET(request: NextRequest) {
             .eq('tenant_id', tenant_id)
             .eq('is_active', true);
           
+          // Buscar role_type de user_profiles para diferenciar Admin de Operador
+          let { data: profile } = await supabaseAdmin
+            .from('user_profiles')
+            .select('role_type, name')
+            .eq('user_id', userId)
+            .maybeSingle();
+          
+          // Se não tem profile, criar automaticamente
+          // IMPORTANTE: Por padrão, criar como 'vendedor' (operador) se não for owner
+          // O admin pode depois mudar para 'admin' se necessário
+          if (!profile && membership) {
+            const autoProfileRoleType = membership.role === 'owner' ? 'admin' : 'vendedor'; // Padrão: operador
+            const autoProfileName = authUser.user.user_metadata?.name || 
+                                   authUser.user.user_metadata?.full_name ||
+                                   authUser.user.email?.split('@')[0] || 
+                                   'Usuário';
+            
+            try {
+              const { data: newProfile, error: createError } = await supabaseAdmin
+                .from('user_profiles')
+                .insert({
+                  user_id: userId,
+                  name: autoProfileName,
+                  role_type: autoProfileRoleType,
+                  is_active: true,
+                })
+                .select('role_type, name')
+                .single();
+              
+              if (!createError && newProfile) {
+                profile = newProfile;
+                console.log(`[tenant-users GET] ✅ Profile criado automaticamente para ${authUser.user.email}:`, {
+                  role_type: autoProfileRoleType,
+                  membership_role: membership.role
+                });
+              } else {
+                console.warn(`[tenant-users GET] ⚠️ Erro ao criar profile automaticamente:`, createError);
+              }
+            } catch (createError) {
+              console.warn(`[tenant-users GET] ⚠️ Exceção ao criar profile:`, createError);
+            }
+          }
+          
+          // Se tem profile mas role_type é 'admin' e membership.role não é 'owner',
+          // pode ser um usuário que foi criado incorretamente como admin
+          // Por enquanto, vamos confiar no profile, mas logar para debug
+          if (profile && profile.role_type === 'admin' && membership?.role !== 'owner') {
+            console.log(`[tenant-users GET] ⚠️ Usuário ${authUser.user.email} tem role_type='admin' mas não é owner. Verifique se deveria ser operador.`);
+          }
+          
+          // Mapear role_type para role do frontend:
+          // 'admin' → 'admin'
+          // 'vendedor' → 'member' (Operador)
+          // 'owner' em user_memberships → 'owner'
+          let displayRole = 'member'; // Padrão: Operador
+          
+          if (membership?.role === 'owner') {
+            displayRole = 'owner';
+          } else if (profile?.role_type === 'admin') {
+            displayRole = 'admin';
+          } else if (profile?.role_type === 'vendedor') {
+            displayRole = 'member'; // Operador
+          } else {
+            // Se não tem profile ou tem outro role_type, assumir operador
+            // (exceto owners que sempre são owners)
+            displayRole = membership?.role === 'owner' ? 'owner' : 'member';
+          }
+          
+          console.log(`[tenant-users GET] Usuário ${authUser.user.email}:`, {
+            membership_role: membership?.role,
+            profile_role_type: profile?.role_type,
+            display_role: displayRole,
+            name: profile?.name || authUser.user.user_metadata?.name,
+            tem_profile: !!profile,
+            mapeamento: profile?.role_type === 'vendedor' ? 'vendedor → member (Operador)' : 
+                       profile?.role_type === 'admin' ? 'admin → admin' : 
+                       'sem profile → member (Operador)'
+          });
+          
           users.push({
             id: authUser.user.id,
             email: authUser.user.email,
+            name: profile?.name || authUser.user.user_metadata?.name || null,
             created_at: authUser.user.created_at,
-            role: membership?.role || 'member',
+            role: displayRole, // Usar role_type do profile, não do membership
             branch_id: membership?.branch_id || null,
             branches: (branchMemberships || []).map((bm: any) => ({
               branch_id: bm.branch_id,
@@ -120,7 +205,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, data: users });
+    const response = NextResponse.json({ success: true, data: users });
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    return response;
   } catch (error: any) {
     console.error('Erro ao listar usuários:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -185,12 +274,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Criar membership (tenant)
-    // Validar role: deve ser 'owner', 'admin' ou 'member' (conforme constraint do banco)
-    let finalRole = 'member'; // padrão
-    if (role === 'admin' || role === 'owner') {
-      finalRole = 'admin'; // 'admin' cobre tanto admin quanto owner para user_memberships
+    // IMPORTANTE: A constraint user_memberships_role_check só aceita 'owner' ou 'admin'
+    // Operadores ('member' do frontend) também devem ser inseridos como 'admin' em user_memberships
+    // A distinção entre admin e operador é feita em outras tabelas (user_branch_memberships, user_profiles)
+    let finalRole = 'admin'; // padrão: todos os usuários são 'admin' em user_memberships
+    if (role === 'owner') {
+      finalRole = 'owner'; // apenas owners têm role 'owner'
     } else {
-      finalRole = 'member';
+      finalRole = 'admin'; // admins e operadores são 'admin' em user_memberships
     }
     
     const membershipData: any = {
@@ -246,17 +337,53 @@ export async function POST(request: NextRequest) {
     }
 
     // Criar user_profile (se necessário)
+    // IMPORTANTE: Mapear 'member' (Operador) para 'vendedor' em user_profiles.role_type
+    // Os valores válidos são: 'admin', 'vendedor', 'financeiro', 'entregador'
+    const profileRoleType = role === 'member' ? 'vendedor' : role === 'admin' ? 'admin' : 'vendedor';
+    
+    console.log(`[tenant-users POST] Criando perfil:`, {
+      user_id: authData.user.id,
+      email: authData.user.email,
+      role_recebido: role,
+      role_type_mapeado: profileRoleType,
+      name
+    });
+    
     try {
-      await supabaseAdmin.from('user_profiles').insert({
-        id: authData.user.id,
-        user_id: authData.user.id,
-        name,
-        email,
-        role_type: role,
-        is_active: true,
-      });
+      const { data: insertedProfile, error: profileError } = await supabaseAdmin
+        .from('user_profiles')
+        .insert({
+          id: authData.user.id,
+          user_id: authData.user.id,
+          name,
+          role_type: profileRoleType, // 'admin' ou 'vendedor' (Operador)
+          is_active: true,
+        })
+        .select()
+        .single();
+      
+      if (profileError) {
+        console.error('[tenant-users POST] Erro ao criar perfil:', profileError);
+        // Não fazer rollback aqui, pois o usuário já foi criado
+      } else {
+        console.log(`[tenant-users POST] ✅ Perfil criado com sucesso:`, {
+          id: insertedProfile?.id,
+          role_type: insertedProfile?.role_type,
+          name: insertedProfile?.name
+        });
+      }
     } catch (profileError) {
-      console.warn('Erro ao criar perfil (não crítico):', profileError);
+      console.error('[tenant-users POST] Erro ao criar perfil (exceção):', profileError);
+    }
+
+    // Criar permissões padrão para o novo usuário
+    try {
+      const { createDefaultPermissions } = await import('@/lib/permissions');
+      await createDefaultPermissions(authData.user.id, perms.tenant_id, profileRoleType);
+      console.log(`[tenant-users POST] Permissões padrão criadas para ${profileRoleType}`);
+    } catch (permError) {
+      console.warn('[tenant-users POST] Erro ao criar permissões padrão (não crítico):', permError);
+      // Não falhar a criação do usuário por isso
     }
 
     return NextResponse.json({
@@ -326,7 +453,9 @@ export async function PUT(request: NextRequest) {
     // Atualizar membership
     const updates: any = {};
     if (role !== undefined) {
-      updates.role = role === 'admin' ? 'admin' : 'member';
+      // A constraint só aceita 'owner' ou 'admin'
+      // Operadores ('member') também são 'admin' em user_memberships
+      updates.role = role === 'owner' ? 'owner' : 'admin';
       
       // Se está tornando admin e tem branch_ids (admin matriz criando admin de filial)
       if (role === 'admin' && branch_ids && Array.isArray(branch_ids) && branch_ids.length === 1 && !perms.isBranchAdmin) {
@@ -375,6 +504,26 @@ export async function PUT(request: NextRequest) {
         }));
 
         await supabaseAdmin.from('user_branch_memberships').insert(branchMemberships);
+      }
+    }
+
+    // Atualizar user_profiles.role_type se role foi alterado
+    if (role !== undefined) {
+      const profileRoleType = role === 'member' ? 'vendedor' : role === 'admin' ? 'admin' : 'vendedor';
+      try {
+        const { error: profileUpdateError } = await supabaseAdmin
+          .from('user_profiles')
+          .update({ role_type: profileRoleType })
+          .eq('user_id', user_id);
+        
+        if (profileUpdateError) {
+          console.warn('[tenant-users PUT] Erro ao atualizar role_type no perfil:', profileUpdateError);
+          // Não falhar a requisição por isso, pois o membership já foi atualizado
+        } else {
+          console.log(`[tenant-users PUT] Perfil atualizado com role_type: ${profileRoleType} (role original: ${role})`);
+        }
+      } catch (profileError) {
+        console.warn('[tenant-users PUT] Erro ao atualizar perfil:', profileError);
       }
     }
 

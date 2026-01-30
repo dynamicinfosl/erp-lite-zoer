@@ -24,6 +24,7 @@ interface CashSessionBody {
   register_id?: string;
   opened_at: string;
   initial_amount: number;
+  opened_by?: string; // Nome/email de quem abriu (obrigatório no banco)
   status?: string;
   notes?: string;
   tenant_id?: string;
@@ -32,7 +33,11 @@ interface CashSessionBody {
 
 function isMissingColumnError(message: string, column: string) {
   const m = (message || "").toLowerCase();
-  return m.includes("does not exist") && m.includes(`"${column.toLowerCase()}"`);
+  const col = column.toLowerCase();
+  return (
+    (m.includes("does not exist") || m.includes("could not find") || m.includes("schema cache")) &&
+    (m.includes(`"${col}"`) || m.includes(`'${col}'`))
+  );
 }
 
 export const GET = async (request: NextRequest) => {
@@ -59,19 +64,20 @@ export const GET = async (request: NextRequest) => {
       return Array.isArray(data) ? data : [];
     };
 
+    const noCacheHeaders = { "Content-Type": "application/json", "Cache-Control": "no-store, no-cache" };
     try {
       const rows = await run({ includeTenantId: true, includeUserId: true });
-      return createSuccessResponse({ data: rows });
+      return new Response(JSON.stringify({ success: true, data: rows }), { status: 200, headers: noCacheHeaders });
     } catch (e: any) {
       const msg = String(e?.message || e || "");
       // fallback: schemas antigos podem não ter tenant_id/user_id
       if (tenantId && isMissingColumnError(msg, "tenant_id")) {
         const rows = await run({ includeTenantId: false, includeUserId: true });
-        return createSuccessResponse({ data: rows });
+        return new Response(JSON.stringify({ success: true, data: rows }), { status: 200, headers: noCacheHeaders });
       }
       if (userId && isMissingColumnError(msg, "user_id")) {
         const rows = await run({ includeTenantId: Boolean(tenantId), includeUserId: false });
-        return createSuccessResponse({ data: rows });
+        return new Response(JSON.stringify({ success: true, data: rows }), { status: 200, headers: noCacheHeaders });
       }
       throw e;
     }
@@ -96,9 +102,13 @@ export const POST = async (request: NextRequest) => {
       return createErrorResponse({ errorMessage: "initial_amount é obrigatório e deve ser número", status: 400 });
     }
 
+    // Banco usa opening_amount (não initial_amount); aceitamos initial_amount no body
+    const valorInicial = Number(body.initial_amount);
+    const openedBy = body.opened_by?.trim() || "Operador";
     const basePayload: Record<string, unknown> = {
       opened_at: body.opened_at,
-      initial_amount: Number(body.initial_amount),
+      opening_amount: valorInicial,
+      opened_by: openedBy,
       status: body.status || "open",
     };
 
@@ -106,6 +116,23 @@ export const POST = async (request: NextRequest) => {
     if (body.register_id) basePayload.register_id = body.register_id;
     if (body.user_id) basePayload.user_id = body.user_id;
     if (body.tenant_id) basePayload.tenant_id = body.tenant_id;
+
+    // Não permitir mais de um caixa aberto por usuário: verificar antes de inserir
+    if (body.user_id) {
+      const { data: existingOpen } = await supabaseAdmin
+        .from("cash_sessions")
+        .select("id")
+        .eq("user_id", body.user_id)
+        .eq("status", "open")
+        .limit(1)
+        .maybeSingle();
+      if (existingOpen) {
+        return createErrorResponse({
+          errorMessage: "Já existe um caixa aberto para este usuário. Feche-o na página de Caixas antes de abrir outro.",
+          status: 400,
+        });
+      }
+    }
 
     const tryInsert = async (payload: Record<string, unknown>) => {
       const { data, error } = await supabaseAdmin
@@ -119,7 +146,7 @@ export const POST = async (request: NextRequest) => {
 
     try {
       const created = await tryInsert(basePayload);
-      return createSuccessResponse({ data: created }, 201);
+      return createSuccessResponse(created, 201);
     } catch (e: any) {
       const msg = String(e?.message || e || "");
       const payload = { ...basePayload };
@@ -139,7 +166,7 @@ export const POST = async (request: NextRequest) => {
       if (JSON.stringify(payload) === JSON.stringify(basePayload)) throw e;
 
       const created = await tryInsert(payload);
-      return createSuccessResponse({ data: created }, 201);
+      return createSuccessResponse(created, 201);
     }
   } catch (error: any) {
     console.error("Erro ao criar sessão de caixa:", error);
@@ -151,23 +178,57 @@ export const POST = async (request: NextRequest) => {
   }
 };
 
+// Campos permitidos no PATCH (fechamento) – só repassar estes para o update
+const PATCH_ALLOWED_KEYS = [
+  "status", "closed_at", "closed_by", "notes",
+  "closing_amount", "closing_amount_cash", "closing_amount_card_debit",
+  "closing_amount_card_credit", "closing_amount_pix", "closing_amount_other",
+  "expected_cash", "expected_card_debit", "expected_card_credit", "expected_pix", "expected_other",
+  "difference_amount", "difference_cash", "difference_card_debit", "difference_card_credit",
+  "difference_pix", "difference_other", "difference_reason",
+  "total_sales", "total_sales_amount", "total_withdrawals", "total_withdrawals_amount",
+  "total_supplies", "total_supplies_amount", "total_refunds", "total_refunds_amount",
+  "device_info", "closed_by_user_id",
+];
+
+function buildPatchPayload(body: Record<string, unknown>): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  const stringKeys = new Set(["status", "closed_at", "closed_by", "notes", "difference_reason", "device_info"]);
+  for (const key of PATCH_ALLOWED_KEYS) {
+    if (!(key in body)) continue;
+    const v = body[key];
+    if (v === undefined) continue;
+    if (stringKeys.has(key) && typeof v === "string") payload[key] = v;
+    else if (key === "closed_by_user_id" && (typeof v === "string" || v === null)) payload[key] = v;
+    else if (typeof v === "number" && !Number.isNaN(v)) payload[key] = v;
+    else if (typeof v === "string" && !stringKeys.has(key) && key !== "closed_by_user_id") {
+      const n = Number(v);
+      if (!Number.isNaN(n)) payload[key] = n;
+    }
+  }
+  return payload;
+}
+
 export const PATCH = async (request: NextRequest) => {
   try {
     const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-    if (!id) return createErrorResponse({ errorMessage: "ID da sessão é obrigatório", status: 400 });
+    const idParam = searchParams.get("id");
+    if (!idParam) return createErrorResponse({ errorMessage: "ID da sessão é obrigatório", status: 400 });
+    const id = /^\d+$/.test(String(idParam).trim()) ? Number(idParam) : idParam.trim();
 
-    const body = (await request.json()) as Partial<CashSessionBody> & {
-      closed_at?: string;
-      closing_amount?: number;
-      action?: string;
-    };
+    let body: Record<string, unknown>;
+    try {
+      body = (await request.json()) as Record<string, unknown>;
+    } catch {
+      return createErrorResponse({ errorMessage: "Body JSON inválido", status: 400 });
+    }
 
-    const payload: Record<string, unknown> = {};
-    if (body.closed_at) payload.closed_at = body.closed_at;
-    if (body.closing_amount !== undefined) payload.closing_amount = Number(body.closing_amount);
-    if (body.status) payload.status = body.status;
-    if (body.notes !== undefined) payload.notes = body.notes;
+    const payload = buildPatchPayload(body);
+    if (!payload.status && !payload.closed_at && !payload.closed_by && Object.keys(payload).length === 0) {
+      return createErrorResponse({ errorMessage: "Envie ao menos status e/ou closed_at para fechar o caixa", status: 400 });
+    }
+    // Garantir fechamento: se vier status 'closed', incluir closed_at se não vier
+    if (payload.status === "closed" && !payload.closed_at) payload.closed_at = new Date().toISOString();
 
     const { data, error } = await supabaseAdmin
       .from("cash_sessions")
@@ -179,10 +240,12 @@ export const PATCH = async (request: NextRequest) => {
     if (error) {
       const msg = error.message || "";
       const retryPayload = { ...payload };
-      if (isMissingColumnError(msg, "closing_amount")) delete retryPayload.closing_amount;
-      if (isMissingColumnError(msg, "closed_at")) delete retryPayload.closed_at;
-      if (isMissingColumnError(msg, "notes")) delete retryPayload.notes;
-
+      PATCH_ALLOWED_KEYS.forEach((key) => {
+        if (isMissingColumnError(msg, key)) delete retryPayload[key];
+      });
+      if (Object.keys(retryPayload).length === 0) {
+        return createErrorResponse({ errorMessage: "Nenhum campo de fechamento existe na tabela cash_sessions. Execute o script SQL da tabela.", status: 400, details: msg });
+      }
       if (JSON.stringify(retryPayload) !== JSON.stringify(payload)) {
         const retry = await supabaseAdmin
           .from("cash_sessions")
@@ -191,13 +254,14 @@ export const PATCH = async (request: NextRequest) => {
           .select("*")
           .single();
         if (retry.error) throw new Error(retry.error.message);
-        return createSuccessResponse({ data: retry.data });
+        if (!retry.data) return createErrorResponse({ errorMessage: "Sessão não encontrada", status: 404 });
+        return createSuccessResponse(retry.data);
       }
-
       throw new Error(error.message);
     }
 
-    return createSuccessResponse({ data });
+    if (!data) return createErrorResponse({ errorMessage: "Sessão não encontrada", status: 404 });
+    return createSuccessResponse(data);
   } catch (error: any) {
     console.error("Erro ao atualizar sessão de caixa:", error);
     return createErrorResponse({
