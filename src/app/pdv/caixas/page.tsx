@@ -79,6 +79,44 @@ export default function CaixasPage() {
   const [closingId, setClosingId] = useState<string | null>(null);
   const [confirmCloseId, setConfirmCloseId] = useState<string | null>(null);
   const [detailsSession, setDetailsSession] = useState<CashSession | null>(null);
+  const [userNamesMap, setUserNamesMap] = useState<Map<string, string>>(new Map());
+
+  // Carregar nomes dos usuários
+  const loadUserNames = useCallback(async () => {
+    if (!tenant?.id || !user?.id) return;
+    
+    try {
+      const timestamp = Date.now();
+      const res = await fetch(
+        `/next_api/tenant-users?tenant_id=${encodeURIComponent(tenant.id)}&user_id=${encodeURIComponent(user.id)}&_t=${timestamp}`,
+        {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
+        }
+      );
+      
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          const namesMap = new Map<string, string>();
+          data.data.forEach((u: any) => {
+            if (u.id && u.name) {
+              namesMap.set(u.id, u.name);
+            } else if (u.id && u.email) {
+              // Se não tem nome, usar email como fallback
+              namesMap.set(u.id, u.email.split('@')[0]);
+            }
+          });
+          setUserNamesMap(namesMap);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar nomes de usuários:', error);
+    }
+  }, [tenant?.id, user?.id]);
 
   const loadSessions = useCallback(async () => {
     if (!tenant?.id) {
@@ -115,6 +153,10 @@ export default function CaixasPage() {
       setLoading(false);
     }
   }, [tenant?.id, statusFilter, userFilter]);
+
+  useEffect(() => {
+    loadUserNames();
+  }, [loadUserNames]);
 
   useEffect(() => {
     loadSessions();
@@ -157,6 +199,13 @@ export default function CaixasPage() {
     });
     return Array.from(ids).sort();
   }, [sessions]);
+
+  // Função para obter o nome do usuário
+  const getUserName = (userId: string | undefined | null): string => {
+    if (!userId) return '—';
+    const name = userNamesMap.get(String(userId));
+    return name || userId; // Se não encontrar nome, retorna o ID como fallback
+  };
 
   const openCount = sessions.filter((s) => s.status === 'open').length;
   const closedCount = sessions.filter((s) => s.status === 'closed').length;
@@ -295,7 +344,7 @@ export default function CaixasPage() {
                     <SelectItem value="">Todos os usuários</SelectItem>
                     {uniqueUserIds.map((uid) => (
                       <SelectItem key={uid} value={uid}>
-                        {uid}
+                        {getUserName(uid)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -346,7 +395,7 @@ export default function CaixasPage() {
                             {s.user_id ? (
                               <>
                                 <User className="h-3.5 w-3.5" />
-                                {String(s.user_id)}
+                                {getUserName(s.user_id)}
                               </>
                             ) : (
                               s.register_id || '—'
