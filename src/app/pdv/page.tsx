@@ -112,6 +112,7 @@ interface Sale {
   data_venda: string;
   status: 'pendente' | 'paga' | 'cancelada';
   created_at?: string;
+  sale_source?: string; // 'pdv' | 'api' | 'produtos' | null
   itens?: Array<{
     produto: string;
     quantidade: number;
@@ -592,6 +593,8 @@ export default function PDVPage() {
             forma_pagamento: sale.payment_method || sale.forma_pagamento || 'dinheiro',
             data_venda: sale.created_at || sale.sold_at || sale.data_venda,
             status: sale.status === 'completed' ? 'paga' : (sale.status || 'paga'),
+            created_at: sale.created_at || sale.sold_at || sale.data_venda,
+            sale_source: sale.sale_source || null, // Incluir sale_source para filtrar vendas da API
           }));
           
           console.log('✅ Vendas convertidas:', localSales.length);
@@ -1105,6 +1108,7 @@ export default function PDVPage() {
         data_venda: savedSaleData.created_at || new Date().toISOString(),
         status: 'paga',
         created_at: savedSaleData.created_at || new Date().toISOString(),
+        sale_source: 'pdv', // Marcar como venda do PDV para diferenciar de vendas da API
         itens: cart.map(item => ({
           produto: item.name,
           quantidade: item.quantity,
@@ -1449,6 +1453,8 @@ export default function PDVPage() {
       
       const vendasDaSessao = sessionOpenedAt 
         ? todaySales.filter(s => {
+            // Excluir vendas da API externa - não devem contabilizar em caixa
+            if (s.sale_source === 'api') return false;
             if (s.status !== 'paga') return false;
             if (!s.created_at) {
               console.warn('⚠️ Venda sem created_at:', s.numero);
@@ -1464,7 +1470,7 @@ export default function PDVPage() {
             }
             return isAfterOpen;
           })
-        : todaySales.filter(s => s.status === 'paga');
+        : todaySales.filter(s => s.status === 'paga' && s.sale_source !== 'api');
       
       console.log(`📊 Vendas da sessão atual: ${vendasDaSessao.length} de ${todaySales.length} vendas do dia`);
 
@@ -1847,9 +1853,9 @@ export default function PDVPage() {
     },
   ];
 
-  // Cálculos de KPIs
+  // Cálculos de KPIs (excluindo vendas da API externa)
   const totalVendasDia = useMemo(() => 
-    todaySales.filter(s => s.status === 'paga').reduce((sum, s) => sum + s.total, 0),
+    todaySales.filter(s => s.status === 'paga' && s.sale_source !== 'api').reduce((sum, s) => sum + s.total, 0),
     [todaySales]
   );
   
@@ -1872,7 +1878,7 @@ export default function PDVPage() {
     itensCarrinho: cart.reduce((sum, i) => sum + i.quantity, 0),
     totalItens: cart.length,
     totalValor: total,
-    vendasDia: todaySales.filter(s => s.status === 'paga').length,
+    vendasDia: todaySales.filter(s => s.status === 'paga' && s.sale_source !== 'api').length,
     totalVendasDia,
     saldoCaixa,
   };
@@ -1978,11 +1984,23 @@ export default function PDVPage() {
     });
     
     if (!sessionOpenedAt) {
-      console.warn('⚠️ Sem data de abertura do caixa, mostrando todas as vendas pagas');
-      return todaySales.filter(s => s.status === 'paga');
+      console.warn('⚠️ Sem data de abertura do caixa, mostrando todas as vendas pagas (exceto API)');
+      return todaySales.filter(s => {
+        // Excluir vendas da API externa mesmo sem sessão de caixa
+        if (s.sale_source === 'api') {
+          return false;
+        }
+        return s.status === 'paga';
+      });
     }
     
     const filtered = todaySales.filter(s => {
+      // Excluir vendas da API externa - não devem contabilizar em caixa
+      if (s.sale_source === 'api') {
+        console.log(`🚫 Venda ${s.numero} excluída do caixa (sale_source: api)`);
+        return false;
+      }
+      
       if (s.status !== 'paga') return false;
       if (!s.created_at) {
         console.warn('⚠️ Venda sem created_at:', s.numero);
