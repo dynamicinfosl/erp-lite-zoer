@@ -33,6 +33,7 @@ import { Wallet, RefreshCw, Search, User, Calendar, DollarSign, Lock, Eye, Print
 import { toast } from 'sonner';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { TenantPageWrapper } from '@/components/layout/PageWrapper';
+import { CashClosingModal, CashClosingData } from '@/components/pdv/CashClosingModal';
 
 export interface CashSession {
   id: string;
@@ -80,6 +81,9 @@ export default function CaixasPage() {
   const [confirmCloseId, setConfirmCloseId] = useState<string | null>(null);
   const [detailsSession, setDetailsSession] = useState<CashSession | null>(null);
   const [userNamesMap, setUserNamesMap] = useState<Map<string, string>>(new Map());
+  const [showCashClosingModal, setShowCashClosingModal] = useState(false);
+  const [sessionToClose, setSessionToClose] = useState<CashSession | null>(null);
+  const [sessionSales, setSessionSales] = useState<any[]>([]);
 
   // Carregar nomes dos usuários
   const loadUserNames = useCallback(async () => {
@@ -210,19 +214,133 @@ export default function CaixasPage() {
   const openCount = sessions.filter((s) => s.status === 'open').length;
   const closedCount = sessions.filter((s) => s.status === 'closed').length;
 
-  const handleCloseSession = useCallback(
-    async (sessionId: string) => {
+  // Buscar vendas da sessão de caixa
+  const loadSessionSales = useCallback(async (session: CashSession) => {
+    if (!tenant?.id || !session.opened_at) return [];
+    
+    try {
+      const tz = -new Date().getTimezoneOffset();
+      const params = new URLSearchParams({
+        today: 'true',
+        tenant_id: tenant.id,
+        tz: tz.toString(),
+        branch_scope: 'all',
+        sale_source: 'pdv', // Apenas vendas do PDV
+      });
+      
+      const res = await fetch(`/next_api/sales?${params.toString()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        const sales = data.sales || data.data || [];
+        
+        // Filtrar vendas da sessão (após abertura do caixa)
+        const sessionOpenedAt = new Date(session.opened_at);
+        const filteredSales = sales.filter((sale: any) => {
+          if (sale.sale_source === 'api') return false; // Excluir vendas da API
+          if (sale.status !== 'paga' && sale.status !== 'completed') return false;
+          if (!sale.created_at) return false;
+          const saleDate = new Date(sale.created_at);
+          return saleDate >= sessionOpenedAt;
+        });
+        
+        return filteredSales.map((sale: any) => ({
+          id: sale.id,
+          total: parseFloat(sale.total_amount || sale.final_amount || sale.total || 0),
+          forma_pagamento: sale.payment_method || sale.forma_pagamento || 'dinheiro',
+          status: sale.status === 'completed' ? 'paga' : (sale.status || 'paga'),
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao buscar vendas da sessão:', error);
+    }
+    
+    return [];
+  }, [tenant?.id]);
+
+  // Preparar fechamento de caixa (buscar vendas e mostrar modal)
+  const prepareCloseSession = useCallback(async (session: CashSession) => {
+    setSessionToClose(session);
+    setConfirmCloseId(null);
+    
+    // Buscar vendas da sessão
+    const sales = await loadSessionSales(session);
+    setSessionSales(sales);
+    
+    // Mostrar modal de fechamento
+    setShowCashClosingModal(true);
+  }, [loadSessionSales]);
+
+  // Confirmar fechamento de caixa (chamado pelo modal)
+  const handleCashClosing = useCallback(
+    async (closingData: CashClosingData) => {
+      if (!sessionToClose) return;
+      
       if (closingId) return;
-      setClosingId(sessionId);
-      setConfirmCloseId(null);
+      setClosingId(sessionToClose.id);
+      
       try {
-        const res = await fetch(`/next_api/cash-sessions?id=${encodeURIComponent(sessionId)}`, {
+        // Calcular valores esperados baseados nas vendas
+        const expectedCash = sessionSales
+          .filter(s => s.forma_pagamento === 'dinheiro')
+          .reduce((sum, s) => sum + s.total, 0);
+        const expectedCardDebit = sessionSales
+          .filter(s => s.forma_pagamento === 'cartao_debito')
+          .reduce((sum, s) => sum + s.total, 0);
+        const expectedCardCredit = sessionSales
+          .filter(s => s.forma_pagamento === 'cartao_credito')
+          .reduce((sum, s) => sum + s.total, 0);
+        const expectedPix = sessionSales
+          .filter(s => s.forma_pagamento === 'pix')
+          .reduce((sum, s) => sum + s.total, 0);
+        const expectedOther = sessionSales
+          .filter(s => !['dinheiro', 'cartao_debito', 'cartao_credito', 'pix'].includes(s.forma_pagamento))
+          .reduce((sum, s) => sum + s.total, 0);
+
+        const res = await fetch(`/next_api/cash-sessions?id=${encodeURIComponent(sessionToClose.id)}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             status: 'closed',
             closed_at: new Date().toISOString(),
             closed_by: user?.email || (user?.id ? String(user.id) : null) || 'Sistema',
+            // Valores contados
+            closing_amount_cash: closingData.closing_amount_cash,
+            closing_amount_card_debit: closingData.closing_amount_card_debit,
+            closing_amount_card_credit: closingData.closing_amount_card_credit,
+            closing_amount_pix: closingData.closing_amount_pix,
+            closing_amount_other: closingData.closing_amount_other,
+            // Valores esperados
+            expected_cash: expectedCash,
+            expected_card_debit: expectedCardDebit,
+            expected_card_credit: expectedCardCredit,
+            expected_pix: expectedPix,
+            expected_other: expectedOther,
+            // Diferenças
+            difference_cash: closingData.closing_amount_cash - expectedCash,
+            difference_card_debit: closingData.closing_amount_card_debit - expectedCardDebit,
+            difference_card_credit: closingData.closing_amount_card_credit - expectedCardCredit,
+            difference_pix: closingData.closing_amount_pix - expectedPix,
+            difference_other: closingData.closing_amount_other - expectedOther,
+            difference_amount: 
+              (closingData.closing_amount_cash + 
+               closingData.closing_amount_card_debit + 
+               closingData.closing_amount_card_credit + 
+               closingData.closing_amount_pix + 
+               closingData.closing_amount_other) - 
+              (expectedCash + expectedCardDebit + expectedCardCredit + expectedPix + expectedOther),
+            // Estatísticas
+            total_sales: sessionSales.length,
+            total_sales_amount: sessionSales.reduce((sum, s) => sum + s.total, 0),
+            // Observações
+            notes: closingData.notes,
+            difference_reason: closingData.difference_reason,
           }),
           cache: 'no-store',
         });
@@ -235,7 +353,11 @@ export default function CaixasPage() {
           } catch (_) {}
           throw new Error(msg || 'Erro ao fechar caixa');
         }
+        
         toast.success('Caixa fechado com sucesso.');
+        setShowCashClosingModal(false);
+        setSessionToClose(null);
+        setSessionSales([]);
         if (statusFilter === 'open') setStatusFilter('todos');
         await loadSessions();
       } catch (e: any) {
@@ -246,7 +368,7 @@ export default function CaixasPage() {
         setClosingId(null);
       }
     },
-    [closingId, loadSessions, statusFilter, user?.email, user?.id]
+    [closingId, loadSessions, statusFilter, user?.email, user?.id, sessionToClose, sessionSales]
   );
 
   const handlePrintSession = useCallback((session: CashSession) => {
@@ -436,7 +558,7 @@ export default function CaixasPage() {
                               type="button"
                               variant="outline"
                               size="sm"
-                              onClick={() => setConfirmCloseId(String(s.id))}
+                              onClick={() => prepareCloseSession(s)}
                               disabled={closingId !== null}
                               className="text-amber-700 border-amber-300 hover:bg-amber-50"
                             >
@@ -475,33 +597,25 @@ export default function CaixasPage() {
           </CardContent>
         </Card>
 
-        {/* Modal de confirmação para fechar caixa */}
-        <Dialog open={confirmCloseId !== null} onOpenChange={(open) => !open && setConfirmCloseId(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-amber-600" />
-                Confirmar fechamento de caixa
-              </DialogTitle>
-              <DialogDescription>
-                Tem certeza que deseja fechar este caixa? Esta ação não pode ser desfeita.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setConfirmCloseId(null)} disabled={closingId !== null}>
-                Cancelar
-              </Button>
-              <Button
-                variant="default"
-                onClick={() => confirmCloseId && handleCloseSession(confirmCloseId)}
-                disabled={closingId !== null}
-                className="bg-amber-600 hover:bg-amber-700"
-              >
-                {closingId === confirmCloseId ? 'Fechando...' : 'Confirmar fechamento'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* Modal de fechamento de caixa */}
+        {sessionToClose && (
+          <CashClosingModal
+            isOpen={showCashClosingModal}
+            onClose={() => {
+              setShowCashClosingModal(false);
+              setSessionToClose(null);
+              setSessionSales([]);
+            }}
+            onConfirm={handleCashClosing}
+            todaySales={sessionSales}
+            caixaInicial={Number((sessionToClose as any).opening_amount ?? sessionToClose.initial_amount) || 0}
+            caixaOperations={[]}
+            openedAt={sessionToClose.opened_at}
+            openedBy={sessionToClose.opened_by}
+            tenantId={tenant?.id}
+            userId={sessionToClose.user_id}
+          />
+        )}
 
         {/* Modal de detalhes do fechamento */}
         <Dialog open={detailsSession !== null} onOpenChange={(open) => !open && setDetailsSession(null)}>
