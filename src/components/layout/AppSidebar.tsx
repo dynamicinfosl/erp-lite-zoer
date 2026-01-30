@@ -147,11 +147,13 @@ function SidebarContentInternal() {
   useEffect(() => {
     const fetchUserRole = async () => {
       if (!ENABLE_AUTH || !user || !tenant) {
+        console.log('[Sidebar] Sem auth/user/tenant, usando role padrão:', mockUserProfile.role);
         setUserRole(mockUserProfile.role);
         return;
       }
 
       try {
+        console.log('[Sidebar] 🔍 Buscando role do usuário:', { userId: user.id, tenantId: tenant.id, email: user.email });
         // Buscar role via API tenant-users que já retorna o role correto
         const timestamp = Date.now();
         const res = await fetch(
@@ -167,23 +169,33 @@ function SidebarContentInternal() {
         
         if (res.ok) {
           const data = await res.json();
+          console.log('[Sidebar] 📦 Resposta da API tenant-users:', { success: data.success, usersCount: data.data?.length });
           if (data.success && Array.isArray(data.data)) {
             // Encontrar o usuário atual na lista
             const currentUser = data.data.find((u: any) => u.id === user.id);
+            console.log('[Sidebar] 👤 Usuário atual encontrado:', currentUser ? { id: currentUser.id, email: currentUser.email, role: currentUser.role } : 'NÃO ENCONTRADO');
             if (currentUser) {
               // Mapear role para role do sidebar
               if (currentUser.role === 'owner' || currentUser.role === 'admin') {
+                console.log('[Sidebar] ✅ Role determinado como ADMIN');
                 setUserRole('admin');
                 return;
+              } else {
+                console.log('[Sidebar] ⚠️ Role determinado como VENDEDOR (role:', currentUser.role, ')');
               }
+            } else {
+              console.warn('[Sidebar] ⚠️ Usuário não encontrado na lista de usuários do tenant');
             }
           }
+        } else {
+          console.error('[Sidebar] ❌ Erro na resposta da API:', res.status, res.statusText);
         }
 
         // Padrão: vendedor/operador
+        console.log('[Sidebar] 🔄 Usando role padrão: vendedor');
         setUserRole('vendedor');
       } catch (error) {
-        console.error('Erro ao buscar role do usuário:', error);
+        console.error('[Sidebar] ❌ Erro ao buscar role do usuário:', error);
         // Em caso de erro, assumir vendedor por segurança
         setUserRole('vendedor');
       }
@@ -200,9 +212,31 @@ function SidebarContentInternal() {
   const filteredGroups = menuGroups.map(group => ({
     title: group.title,
     items: group.items
-      .filter(item => item.roles.includes(userRole))
+      .filter(item => {
+        const hasRole = item.roles.includes(userRole);
+        const isFiliaisItem = item.url === '/filiais';
+        const shouldShowFiliais = isFiliaisItem ? isBranchesEnabled : true;
+        const shouldShow = hasRole && shouldShowFiliais;
+        
+        // Log para debug do item "Usuários"
+        if (item.url === '/configuracoes/usuarios') {
+          console.log('[Sidebar] 🔍 Item "Usuários":', {
+            url: item.url,
+            requiredRoles: item.roles,
+            currentRole: userRole,
+            hasRole,
+            isBranchesEnabled,
+            shouldShow
+          });
+        }
+        
+        return shouldShow;
+      })
       .filter(item => (item.url === '/filiais' ? isBranchesEnabled : true)),
   })).filter(group => group.items.length > 0);
+  
+  console.log('[Sidebar] 📊 Grupos filtrados:', filteredGroups.map(g => ({ title: g.title, itemsCount: g.items.length })));
+  console.log('[Sidebar] 👤 Role atual:', userRole);
 
 
   return (
