@@ -234,10 +234,12 @@ export default function CaixasPage() {
       
       // Buscar vendas sem filtro de "today" - buscar todas e filtrar por data de abertura
       // Não filtrar por sale_source na API para pegar todas as vendas e filtrar depois
+      // Isso inclui vendas antigas que podem não ter sale_source definido
       const params = new URLSearchParams({
         tenant_id: tenant.id,
         branch_scope: 'all',
         // Removido sale_source da query - vamos filtrar depois para incluir vendas antigas sem sale_source
+        // Removido today - vamos filtrar por data de abertura manualmente
       });
       
       const res = await fetch(`/next_api/sales?${params.toString()}`, {
@@ -268,16 +270,8 @@ export default function CaixasPage() {
             return false;
           }
           
-          // Se a sessão tem user_id, filtrar por ele também (opcional, mas ajuda)
-          if (session.user_id && sale.user_id && sale.user_id !== session.user_id) {
-            console.log('[Caixas] Venda excluída (user_id diferente):', {
-              saleId: sale.id,
-              saleUserId: sale.user_id,
-              sessionUserId: session.user_id
-            });
-            // Não excluir - pode haver vendas de outros usuários no mesmo caixa
-            // return false;
-          }
+          // Incluir vendas sem sale_source (vendas antigas) ou com sale_source='pdv'
+          // Não excluir se sale_source for null/undefined (vendas antigas)
           
           // Apenas vendas pagas
           if (sale.status !== 'paga' && sale.status !== 'completed' && sale.status !== 'paid') {
@@ -293,8 +287,9 @@ export default function CaixasPage() {
           
           const saleDate = new Date(sale.created_at);
           
-          // Venda deve ser após abertura
-          if (saleDate < sessionOpenedAt) {
+          // Venda deve ser após abertura (com margem de 1 minuto para evitar problemas de timezone)
+          const marginMs = 60 * 1000; // 1 minuto
+          if (saleDate.getTime() < (sessionOpenedAt.getTime() - marginMs)) {
             console.log('[Caixas] Venda excluída (antes da abertura):', {
               saleId: sale.id,
               saleDate: saleDate.toISOString(),
@@ -304,8 +299,8 @@ export default function CaixasPage() {
             return false;
           }
           
-          // Se o caixa foi fechado, venda deve ser antes do fechamento
-          if (session.closed_at && saleDate > sessionClosedAt) {
+          // Se o caixa foi fechado, venda deve ser antes do fechamento (com margem)
+          if (session.closed_at && saleDate.getTime() > (sessionClosedAt.getTime() + marginMs)) {
             console.log('[Caixas] Venda excluída (após fechamento):', {
               saleId: sale.id,
               saleDate: saleDate.toISOString(),
@@ -320,7 +315,8 @@ export default function CaixasPage() {
             total: sale.total_amount,
             paymentMethod: sale.payment_method,
             saleDate: saleDate.toISOString(),
-            saleSource: sale.sale_source
+            saleSource: sale.sale_source || '(sem sale_source)',
+            openedAt: sessionOpenedAt.toISOString()
           });
           
           return true;
