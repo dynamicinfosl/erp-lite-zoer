@@ -154,7 +154,39 @@ function SidebarContentInternal() {
 
       try {
         console.log('[Sidebar] 🔍 Buscando role do usuário:', { userId: user.id, tenantId: tenant.id, email: user.email });
-        // Buscar role via API tenant-users que já retorna o role correto
+        
+        // Método 1: Tentar API user-branch-info (mais simples e direta)
+        try {
+          const branchRes = await fetch(
+            `/next_api/user-branch-info?user_id=${encodeURIComponent(user.id)}&_t=${Date.now()}`,
+            { 
+              cache: 'no-store',
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+              }
+            }
+          );
+          
+          if (branchRes.ok) {
+            const branchData = await branchRes.json();
+            console.log('[Sidebar] 📦 Resposta da API user-branch-info:', branchData);
+            if (branchData.success && branchData.data) {
+              const role = branchData.data.role;
+              const isMatrixAdmin = branchData.data.isMatrixAdmin;
+              // Se for owner, admin ou admin matriz, mostrar como admin
+              if (role === 'owner' || role === 'admin' || isMatrixAdmin) {
+                console.log('[Sidebar] ✅ Role determinado como ADMIN via user-branch-info (role:', role, ', isMatrixAdmin:', isMatrixAdmin, ')');
+                setUserRole('admin');
+                return;
+              }
+            }
+          }
+        } catch (branchError) {
+          console.warn('[Sidebar] ⚠️ Erro ao buscar via user-branch-info, tentando método alternativo:', branchError);
+        }
+
+        // Método 2: Tentar API tenant-users (fallback)
         const timestamp = Date.now();
         const res = await fetch(
           `/next_api/tenant-users?tenant_id=${encodeURIComponent(tenant.id)}&user_id=${encodeURIComponent(user.id)}&_t=${timestamp}`,
@@ -177,7 +209,7 @@ function SidebarContentInternal() {
             if (currentUser) {
               // Mapear role para role do sidebar
               if (currentUser.role === 'owner' || currentUser.role === 'admin') {
-                console.log('[Sidebar] ✅ Role determinado como ADMIN');
+                console.log('[Sidebar] ✅ Role determinado como ADMIN via tenant-users');
                 setUserRole('admin');
                 return;
               } else {
@@ -188,7 +220,7 @@ function SidebarContentInternal() {
             }
           }
         } else {
-          console.error('[Sidebar] ❌ Erro na resposta da API:', res.status, res.statusText);
+          console.error('[Sidebar] ❌ Erro na resposta da API tenant-users:', res.status, res.statusText);
         }
 
         // Padrão: vendedor/operador
