@@ -273,9 +273,16 @@ export default function CaixasPage() {
           // Incluir vendas sem sale_source (vendas antigas) ou com sale_source='pdv'
           // Não excluir se sale_source for null/undefined (vendas antigas)
           
-          // Apenas vendas pagas
-          if (sale.status !== 'paga' && sale.status !== 'completed' && sale.status !== 'paid') {
-            console.log('[Caixas] Venda excluída (status):', sale.id, sale.status);
+          // Apenas vendas pagas (incluir null como paga, pois vendas do PDV podem ter status null)
+          // Vendas do PDV geralmente têm status null ou 'paga', vendas da API podem ter 'completed' ou 'paid'
+          const isPaid = sale.status === 'paga' || 
+                        sale.status === 'completed' || 
+                        sale.status === 'paid' || 
+                        sale.status === null || 
+                        sale.status === undefined;
+          
+          if (!isPaid) {
+            console.log('[Caixas] Venda excluída (status não pago):', sale.id, sale.status);
             return false;
           }
           
