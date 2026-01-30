@@ -2226,16 +2226,9 @@ export default function PDVPage() {
                 variant="outline" 
                 size="sm"
                 onClick={() => {
-                  if (currentCashSessionId) {
-                    if (confirm('O caixa ainda está aberto. Deseja fechar o caixa antes de sair?')) {
-                      setCaixaOperationType('fechamento');
-                      setShowCaixaDialog(true);
-                    } else {
-                      router.push('/dashboard');
-                    }
-                  } else {
-                    router.push('/dashboard');
-                  }
+                  // Sair diretamente sem perguntar sobre fechamento de caixa
+                  // O fechamento deve ser feito apenas pelo botão de fechamento normal
+                  router.push('/dashboard');
                 }}
                 className="flex items-center gap-2"
               >
