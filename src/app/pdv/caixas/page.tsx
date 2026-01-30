@@ -84,6 +84,14 @@ export default function CaixasPage() {
   const [showCashClosingModal, setShowCashClosingModal] = useState(false);
   const [sessionToClose, setSessionToClose] = useState<CashSession | null>(null);
   const [sessionSales, setSessionSales] = useState<any[]>([]);
+  const [sessionOperations, setSessionOperations] = useState<Array<{
+    id: string;
+    tipo: 'sangria' | 'reforco' | 'abertura' | 'fechamento';
+    valor: number;
+    descricao: string;
+    data: string;
+    usuario: string;
+  }>>([]);
 
   // Carregar nomes dos usuários
   const loadUserNames = useCallback(async () => {
@@ -148,7 +156,15 @@ export default function CaixasPage() {
         (Array.isArray(json?.data?.data) ? json.data.data : null) ??
         (Array.isArray(json?.rows) ? json.rows : null) ??
         [];
-      setSessions(rows);
+      // Garantir que os campos de sangrias e reforços estejam presentes
+      const enrichedRows = rows.map((session: any) => ({
+        ...session,
+        total_withdrawals: session.total_withdrawals || 0,
+        total_withdrawals_amount: session.total_withdrawals_amount || 0,
+        total_supplies: session.total_supplies || 0,
+        total_supplies_amount: session.total_supplies_amount || 0,
+      }));
+      setSessions(enrichedRows);
     } catch (e) {
       console.error(e);
       toast.error('Erro ao carregar sessões de caixa');
@@ -369,6 +385,73 @@ export default function CaixasPage() {
     console.log('[Caixas] Vendas encontradas para a sessão:', sales.length);
     setSessionSales(sales);
     
+    // Criar operações de caixa baseadas nos valores salvos na sessão
+    // Se a sessão já foi fechada antes, usar os valores salvos
+    // Caso contrário, criar operações vazias (serão preenchidas durante o fechamento)
+    const operations: Array<{
+      id: string;
+      tipo: 'sangria' | 'reforco' | 'abertura' | 'fechamento';
+      valor: number;
+      descricao: string;
+      data: string;
+      usuario: string;
+    }> = [];
+    
+    // Adicionar abertura como operação
+    if (session.opening_amount || session.initial_amount) {
+      const openingAmount = session.opening_amount || session.initial_amount || 0;
+      operations.push({
+        id: `${session.id}-abertura`,
+        tipo: 'abertura',
+        valor: openingAmount,
+        descricao: `Abertura de caixa - Valor inicial: R$ ${openingAmount.toFixed(2)}`,
+        data: session.opened_at,
+        usuario: session.opened_by || 'Sistema',
+      });
+    }
+    
+    // Buscar valores de sangrias e reforços da sessão (se já foram salvos)
+    // Esses valores são salvos quando o caixa é fechado no PDV
+    // Como não temos uma tabela de operações individuais, vamos usar os totais salvos
+    // e criar operações sintéticas para o cálculo
+    const totalWithdrawalsAmount = (session as any).total_withdrawals_amount || 0;
+    const totalSuppliesAmount = (session as any).total_supplies_amount || 0;
+    const totalWithdrawals = (session as any).total_withdrawals || 0;
+    const totalSupplies = (session as any).total_supplies || 0;
+    
+    // Se houver sangrias, criar uma operação sintética
+    if (totalWithdrawalsAmount > 0 && totalWithdrawals > 0) {
+      const avgWithdrawal = totalWithdrawalsAmount / totalWithdrawals;
+      for (let i = 0; i < totalWithdrawals; i++) {
+        operations.push({
+          id: `${session.id}-sangria-${i}`,
+          tipo: 'sangria',
+          valor: avgWithdrawal,
+          descricao: `Sangria de R$ ${avgWithdrawal.toFixed(2)}`,
+          data: session.opened_at, // Usar data de abertura como aproximação
+          usuario: session.opened_by || 'Sistema',
+        });
+      }
+    }
+    
+    // Se houver reforços, criar uma operação sintética
+    if (totalSuppliesAmount > 0 && totalSupplies > 0) {
+      const avgSupply = totalSuppliesAmount / totalSupplies;
+      for (let i = 0; i < totalSupplies; i++) {
+        operations.push({
+          id: `${session.id}-reforco-${i}`,
+          tipo: 'reforco',
+          valor: avgSupply,
+          descricao: `Reforço de R$ ${avgSupply.toFixed(2)}`,
+          data: session.opened_at, // Usar data de abertura como aproximação
+          usuario: session.opened_by || 'Sistema',
+        });
+      }
+    }
+    
+    console.log('[Caixas] Operações de caixa criadas:', operations.length);
+    setSessionOperations(operations);
+    
     // Mostrar modal de fechamento
     setShowCashClosingModal(true);
   }, [loadSessionSales]);
@@ -383,7 +466,7 @@ export default function CaixasPage() {
       
       try {
         // Calcular valores esperados baseados nas vendas
-        const expectedCash = sessionSales
+        const vendasDinheiro = sessionSales
           .filter(s => s.forma_pagamento === 'dinheiro')
           .reduce((sum, s) => sum + s.total, 0);
         const expectedCardDebit = sessionSales
@@ -398,6 +481,19 @@ export default function CaixasPage() {
         const expectedOther = sessionSales
           .filter(s => !['dinheiro', 'cartao_debito', 'cartao_credito', 'pix'].includes(s.forma_pagamento))
           .reduce((sum, s) => sum + s.total, 0);
+        
+        // Calcular sangrias e reforços das operações de caixa
+        const totalSangrias = sessionOperations
+          .filter(op => op.tipo === 'sangria')
+          .reduce((sum, op) => sum + op.valor, 0);
+        
+        const totalReforcos = sessionOperations
+          .filter(op => op.tipo === 'reforco')
+          .reduce((sum, op) => sum + op.valor, 0);
+        
+        // Calcular valor esperado em dinheiro considerando reforços e sangrias
+        const caixaInicial = Number((sessionToClose as any).opening_amount ?? sessionToClose.initial_amount) || 0;
+        const expectedCash = caixaInicial + vendasDinheiro + totalReforcos - totalSangrias;
 
         const res = await fetch(`/next_api/cash-sessions?id=${encodeURIComponent(sessionToClose.id)}`, {
           method: 'PATCH',
@@ -434,6 +530,11 @@ export default function CaixasPage() {
             // Estatísticas
             total_sales: sessionSales.length,
             total_sales_amount: sessionSales.reduce((sum, s) => sum + s.total, 0),
+            // Sangrias e reforços
+            total_withdrawals: sessionOperations.filter(op => op.tipo === 'sangria').length,
+            total_withdrawals_amount: totalSangrias,
+            total_supplies: sessionOperations.filter(op => op.tipo === 'reforco').length,
+            total_supplies_amount: totalReforcos,
             // Observações
             notes: closingData.notes,
             difference_reason: closingData.difference_reason,
@@ -464,7 +565,7 @@ export default function CaixasPage() {
         setClosingId(null);
       }
     },
-    [closingId, loadSessions, statusFilter, user?.email, user?.id, sessionToClose, sessionSales]
+    [closingId, loadSessions, statusFilter, user?.email, user?.id, sessionToClose, sessionSales, sessionOperations]
   );
 
   const handlePrintSession = useCallback((session: CashSession) => {
@@ -701,11 +802,12 @@ export default function CaixasPage() {
               setShowCashClosingModal(false);
               setSessionToClose(null);
               setSessionSales([]);
+              setSessionOperations([]);
             }}
             onConfirm={handleCashClosing}
             todaySales={sessionSales}
             caixaInicial={Number((sessionToClose as any).opening_amount ?? sessionToClose.initial_amount) || 0}
-            caixaOperations={[]}
+            caixaOperations={sessionOperations}
             openedAt={sessionToClose.opened_at}
             openedBy={sessionToClose.opened_by}
             tenantId={tenant?.id}
