@@ -534,17 +534,32 @@ export default function CaixasPage() {
           .reduce((sum, s) => sum + s.total, 0);
         
         // Calcular sangrias e reforços das operações de caixa
-        const totalSangrias = sessionOperations
-          .filter(op => op.tipo === 'sangria')
-          .reduce((sum, op) => sum + op.valor, 0);
+        // IMPORTANTE: Filtrar apenas sangrias e reforços (excluir abertura e fechamento)
+        const sangrias = sessionOperations.filter(op => op.tipo === 'sangria');
+        const reforcos = sessionOperations.filter(op => op.tipo === 'reforco');
         
-        const totalReforcos = sessionOperations
-          .filter(op => op.tipo === 'reforco')
-          .reduce((sum, op) => sum + op.valor, 0);
+        const totalSangrias = sangrias.reduce((sum, op) => sum + op.valor, 0);
+        const totalReforcos = reforcos.reduce((sum, op) => sum + op.valor, 0);
+        
+        console.log('[Caixas] Cálculo de fechamento:', {
+          caixaInicial,
+          vendasDinheiro,
+          totalReforcos,
+          totalSangrias,
+          sangriasCount: sangrias.length,
+          reforcosCount: reforcos.length,
+          sangriasDetalhes: sangrias.map(s => ({ valor: s.valor, descricao: s.descricao })),
+          reforcosDetalhes: reforcos.map(r => ({ valor: r.valor, descricao: r.descricao })),
+        });
         
         // Calcular valor esperado em dinheiro considerando reforços e sangrias
         const caixaInicial = Number((sessionToClose as any).opening_amount ?? sessionToClose.initial_amount) || 0;
         const expectedCash = caixaInicial + vendasDinheiro + totalReforcos - totalSangrias;
+        
+        console.log('[Caixas] Valor esperado em dinheiro:', {
+          formula: `caixaInicial (${caixaInicial}) + vendasDinheiro (${vendasDinheiro}) + reforcos (${totalReforcos}) - sangrias (${totalSangrias})`,
+          resultado: expectedCash
+        });
 
         const res = await fetch(`/next_api/cash-sessions?id=${encodeURIComponent(sessionToClose.id)}`, {
           method: 'PATCH',

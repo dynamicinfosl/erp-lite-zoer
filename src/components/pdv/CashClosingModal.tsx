@@ -150,13 +150,21 @@ export function CashClosingModal({
         .reduce((sum, [, valor]) => sum + valor, 0);
 
       // Calcular reforços e sangrias
-      const totalReforcos = caixaOperations
-        .filter(op => op.tipo === 'reforco')
-        .reduce((sum, op) => sum + op.valor, 0);
+      // IMPORTANTE: Filtrar apenas sangrias e reforços (excluir abertura e fechamento)
+      const sangrias = caixaOperations.filter(op => op.tipo === 'sangria');
+      const reforcos = caixaOperations.filter(op => op.tipo === 'reforco');
       
-      const totalSangrias = caixaOperations
-        .filter(op => op.tipo === 'sangria')
-        .reduce((sum, op) => sum + op.valor, 0);
+      const totalReforcos = reforcos.reduce((sum, op) => sum + op.valor, 0);
+      const totalSangrias = sangrias.reduce((sum, op) => sum + op.valor, 0);
+
+      console.log('[CashClosingModal] Cálculo de valores esperados:', {
+        caixaInicial,
+        vendasDinheiro,
+        totalReforcos,
+        totalSangrias,
+        sangriasCount: sangrias.length,
+        reforcosCount: reforcos.length,
+      });
 
       return {
         cash: caixaInicial + vendasDinheiro + totalReforcos - totalSangrias,

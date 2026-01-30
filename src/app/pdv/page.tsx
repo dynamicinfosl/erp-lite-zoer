@@ -1613,15 +1613,30 @@ export default function PDVPage() {
         return acc;
       }, {} as Record<string, number>);
 
-      const totalReforcos = caixaOperations
-        .filter(op => op.tipo === 'reforco')
-        .reduce((sum, op) => sum + op.valor, 0);
+      // IMPORTANTE: Filtrar apenas sangrias e reforços (excluir abertura e fechamento)
+      const sangrias = caixaOperations.filter(op => op.tipo === 'sangria');
+      const reforcos = caixaOperations.filter(op => op.tipo === 'reforco');
       
-      const totalSangrias = caixaOperations
-        .filter(op => op.tipo === 'sangria')
-        .reduce((sum, op) => sum + op.valor, 0);
+      const totalReforcos = reforcos.reduce((sum, op) => sum + op.valor, 0);
+      const totalSangrias = sangrias.reduce((sum, op) => sum + op.valor, 0);
+
+      console.log('[PDV] Cálculo de fechamento:', {
+        caixaInicial,
+        vendasDinheiro: vendasPorMetodo['dinheiro'] || 0,
+        totalReforcos,
+        totalSangrias,
+        sangriasCount: sangrias.length,
+        reforcosCount: reforcos.length,
+        sangriasDetalhes: sangrias.map(s => ({ valor: s.valor, descricao: s.descricao })),
+        reforcosDetalhes: reforcos.map(r => ({ valor: r.valor, descricao: r.descricao })),
+      });
 
       const expectedCash = caixaInicial + (vendasPorMetodo['dinheiro'] || 0) + totalReforcos - totalSangrias;
+      
+      console.log('[PDV] Valor esperado em dinheiro:', {
+        formula: `caixaInicial (${caixaInicial}) + vendasDinheiro (${vendasPorMetodo['dinheiro'] || 0}) + reforcos (${totalReforcos}) - sangrias (${totalSangrias})`,
+        resultado: expectedCash
+      });
       const expectedCardDebit = vendasPorMetodo['cartao_debito'] || 0;
       const expectedCardCredit = vendasPorMetodo['cartao_credito'] || 0;
       const expectedPix = vendasPorMetodo['pix'] || 0;
