@@ -388,12 +388,15 @@ export default function VendasPage() {
       // A API pode retornar data, rows ou um array direto
       const allData = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
       
-      // Filtrar apenas vendas de PDV/balcão
-      // Incluir: sale_source = 'pdv', sale_type = 'balcao' ou 'entrega', ou vendas sem sale_source e sem sale_type='produtos'
+      // Filtrar vendas de PDV/balcão e API externa
+      // Incluir: sale_source = 'pdv' ou 'api', sale_type = 'balcao' ou 'entrega', ou vendas sem sale_source e sem sale_type='produtos'
       // NOTA: Vendas canceladas são carregadas mas filtradas na visualização padrão (filteredVendas)
+      // NOTA: Vendas da API aparecem na listagem mas NÃO contabilizam em caixa
       const data = allData.filter((s: any) => {
         // Vendas do PDV (marcadas explicitamente)
         if (s.sale_source === 'pdv') return true;
+        // Vendas da API externa (aparecem na listagem mas não contabilizam em caixa)
+        if (s.sale_source === 'api') return true;
         // Vendas de balcão ou entrega (tipo antigo)
         if (s.sale_type === 'balcao' || s.sale_type === 'entrega') return true;
         // Vendas sem sale_source e sem sale_type='produtos' (vendas antigas de balcão)
