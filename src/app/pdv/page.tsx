@@ -647,6 +647,26 @@ export default function PDVPage() {
             setCashSessionOpenedAt(openSession.opened_at);
             setCashSessionOpenedBy(openSession.opened_by);
             setCaixaInicial(parseFloat(openSession.opening_amount || openSession.initial_amount || 0));
+            
+            // Carregar operações de caixa da sessão
+            try {
+              const opsResponse = await fetch(`/next_api/cash-operations?tenant_id=${encodeURIComponent(tenant.id)}&cash_session_id=${encodeURIComponent(openSession.id)}`);
+              if (opsResponse.ok) {
+                const opsData = await opsResponse.json();
+                const operations = (opsData.data || []).map((op: any) => ({
+                  id: op.id,
+                  tipo: op.operation_type,
+                  valor: parseFloat(op.amount || 0),
+                  descricao: op.description || '',
+                  data: op.created_at,
+                  usuario: op.created_by || 'Sistema',
+                }));
+                setCaixaOperations(operations);
+                console.log('[PDV] Operações de caixa carregadas:', operations.length);
+              }
+            } catch (error) {
+              console.error('[PDV] Erro ao carregar operações de caixa:', error);
+            }
           } else {
             // Se não houver sessão aberta, inicializar com valores padrão
             setCashSessionOpenedAt(new Date().toISOString());
@@ -1413,6 +1433,27 @@ export default function PDVPage() {
         };
         
         setCaixaOperations(prev => [operation, ...prev]);
+        
+        // Salvar operação de abertura no banco (opcional, pois abertura já está na sessão)
+        // Mas vamos salvar para manter histórico completo
+        try {
+          await fetch('/next_api/cash-operations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tenant_id: tenant.id,
+              cash_session_id: result.data.id,
+              user_id: user?.id || null,
+              operation_type: 'abertura',
+              amount: openingData.opening_amount,
+              description: `Abertura de caixa - Valor inicial: ${formatCurrency(openingData.opening_amount)}`,
+              created_by: user?.email || 'Operador',
+            }),
+          });
+        } catch (error) {
+          console.error('Erro ao salvar operação de abertura no banco:', error);
+          // Não bloquear se falhar
+        }
 
         toast.success('Caixa aberto com sucesso!', {
           description: `Valor inicial: ${formatCurrency(openingData.opening_amount)}`,
@@ -1801,6 +1842,34 @@ export default function PDVPage() {
         return;
       }
     } else {
+      // Salvar operação no banco de dados se houver sessão de caixa aberta
+      if (currentCashSessionId && tenant?.id && (caixaOperationType === 'sangria' || caixaOperationType === 'reforco')) {
+        try {
+          const res = await fetch('/next_api/cash-operations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tenant_id: tenant.id,
+              cash_session_id: currentCashSessionId,
+              user_id: user?.id || null,
+              operation_type: caixaOperationType,
+              amount: valor,
+              description: descricao,
+              created_by: user?.email || 'Operador',
+            }),
+          });
+
+          if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            console.error('Erro ao salvar operação no banco:', errorData);
+            // Continuar mesmo se falhar para não bloquear o usuário
+          }
+        } catch (error) {
+          console.error('Erro ao salvar operação no banco:', error);
+          // Continuar mesmo se falhar para não bloquear o usuário
+        }
+      }
+
       const operation: CaixaOperation = {
         id: Date.now().toString(),
         tipo: caixaOperationType,

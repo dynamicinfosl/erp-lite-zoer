@@ -385,9 +385,7 @@ export default function CaixasPage() {
     console.log('[Caixas] Vendas encontradas para a sessão:', sales.length);
     setSessionSales(sales);
     
-    // Criar operações de caixa baseadas nos valores salvos na sessão
-    // Se a sessão já foi fechada antes, usar os valores salvos
-    // Caso contrário, criar operações vazias (serão preenchidas durante o fechamento)
+    // Buscar operações de caixa reais do banco de dados
     const operations: Array<{
       id: string;
       tipo: 'sangria' | 'reforco' | 'abertura' | 'fechamento';
@@ -397,7 +395,7 @@ export default function CaixasPage() {
       usuario: string;
     }> = [];
     
-    // Adicionar abertura como operação
+    // Adicionar abertura como operação (não está na tabela cash_operations)
     if (session.opening_amount || session.initial_amount) {
       const openingAmount = session.opening_amount || session.initial_amount || 0;
       operations.push({
@@ -410,46 +408,40 @@ export default function CaixasPage() {
       });
     }
     
-    // Buscar valores de sangrias e reforços da sessão (se já foram salvos)
-    // Esses valores são salvos quando o caixa é fechado no PDV
-    // Como não temos uma tabela de operações individuais, vamos usar os totais salvos
-    // e criar operações sintéticas para o cálculo
-    const totalWithdrawalsAmount = (session as any).total_withdrawals_amount || 0;
-    const totalSuppliesAmount = (session as any).total_supplies_amount || 0;
-    const totalWithdrawals = (session as any).total_withdrawals || 0;
-    const totalSupplies = (session as any).total_supplies || 0;
-    
-    // Se houver sangrias, criar uma operação sintética
-    if (totalWithdrawalsAmount > 0 && totalWithdrawals > 0) {
-      const avgWithdrawal = totalWithdrawalsAmount / totalWithdrawals;
-      for (let i = 0; i < totalWithdrawals; i++) {
-        operations.push({
-          id: `${session.id}-sangria-${i}`,
-          tipo: 'sangria',
-          valor: avgWithdrawal,
-          descricao: `Sangria de R$ ${avgWithdrawal.toFixed(2)}`,
-          data: session.opened_at, // Usar data de abertura como aproximação
-          usuario: session.opened_by || 'Sistema',
+    // Buscar operações reais do banco de dados
+    try {
+      if (tenant?.id) {
+        const opsResponse = await fetch(`/next_api/cash-operations?tenant_id=${encodeURIComponent(tenant.id)}&cash_session_id=${encodeURIComponent(session.id)}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
         });
+        
+        if (opsResponse.ok) {
+          const opsData = await opsResponse.json();
+          const dbOperations = (opsData.data || []).map((op: any) => ({
+            id: op.id,
+            tipo: op.operation_type,
+            valor: parseFloat(op.amount || 0),
+            descricao: op.description || op.notes || '',
+            data: op.created_at,
+            usuario: op.created_by || 'Sistema',
+          }));
+          
+          // Adicionar operações do banco (sangrias e reforços)
+          operations.push(...dbOperations);
+          console.log('[Caixas] Operações de caixa carregadas do banco:', dbOperations.length);
+        } else {
+          console.warn('[Caixas] Erro ao buscar operações do banco:', opsResponse.status);
+        }
       }
+    } catch (error) {
+      console.error('[Caixas] Erro ao buscar operações de caixa:', error);
     }
     
-    // Se houver reforços, criar uma operação sintética
-    if (totalSuppliesAmount > 0 && totalSupplies > 0) {
-      const avgSupply = totalSuppliesAmount / totalSupplies;
-      for (let i = 0; i < totalSupplies; i++) {
-        operations.push({
-          id: `${session.id}-reforco-${i}`,
-          tipo: 'reforco',
-          valor: avgSupply,
-          descricao: `Reforço de R$ ${avgSupply.toFixed(2)}`,
-          data: session.opened_at, // Usar data de abertura como aproximação
-          usuario: session.opened_by || 'Sistema',
-        });
-      }
-    }
-    
-    console.log('[Caixas] Operações de caixa criadas:', operations.length);
+    console.log('[Caixas] Total de operações de caixa:', operations.length);
     setSessionOperations(operations);
     
     // Mostrar modal de fechamento
