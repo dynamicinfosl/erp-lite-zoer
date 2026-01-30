@@ -309,7 +309,7 @@ async function listSalesHandler(request: NextRequest) {
     // Buscar apenas as vendas (select otimizado com apenas campos essenciais)
     let query = supabaseAdmin
       .from('sales')
-      .select('id, sale_number, customer_id, customer_name, total_amount, final_amount, discount_amount, payment_method, sale_type, sale_source, status, notes, created_at, updated_at');
+      .select('id, sale_number, customer_id, customer_name, total_amount, final_amount, discount_amount, payment_method, sale_type, sale_source, status, notes, created_at, updated_at, user_id');
 
     // Filtrar por tenant_id se fornecido
     if (tenant_id && tenant_id !== '00000000-0000-0000-0000-000000000000') {
