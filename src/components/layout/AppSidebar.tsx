@@ -141,10 +141,56 @@ function SidebarContentInternal() {
   const pathname = usePathname();
   const { user, tenant, signOut } = useSimpleAuth();
   const { enabled: isBranchesEnabled } = useBranch();
+  const [userRole, setUserRole] = useState<string>('vendedor');
   
-  
-  // Simular perfil do usuário baseado no role ou usar um perfil padrão se auth estiver desabilitado
-  const userRole = ENABLE_AUTH && user ? 'admin' : mockUserProfile.role;
+  // Buscar role real do usuário
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!ENABLE_AUTH || !user || !tenant) {
+        setUserRole(mockUserProfile.role);
+        return;
+      }
+
+      try {
+        // Buscar role via API tenant-users que já retorna o role correto
+        const timestamp = Date.now();
+        const res = await fetch(
+          `/next_api/tenant-users?tenant_id=${encodeURIComponent(tenant.id)}&user_id=${encodeURIComponent(user.id)}&_t=${timestamp}`,
+          { 
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache'
+            }
+          }
+        );
+        
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.data)) {
+            // Encontrar o usuário atual na lista
+            const currentUser = data.data.find((u: any) => u.id === user.id);
+            if (currentUser) {
+              // Mapear role para role do sidebar
+              if (currentUser.role === 'owner' || currentUser.role === 'admin') {
+                setUserRole('admin');
+                return;
+              }
+            }
+          }
+        }
+
+        // Padrão: vendedor/operador
+        setUserRole('vendedor');
+      } catch (error) {
+        console.error('Erro ao buscar role do usuário:', error);
+        // Em caso de erro, assumir vendedor por segurança
+        setUserRole('vendedor');
+      }
+    };
+
+    fetchUserRole();
+  }, [user, tenant]);
 
   // Nome para exibir (sempre tem algo)
   const displayName = tenant?.name || 

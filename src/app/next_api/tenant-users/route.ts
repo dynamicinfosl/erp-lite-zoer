@@ -80,6 +80,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Buscar usuários do tenant (sem join para evitar erro de relacionamento)
+    console.log(`[tenant-users GET] 🔍 Buscando usuários do tenant: ${tenant_id}`);
     const { data: memberships, error: memError } = await supabaseAdmin
       .from('user_memberships')
       .select('*')
@@ -87,18 +88,32 @@ export async function GET(request: NextRequest) {
       .eq('is_active', true);
 
     if (memError) {
+      console.error(`[tenant-users GET] ❌ Erro ao buscar memberships:`, memError);
       return NextResponse.json({ success: false, error: memError.message }, { status: 400 });
     }
 
-    // Buscar dados dos usuários
-    const userIds = memberships?.map((m: any) => m.user_id) || [];
+    console.log(`[tenant-users GET] ✅ Encontrados ${memberships?.length || 0} memberships para tenant ${tenant_id}`);
+    
+    // Validação adicional: garantir que todos os memberships pertencem ao tenant correto
+    const validMemberships = memberships?.filter((m: any) => m.tenant_id === tenant_id) || [];
+    const invalidMemberships = memberships?.filter((m: any) => m.tenant_id !== tenant_id) || [];
+    if (invalidMemberships.length > 0) {
+      console.error(`[tenant-users GET] ⚠️ ATENÇÃO: Encontrados ${invalidMemberships.length} memberships com tenant_id incorreto!`);
+      console.error(`[tenant-users GET] ⚠️ Tenant esperado: ${tenant_id}, mas encontrados:`, invalidMemberships.map((m: any) => ({ user_id: m.user_id, tenant_id: m.tenant_id })));
+    }
+    
+    // Usar apenas os memberships válidos
+    const filteredMemberships = validMemberships;
+
+    // Buscar dados dos usuários (usar apenas memberships válidos)
+    const userIds = filteredMemberships.map((m: any) => m.user_id) || [];
     const users: any[] = [];
 
     for (const userId of userIds) {
       try {
         const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
         if (authUser?.user) {
-          const membership = memberships?.find((m: any) => m.user_id === userId);
+          const membership = filteredMemberships.find((m: any) => m.user_id === userId);
           
           // Buscar branch_memberships separadamente
           const { data: branchMemberships } = await supabaseAdmin

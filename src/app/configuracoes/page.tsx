@@ -49,15 +49,24 @@ export default function ConfiguracoesPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      // Esta página está obsoleta - não deve buscar usuários de outros tenants
+      // Redirecionar para a página correta se necessário
       const res = await fetch('/next_api/user-profiles', {
         cache: 'no-store',
       });
       const json = await res.json();
       
       if (!res.ok || !json.success) {
+        // Se a API retornar erro 410 (Gone), redirecionar
+        if (res.status === 410) {
+          window.location.href = '/configuracoes/usuarios';
+          return;
+        }
         throw new Error(json.errorMessage || 'Erro ao carregar usuários');
       }
       
+      // ⚠️ AVISO: Esta API não filtra por tenant e pode mostrar usuários de outros tenants
+      // Esta página está obsoleta - use /configuracoes/usuarios
       setUsers(json.data || []);
     } catch (error: any) {
       console.error('Erro ao carregar usuários:', error);
