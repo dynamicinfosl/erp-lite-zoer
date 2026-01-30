@@ -111,6 +111,13 @@ interface Sale {
   forma_pagamento: string;
   data_venda: string;
   status: 'pendente' | 'paga' | 'cancelada';
+  created_at?: string;
+  itens?: Array<{
+    produto: string;
+    quantidade: number;
+    preco_unitario: number;
+    subtotal: number;
+  }>;
 }
 
 interface CaixaOperation {
