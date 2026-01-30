@@ -155,7 +155,36 @@ function SidebarContentInternal() {
       try {
         console.log('[Sidebar] 🔍 Buscando role do usuário:', { userId: user.id, tenantId: tenant.id, email: user.email });
         
-        // Método 1: Tentar API user-branch-info (mais simples e direta)
+        // Método 1: Tentar API user-role (nova API simples e direta)
+        try {
+          const roleRes = await fetch(
+            `/next_api/user-role?user_id=${encodeURIComponent(user.id)}&tenant_id=${encodeURIComponent(tenant.id)}&_t=${Date.now()}`,
+            { 
+              cache: 'no-store',
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+              }
+            }
+          );
+          
+          if (roleRes.ok) {
+            const roleData = await roleRes.json();
+            console.log('[Sidebar] 📦 Resposta da API user-role:', roleData);
+            if (roleData.success && roleData.data) {
+              const role = roleData.data.role;
+              if (role === 'admin') {
+                console.log('[Sidebar] ✅ Role determinado como ADMIN via user-role');
+                setUserRole('admin');
+                return;
+              }
+            }
+          }
+        } catch (roleError) {
+          console.warn('[Sidebar] ⚠️ Erro ao buscar via user-role, tentando método alternativo:', roleError);
+        }
+
+        // Método 2: Tentar API user-branch-info (fallback)
         try {
           const branchRes = await fetch(
             `/next_api/user-branch-info?user_id=${encodeURIComponent(user.id)}&_t=${Date.now()}`,
@@ -186,7 +215,7 @@ function SidebarContentInternal() {
           console.warn('[Sidebar] ⚠️ Erro ao buscar via user-branch-info, tentando método alternativo:', branchError);
         }
 
-        // Método 2: Tentar API tenant-users (fallback)
+        // Método 3: Tentar API tenant-users (fallback final)
         const timestamp = Date.now();
         const res = await fetch(
           `/next_api/tenant-users?tenant_id=${encodeURIComponent(tenant.id)}&user_id=${encodeURIComponent(user.id)}&_t=${timestamp}`,
@@ -241,6 +270,64 @@ function SidebarContentInternal() {
     (user?.email ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ') : 'Meu Negócio');
   
 
+  // Verificação adicional: se o item "Usuários" não aparecer, forçar verificação
+  const [forceCheck, setForceCheck] = useState(false);
+  
+  useEffect(() => {
+    // Se após 2 segundos o role ainda for 'vendedor' e o usuário existe, forçar nova verificação
+    if (user && tenant && userRole === 'vendedor' && !forceCheck) {
+      const timer = setTimeout(() => {
+        console.log('[Sidebar] ⏰ Timeout: Role ainda é vendedor após 2s, forçando nova verificação');
+        setForceCheck(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [user, tenant, userRole, forceCheck]);
+
+  // Se forceCheck for true, tentar novamente
+  useEffect(() => {
+      if (forceCheck && user && tenant) {
+        console.log('[Sidebar] 🔄 Forçando nova verificação de role...');
+        const fetchUserRoleAgain = async () => {
+          try {
+            // Tentar API user-role primeiro
+            const roleRes = await fetch(
+              `/next_api/user-role?user_id=${encodeURIComponent(user.id)}&tenant_id=${encodeURIComponent(tenant.id)}&_t=${Date.now()}`,
+              { cache: 'no-store' }
+            );
+            if (roleRes.ok) {
+              const roleData = await roleRes.json();
+              if (roleData.success && roleData.data && roleData.data.role === 'admin') {
+                console.log('[Sidebar] ✅ Role determinado como ADMIN na verificação forçada');
+                setUserRole('admin');
+                return;
+              }
+            }
+            
+            // Fallback para user-branch-info
+            const branchRes = await fetch(
+              `/next_api/user-branch-info?user_id=${encodeURIComponent(user.id)}&_t=${Date.now()}`,
+              { cache: 'no-store' }
+            );
+            if (branchRes.ok) {
+              const branchData = await branchRes.json();
+              if (branchData.success && branchData.data) {
+                const role = branchData.data.role;
+                const isMatrixAdmin = branchData.data.isMatrixAdmin;
+                if (role === 'owner' || role === 'admin' || isMatrixAdmin) {
+                  console.log('[Sidebar] ✅ Role determinado como ADMIN na verificação forçada (fallback)');
+                  setUserRole('admin');
+                }
+              }
+            }
+          } catch (error) {
+            console.error('[Sidebar] ❌ Erro na verificação forçada:', error);
+          }
+        };
+        fetchUserRoleAgain();
+      }
+  }, [forceCheck, user, tenant]);
+
   const filteredGroups = menuGroups.map(group => ({
     title: group.title,
     items: group.items
@@ -258,7 +345,9 @@ function SidebarContentInternal() {
             currentRole: userRole,
             hasRole,
             isBranchesEnabled,
-            shouldShow
+            shouldShow,
+            userExists: !!user,
+            tenantExists: !!tenant
           });
         }
         
@@ -267,8 +356,8 @@ function SidebarContentInternal() {
       .filter(item => (item.url === '/filiais' ? isBranchesEnabled : true)),
   })).filter(group => group.items.length > 0);
   
-  console.log('[Sidebar] 📊 Grupos filtrados:', filteredGroups.map(g => ({ title: g.title, itemsCount: g.items.length })));
-  console.log('[Sidebar] 👤 Role atual:', userRole);
+  console.log('[Sidebar] 📊 Grupos filtrados:', filteredGroups.map(g => ({ title: g.title, itemsCount: g.items.length, items: g.items.map((i: any) => i.title) })));
+  console.log('[Sidebar] 👤 Role atual:', userRole, '| User:', user?.email, '| Tenant:', tenant?.name);
 
 
   return (
