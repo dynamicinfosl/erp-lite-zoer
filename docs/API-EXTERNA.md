@@ -79,8 +79,40 @@ Cria uma nova venda. Quando `sale_type='entrega'`, cria automaticamente o regist
   "delivery_address": "Rua Exemplo, 123", // Obrigatório se sale_type="entrega"
   "delivery_neighborhood": "Centro",     // Opcional
   "delivery_phone": "11999999999",       // Obrigatório se sale_type="entrega"
-  "delivery_fee": 5.00,                  // Opcional - Taxa de entrega
+  "delivery_fee": 5.00,                  // Opcional - Taxa de entrega (apenas R$ 5,00 ou R$ 10,00)
   "notes": "Observações da venda"        // Opcional
+}
+```
+
+**🛡️ Validações de Cálculo e Entrega:**
+
+- **Validação de `delivery_fee`**: Se fornecido, o valor deve ser exatamente **R$ 5,00** ou **R$ 10,00**. Qualquer outro valor será rejeitado com erro `400`.
+- **Validação de `total_amount`**: O sistema valida se o `total_amount` fornecido corresponde à soma dos produtos (`price × quantity`) + `delivery_fee`. Diferenças maiores que R$ 0,01 serão rejeitadas com erro `400`.
+
+**Exemplo de Erro - Valor de Entrega Inválido:**
+```json
+{
+  "success": false,
+  "error": "Valor de entrega inválido. Apenas R$ 5,00 ou R$ 10,00 são permitidos. Valor fornecido: R$ 1,49",
+  "details": {
+    "provided_delivery_fee": 1.49,
+    "allowed_values": [5, 10]
+  }
+}
+```
+
+**Exemplo de Erro - Cálculo Incorreto:**
+```json
+{
+  "success": false,
+  "error": "Cálculo do valor total incorreto. O total_amount fornecido não corresponde à soma dos produtos + taxa de entrega.",
+  "details": {
+    "provided_total_amount": 823.46,
+    "calculated_products_total": 824.95,
+    "delivery_fee": 0,
+    "expected_total": 824.95,
+    "difference": "1.49"
+  }
 }
 ```
 
@@ -112,6 +144,10 @@ Cria uma nova venda. Quando `sale_type='entrega'`, cria automaticamente o regist
 ```
 
 **Nota:** Quando `sale_type='entrega'`, o sistema cria automaticamente um registro na tabela de entregas com status `'aguardando'`.
+
+**🛡️ Proteção contra cálculos incorretos:** O sistema valida automaticamente:
+- Se `delivery_fee` for fornecido, deve ser exatamente R$ 5,00 ou R$ 10,00
+- O `total_amount` deve corresponder à soma dos produtos + taxa de entrega (tolerância de R$ 0,01 para arredondamento)
 
 **🚫 Proteção contra vendas duplicadas:** Para evitar duplicidade, o sistema **bloqueia** a criação de vendas com as seguintes características idênticas:
 - Mesmo cliente (`customer_id` ou `customer_name`)

@@ -80,6 +80,56 @@ async function createSaleHandler(
       }
     }
 
+    // 🛡️ VALIDAÇÃO DE CÁLCULOS: Proteger contra valores de entrega incorretos
+    // Calcular soma dos produtos
+    const productsTotal = products.reduce((sum: number, product: any) => {
+      const price = Number(product.price) || 0;
+      const quantity = Number(product.quantity) || 0;
+      return sum + (price * quantity);
+    }, 0);
+
+    const totalAmountNum = parseFloat(String(total_amount));
+    const deliveryFeeNum = delivery_fee ? parseFloat(String(delivery_fee)) : 0;
+
+    // Validar delivery_fee se fornecido (apenas R$ 5 ou R$ 10 são permitidos)
+    if (delivery_fee !== null && delivery_fee !== undefined) {
+      if (deliveryFeeNum !== 5 && deliveryFeeNum !== 10) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: `Valor de entrega inválido. Apenas R$ 5,00 ou R$ 10,00 são permitidos. Valor fornecido: R$ ${deliveryFeeNum.toFixed(2)}`,
+            details: {
+              provided_delivery_fee: deliveryFeeNum,
+              allowed_values: [5, 10]
+            }
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validar se o total_amount está correto
+    const expectedTotal = productsTotal + deliveryFeeNum;
+    const difference = Math.abs(totalAmountNum - expectedTotal);
+    
+    // Tolerar diferença de até 0.01 centavos (arredondamento)
+    if (difference > 0.01) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `Cálculo do valor total incorreto. O total_amount fornecido não corresponde à soma dos produtos + taxa de entrega.`,
+          details: {
+            provided_total_amount: totalAmountNum,
+            calculated_products_total: productsTotal,
+            delivery_fee: deliveryFeeNum,
+            expected_total: expectedTotal,
+            difference: difference.toFixed(2)
+          }
+        },
+        { status: 400 }
+      );
+    }
+
     // 🚫 PROIBIR VENDAS DUPLICADAS: mesmo cliente + mesmo valor + mesmo dia + mesma quantidade de produtos
     const hasCustomerId = customer_id != null && customer_id !== undefined && customer_id !== '';
     const customerNameTrimmed = (customer_name || '').trim();
@@ -90,7 +140,6 @@ async function createSaleHandler(
       const now = new Date();
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
       const startOfDayISO = startOfDay.toISOString();
-      const totalAmountNum = parseFloat(String(total_amount));
       const productCount = products.length;
 
       // Buscar vendas do mesmo cliente, mesmo valor, criadas hoje
