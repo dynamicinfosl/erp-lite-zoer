@@ -2979,6 +2979,76 @@ export default function PDVPage() {
                   </span>
                 </div>
               </div>
+
+              {/* Operações de Caixa (Sangrias e Reforços) */}
+              {caixaOperations.filter(op => op.tipo === 'sangria' || op.tipo === 'reforco').length > 0 && (
+                <div className="border-t pt-4 mt-6">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <Wallet className="h-4 w-4" />
+                    Operações de Caixa
+                  </h3>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {caixaOperations
+                      .filter(op => op.tipo === 'sangria' || op.tipo === 'reforco')
+                      .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+                      .map((op) => (
+                        <Card key={op.id} className={`juga-card ${
+                          op.tipo === 'reforco'
+                            ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/20'
+                            : 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/20'
+                        }`}>
+                          <CardContent className="p-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant={op.tipo === 'reforco' ? 'default' : 'destructive'}
+                                  className={
+                                    op.tipo === 'reforco'
+                                      ? 'bg-green-600 hover:bg-green-700'
+                                      : 'bg-red-600 hover:bg-red-700'
+                                  }
+                                >
+                                  {op.tipo === 'reforco' ? 'Reforço' : 'Sangria'}
+                                </Badge>
+                                <span className="text-sm font-semibold">
+                                  {formatCurrency(op.valor)}
+                                </span>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {new Date(op.data).toLocaleString('pt-BR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </div>
+                            </div>
+                            {op.descricao && (
+                              <p className="text-xs text-muted-foreground mt-1">{op.descricao}</p>
+                            )}
+                            {op.usuario && (
+                              <p className="text-xs text-muted-foreground mt-1">Por: {op.usuario}</p>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                  </div>
+                  <div className="mt-3 p-3 bg-muted rounded-lg">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">Total Reforços:</span>
+                      <span className="font-semibold text-green-600 dark:text-green-400">
+                        {formatCurrency(totalReforcos)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm mt-1">
+                      <span className="text-muted-foreground">Total Sangrias:</span>
+                      <span className="font-semibold text-red-600 dark:text-red-400">
+                        {formatCurrency(totalSangrias)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

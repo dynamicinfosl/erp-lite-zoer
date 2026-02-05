@@ -29,7 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Wallet, RefreshCw, Search, User, Calendar, DollarSign, Lock, Eye, Printer, AlertCircle } from 'lucide-react';
+import { Wallet, RefreshCw, Search, User, Calendar, DollarSign, Lock, Eye, Printer, AlertCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { TenantPageWrapper } from '@/components/layout/PageWrapper';
@@ -80,6 +80,14 @@ export default function CaixasPage() {
   const [closingId, setClosingId] = useState<string | null>(null);
   const [confirmCloseId, setConfirmCloseId] = useState<string | null>(null);
   const [detailsSession, setDetailsSession] = useState<CashSession | null>(null);
+  const [detailsOperations, setDetailsOperations] = useState<Array<{
+    id: string;
+    tipo: 'sangria' | 'reforco' | 'abertura' | 'fechamento';
+    valor: number;
+    descricao: string;
+    data: string;
+    usuario: string;
+  }>>([]);
   const [userNamesMap, setUserNamesMap] = useState<Map<string, string>>(new Map());
   const [showCashClosingModal, setShowCashClosingModal] = useState(false);
   const [sessionToClose, setSessionToClose] = useState<CashSession | null>(null);
@@ -92,6 +100,55 @@ export default function CaixasPage() {
     data: string;
     usuario: string;
   }>>([]);
+
+  // Carregar operações de caixa para o modal de detalhes
+  const loadDetailsOperations = useCallback(async (session: CashSession) => {
+    if (!tenant?.id || !session.id) {
+      setDetailsOperations([]);
+      return;
+    }
+
+    try {
+      const sessionIdStr = typeof session.id === 'number' 
+        ? String(session.id) 
+        : String(session.id).trim();
+      
+      const opsResponse = await fetch(`/next_api/cash-operations?tenant_id=${encodeURIComponent(tenant.id)}&cash_session_id=${encodeURIComponent(sessionIdStr)}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (opsResponse.ok) {
+        const opsData = await opsResponse.json();
+        const operations = (opsData.data || []).map((op: any) => ({
+          id: op.id,
+          tipo: op.operation_type,
+          valor: parseFloat(op.amount || 0),
+          descricao: op.description || op.notes || '',
+          data: op.created_at,
+          usuario: op.created_by || 'Sistema',
+        }));
+        setDetailsOperations(operations);
+      } else {
+        setDetailsOperations([]);
+      }
+    } catch (error) {
+      console.error('[Caixas] Erro ao buscar operações para detalhes:', error);
+      setDetailsOperations([]);
+    }
+  }, [tenant?.id]);
+
+  // Carregar operações quando o modal de detalhes abrir
+  useEffect(() => {
+    if (detailsSession) {
+      loadDetailsOperations(detailsSession);
+    } else {
+      setDetailsOperations([]);
+    }
+  }, [detailsSession, loadDetailsOperations]);
 
   // Carregar nomes dos usuários
   const loadUserNames = useCallback(async () => {
@@ -967,6 +1024,59 @@ export default function CaixasPage() {
                             <span className="text-sm text-muted-foreground">Valor Total Vendido:</span>
                             <span className="text-sm font-medium">{formatCurrency(Number(detailsSession.total_sales_amount || 0))}</span>
                           </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Lista de Operações de Caixa (Sangrias e Reforços) */}
+                    {detailsOperations.filter(op => op.tipo === 'sangria' || op.tipo === 'reforco').length > 0 && (
+                      <div className="border-t pt-4">
+                        <h4 className="font-semibold mb-3">Operações de Caixa (Sangrias e Reforços)</h4>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {detailsOperations
+                            .filter(op => op.tipo === 'sangria' || op.tipo === 'reforco')
+                            .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+                            .map((op) => (
+                              <div
+                                key={op.id}
+                                className={`flex items-center justify-between p-3 rounded-lg border ${
+                                  op.tipo === 'reforco'
+                                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                                    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                                }`}
+                              >
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <Badge
+                                      variant={op.tipo === 'reforco' ? 'default' : 'destructive'}
+                                      className={
+                                        op.tipo === 'reforco'
+                                          ? 'bg-green-600 hover:bg-green-700'
+                                          : 'bg-red-600 hover:bg-red-700'
+                                      }
+                                    >
+                                      {op.tipo === 'reforco' ? 'Reforço' : 'Sangria'}
+                                    </Badge>
+                                    <span className="text-sm font-semibold">
+                                      {formatCurrency(op.valor)}
+                                    </span>
+                                  </div>
+                                  {op.descricao && (
+                                    <p className="text-xs text-muted-foreground mt-1">{op.descricao}</p>
+                                  )}
+                                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                                    <Calendar className="h-3 w-3" />
+                                    <span>{formatDate(op.data)}</span>
+                                    {op.usuario && (
+                                      <>
+                                        <span>•</span>
+                                        <span>Por: {op.usuario}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                         </div>
                       </div>
                     )}

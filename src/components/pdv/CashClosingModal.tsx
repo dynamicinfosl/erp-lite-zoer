@@ -369,6 +369,64 @@ export function CashClosingModal({
             </CardContent>
           </Card>
 
+          {/* Lista de Operações de Caixa (Sangrias e Reforços) */}
+          {caixaOperations.filter(op => op.tipo === 'sangria' || op.tipo === 'reforco').length > 0 && (
+            <Card>
+              <CardContent className="pt-6">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Operações de Caixa (Sangrias e Reforços)
+                </h3>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {caixaOperations
+                    .filter(op => op.tipo === 'sangria' || op.tipo === 'reforco')
+                    .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+                    .map((op) => (
+                      <div
+                        key={op.id}
+                        className={`flex items-center justify-between p-3 rounded-lg border ${
+                          op.tipo === 'reforco'
+                            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                        }`}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant={op.tipo === 'reforco' ? 'default' : 'destructive'}
+                              className={
+                                op.tipo === 'reforco'
+                                  ? 'bg-green-600 hover:bg-green-700'
+                                  : 'bg-red-600 hover:bg-red-700'
+                              }
+                            >
+                              {op.tipo === 'reforco' ? 'Reforço' : 'Sangria'}
+                            </Badge>
+                            <span className="text-sm font-semibold">
+                              {formatCurrency(op.valor)}
+                            </span>
+                          </div>
+                          {op.descricao && (
+                            <p className="text-xs text-muted-foreground mt-1">{op.descricao}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            <span>{formatDateTime(op.data)}</span>
+                            {op.usuario && (
+                              <>
+                                <span>•</span>
+                                <span>Por: {op.usuario}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Valores Esperados vs Contados */}
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Valores Esperados vs Contados</h3>
@@ -645,6 +703,10 @@ export function CashClosingModal({
     </Dialog>
   );
 }
+
+
+
+
 
 
 
