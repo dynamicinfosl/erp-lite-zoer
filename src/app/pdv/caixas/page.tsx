@@ -804,17 +804,28 @@ export default function CaixasPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           {s.status === 'open' ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => prepareCloseSession(s)}
-                              disabled={closingId !== null}
-                              className="text-amber-700 border-amber-300 hover:bg-amber-50"
-                            >
-                              <Lock className="h-3.5 w-3.5 mr-1" />
-                              Fechar
-                            </Button>
+                            <div className="flex items-center gap-2 justify-end">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDetailsSession(s)}
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => prepareCloseSession(s)}
+                                disabled={closingId !== null}
+                                className="text-amber-700 border-amber-300 hover:bg-amber-50"
+                              >
+                                <Lock className="h-3.5 w-3.5 mr-1" />
+                                Fechar
+                              </Button>
+                            </div>
                           ) : (
                             <div className="flex items-center gap-2 justify-end">
                               <Button
@@ -868,13 +879,17 @@ export default function CaixasPage() {
           />
         )}
 
-        {/* Modal de detalhes do fechamento */}
+        {/* Modal de detalhes do caixa */}
         <Dialog open={detailsSession !== null} onOpenChange={(open) => !open && setDetailsSession(null)}>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Detalhes do Fechamento de Caixa</DialogTitle>
+              <DialogTitle>
+                {detailsSession?.status === 'open' ? 'Visualização do Caixa' : 'Detalhes do Fechamento de Caixa'}
+              </DialogTitle>
               <DialogDescription>
-                Informações completas da sessão de caixa
+                {detailsSession?.status === 'open' 
+                  ? 'Visualize as movimentações do caixa em tempo real'
+                  : 'Informações completas da sessão de caixa'}
               </DialogDescription>
             </DialogHeader>
             {detailsSession && (
@@ -909,6 +924,104 @@ export default function CaixasPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Lista de Operações de Caixa (Sangrias e Reforços) - Disponível para caixas abertos e fechados */}
+                {detailsOperations.filter(op => op.tipo === 'sangria' || op.tipo === 'reforco').length > 0 && (
+                  <div className="border-t pt-4">
+                    <h4 className="font-semibold mb-3">Operações de Caixa (Sangrias e Reforços)</h4>
+                    
+                    {/* Resumo das operações para caixas abertos */}
+                    {detailsSession?.status === 'open' && (
+                      <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Total de Sangrias</Label>
+                            <p className="text-sm font-semibold text-red-600">
+                              {detailsOperations.filter(op => op.tipo === 'sangria').length} operação(ões)
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatCurrency(
+                                detailsOperations
+                                  .filter(op => op.tipo === 'sangria')
+                                  .reduce((sum, op) => sum + op.valor, 0)
+                              )}
+                            </p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Total de Reforços</Label>
+                            <p className="text-sm font-semibold text-green-600">
+                              {detailsOperations.filter(op => op.tipo === 'reforco').length} operação(ões)
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatCurrency(
+                                detailsOperations
+                                  .filter(op => op.tipo === 'reforco')
+                                  .reduce((sum, op) => sum + op.valor, 0)
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {detailsOperations
+                        .filter(op => op.tipo === 'sangria' || op.tipo === 'reforco')
+                        .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+                        .map((op) => (
+                          <div
+                            key={op.id}
+                            className={`flex items-center justify-between p-3 rounded-lg border ${
+                              op.tipo === 'reforco'
+                                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                                : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                            }`}
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant={op.tipo === 'reforco' ? 'default' : 'destructive'}
+                                  className={
+                                    op.tipo === 'reforco'
+                                      ? 'bg-green-600 hover:bg-green-700'
+                                      : 'bg-red-600 hover:bg-red-700'
+                                  }
+                                >
+                                  {op.tipo === 'reforco' ? 'Reforço' : 'Sangria'}
+                                </Badge>
+                                <span className="text-sm font-semibold">
+                                  {formatCurrency(op.valor)}
+                                </span>
+                              </div>
+                              {op.descricao && (
+                                <p className="text-xs text-muted-foreground mt-1">{op.descricao}</p>
+                              )}
+                              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                                <Calendar className="h-3 w-3" />
+                                <span>{formatDate(op.data)}</span>
+                                {op.usuario && (
+                                  <>
+                                    <span>•</span>
+                                    <span>Por: {op.usuario}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {detailsOperations.filter(op => op.tipo === 'sangria' || op.tipo === 'reforco').length === 0 && detailsSession.status === 'open' && (
+                  <div className="border-t pt-4">
+                    <div className="text-center py-6 text-muted-foreground">
+                      <AlertCircle className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm">Nenhuma movimentação registrada ainda</p>
+                      <p className="text-xs mt-1">As sangrias e reforços aparecerão aqui quando forem realizadas</p>
+                    </div>
+                  </div>
+                )}
 
                 {detailsSession.status === 'closed' && (
                   <>
@@ -1024,59 +1137,6 @@ export default function CaixasPage() {
                             <span className="text-sm text-muted-foreground">Valor Total Vendido:</span>
                             <span className="text-sm font-medium">{formatCurrency(Number(detailsSession.total_sales_amount || 0))}</span>
                           </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Lista de Operações de Caixa (Sangrias e Reforços) */}
-                    {detailsOperations.filter(op => op.tipo === 'sangria' || op.tipo === 'reforco').length > 0 && (
-                      <div className="border-t pt-4">
-                        <h4 className="font-semibold mb-3">Operações de Caixa (Sangrias e Reforços)</h4>
-                        <div className="space-y-2 max-h-60 overflow-y-auto">
-                          {detailsOperations
-                            .filter(op => op.tipo === 'sangria' || op.tipo === 'reforco')
-                            .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
-                            .map((op) => (
-                              <div
-                                key={op.id}
-                                className={`flex items-center justify-between p-3 rounded-lg border ${
-                                  op.tipo === 'reforco'
-                                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-                                    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                                }`}
-                              >
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <Badge
-                                      variant={op.tipo === 'reforco' ? 'default' : 'destructive'}
-                                      className={
-                                        op.tipo === 'reforco'
-                                          ? 'bg-green-600 hover:bg-green-700'
-                                          : 'bg-red-600 hover:bg-red-700'
-                                      }
-                                    >
-                                      {op.tipo === 'reforco' ? 'Reforço' : 'Sangria'}
-                                    </Badge>
-                                    <span className="text-sm font-semibold">
-                                      {formatCurrency(op.valor)}
-                                    </span>
-                                  </div>
-                                  {op.descricao && (
-                                    <p className="text-xs text-muted-foreground mt-1">{op.descricao}</p>
-                                  )}
-                                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                                    <Calendar className="h-3 w-3" />
-                                    <span>{formatDate(op.data)}</span>
-                                    {op.usuario && (
-                                      <>
-                                        <span>•</span>
-                                        <span>Por: {op.usuario}</span>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
                         </div>
                       </div>
                     )}
