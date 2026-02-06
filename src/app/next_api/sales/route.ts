@@ -296,6 +296,7 @@ async function listSalesHandler(request: NextRequest) {
     const branch_id = searchParams.get('branch_id'); // ✅ Novo: filtrar por filial
     const branch_scope = searchParams.get('branch_scope'); // 'all' | 'branch'
     const tzParam = searchParams.get('tz'); // minutos de offset do fuso (ex: -180 para BRT)
+    const user_id = searchParams.get('user_id'); // filtrar por operador/vendedor
 
     console.log(`💰 [SALES API] GET /sales INICIADO`);
     console.log(`💰 [SALES API] tenant_id: ${tenant_id}`);
@@ -347,6 +348,12 @@ async function listSalesHandler(request: NextRequest) {
     if (sale_source) {
       query = query.eq('sale_source', sale_source);
       console.log(`🔍 Filtrando por sale_source: ${sale_source}`);
+    }
+
+    // Filtrar por operador/usuário (user_id) se fornecido
+    if (user_id && user_id.trim() !== '') {
+      query = query.eq('user_id', user_id.trim());
+      console.log(`🔍 Filtrando por operador (user_id): ${user_id}`);
     }
 
     // Se solicitado apenas vendas de hoje

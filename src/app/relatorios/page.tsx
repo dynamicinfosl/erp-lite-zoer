@@ -26,11 +26,15 @@ import {
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, LineChart, Line, PieChart, Pie, Cell, LabelList, CartesianGrid, Tooltip } from 'recharts';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { User } from 'lucide-react';
 
 const COLORS = ['#2563eb', '#22c55e', '#f97316', '#a855f7', '#0ea5e9'];
 
+type TenantUser = { id: string; email?: string; name?: string | null; role?: string };
+
 export default function RelatoriosPage() {
-  const { tenant } = useSimpleAuth();
+  const { tenant, user } = useSimpleAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [sales, setSales] = useState<any[]>([]);
@@ -42,6 +46,8 @@ export default function RelatoriosPage() {
   const [activeExport, setActiveExport] = useState<'all' | 'financial' | 'sales' | 'logistics'>('all');
   const [activeTab, setActiveTab] = useState<'vendas' | 'financeiro' | 'produtos' | 'entregas'>('vendas');
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [operatorUserId, setOperatorUserId] = useState<string>('');
+  const [tenantUsers, setTenantUsers] = useState<TenantUser[]>([]);
   
   // Determinar qual semestre estamos (para o título do gráfico)
   const currentSemester = useMemo(() => {
@@ -74,12 +80,25 @@ export default function RelatoriosPage() {
       }
 
       const tz = -new Date().getTimezoneOffset();
+      const salesParams = new URLSearchParams({
+        tenant_id: tenant.id,
+        tz: String(tz),
+        branch_scope: 'all',
+      });
+      if (operatorUserId) salesParams.set('user_id', operatorUserId);
+      const reportParams = new URLSearchParams({
+        tenant_id: tenant.id,
+        start: dateRange.start,
+        end: dateRange.end,
+      });
+      if (operatorUserId) reportParams.set('user_id', operatorUserId);
+
       const [salesRes, productsRes, transactionsRes, deliveriesRes, reportRes] = await Promise.allSettled([
-        fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}&tz=${tz}`),
+        fetch(`/next_api/sales?${salesParams.toString()}`),
         fetch(`/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`),
         fetch(`/next_api/financial-transactions?tenant_id=${encodeURIComponent(tenant.id)}`),
-        fetch(`/next_api/deliveries?tenant_id=${encodeURIComponent(tenant.id)}`),
-        fetch(`/next_api/reports/sales?tenant_id=${encodeURIComponent(tenant.id)}&start=${dateRange.start}&end=${dateRange.end}`),
+        fetch(`/next_api/deliveries?tenant_id=${encodeURIComponent(tenant.id)}&limit=500`),
+        fetch(`/next_api/reports/sales?${reportParams.toString()}`),
       ]);
 
       const salesData = salesRes.status === 'fulfilled' ? await salesRes.value.json() : { data: [] };
@@ -119,7 +138,7 @@ export default function RelatoriosPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id, dateRange]);
+  }, [tenant?.id, dateRange, operatorUserId]);
 
   useEffect(() => {
     console.log('🔄 useEffect disparado - tenant:', tenant?.id, 'dateRange:', dateRange);
@@ -130,6 +149,29 @@ export default function RelatoriosPage() {
     console.log('📊 Carregando dados...');
     loadData();
   }, [tenant?.id, dateRange, loadData]);
+
+  // Carregar lista de operadores/usuários do tenant para o filtro
+  useEffect(() => {
+    if (!tenant?.id || !user?.id) {
+      setTenantUsers([]);
+      return;
+    }
+    const loadTenantUsers = async () => {
+      try {
+        const res = await fetch(
+          `/next_api/tenant-users?tenant_id=${encodeURIComponent(tenant.id)}&user_id=${encodeURIComponent(user.id)}`
+        );
+        if (res.ok) {
+          const json = await res.json();
+          const list = Array.isArray(json?.data) ? json.data : [];
+          setTenantUsers(list);
+        }
+      } catch {
+        setTenantUsers([]);
+      }
+    };
+    loadTenantUsers();
+  }, [tenant?.id, user?.id]);
 
   // Detectar dark mode
   useEffect(() => {
@@ -669,7 +711,7 @@ export default function RelatoriosPage() {
     () => [
       {
         title: 'Faturamento no período',
-        value: formatCurrency(report?.totalRevenue ?? salesStats.totalAmount),
+        value: formatCurrency((report?.totalRevenue != null && report.totalRevenue > 0) ? report.totalRevenue : salesStats.totalAmount),
         description: `${salesStats.totalSales} vendas concluídas`,
         trend: 'up' as const,
         trendValue: '+8,2%',
@@ -678,8 +720,8 @@ export default function RelatoriosPage() {
       },
       {
         title: 'Lucro no período',
-        value: formatCurrency(report?.totalProfit ?? 0),
-        description: `Margem ${report ? report.profitMargin + '%' : '-'}`,
+        value: formatCurrency((report?.totalProfit != null && report.totalProfit !== 0) ? report.totalProfit : (report?.totalRevenue != null && report.totalRevenue > 0 ? (report.totalRevenue - (report?.totalCost ?? 0)) : 0)),
+        description: `Margem ${report && (report.totalRevenue > 0) ? report.profitMargin + '%' : '-'}`,
         trend: 'neutral' as const,
         trendValue: '—',
         icon: <TrendingUp className="h-4 w-4" />,
@@ -704,9 +746,9 @@ export default function RelatoriosPage() {
         color: 'success' as const,
       },
       {
-        title: 'Entregas concluídas',
-        value: `${filteredDeliveries.filter((d) => d.status === 'entregue').length}`,
-        description: `${filteredDeliveries.length} no período`,
+        title: 'Entregas no período',
+        value: `${filteredDeliveries.length}`,
+        description: `${filteredDeliveries.filter((d) => (d.status || '').toLowerCase() === 'entregue').length} concluídas`,
         trend: 'up' as const,
         trendValue: '+5%',
         icon: <Truck className="h-4 w-4" />,
@@ -755,6 +797,22 @@ export default function RelatoriosPage() {
               className="h-10 border-none bg-transparent focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-0 text-heading font-medium"
             />
             <Calendar className="absolute right-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+          </div>
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-background/70 dark:bg-gray-900/60 px-3 py-2 shadow-sm min-w-[200px]">
+            <User className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Select value={operatorUserId || 'all'} onValueChange={(v) => setOperatorUserId(v === 'all' ? '' : v)}>
+              <SelectTrigger className="h-10 border-0 bg-transparent focus:ring-0 focus:ring-offset-0 shadow-none px-0 w-full text-foreground font-medium min-w-0">
+                <SelectValue placeholder="Todos os operadores" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os operadores</SelectItem>
+                {tenantUsers.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name || u.email || u.id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <Button className="juga-gradient text-white w-full sm:w-auto">
             <Download className="h-4 w-4 mr-2" />
@@ -892,7 +950,7 @@ export default function RelatoriosPage() {
                           <span className="text-[9px] sm:text-[11px] text-green-700 dark:text-green-300 font-semibold uppercase tracking-wide">Receita</span>
                         </div>
                         <span className="text-sm sm:text-base font-bold text-green-700 dark:text-green-300">
-                          {formatCurrency((report?.totalRevenue ?? 0) as number)}
+                          {formatCurrency(((report?.totalRevenue != null && report.totalRevenue > 0) ? report.totalRevenue : salesStats.totalAmount) as number)}
                         </span>
                       </div>
                       <div className="flex flex-col items-center gap-1.5 py-2 px-2.5 rounded-lg bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/30 dark:to-rose-900/30 border border-red-200 dark:border-red-800 shadow-sm">
@@ -910,7 +968,7 @@ export default function RelatoriosPage() {
                           <span className="text-[9px] sm:text-[11px] text-blue-700 dark:text-blue-300 font-semibold uppercase tracking-wide">Lucro</span>
                         </div>
                         <span className="text-sm sm:text-base font-bold text-blue-700 dark:text-blue-300">
-                          {formatCurrency((report?.totalProfit ?? 0) as number)}
+                          {formatCurrency((report?.totalProfit != null && report.totalProfit !== 0) ? report.totalProfit : ((report?.totalRevenue ?? 0) - (report?.totalCost ?? 0)) as number)}
                         </span>
                       </div>
                     </div>
@@ -920,9 +978,9 @@ export default function RelatoriosPage() {
                       <BarChart
                         data={[{
                           name: 'Financeiro',
-                          receita: report?.totalRevenue ?? 0,
+                          receita: (report?.totalRevenue != null && report.totalRevenue > 0) ? report.totalRevenue : salesStats.totalAmount,
                           custo: report?.totalCost ?? 0,
-                          lucro: report?.totalProfit ?? 0,
+                          lucro: (report?.totalProfit != null && report.totalProfit !== 0) ? report.totalProfit : ((report?.totalRevenue ?? 0) - (report?.totalCost ?? 0)),
                         }]}
                         margin={{ top: 12, right: 8, left: 8, bottom: 8 }}
                         barGap={8}
@@ -971,11 +1029,11 @@ export default function RelatoriosPage() {
                     </ResponsiveContainer>
 
                     {/* Estado vazio melhorado */}
-                    {((report?.totalRevenue ?? 0) === 0 && (report?.totalCost ?? 0) === 0 && (report?.totalProfit ?? 0) === 0) && (
+                    {(salesStats.totalAmount === 0 && (report?.totalRevenue ?? 0) === 0 && (report?.totalCost ?? 0) === 0 && (report?.totalProfit ?? 0) === 0) && (
                       <div className="flex flex-col items-center justify-center py-6 text-center">
                         <DollarSign className="h-8 w-8 text-gray-300 dark:text-gray-600 mb-2" />
                         <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Sem dados no período selecionado</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Ajuste o filtro de datas para visualizar os dados</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Ajuste o filtro de datas ou operador para visualizar os dados</p>
                       </div>
                     )}
                   </CardContent>
