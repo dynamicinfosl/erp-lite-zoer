@@ -61,6 +61,7 @@ import { toast } from 'sonner';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { useBranch } from '@/contexts/BranchContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { TenantPageWrapper } from '@/components/layout/PageWrapper';
 
 interface Sale {
@@ -193,7 +194,7 @@ interface ColumnVisibility {
 }
 
 export default function VendasPage() {
-  const { tenant } = useSimpleAuth();
+  const { tenant, user } = useSimpleAuth();
   const { enabled: branchesEnabled, loading: branchLoading, branches, branchId, scope, currentBranch, isMatrixAdmin } = useBranch();
   const [vendas, setVendas] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -233,12 +234,17 @@ export default function VendasPage() {
     status: '',
     forma_pagamento: '',
     vendedor: '',
+    vendedor_user_id: '', // ID do operador selecionado (para filtro por operador)
     cliente: '',
     data_inicio: '',
     data_fim: '',
     valor_min: '',
     valor_max: ''
   });
+
+  // Lista de operadores do tenant (para filtro por vendedor)
+  const [tenantUsers, setTenantUsers] = useState<Array<{ id: string; email?: string; name?: string | null }>>([]);
+  const { isAdmin } = useUserRole(tenant?.id, user?.id);
 
   // Lista de clientes para autocomplete
   const [customersList, setCustomersList] = useState<QuickCustomer[]>([]);
@@ -297,6 +303,30 @@ export default function VendasPage() {
     }
   }, [showAdvancedSearch, loadCustomers]);
 
+  // Carregar lista de operadores do tenant (só admin precisa para filtrar por operador)
+  useEffect(() => {
+    if (!tenant?.id || !user?.id || !isAdmin) {
+      setTenantUsers([]);
+      return;
+    }
+    if (!showAdvancedSearch) return;
+    const loadTenantUsers = async () => {
+      try {
+        const res = await fetch(
+          `/next_api/tenant-users?tenant_id=${encodeURIComponent(tenant.id)}&user_id=${encodeURIComponent(user.id)}`
+        );
+        if (res.ok) {
+          const json = await res.json();
+          const list = Array.isArray(json?.data) ? json.data : [];
+          setTenantUsers(list);
+        }
+      } catch {
+        setTenantUsers([]);
+      }
+    };
+    loadTenantUsers();
+  }, [tenant?.id, user?.id, isAdmin, showAdvancedSearch]);
+
   const loadVendas = useCallback(async () => {
     try {
       setLoading(true);
@@ -354,6 +384,12 @@ export default function VendasPage() {
         // Se está em uma filial, buscar vendas da filial
         params.set('branch_id', String(branchId));
         console.log(`🔄 [Filial ${branchId}] Buscando vendas da filial`);
+      }
+
+      // Filtrar por operador (user_id) se selecionado
+      if (advancedFilters.vendedor_user_id && advancedFilters.vendedor_user_id.trim()) {
+        params.set('user_id', advancedFilters.vendedor_user_id.trim());
+        console.log(`🔍 Filtrando por operador: ${advancedFilters.vendedor_user_id}`);
       }
       
       const url = `/next_api/sales?${params.toString()}`;
@@ -471,7 +507,7 @@ export default function VendasPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id, branchesEnabled, branchLoading, branches, branchId, scope, currentBranch, isMatrixAdmin]);
+  }, [tenant?.id, branchesEnabled, branchLoading, branches, branchId, scope, currentBranch, isMatrixAdmin, advancedFilters.vendedor_user_id]);
 
   useEffect(() => {
     loadVendas();
@@ -495,21 +531,21 @@ export default function VendasPage() {
                              (!advancedFilters.valor_min || venda.total >= parseFloat(advancedFilters.valor_min)) &&
                              (!advancedFilters.valor_max || venda.total <= parseFloat(advancedFilters.valor_max));
 
-      // Filtro de período
+      // Filtro de período (usar horário local para evitar problema de timezone)
       if (advancedFilters.data_inicio || advancedFilters.data_fim) {
         const vendaDate = new Date(venda.data_venda);
-        vendaDate.setHours(0, 0, 0, 0);
+        const vendaLocal = new Date(vendaDate.getFullYear(), vendaDate.getMonth(), vendaDate.getDate(), 0, 0, 0, 0);
         
         if (advancedFilters.data_inicio) {
-          const inicioDate = new Date(advancedFilters.data_inicio);
-          inicioDate.setHours(0, 0, 0, 0);
-          if (vendaDate < inicioDate) return false;
+          const [yi, mi, di] = advancedFilters.data_inicio.split('-').map(Number);
+          const inicioDate = new Date(yi, (mi || 1) - 1, di || 1, 0, 0, 0, 0);
+          if (vendaLocal < inicioDate) return false;
         }
         
         if (advancedFilters.data_fim) {
-          const fimDate = new Date(advancedFilters.data_fim);
-          fimDate.setHours(23, 59, 59, 999);
-          if (vendaDate > fimDate) return false;
+          const [yf, mf, df] = advancedFilters.data_fim.split('-').map(Number);
+          const fimDate = new Date(yf, (mf || 1) - 1, df || 1, 23, 59, 59, 999);
+          if (vendaLocal > fimDate) return false;
         }
       }
 
@@ -1564,14 +1600,37 @@ export default function VendasPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="filter-vendedor" className="text-sm font-medium">Vendedor</Label>
-                    <Input
-                      id="filter-vendedor"
-                      placeholder="Digite o nome do vendedor..."
-                      value={advancedFilters.vendedor}
-                      onChange={(e) => setAdvancedFilters(prev => ({ ...prev, vendedor: e.target.value }))}
-                      className="bg-white dark:bg-slate-900"
-                    />
+                    <Label htmlFor="filter-vendedor" className="text-sm font-medium">Operador / Vendedor</Label>
+                    {isAdmin ? (
+                      <Select
+                        value={advancedFilters.vendedor_user_id || 'all'}
+                        onValueChange={(v) => setAdvancedFilters(prev => ({
+                          ...prev,
+                          vendedor_user_id: v === 'all' ? '' : v,
+                          vendedor: ''
+                        }))}
+                      >
+                        <SelectTrigger id="filter-vendedor" className="bg-white dark:bg-slate-900">
+                          <SelectValue placeholder="Todos os operadores" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos os operadores</SelectItem>
+                          {tenantUsers.map((u) => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.name || u.email || u.id}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="filter-vendedor"
+                        placeholder="Digite o nome do vendedor..."
+                        value={advancedFilters.vendedor}
+                        onChange={(e) => setAdvancedFilters(prev => ({ ...prev, vendedor: e.target.value }))}
+                        className="bg-white dark:bg-slate-900"
+                      />
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -1629,6 +1688,7 @@ export default function VendasPage() {
                         status: '',
                         forma_pagamento: '',
                         vendedor: '',
+                        vendedor_user_id: '',
                         cliente: '',
                         data_inicio: '',
                         data_fim: '',

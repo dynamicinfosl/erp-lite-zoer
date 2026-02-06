@@ -232,6 +232,21 @@ async function createSaleHandler(
       );
     }
 
+    // 🚫 Rejeitar venda com código duplicado (sale_number)
+    const { data: existingByNumber } = await supabaseAdmin
+      .from('sales')
+      .select('id, sale_number')
+      .eq('tenant_id', tenant_id)
+      .eq('sale_number', saleNumber)
+      .maybeSingle();
+    if (existingByNumber) {
+      console.warn('⚠️ Código da venda duplicado:', saleNumber);
+      return NextResponse.json(
+        { success: false, error: `Código da venda duplicado (${saleNumber}). Tente novamente.` },
+        { status: 409 }
+      );
+    }
+
     // Criar a venda
     const currentDate = new Date();
     const createdAt = currentDate.toISOString();

@@ -25,8 +25,10 @@ import {
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, LineChart, Line, PieChart, Pie, Cell, LabelList, CartesianGrid, Tooltip } from 'recharts';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { User } from 'lucide-react';
 
 const COLORS = ['#2563eb', '#22c55e', '#f97316', '#a855f7', '#0ea5e9'];
@@ -35,6 +37,7 @@ type TenantUser = { id: string; email?: string; name?: string | null; role?: str
 
 export default function RelatoriosPage() {
   const { tenant, user } = useSimpleAuth();
+  const { isAdmin } = useUserRole(tenant?.id, user?.id);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [sales, setSales] = useState<any[]>([]);
@@ -47,6 +50,7 @@ export default function RelatoriosPage() {
   const [activeTab, setActiveTab] = useState<'vendas' | 'financeiro' | 'produtos' | 'entregas'>('vendas');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [operatorUserId, setOperatorUserId] = useState<string>('');
+  const [excludeApiSales, setExcludeApiSales] = useState<boolean>(true); // padrão: só vendas do PDV
   const [tenantUsers, setTenantUsers] = useState<TenantUser[]>([]);
   
   // Determinar qual semestre estamos (para o título do gráfico)
@@ -86,12 +90,14 @@ export default function RelatoriosPage() {
         branch_scope: 'all',
       });
       if (operatorUserId) salesParams.set('user_id', operatorUserId);
+      if (excludeApiSales) salesParams.set('sale_source', 'pdv');
       const reportParams = new URLSearchParams({
         tenant_id: tenant.id,
         start: dateRange.start,
         end: dateRange.end,
       });
       if (operatorUserId) reportParams.set('user_id', operatorUserId);
+      if (excludeApiSales) reportParams.set('sale_source', 'pdv');
 
       const [salesRes, productsRes, transactionsRes, deliveriesRes, reportRes] = await Promise.allSettled([
         fetch(`/next_api/sales?${salesParams.toString()}`),
@@ -138,7 +144,7 @@ export default function RelatoriosPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id, dateRange, operatorUserId]);
+  }, [tenant?.id, dateRange, operatorUserId, excludeApiSales]);
 
   useEffect(() => {
     console.log('🔄 useEffect disparado - tenant:', tenant?.id, 'dateRange:', dateRange);
@@ -150,12 +156,20 @@ export default function RelatoriosPage() {
     loadData();
   }, [tenant?.id, dateRange, loadData]);
 
-  // Carregar lista de operadores/usuários do tenant para o filtro
+  // Operador (não admin): forçar filtro por seu próprio user_id nos relatórios
+  useEffect(() => {
+    if (!isAdmin && user?.id) {
+      setOperatorUserId(user.id);
+    }
+  }, [isAdmin, user?.id]);
+
+  // Carregar lista de operadores/usuários do tenant para o filtro (só admin vê outros)
   useEffect(() => {
     if (!tenant?.id || !user?.id) {
       setTenantUsers([]);
       return;
     }
+    if (!isAdmin) return; // só admin precisa da lista para filtrar por operador
     const loadTenantUsers = async () => {
       try {
         const res = await fetch(
@@ -171,7 +185,7 @@ export default function RelatoriosPage() {
       }
     };
     loadTenantUsers();
-  }, [tenant?.id, user?.id]);
+  }, [tenant?.id, user?.id, isAdmin]);
 
   // Detectar dark mode
   useEffect(() => {
@@ -798,22 +812,35 @@ export default function RelatoriosPage() {
             />
             <Calendar className="absolute right-3 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-background/70 dark:bg-gray-900/60 px-3 py-2 shadow-sm min-w-[200px]">
-            <User className="h-4 w-4 text-muted-foreground shrink-0" />
-            <Select value={operatorUserId || 'all'} onValueChange={(v) => setOperatorUserId(v === 'all' ? '' : v)}>
-              <SelectTrigger className="h-10 border-0 bg-transparent focus:ring-0 focus:ring-offset-0 shadow-none px-0 w-full text-foreground font-medium min-w-0">
-                <SelectValue placeholder="Todos os operadores" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os operadores</SelectItem>
-                {tenantUsers.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.name || u.email || u.id}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {isAdmin ? (
+            <>
+              <div className="flex items-center gap-2 rounded-xl border border-border bg-background/70 dark:bg-gray-900/60 px-3 py-2 shadow-sm min-w-[200px]">
+                <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Select value={operatorUserId || 'all'} onValueChange={(v) => setOperatorUserId(v === 'all' ? '' : v)}>
+                  <SelectTrigger className="h-10 border-0 bg-transparent focus:ring-0 focus:ring-offset-0 shadow-none px-0 w-full text-foreground font-medium min-w-0">
+                    <SelectValue placeholder="Todos os operadores" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os operadores</SelectItem>
+                    {tenantUsers.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name || u.email || u.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <label className="flex items-center gap-2 rounded-xl border border-border bg-background/70 dark:bg-gray-900/60 px-3 py-2.5 shadow-sm cursor-pointer whitespace-nowrap">
+                <Checkbox checked={excludeApiSales} onCheckedChange={(v) => setExcludeApiSales(v === true)} />
+                <span className="text-sm text-foreground">Excluir vendas da API</span>
+              </label>
+            </>
+          ) : (
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-background/70 dark:bg-gray-900/60 px-3 py-2 shadow-sm">
+              <User className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm font-medium text-foreground">Suas vendas</span>
+            </div>
+          )}
           <Button className="juga-gradient text-white w-full sm:w-auto">
             <Download className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Exportar</span>

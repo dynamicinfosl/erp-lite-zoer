@@ -26,6 +26,7 @@ async function handler(request: NextRequest): Promise<Response> {
   const start = searchParams.get('start') || ''
   const end = searchParams.get('end') || ''
   const user_id = searchParams.get('user_id') || ''
+  const sale_source = searchParams.get('sale_source') || ''
 
   if (!tenantId) {
     return NextResponse.json({ error: 'tenant_id é obrigatório' }, { status: 400 })
@@ -46,6 +47,11 @@ async function handler(request: NextRequest): Promise<Response> {
     // Filtrar por operador (user_id) se fornecido
     if (user_id && user_id.trim() !== '') {
       query = query.eq('user_id', user_id.trim());
+    }
+
+    // Filtrar por origem (ex.: apenas vendas do PDV, excluindo API)
+    if (sale_source && sale_source.trim() !== '') {
+      query = query.eq('sale_source', sale_source.trim());
     }
 
     // Aplicar filtros de data se fornecidos (inclusive: start = início do dia, end = fim do dia)

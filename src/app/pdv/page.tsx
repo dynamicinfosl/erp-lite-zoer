@@ -82,6 +82,7 @@ import { Product, PDVItem } from '@/types';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { api } from '@/lib/api-client';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useBranch } from '@/contexts/BranchContext';
 import { TenantPageWrapper } from '@/components/layout/PageWrapper';
 import { PaymentSection } from '@/components/pdv/PaymentSection';
@@ -142,6 +143,7 @@ interface PendingSale {
 export default function PDVPage() {
   const { user, tenant, signOut } = useSimpleAuth();
   const { scope, branchId } = useBranch();
+  const { isAdmin } = useUserRole(tenant?.id, user?.id);
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<PDVItem[]>([]);
@@ -551,9 +553,13 @@ export default function PDVPage() {
           today: 'true',
           tenant_id: tenant.id,
           tz: tz.toString(),
-          branch_scope: 'all', // Buscar todas as vendas do tenant (sem filtrar por filial)
-          sale_source: 'pdv' // Filtrar apenas vendas do PDV
+          branch_scope: 'all',
+          sale_source: 'pdv'
         });
+        // Operador (não admin): só contabilizar vendas do próprio usuário no PDV e fechamento de caixa
+        if (!isAdmin && user?.id) {
+          params.set('user_id', String(user.id));
+        }
         const url = `/next_api/sales?${params.toString()}`;
         console.log('🔍 [PDV] URL completa da requisição:', url);
         console.log('🔍 [PDV] Timezone offset:', tz);
@@ -614,7 +620,7 @@ export default function PDVPage() {
       console.error('❌ Erro ao carregar vendas do dia:', error);
       // Mantém dados locais
     }
-  }, [tenant?.id, loadTodaySalesLocal, saveTodaySalesLocal]);
+  }, [tenant?.id, loadTodaySalesLocal, saveTodaySalesLocal, isAdmin, user?.id]);
 
   // Carregar vendas do dia
   useEffect(() => {

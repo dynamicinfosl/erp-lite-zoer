@@ -305,15 +305,16 @@ export default function CaixasPage() {
         userId: session.user_id
       });
       
-      // Buscar vendas sem filtro de "today" - buscar todas e filtrar por data de abertura
-      // Não filtrar por sale_source na API para pegar todas as vendas e filtrar depois
-      // Isso inclui vendas antigas que podem não ter sale_source definido
+      // Buscar vendas da sessão: user_id do operador + apenas sale_source=pdv
+      // (mesma base do relatório com "Excluir vendas da API", para totais baterem)
       const params = new URLSearchParams({
         tenant_id: tenant.id,
         branch_scope: 'all',
-        // Removido sale_source da query - vamos filtrar depois para incluir vendas antigas sem sale_source
-        // Removido today - vamos filtrar por data de abertura manualmente
+        sale_source: 'pdv',
       });
+      if (session.user_id && String(session.user_id).trim()) {
+        params.set('user_id', String(session.user_id).trim());
+      }
       
       const res = await fetch(`/next_api/sales?${params.toString()}`, {
         cache: 'no-store',
@@ -330,21 +331,18 @@ export default function CaixasPage() {
         console.log('[Caixas] Vendas recebidas da API:', sales.length);
         
         // Filtrar vendas da sessão (após abertura e antes do fechamento, se fechado)
+        // Considerar apenas sale_source='pdv' para bater com o relatório (excluir API e vendas sem origem)
         const filteredSales = sales.filter((sale: any) => {
-          // Excluir vendas da API externa
           if (sale.sale_source === 'api') {
-            console.log('[Caixas] Venda excluída (API externa):', sale.id);
             return false;
           }
-          
-          // Excluir vendas de produtos (sale_source='produtos')
           if (sale.sale_source === 'produtos') {
-            console.log('[Caixas] Venda excluída (produtos):', sale.id);
             return false;
           }
-          
-          // Incluir vendas sem sale_source (vendas antigas) ou com sale_source='pdv'
-          // Não excluir se sale_source for null/undefined (vendas antigas)
+          // Apenas vendas do PDV (igual ao relatório com "Excluir vendas da API")
+          if (sale.sale_source !== 'pdv') {
+            return false;
+          }
           
           // Apenas vendas pagas (incluir null como paga, pois vendas do PDV podem ter status null)
           // Vendas do PDV geralmente têm status null ou 'paga', vendas da API podem ter 'completed' ou 'paid'

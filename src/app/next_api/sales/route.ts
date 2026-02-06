@@ -139,6 +139,47 @@ async function createSaleHandler(request: NextRequest) {
       );
     }
 
+    // 🚫 Rejeitar venda com código duplicado (sale_number)
+    const { data: existingByNumber } = await supabaseAdmin
+      .from('sales')
+      .select('id, sale_number')
+      .eq('tenant_id', tenant_id)
+      .eq('sale_number', saleNumber)
+      .maybeSingle();
+    if (existingByNumber) {
+      console.warn('⚠️ Código da venda duplicado:', saleNumber);
+      return NextResponse.json(
+        { error: `Código da venda duplicado (${saleNumber}). Tente novamente.` },
+        { status: 409 }
+      );
+    }
+
+    const customerName = (customer_name || body.customer_name || 'Cliente Avulso').trim();
+    const finalTotalNum = parseFloat(finalTotal);
+
+    // 🚫 Rejeitar venda duplicada: mesmo cliente + mesmo valor total (últimos 10 min)
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    let dupQuery = supabaseAdmin
+      .from('sales')
+      .select('id, sale_number')
+      .eq('tenant_id', tenant_id)
+      .eq('customer_name', customerName)
+      .gte('total_amount', finalTotalNum - 0.01)
+      .lte('total_amount', finalTotalNum + 0.01)
+      .gte('created_at', tenMinutesAgo)
+      .limit(1);
+    if (user_id && user_id !== '00000000-0000-0000-0000-000000000000') {
+      dupQuery = dupQuery.eq('user_id', user_id);
+    }
+    const { data: existingByClientTotal } = await dupQuery;
+    if (existingByClientTotal && existingByClientTotal.length > 0) {
+      console.warn('⚠️ Venda duplicada: mesmo cliente e valor:', { customerName, finalTotalNum });
+      return NextResponse.json(
+        { error: `Venda duplicada detectada. Já existe venda para "${customerName}" com valor R$ ${finalTotalNum.toFixed(2)} nos últimos 10 minutos.` },
+        { status: 409 }
+      );
+    }
+
     // Criar a venda (versão simplificada)
     const currentDate = new Date();
     const createdAt = currentDate.toISOString();
