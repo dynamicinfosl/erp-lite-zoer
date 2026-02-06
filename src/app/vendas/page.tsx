@@ -602,11 +602,15 @@ export default function VendasPage() {
   };
 
   const handleImprimirCupom = (venda: Sale) => {
+    // Fechar o dialog para liberar a página (evita "travar" enquanto a aba de impressão está aberta)
+    setShowDetailsDialog(false);
     // Abrir página de cupom em nova aba
     window.open(`/cupom/${venda.id}`, '_blank');
   };
 
   const handleImprimirA4 = (venda: Sale) => {
+    // Fechar o dialog para liberar a página
+    setShowDetailsDialog(false);
     // Abrir página de impressão A4 em nova aba
     window.open(`/vendas/${venda.id}/a4`, '_blank');
   };
