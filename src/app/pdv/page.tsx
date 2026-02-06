@@ -252,6 +252,7 @@ export default function PDVPage() {
   const [restoredSaleId, setRestoredSaleId] = useState<string | null>(null);
   
   // Funções para gerenciar vendas em espera no localStorage
+  // Chave SEM data: vendas em espera persistem independente do dia (não somem ao resetar/fechar caixa)
   const getPendingSalesKey = useCallback(() => {
     const tenantId = tenant?.id || 'no-tenant';
     return `pdv.pendingSales.${tenantId}`;
@@ -1837,18 +1838,20 @@ export default function PDVPage() {
     setCashSessionOpenedBy('');
     setCaixaOperations([]);
     
-    // Limpar localStorage de vendas do dia
+    // Limpar localStorage de vendas do dia (apenas chave de vendas do dia; NÃO limpar vendas em espera)
     try {
       if (typeof window !== 'undefined') {
         const tenantId = tenant?.id || 'default';
         const today = new Date().toISOString().split('T')[0];
         const key = `pdv_sales_${tenantId}_${today}`;
         localStorage.removeItem(key);
+        // Garantir que vendas em espera permaneçam: reidratar do localStorage após o "reset do dia"
+        loadPendingSales();
       }
     } catch (e) {
       console.error('Erro ao limpar vendas do dia:', e);
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, loadPendingSales]);
   
   const executeCaixaOperation = useCallback(async (valor: number, descricao: string) => {
     if (caixaOperationType === 'fechamento' && currentCashSessionId) {
