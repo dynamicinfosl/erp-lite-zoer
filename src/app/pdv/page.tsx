@@ -966,21 +966,54 @@ export default function PDVPage() {
       return;
     }
 
-    const pendingSale: PendingSale = {
-      id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      cart: [...cart],
-      customerName: customerName || '',
-      customerId: selectedCustomerId,
-      total: total,
-      createdAt: new Date().toISOString(),
-    };
+    const now = new Date().toISOString();
 
-    const updatedPendingSales = [...pendingSales, pendingSale];
-    savePendingSales(updatedPendingSales);
-    
+    if (restoredSaleId) {
+      // Venda restaurada sendo recolocada em espera: atualizar a existente para não duplicar
+      const existingIndex = pendingSales.findIndex(s => s.id === restoredSaleId);
+      if (existingIndex >= 0) {
+        const updatedPendingSales = pendingSales.map((sale, i) =>
+          i === existingIndex
+            ? {
+                ...sale,
+                cart: [...cart],
+                customerName: customerName || '',
+                customerId: selectedCustomerId,
+                total: total,
+                createdAt: now,
+              }
+            : sale
+        );
+        savePendingSales(updatedPendingSales);
+      } else {
+        // Venda restaurada não está mais na lista (ex.: removida em outra aba); adicionar mantendo o id
+        const pendingSale: PendingSale = {
+          id: restoredSaleId,
+          cart: [...cart],
+          customerName: customerName || '',
+          customerId: selectedCustomerId,
+          total: total,
+          createdAt: now,
+        };
+        savePendingSales([...pendingSales, pendingSale]);
+      }
+      setRestoredSaleId(null);
+    } else {
+      const pendingSale: PendingSale = {
+        id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        cart: [...cart],
+        customerName: customerName || '',
+        customerId: selectedCustomerId,
+        total: total,
+        createdAt: now,
+      };
+      const updatedPendingSales = [...pendingSales, pendingSale];
+      savePendingSales(updatedPendingSales);
+    }
+
     toast.success('Venda colocada em espera');
     clearCart();
-  }, [cart, customerName, selectedCustomerId, total, pendingSales, savePendingSales, clearCart]);
+  }, [cart, customerName, selectedCustomerId, total, pendingSales, restoredSaleId, savePendingSales, clearCart]);
 
   // Função para restaurar uma venda em espera
   const restorePendingSale = useCallback((pendingSale: PendingSale) => {
