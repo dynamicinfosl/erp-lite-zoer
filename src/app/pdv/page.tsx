@@ -75,6 +75,7 @@ import {
   Building2,
   UserCog,
   LogOut,
+  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -148,6 +149,7 @@ export default function PDVPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<PDVItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<PDVItem | null>(null);
+  const [editingCartKey, setEditingCartKey] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
@@ -400,6 +402,7 @@ export default function PDVPage() {
   const addSelectedToCart = useCallback(() => {
     if (!selectedProduct) return;
 
+    setEditingCartKey(null);
     const variantId = selectedVariantId;
     const variantLabel = selectedVariants.find((v) => v.id === variantId)?.label || null;
     
@@ -712,6 +715,7 @@ export default function PDVPage() {
             setSelectedProduct(null);
             setSearchTerm('');
             setPriceInputValue('');
+            setEditingCartKey(null);
             break;
         }
       }
@@ -810,6 +814,7 @@ export default function PDVPage() {
 
   const selectProduct = async (product: { id: number; name: string; price: number; code: string }) => {
     // Se o produto tem variações de valor, carregá-las e permitir seleção inline (sem modal)
+    setEditingCartKey(null);
     if (!tenant?.id) {
       setSelectedProduct({ ...product, quantity: 1, discount: 0 });
       setSelectedVariants([]);
@@ -897,7 +902,31 @@ export default function PDVPage() {
     setSelectedVariantId(null);
     setSearchTerm('');
     setPriceInputValue('');
+    setEditingCartKey(null);
   };
+
+  const updateCartItemFromSelection = useCallback(() => {
+    if (!selectedProduct || !editingCartKey) return;
+
+    const nextQuantity = selectedProduct.quantity && selectedProduct.quantity > 0 ? selectedProduct.quantity : 1;
+    const nextDiscount = selectedProduct.discount && selectedProduct.discount > 0 ? selectedProduct.discount : 0;
+
+    setCart((prevCart) =>
+      prevCart.map((item) => {
+        const key = item.variant_id ? `${item.id}-${item.variant_id}` : `${item.id}-null`;
+        if (key !== editingCartKey) return item;
+        return {
+          ...item,
+          ...selectedProduct,
+          quantity: nextQuantity,
+          discount: nextDiscount,
+        };
+      }),
+    );
+
+    clearSelection();
+    toast.success('Item atualizado');
+  }, [selectedProduct, editingCartKey]);
 
   const removeFromCart = useCallback((productId: number, variantId?: number | null) => {
     setCart((prevCart) => {
@@ -924,6 +953,17 @@ export default function PDVPage() {
       );
     }
   }, [removeFromCart]);
+
+  const startEditCartItem = useCallback((item: PDVItem) => {
+    const itemKey = item.variant_id ? `${item.id}-${item.variant_id}` : `${item.id}-null`;
+    setEditingCartKey(itemKey);
+    setSelectedProduct({ ...item });
+    setSelectedVariantId(item.variant_id ?? null);
+    setSelectedVariants([]);
+    setSelectedPriceTiers([]);
+    setPriceInputValue(item.price > 0 ? item.price.toFixed(2).replace('.', ',') : '');
+    setSearchTerm('');
+  }, []);
 
   const calculateItemTotal = useCallback((item: PDVItem) => {
     const subtotal = item.price * item.quantity;
@@ -1892,39 +1932,6 @@ export default function PDVPage() {
         return;
       }
     } else {
-      // Salvar operação no banco de dados se houver sessão de caixa aberta
-      if (currentCashSessionId && tenant?.id && (caixaOperationType === 'sangria' || caixaOperationType === 'reforco')) {
-        try {
-          // Converter cashSessionId para string se necessário (pode ser number ou string)
-          const sessionIdStr = typeof currentCashSessionId === 'number' 
-            ? String(currentCashSessionId) 
-            : String(currentCashSessionId).trim();
-          
-          const res = await fetch('/next_api/cash-operations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tenant_id: tenant.id,
-              cash_session_id: sessionIdStr,
-              user_id: user?.id || null,
-              operation_type: caixaOperationType,
-              amount: valor,
-              description: descricao,
-              created_by: user?.email || 'Operador',
-            }),
-          });
-
-          if (!res.ok) {
-            const errorData = await res.json().catch(() => ({}));
-            console.error('Erro ao salvar operação no banco:', errorData);
-            // Continuar mesmo se falhar para não bloquear o usuário
-          }
-        } catch (error) {
-          console.error('Erro ao salvar operação no banco:', error);
-          // Continuar mesmo se falhar para não bloquear o usuário
-        }
-      }
-
       const operation: CaixaOperation = {
         id: Date.now().toString(),
         tipo: caixaOperationType,
@@ -2720,8 +2727,12 @@ export default function PDVPage() {
                   )}
 
                   <div className="mt-4 pt-4 border-t">
-                    <Button className="w-full juga-gradient text-white h-10 text-sm" disabled={!selectedProduct} onClick={addSelectedToCart}>
-                      ADICIONAR PRODUTO/ITEM
+                    <Button
+                      className="w-full juga-gradient text-white h-10 text-sm"
+                      disabled={!selectedProduct}
+                      onClick={editingCartKey ? updateCartItemFromSelection : addSelectedToCart}
+                    >
+                      {editingCartKey ? 'ATUALIZAR ITEM' : 'ADICIONAR PRODUTO/ITEM'}
                     </Button>
               </div>
             </CardContent>
@@ -2761,14 +2772,24 @@ export default function PDVPage() {
                                 <h5 className="font-medium text-sm text-heading">{item.name}</h5>
                                 <p className="text-xs text-muted-foreground">Cód: {item.code}</p>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeFromCart(item.id, item.variant_id)}
-                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => startEditCartItem(item)}
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeFromCart(item.id, item.variant_id)}
+                                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
 
                             <div className="flex items-center justify-between">

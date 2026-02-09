@@ -13,11 +13,20 @@ setTimeout(() => {
   console.log(`\nAbrindo ${url} no navegador...\n`);
   
   // Comando para abrir no navegador padrão do Windows
-  exec(`start ${url}`, (error) => {
-    if (error) {
+  try {
+    exec(`start ${url}`, (error) => {
+      if (error) {
+        // Ignorar EPERM em ambientes restritos
+        if (error.code !== 'EPERM') {
+          console.error('Erro ao abrir o navegador:', error);
+        }
+      }
+    });
+  } catch (error) {
+    if (error && error.code !== 'EPERM') {
       console.error('Erro ao abrir o navegador:', error);
     }
-  });
+  }
 }, 3000); // Aguarda 3 segundos
 
 // Passa os sinais de interrupção para o processo Next.js
