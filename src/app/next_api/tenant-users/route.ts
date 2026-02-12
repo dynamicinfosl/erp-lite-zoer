@@ -7,32 +7,63 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJ
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 // Helper: obter usuário atual e suas permissões via user_id do header/body
-async function getCurrentUserPermissions(user_id?: string) {
+// IMPORTANTE: Agora aceita tenant_id para buscar o membership correto
+async function getCurrentUserPermissions(user_id?: string, tenant_id?: string) {
   if (!user_id) {
+    console.log('[getCurrentUserPermissions] user_id não fornecido');
     return null;
   }
 
   try {
-    console.log('[getCurrentUserPermissions] Buscando membership para user_id:', user_id);
-    // Buscar membership do usuário
-    const { data: membership, error } = await supabaseAdmin
+    console.log('[getCurrentUserPermissions] Buscando membership para user_id:', user_id, tenant_id ? `no tenant: ${tenant_id}` : '');
+    
+    // Se tenant_id foi fornecido, buscar membership específico desse tenant
+    // Caso contrário, buscar todos e usar o primeiro
+    let query = supabaseAdmin
       .from('user_memberships')
-      .select('tenant_id, role, branch_id')
+      .select('tenant_id, role, branch_id, is_active')
       .eq('user_id', user_id)
-      .eq('is_active', true)
-      .maybeSingle();
+      .eq('is_active', true);
+    
+    if (tenant_id) {
+      query = query.eq('tenant_id', tenant_id);
+    }
+    
+    const { data: memberships, error } = await query;
 
     if (error) {
       console.error('[getCurrentUserPermissions] Erro ao buscar membership:', error);
       return null;
     }
 
-    if (!membership) {
-      console.log('[getCurrentUserPermissions] Membership não encontrado para user_id:', user_id);
+    if (!memberships || memberships.length === 0) {
+      console.log('[getCurrentUserPermissions] ❌ Nenhum membership ativo encontrado para user_id:', user_id, tenant_id ? `no tenant ${tenant_id}` : '');
+      // Verificar se existe algum membership inativo
+      let inactiveQuery = supabaseAdmin
+        .from('user_memberships')
+        .select('tenant_id, role, branch_id, is_active')
+        .eq('user_id', user_id)
+        .eq('is_active', false);
+      
+      if (tenant_id) {
+        inactiveQuery = inactiveQuery.eq('tenant_id', tenant_id);
+      }
+      
+      const { data: inactiveMemberships } = await inactiveQuery;
+      
+      if (inactiveMemberships && inactiveMemberships.length > 0) {
+        console.log('[getCurrentUserPermissions] ⚠️ Encontrados memberships inativos:', inactiveMemberships);
+      }
       return null;
     }
 
-    console.log('[getCurrentUserPermissions] Membership encontrado:', membership);
+    console.log(`[getCurrentUserPermissions] ✅ Encontrados ${memberships.length} membership(s) ativo(s):`, memberships);
+
+    // Se tem múltiplos memberships, usar o primeiro (ou o que não tem branch_id se houver)
+    // Priorizar membership sem branch_id (matriz) sobre com branch_id (filial)
+    const membership = memberships.find(m => !m.branch_id) || memberships[0];
+
+    console.log('[getCurrentUserPermissions] Membership selecionado:', membership);
 
     // Se tem branch_id, é admin de filial; senão, é admin matriz/owner
     const isBranchAdmin = !!membership.branch_id;
@@ -47,7 +78,7 @@ async function getCurrentUserPermissions(user_id?: string) {
       isOwnerOrAdmin,
     };
 
-    console.log('[getCurrentUserPermissions] Resultado:', result);
+    console.log('[getCurrentUserPermissions] Resultado final:', result);
     return result;
   } catch (error) {
     console.error('[getCurrentUserPermissions] Erro ao obter permissões:', error);
@@ -72,11 +103,40 @@ export async function GET(request: NextRequest) {
     }
 
     // Validar permissões se user_id fornecido
+    // IMPORTANTE: Passar tenant_id para buscar o membership correto
     if (user_id) {
-      const perms = await getCurrentUserPermissions(user_id);
-      if (!perms || perms.tenant_id !== tenant_id || !perms.isOwnerOrAdmin) {
-        return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 403 });
+      const perms = await getCurrentUserPermissions(user_id, tenant_id);
+      console.log(`[tenant-users GET] Permissões do usuário ${user_id} no tenant ${tenant_id}:`, perms);
+      console.log(`[tenant-users GET] Tenant esperado: ${tenant_id}, Tenant do usuário: ${perms?.tenant_id}`);
+      console.log(`[tenant-users GET] É owner ou admin? ${perms?.isOwnerOrAdmin}`);
+      
+      if (!perms) {
+        console.error(`[tenant-users GET] ❌ Permissões não encontradas para user_id: ${user_id} no tenant: ${tenant_id}`);
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Não autorizado: usuário não encontrado ou sem permissões neste tenant' 
+        }, { status: 403 });
       }
+      
+      // Agora não precisa verificar se tenant_id corresponde porque já buscamos pelo tenant_id correto
+      // Mas vamos manter a verificação como segurança extra
+      if (perms.tenant_id !== tenant_id) {
+        console.error(`[tenant-users GET] ❌ Tenant não corresponde. Esperado: ${tenant_id}, Encontrado: ${perms.tenant_id}`);
+        return NextResponse.json({ 
+          success: false, 
+          error: `Não autorizado: tenant não corresponde (esperado: ${tenant_id}, encontrado: ${perms.tenant_id})` 
+        }, { status: 403 });
+      }
+      
+      if (!perms.isOwnerOrAdmin) {
+        console.error(`[tenant-users GET] ❌ Usuário não é owner ou admin. Role: ${perms.role}`);
+        return NextResponse.json({ 
+          success: false, 
+          error: `Não autorizado: usuário precisa ser owner ou admin (role atual: ${perms.role})` 
+        }, { status: 403 });
+      }
+      
+      console.log(`[tenant-users GET] ✅ Usuário autorizado: ${user_id}, role: ${perms.role}, tenant: ${tenant_id}`);
     }
 
     // Buscar usuários do tenant (sem join para evitar erro de relacionamento)
@@ -107,28 +167,66 @@ export async function GET(request: NextRequest) {
 
     // Buscar dados dos usuários (usar apenas memberships válidos)
     const userIds = filteredMemberships.map((m: any) => m.user_id) || [];
+    console.log(`[tenant-users GET] 🔍 IDs de usuários para buscar:`, userIds);
+    console.log(`[tenant-users GET] Total de memberships válidos: ${filteredMemberships.length}`);
+    
     const users: any[] = [];
+
+    if (userIds.length === 0) {
+      console.log(`[tenant-users GET] ⚠️ Nenhum user_id encontrado nos memberships. Retornando lista vazia.`);
+      return NextResponse.json({ success: true, data: [] }, { headers });
+    }
 
     for (const userId of userIds) {
       try {
-        const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+        console.log(`[tenant-users GET] 🔍 Buscando dados do usuário: ${userId}`);
+        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(userId);
+        
+        if (authError) {
+          console.error(`[tenant-users GET] ❌ Erro ao buscar usuário ${userId}:`, authError);
+          continue;
+        }
+        
         if (authUser?.user) {
+          console.log(`[tenant-users GET] ✅ Usuário encontrado: ${authUser.user.email}`);
           const membership = filteredMemberships.find((m: any) => m.user_id === userId);
           
           // Buscar branch_memberships separadamente
-          const { data: branchMemberships } = await supabaseAdmin
-            .from('user_branch_memberships')
-            .select('branch_id, branches(name)')
-            .eq('user_id', userId)
-            .eq('tenant_id', tenant_id)
-            .eq('is_active', true);
+          let branchMemberships: any[] = [];
+          try {
+            const { data: branchData, error: branchError } = await supabaseAdmin
+              .from('user_branch_memberships')
+              .select('branch_id, branches(name)')
+              .eq('user_id', userId)
+              .eq('tenant_id', tenant_id)
+              .eq('is_active', true);
+            
+            if (branchError) {
+              console.warn(`[tenant-users GET] ⚠️ Erro ao buscar branch_memberships para ${userId}:`, branchError);
+            } else {
+              branchMemberships = branchData || [];
+              console.log(`[tenant-users GET] ✅ Branch memberships encontrados para ${userId}:`, branchMemberships.length);
+            }
+          } catch (branchErr) {
+            console.warn(`[tenant-users GET] ⚠️ Exceção ao buscar branch_memberships:`, branchErr);
+          }
           
           // Buscar role_type de user_profiles para diferenciar Admin de Operador
-          let { data: profile } = await supabaseAdmin
+          let { data: profile, error: profileError } = await supabaseAdmin
             .from('user_profiles')
             .select('role_type, name')
             .eq('user_id', userId)
             .maybeSingle();
+          
+          if (profileError) {
+            console.warn(`[tenant-users GET] ⚠️ Erro ao buscar profile para ${userId}:`, profileError);
+          }
+          
+          console.log(`[tenant-users GET] 🔍 Profile encontrado para ${authUser.user.email}:`, {
+            tem_profile: !!profile,
+            role_type: profile?.role_type,
+            name: profile?.name
+          });
           
           // Se não tem profile, criar automaticamente
           // IMPORTANTE: Por padrão, criar como 'vendedor' (operador) se não for owner
@@ -140,29 +238,41 @@ export async function GET(request: NextRequest) {
                                    authUser.user.email?.split('@')[0] || 
                                    'Usuário';
             
+            console.log(`[tenant-users GET] 🔧 Criando profile automaticamente para ${authUser.user.email}:`, {
+              role_type: autoProfileRoleType,
+              name: autoProfileName,
+              membership_role: membership.role
+            });
+            
             try {
+              // Tentar inserir sem id primeiro (se a tabela tiver id auto-increment)
+              const insertData: any = {
+                user_id: userId,
+                name: autoProfileName,
+                role_type: autoProfileRoleType,
+                is_active: true,
+              };
+              
+              // Se a tabela user_profiles usa user_id como PK, não precisa de id
+              // Se usa id separado, tentar usar user_id como id também
               const { data: newProfile, error: createError } = await supabaseAdmin
                 .from('user_profiles')
-                .insert({
-                  user_id: userId,
-                  name: autoProfileName,
-                  role_type: autoProfileRoleType,
-                  is_active: true,
-                })
-                .select('role_type, name')
+                .insert(insertData)
+                .select('role_type, name, user_id')
                 .single();
               
               if (!createError && newProfile) {
                 profile = newProfile;
                 console.log(`[tenant-users GET] ✅ Profile criado automaticamente para ${authUser.user.email}:`, {
                   role_type: autoProfileRoleType,
-                  membership_role: membership.role
+                  membership_role: membership.role,
+                  profile_id: newProfile.id || newProfile.user_id
                 });
               } else {
-                console.warn(`[tenant-users GET] ⚠️ Erro ao criar profile automaticamente:`, createError);
+                console.error(`[tenant-users GET] ❌ Erro ao criar profile automaticamente:`, createError);
               }
             } catch (createError) {
-              console.warn(`[tenant-users GET] ⚠️ Exceção ao criar profile:`, createError);
+              console.error(`[tenant-users GET] ❌ Exceção ao criar profile:`, createError);
             }
           }
           
@@ -181,17 +291,25 @@ export async function GET(request: NextRequest) {
           
           if (membership?.role === 'owner') {
             displayRole = 'owner';
+            console.log(`[tenant-users GET] ✅ Usuário ${authUser.user.email} é OWNER`);
           } else if (profile?.role_type === 'admin') {
             displayRole = 'admin';
+            console.log(`[tenant-users GET] ✅ Usuário ${authUser.user.email} é ADMIN (via profile.role_type)`);
           } else if (profile?.role_type === 'vendedor') {
             displayRole = 'member'; // Operador
+            console.log(`[tenant-users GET] ✅ Usuário ${authUser.user.email} é OPERADOR (via profile.role_type='vendedor')`);
           } else {
             // Se não tem profile ou tem outro role_type, assumir operador
             // (exceto owners que sempre são owners)
             displayRole = membership?.role === 'owner' ? 'owner' : 'member';
+            console.warn(`[tenant-users GET] ⚠️ Usuário ${authUser.user.email} sem profile válido. Usando fallback:`, {
+              membership_role: membership?.role,
+              profile_role_type: profile?.role_type,
+              display_role: displayRole
+            });
           }
           
-          console.log(`[tenant-users GET] Usuário ${authUser.user.email}:`, {
+          console.log(`[tenant-users GET] 📊 Resumo do usuário ${authUser.user.email}:`, {
             membership_role: membership?.role,
             profile_role_type: profile?.role_type,
             display_role: displayRole,
@@ -199,10 +317,11 @@ export async function GET(request: NextRequest) {
             tem_profile: !!profile,
             mapeamento: profile?.role_type === 'vendedor' ? 'vendedor → member (Operador)' : 
                        profile?.role_type === 'admin' ? 'admin → admin' : 
+                       membership?.role === 'owner' ? 'owner → owner' :
                        'sem profile → member (Operador)'
           });
           
-          users.push({
+          const userData = {
             id: authUser.user.id,
             email: authUser.user.email,
             name: profile?.name || authUser.user.user_metadata?.name || null,
@@ -213,13 +332,25 @@ export async function GET(request: NextRequest) {
               branch_id: bm.branch_id,
               branch_name: bm.branches?.name || null,
             })),
+          };
+          
+          console.log(`[tenant-users GET] ✅ Dados do usuário preparados:`, {
+            email: userData.email,
+            name: userData.name,
+            role: userData.role,
+            branches: userData.branches.length
           });
+          
+          users.push(userData);
+        } else {
+          console.warn(`[tenant-users GET] ⚠️ Usuário ${userId} não encontrado no auth.users`);
         }
       } catch (err) {
-        console.warn('Erro ao buscar usuário:', userId, err);
+        console.error(`[tenant-users GET] ❌ Erro ao buscar usuário ${userId}:`, err);
       }
     }
 
+    console.log(`[tenant-users GET] ✅ Total de usuários retornados: ${users.length}`);
     const response = NextResponse.json({ success: true, data: users });
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     response.headers.set('Pragma', 'no-cache');
@@ -252,6 +383,9 @@ export async function POST(request: NextRequest) {
     if (!perms || !perms.isOwnerOrAdmin) {
       return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 403 });
     }
+    
+    // Obter tenant_id do membership para garantir que estamos criando no tenant correto
+    const targetTenantId = perms.tenant_id;
 
     // Validação de permissões:
     // - Admin de filial não pode criar admin

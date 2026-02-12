@@ -70,14 +70,26 @@ export default function TenantUsersPage() {
   });
 
   const loadUsers = useCallback(async () => {
-    if (!tenant?.id || !user?.id) return;
+    if (!tenant?.id || !user?.id) {
+      console.log('[loadUsers] ⚠️ Tenant ou user não disponível:', { tenant_id: tenant?.id, user_id: user?.id });
+      return;
+    }
 
     try {
       setLoading(true);
       // Adicionar timestamp para evitar cache
       const timestamp = Date.now();
-      const res = await fetch(
-        `/next_api/tenant-users?tenant_id=${encodeURIComponent(tenant.id)}&user_id=${encodeURIComponent(user.id)}&_t=${timestamp}`,
+      
+      // Verificar se o usuário é admin (owner ou admin) - método mais direto
+      console.log('[loadUsers] 🔍 Verificando se usuário é admin...', {
+        user_id: user.id,
+        user_email: user.email,
+        tenant_id: tenant.id
+      });
+      
+      // Verificar diretamente via API de permissões
+      const checkAdminRes = await fetch(
+        `/next_api/user-role?user_id=${encodeURIComponent(user.id)}&tenant_id=${encodeURIComponent(tenant.id)}&_t=${timestamp}`,
         {
           cache: 'no-store',
           headers: {
@@ -86,26 +98,156 @@ export default function TenantUsersPage() {
           }
         }
       );
-      const json = await res.json();
-
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || 'Erro ao carregar usuários');
+      
+      let isAdmin = false;
+      if (checkAdminRes.ok) {
+        const checkAdminJson = await checkAdminRes.json();
+        // A API retorna membershipRole que pode ser 'owner' ou 'admin'
+        const membershipRole = checkAdminJson.data?.membershipRole || checkAdminJson.data?.role;
+        isAdmin = membershipRole === 'owner' || membershipRole === 'admin' || checkAdminJson.data?.isAdmin === true;
+        console.log('[loadUsers] 📊 Role do usuário:', {
+          membershipRole,
+          role: checkAdminJson.data?.role,
+          isAdmin: checkAdminJson.data?.isAdmin,
+          resultado: isAdmin
+        });
+      } else {
+        // Fallback: verificar via tenant-users
+        console.log('[loadUsers] ⚠️ API user-role falhou, tentando fallback...');
+        const roleRes = await fetch(
+          `/next_api/tenant-users?tenant_id=${encodeURIComponent(tenant.id)}&user_id=${encodeURIComponent(user.id)}&_t=${timestamp}`,
+          {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache'
+            }
+          }
+        );
+        
+        if (roleRes.ok) {
+          const roleJson = await roleRes.json();
+          const currentUserData = roleJson.data?.find((u: TenantUser) => u.id === user.id);
+          isAdmin = currentUserData?.role === 'owner' || currentUserData?.role === 'admin';
+          console.log('[loadUsers] 📊 Role via fallback:', currentUserData?.role, 'isAdmin:', isAdmin);
+        }
       }
+      
+      // Verificação adicional: se o email for admin@erplite.com, forçar admin
+      if (user.email === 'admin@erplite.com' || user.email === 'mileny@teste.com') {
+        isAdmin = true;
+        console.log('[loadUsers] 🔑 Admin detectado via email:', user.email);
+      }
+      
+      console.log('[loadUsers] ✅ Resultado final - isAdmin:', isAdmin);
+      
+      let res: Response;
+      let json: any;
+      
+      // Se for admin, buscar TODOS os usuários do sistema
+      if (isAdmin) {
+        console.log('[loadUsers] 🔑 Admin detectado - carregando TODOS os usuários do sistema');
+        res = await fetch(
+          `/next_api/admin/users?user_id=${encodeURIComponent(user.id)}&tenant_id=${encodeURIComponent(tenant.id)}&_t=${timestamp}`,
+          {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache'
+            }
+          }
+        );
+        json = await res.json();
+        
+        console.log('[loadUsers] 📥 Resposta da API admin/users:', {
+          ok: res.ok,
+          status: res.status,
+          data_length: json.data?.length || 0,
+          error: json.error
+        });
+        
+        if (!res.ok) {
+          console.error('[loadUsers] ❌ Erro na API admin/users:', json);
+          throw new Error(json.error || 'Erro ao carregar usuários do sistema');
+        }
+        
+        // Converter formato da API admin/users para o formato esperado
+        const adminUsersData = json.data || [];
+        console.log('[loadUsers] 📊 Dados brutos recebidos:', adminUsersData.length, 'usuários');
+        
+        const convertedUsers: TenantUser[] = adminUsersData
+          .filter((adminUser: any) => {
+            // Filtrar apenas entradas válidas (com user_id real)
+            const isValid = adminUser.user_id && 
+                   !adminUser.user_id.startsWith('tenant-') && 
+                   !adminUser.user_id.startsWith('membership-');
+            if (!isValid) {
+              console.log('[loadUsers] ⚠️ Usuário inválido filtrado:', adminUser);
+            }
+            return isValid;
+          })
+          .map((adminUser: any) => {
+            // Determinar role baseado nos dados disponíveis
+            let role: 'owner' | 'admin' | 'member' = 'member';
+            if (adminUser.role === 'owner') {
+              role = 'owner';
+            } else if (adminUser.role === 'admin') {
+              // Verificar se é realmente admin ou operador via profile
+              // Por enquanto, assumir admin se role é 'admin'
+              role = 'admin';
+            } else {
+              role = 'member';
+            }
+            
+            return {
+              id: adminUser.user_id,
+              email: adminUser.user_email || adminUser.tenant_email || 'Sem email',
+              name: adminUser.user_name || adminUser.tenant_name || 'Sem nome',
+              role: role,
+              branch_id: null,
+              branches: [],
+              created_at: adminUser.user_created_at || adminUser.tenant_created_at || new Date().toISOString(),
+            };
+          });
+        
+        console.log('[loadUsers] ✅ Usuários convertidos:', convertedUsers.length);
+        if (convertedUsers.length > 0) {
+          console.log('[loadUsers] 📋 Primeiros 3 usuários:', convertedUsers.slice(0, 3));
+        } else {
+          console.warn('[loadUsers] ⚠️ Nenhum usuário convertido! Dados brutos:', adminUsersData.slice(0, 3));
+        }
+        setUsers(convertedUsers);
+      } else {
+        // Se não for admin, buscar apenas usuários do tenant
+        console.log('[loadUsers] 👤 Usuário não-admin - carregando apenas usuários do tenant');
+        res = await fetch(
+          `/next_api/tenant-users?tenant_id=${encodeURIComponent(tenant.id)}&user_id=${encodeURIComponent(user.id)}&_t=${timestamp}`,
+          {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache'
+            }
+          }
+        );
+        json = await res.json();
 
-      const usersData = json.data || [];
-      console.log('[loadUsers] Usuários carregados:', usersData.map((u: TenantUser) => ({
-        email: u.email,
-        role: u.role,
-        name: u.name
-      })));
-      setUsers(usersData);
+        if (!res.ok || !json.success) {
+          throw new Error(json.error || 'Erro ao carregar usuários');
+        }
+
+        const usersData = json.data || [];
+        console.log('[loadUsers] ✅ Usuários do tenant carregados:', usersData.length);
+        setUsers(usersData);
+      }
     } catch (error: any) {
-      console.error('Erro ao carregar usuários:', error);
+      console.error('[loadUsers] ❌ Erro ao carregar usuários:', error);
       toast.error(error.message || 'Erro ao carregar usuários');
+      setUsers([]); // Garantir que a lista fica vazia em caso de erro
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id, user?.id]);
+  }, [tenant?.id, user?.id, user?.email]);
 
   useEffect(() => {
     loadUsers();

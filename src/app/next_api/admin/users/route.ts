@@ -6,19 +6,54 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasao
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10'
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     // Garantir que sempre retornamos JSON, mesmo em caso de erro
     const headers = {
       'Content-Type': 'application/json',
     };
 
+    // Verificar se o usuário é admin (opcional - pode ser verificado no frontend também)
+    const { searchParams } = new URL(request.url);
+    const user_id = searchParams.get('user_id');
+    const tenant_id = searchParams.get('tenant_id');
+
+    if (user_id && tenant_id) {
+      // Verificar se o usuário é admin
+      const { data: membership } = await supabaseAdmin
+        .from('user_memberships')
+        .select('role')
+        .eq('user_id', user_id)
+        .eq('tenant_id', tenant_id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      const isAdmin = membership?.role === 'owner' || membership?.role === 'admin';
+      
+      if (!isAdmin) {
+        console.warn(`⚠️ [ADMIN/USERS] Acesso negado - usuário ${user_id} não é admin`);
+        return NextResponse.json(
+          { 
+            success: false,
+            error: 'Apenas administradores podem acessar esta lista',
+            data: []
+          },
+          { 
+            status: 403,
+            headers 
+          }
+        );
+      }
+    }
+
+    console.log('🔍 [ADMIN/USERS] Iniciando busca de todos os usuários do sistema...');
+
     const [profilesResult, tenantsResult, membershipsResult, subscriptionsResult] = await Promise.all([
       supabaseAdmin.from('user_profiles').select('*'),
       supabaseAdmin.from('tenants').select('*'),
       supabaseAdmin.from('user_memberships').select('*').then(result => {
         if (result.error) {
-          console.warn('⚠️ Tabela user_memberships não existe ou sem permissão:', result.error.message)
+          console.warn('⚠️ [ADMIN/USERS] Tabela user_memberships não existe ou sem permissão:', result.error.message)
           return { data: [], error: null }
         }
         return result
@@ -28,7 +63,7 @@ export async function GET(_request: NextRequest) {
         plan:plans(id, name, slug)
       `).then(result => {
         if (result.error) {
-          console.warn('⚠️ Tabela subscriptions não existe ou sem permissão:', result.error.message)
+          console.warn('⚠️ [ADMIN/USERS] Tabela subscriptions não existe ou sem permissão:', result.error.message)
           return { data: [], error: null }
         }
         return result
@@ -36,11 +71,11 @@ export async function GET(_request: NextRequest) {
     ])
 
     if (profilesResult.error) {
-      console.error('❌ Erro ao buscar profiles:', profilesResult.error)
+      console.error('❌ [ADMIN/USERS] Erro ao buscar profiles:', profilesResult.error)
       throw profilesResult.error
     }
     if (tenantsResult.error) {
-      console.error('❌ Erro ao buscar tenants:', tenantsResult.error)
+      console.error('❌ [ADMIN/USERS] Erro ao buscar tenants:', tenantsResult.error)
       throw tenantsResult.error
     }
 
@@ -49,58 +84,112 @@ export async function GET(_request: NextRequest) {
     const memberships = membershipsResult.data || []
     const subscriptions = subscriptionsResult.data || []
 
+    console.log(`📊 [ADMIN/USERS] Dados encontrados:`, {
+      profiles: profiles.length,
+      tenants: tenants.length,
+      memberships: memberships.length,
+      subscriptions: subscriptions.length
+    });
+
+    // Se não há memberships, retornar lista vazia
+    if (memberships.length === 0) {
+      console.warn('⚠️ [ADMIN/USERS] Nenhum membership encontrado no banco de dados');
+      return NextResponse.json({ data: [] }, { headers });
+    }
+
     let mappedUsers: any[] = []
 
-    if (memberships.length > 0) {
-      // ✅ NOVO: Filtrar duplicados - manter apenas 1 tenant por user_id
-      // Priorizar tenant com subscription válida
-      const userTenantMap = new Map<string, any>();
+    // ✅ NOVO: Filtrar duplicados - manter apenas 1 tenant por user_id
+    // Priorizar tenant com subscription válida
+    const userTenantMap = new Map<string, any>();
+    
+    console.log(`🔍 [ADMIN/USERS] Processando ${memberships.length} memberships...`);
+    
+    memberships.forEach((membership: any) => {
+      const userId = membership.user_id;
+      if (!userId) {
+        console.warn('⚠️ [ADMIN/USERS] Membership sem user_id:', membership);
+        return;
+      }
       
-      memberships.forEach((membership: any) => {
-        const userId = membership.user_id;
-        const subscription = subscriptions.find((s: any) => s.tenant_id === membership.tenant_id);
-        
-        // Verificar se subscription é válida
-        const now = new Date();
-        const isValidSubscription = subscription && (
-          (subscription.status === 'active' && subscription.current_period_end && new Date(subscription.current_period_end) > now) ||
-          (subscription.status === 'trial' && subscription.trial_end && new Date(subscription.trial_end) > now)
-        );
-        
-        const existing = userTenantMap.get(userId);
-        
-        // Se não existe ou a nova é mais recente/válida, substituir
-        if (!existing) {
+      const subscription = subscriptions.find((s: any) => s.tenant_id === membership.tenant_id);
+      
+      // Verificar se subscription é válida
+      const now = new Date();
+      const isValidSubscription = subscription && (
+        (subscription.status === 'active' && subscription.current_period_end && new Date(subscription.current_period_end) > now) ||
+        (subscription.status === 'trial' && subscription.trial_end && new Date(subscription.trial_end) > now)
+      );
+      
+      const existing = userTenantMap.get(userId);
+      
+      // Se não existe ou a nova é mais recente/válida, substituir
+      if (!existing) {
+        userTenantMap.set(userId, { membership, subscription, isValid: isValidSubscription });
+      } else if (isValidSubscription && !existing.isValid) {
+        // Priorizar subscription válida
+        console.log(`✅ [ADMIN/USERS] Priorizando tenant com subscription válida para user ${userId}`);
+        userTenantMap.set(userId, { membership, subscription, isValid: isValidSubscription });
+      } else if (!existing.isValid && !isValidSubscription) {
+        // Se nenhum é válido, usar o mais recente
+        const existingDate = new Date(existing.membership.created_at);
+        const newDate = new Date(membership.created_at);
+        if (newDate > existingDate) {
           userTenantMap.set(userId, { membership, subscription, isValid: isValidSubscription });
-        } else if (isValidSubscription && !existing.isValid) {
-          // Priorizar subscription válida
-          console.log(`✅ [ADMIN] Priorizando tenant com subscription válida para user ${userId}`);
-          userTenantMap.set(userId, { membership, subscription, isValid: isValidSubscription });
-        } else if (!existing.isValid && !isValidSubscription) {
-          // Se nenhum é válido, usar o mais recente
-          const existingDate = new Date(existing.membership.created_at);
-          const newDate = new Date(membership.created_at);
-          if (newDate > existingDate) {
-            userTenantMap.set(userId, { membership, subscription, isValid: isValidSubscription });
-          }
         }
-      });
+      }
+    });
+    
+    console.log(`📊 [ADMIN/USERS] Total memberships: ${memberships.length}, Após filtrar duplicados: ${userTenantMap.size}`);
       
-      console.log(`📊 [ADMIN] Total memberships: ${memberships.length}, Após filtrar duplicados: ${userTenantMap.size}`);
+      // Mapear usuários únicos - buscar dados do auth.users para cada um
+      console.log(`🔄 [ADMIN/USERS] Mapeando ${userTenantMap.size} usuários únicos...`);
       
-      // Mapear usuários únicos
-      mappedUsers = Array.from(userTenantMap.values()).map((item: any, index: number) => {
+      const mappedUsersPromises = Array.from(userTenantMap.values()).map(async (item: any, index: number) => {
         const membership = item.membership;
         const subscription = item.subscription;
         
-        const profile = profiles.find((p: any) => p.id === membership.user_id);
+        if (!membership || !membership.user_id) {
+          console.warn(`⚠️ [ADMIN/USERS] Membership inválido no índice ${index}:`, membership);
+          return null;
+        }
+        
+        // Buscar profile - user_profiles.user_id é UUID, não id
+        const profile = profiles.find((p: any) => p.user_id === membership.user_id);
         const tenant = tenants.find((t: any) => t.id === membership.tenant_id);
         const plan = subscription?.plan && (Array.isArray(subscription.plan) ? subscription.plan[0] : subscription.plan);
         
+        // Buscar email e nome do usuário no auth.users
+        let userEmail = 'Desconhecido';
+        let userName = profile?.name || 'Sem nome';
+        let userCreatedAt = profile?.created_at || membership.created_at;
+        
+        try {
+          const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(membership.user_id);
+          if (authError) {
+            console.warn(`⚠️ [ADMIN/USERS] Erro ao buscar auth.users para ${membership.user_id}:`, authError.message);
+          } else if (authUser?.user) {
+            if (authUser.user.email) {
+              userEmail = authUser.user.email;
+            }
+            if (authUser.user.user_metadata?.name && !profile?.name) {
+              userName = authUser.user.user_metadata.name;
+            }
+            if (authUser.user.created_at) {
+              userCreatedAt = authUser.user.created_at;
+            }
+          } else {
+            console.warn(`⚠️ [ADMIN/USERS] Usuário não encontrado no auth.users: ${membership.user_id}`);
+          }
+        } catch (err: any) {
+          console.warn(`⚠️ [ADMIN/USERS] Exceção ao buscar dados do auth.users para ${membership.user_id}:`, err?.message || err);
+        }
+        
         return {
-          user_id: membership.user_id || `membership-${index}`,
-          user_email: profile?.email || 'Desconhecido',
-          user_created_at: profile?.created_at || membership.created_at,
+          user_id: membership.user_id,
+          user_email: userEmail,
+          user_name: userName,
+          user_created_at: userCreatedAt,
           user_last_login: '-',
           tenant_id: membership.tenant_id || '',
           tenant_name: tenant?.name || 'Sem empresa',
@@ -119,40 +208,27 @@ export async function GET(_request: NextRequest) {
           subscription_plan_slug: plan?.slug || null,
         };
       });
-    } else {
-      mappedUsers = tenants.map((tenant: any, index: number) => {
-        const subscription = subscriptions.find((s: any) => s.tenant_id === tenant.id)
-        const plan = subscription?.plan && (Array.isArray(subscription.plan) ? subscription.plan[0] : subscription.plan)
-        
-        return {
-          user_id: `tenant-${tenant.id}-${index}`,
-          user_email: tenant.email || 'Desconhecido',
-          user_created_at: tenant.created_at,
-          user_last_login: '-',
-          tenant_id: tenant.id,
-          tenant_name: tenant.name || 'Sem empresa',
-          tenant_status: tenant.status || 'trial',
-          role: 'admin',
-          is_active: true,
-          tenant_email: tenant.email,
-          tenant_phone: tenant.phone,
-          tenant_document: tenant.document,
-          approval_status: 'pending',
-          // Dados de subscription
-          subscription_status: subscription?.status || null,
-          subscription_trial_ends_at: subscription?.trial_end || null,
-          subscription_current_period_end: subscription?.current_period_end || null,
-          subscription_plan_name: plan?.name || null,
-          subscription_plan_slug: plan?.slug || null,
-        }
-      })
-    }
+      
+      const mappedUsersResults = await Promise.all(mappedUsersPromises);
+      // Filtrar nulls (caso algum membership seja inválido)
+      mappedUsers = mappedUsersResults.filter((u: any) => u !== null);
+      console.log(`✅ [ADMIN/USERS] Usuários mapeados: ${mappedUsers.length} (de ${mappedUsersResults.length} tentativas)`);
 
     // dedup por user_id
     const unique = mappedUsers.reduce((acc: any[], cur: any) => {
       if (!acc.find(u => u.user_id === cur.user_id)) acc.push(cur)
       return acc
     }, [])
+
+    console.log(`✅ [ADMIN/USERS] Total de usuários únicos retornados: ${unique.length}`);
+    if (unique.length > 0) {
+      console.log(`📋 [ADMIN/USERS] Primeiros 3 usuários:`, unique.slice(0, 3).map(u => ({
+        user_id: u.user_id,
+        user_email: u.user_email,
+        user_name: u.user_name,
+        role: u.role
+      })));
+    }
 
     return NextResponse.json({ data: unique }, { headers })
   } catch (error: any) {
