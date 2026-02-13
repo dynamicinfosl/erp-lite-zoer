@@ -774,19 +774,19 @@ export default function ClientesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-[calc(100vh-120px)] overflow-hidden space-y-3">
       {/* Header */}
-      <Card className="border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-white">
-        <CardContent className="pt-6 pb-5">
+      <Card className="border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-white flex-shrink-0">
+        <CardContent className="pt-4 pb-3">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-blue-900">Clientes</h1>
-              <p className="text-sm text-blue-900/70">
+              <h1 className="text-2xl font-bold tracking-tight text-blue-900">Gerenciar Clientes</h1>
+              <p className="text-xs text-blue-900/70">
                 Gerencie seus clientes e informações de contato
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Badge className="px-3 py-1 bg-blue-600 text-white">
+              <Badge className="px-2 py-1 bg-blue-600 text-white text-xs">
                 <Users className="h-3 w-3 mr-1" />
                 {customers.length} clientes
               </Badge>
@@ -796,8 +796,8 @@ export default function ClientesPage() {
       </Card>
 
       {/* Toolbar */}
-      <Card className="border-blue-100">
-        <CardContent className="pt-6">
+      <Card className="border-blue-100 flex-shrink-0">
+        <CardContent className="pt-3 pb-3">
           <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
             {/* Lado esquerdo - Botões de ação */}
             <div className="flex items-center gap-2">
@@ -978,99 +978,101 @@ export default function ClientesPage() {
       </Card>
 
       {/* Tabela */}
-      <Card className="border-blue-100">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
+      <Card className="border-blue-100 flex-1 flex flex-col min-h-0 overflow-hidden">
+        <CardHeader className="flex-shrink-0 pb-2 pt-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Users className="h-4 w-4" />
             Lista de Clientes ({filteredCustomers.length})
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 overflow-hidden p-0">
           {loading ? (
             <div className="text-center py-8">Carregando clientes...</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  {columnVisibility.type && <TableHead>Tipo</TableHead>}
-                  {columnVisibility.document && <TableHead>CPF/CNPJ</TableHead>}
-                  {columnVisibility.phone && <TableHead>Telefone</TableHead>}
-                  {columnVisibility.email && <TableHead>E-mail</TableHead>}
-                  {columnVisibility.city && <TableHead>Cidade</TableHead>}
-                  {columnVisibility.status && <TableHead>Status</TableHead>}
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.name}</TableCell>
-                    {columnVisibility.type && (
-                      <TableCell>
-                        <Badge variant={customer.type === 'PF' ? 'default' : 'secondary'}>
-                          {customer.type === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica'}
-                        </Badge>
-                      </TableCell>
-                    )}
-                    {columnVisibility.document && (
-                      <TableCell>{formatDocument(customer.document, customer.type)}</TableCell>
-                    )}
-                    {columnVisibility.phone && (
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Phone className="h-3 w-3 text-gray-400" />
-                          {formatPhone(customer.phone)}
-                        </div>
-                      </TableCell>
-                    )}
-                    {columnVisibility.email && (
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Mail className="h-3 w-3 text-gray-400" />
-                          {customer.email}
-                        </div>
-                      </TableCell>
-                    )}
-                    {columnVisibility.city && <TableCell>{customer.city}</TableCell>}
-                    {columnVisibility.status && (
-                      <TableCell>
-                        <Badge variant={customer.status === 'active' ? 'default' : 'secondary'}>
-                          {customer.status === 'active' ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => {/* TODO: Implementar ver detalhes */}}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            Ver Detalhes
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEdit(customer)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            className="text-red-600"
-                            onClick={() => handleDelete(customer)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+            <div className="h-full overflow-auto">
+              <Table>
+                <TableHeader className="sticky top-0 bg-white dark:bg-gray-950 z-10">
+                  <TableRow>
+                    <TableHead className="font-semibold">Nome</TableHead>
+                    {columnVisibility.type && <TableHead className="font-semibold">Tipo</TableHead>}
+                    {columnVisibility.document && <TableHead className="font-semibold">CPF/CNPJ</TableHead>}
+                    {columnVisibility.phone && <TableHead className="font-semibold">Telefone</TableHead>}
+                    {columnVisibility.email && <TableHead className="font-semibold">E-mail</TableHead>}
+                    {columnVisibility.city && <TableHead className="font-semibold">Cidade</TableHead>}
+                    {columnVisibility.status && <TableHead className="font-semibold">Status</TableHead>}
+                    <TableHead className="font-semibold">Ações</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredCustomers.map((customer) => (
+                    <TableRow key={customer.id}>
+                      <TableCell className="font-medium">{customer.name}</TableCell>
+                      {columnVisibility.type && (
+                        <TableCell>
+                          <Badge variant={customer.type === 'PF' ? 'default' : 'secondary'}>
+                            {customer.type === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica'}
+                          </Badge>
+                        </TableCell>
+                      )}
+                      {columnVisibility.document && (
+                        <TableCell>{formatDocument(customer.document, customer.type)}</TableCell>
+                      )}
+                      {columnVisibility.phone && (
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Phone className="h-3 w-3 text-gray-400" />
+                            {formatPhone(customer.phone)}
+                          </div>
+                        </TableCell>
+                      )}
+                      {columnVisibility.email && (
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Mail className="h-3 w-3 text-gray-400" />
+                            {customer.email}
+                          </div>
+                        </TableCell>
+                      )}
+                      {columnVisibility.city && <TableCell>{customer.city}</TableCell>}
+                      {columnVisibility.status && (
+                        <TableCell>
+                          <Badge variant={customer.status === 'active' ? 'default' : 'secondary'}>
+                            {customer.status === 'active' ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => {/* TODO: Implementar ver detalhes */}}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              Ver Detalhes
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEdit(customer)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              className="text-red-600"
+                              onClick={() => handleDelete(customer)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
 
           {filteredCustomers.length === 0 && !loading && (

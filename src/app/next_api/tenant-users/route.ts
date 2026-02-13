@@ -264,7 +264,8 @@ export async function GET(request: NextRequest) {
               if (!createError && newProfile) {
                 profile = newProfile;
                 // Usar user_id como fallback se id não estiver disponível
-                const profileId = (newProfile as any).id || newProfile.user_id;
+                // TypeScript pode não inferir 'id' corretamente, então usar cast
+                const profileId = (newProfile as any)?.id || newProfile?.user_id || null;
                 console.log(`[tenant-users GET] ✅ Profile criado automaticamente para ${authUser.user.email}:`, {
                   role_type: autoProfileRoleType,
                   membership_role: membership.role,

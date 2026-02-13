@@ -102,3 +102,10 @@ COMMENT ON COLUMN cash_sessions.total_sales IS 'Quantidade de vendas realizadas 
 
 
 
+
+
+
+
+
+
+

@@ -32,33 +32,55 @@ export async function GET(request: NextRequest) {
       query = query.eq('tenant_id', tenant_id);
     }
 
-    const { data: memberships, error } = await query.limit(1);
+    const { data: memberships, error: membershipError } = await query.limit(1);
     
     const membership = memberships && memberships.length > 0 ? memberships[0] : null;
 
-    if (error) {
-      console.error('[user-role] Erro ao buscar membership:', error);
+    if (membershipError) {
+      console.error('[user-role] Erro ao buscar membership:', membershipError);
       return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: membershipError.message },
         { status: 400 },
       );
     }
 
-    if (!membership) {
-      return NextResponse.json({
-        success: true,
-        data: { role: 'vendedor', isAdmin: false },
-      });
+    // Buscar role_type do user_profiles (aqui é onde realmente diferencia Admin de Operador)
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('role_type')
+      .eq('user_id', user_id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.warn('[user-role] Erro ao buscar profile (continuando):', profileError);
     }
 
-    // Determinar se é admin
-    const isAdmin = membership.role === 'owner' || membership.role === 'admin';
-    const roleForSidebar = isAdmin ? 'admin' : 'vendedor';
+    // Determinar se é admin baseado em:
+    // 1. Se membership.role === 'owner' → sempre admin
+    // 2. Se profile.role_type === 'admin' → admin
+    // 3. Caso contrário → operador (vendedor)
+    let isAdmin = false;
+    let roleForSidebar = 'vendedor';
+
+    if (membership?.role === 'owner') {
+      // Owners são sempre admin
+      isAdmin = true;
+      roleForSidebar = 'admin';
+    } else if (profile?.role_type === 'admin') {
+      // Se role_type é 'admin', é admin
+      isAdmin = true;
+      roleForSidebar = 'admin';
+    } else {
+      // Se role_type é 'vendedor' ou não tem profile, é operador
+      isAdmin = false;
+      roleForSidebar = 'vendedor';
+    }
 
     console.log('[user-role] Role determinado:', { 
       user_id, 
       tenant_id, 
-      membership_role: membership.role, 
+      membership_role: membership?.role,
+      profile_role_type: profile?.role_type,
       roleForSidebar,
       isAdmin 
     });
@@ -68,7 +90,8 @@ export async function GET(request: NextRequest) {
       data: {
         role: roleForSidebar,
         isAdmin,
-        membershipRole: membership.role,
+        membershipRole: membership?.role,
+        profileRoleType: profile?.role_type,
       },
     });
   } catch (error: any) {

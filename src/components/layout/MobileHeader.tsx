@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -33,45 +33,46 @@ import { ENABLE_AUTH } from '@/constants/auth';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { BranchSelector } from '@/components/branches/BranchSelector';
 import { useBranch } from '@/contexts/BranchContext';
+import { mockUserProfile } from '@/lib/mock-data';
 
 const menuGroups = [
   {
     title: 'Principal',
     items: [
-      { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
-      { title: 'PDV', url: '/pdv', icon: ShoppingCart },
+      { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'PDV', url: '/pdv', icon: ShoppingCart, roles: ['admin', 'vendedor'] },
     ],
   },
   {
     title: 'Gestão',
     items: [
-      { title: 'Financeiro', url: '/financeiro', icon: DollarSign },
-      { title: 'Relatórios', url: '/relatorios', icon: BarChart3 },
-      { title: 'Estoque', url: '/estoque', icon: Warehouse },
-      { title: 'Filiais', url: '/filiais', icon: Building2 },
+      { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Relatórios', url: '/relatorios', icon: BarChart3, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Estoque', url: '/estoque', icon: Warehouse, roles: ['admin', 'vendedor'] },
+      { title: 'Filiais', url: '/filiais', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
     ],
   },
   {
     title: 'Vendas',
     items: [
-      { title: 'Vendas', url: '/vendas', icon: Receipt },
-      { title: 'Clientes', url: '/clientes', icon: Users },
-      { title: 'Produtos', url: '/produtos', icon: Package },
-      { title: 'Entregas', url: '/entregas', icon: Truck },
-      { title: 'Entregadores', url: '/entregadores', icon: UsersRound },
-      { title: 'Entregador', url: '/entregador', icon: Truck },
+      { title: 'Vendas', url: '/vendas', icon: Receipt, roles: ['admin', 'vendedor'] },
+      { title: 'Clientes', url: '/clientes', icon: Users, roles: ['admin', 'vendedor'] },
+      { title: 'Produtos', url: '/produtos', icon: Package, roles: ['admin', 'vendedor'] },
+      { title: 'Entregas', url: '/entregas', icon: Truck, roles: ['admin', 'vendedor'] },
+      { title: 'Entregadores', url: '/entregadores', icon: UsersRound, roles: ['admin', 'vendedor'] },
+      { title: 'Entregador', url: '/entregador', icon: Truck, roles: ['admin', 'vendedor'] },
     ],
   },
   {
     title: 'Configurações',
     items: [
-      { title: 'Fornecedores', url: '/fornecedores', icon: Building2 },
-      { title: 'Ordem de Serviços', url: '/ordem-servicos', icon: Wrench },
-      { title: 'Assinatura', url: '/assinatura', icon: CreditCard },
-      { title: 'Usuários', url: '/configuracoes/usuarios', icon: Users },
-      { title: 'Configurações', url: '/configuracoes', icon: Settings },
-      { title: 'Perfil Empresa', url: '/perfil-empresa', icon: Store },
-      { title: 'Perfil Usuário', url: '/perfil-usuario', icon: UserCog },
+      { title: 'Fornecedores', url: '/fornecedores', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Ordem de Serviços', url: '/ordem-servicos', icon: Wrench, roles: ['admin', 'vendedor'] },
+      { title: 'Assinatura', url: '/assinatura', icon: CreditCard, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Usuários', url: '/configuracoes/usuarios', icon: Users, roles: ['admin'] },
+      { title: 'Configurações', url: '/configuracoes', icon: Settings, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Perfil Empresa', url: '/perfil-empresa', icon: Store, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Perfil Usuário', url: '/perfil-usuario', icon: UserCog, roles: ['admin', 'vendedor', 'financeiro'] },
     ],
   },
 ];
@@ -80,8 +81,110 @@ export function MobileHeader() {
   const [isOpen, setIsOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<string[]>([]);
   const pathname = usePathname();
-  const { signOut } = useSimpleAuth();
+  const { signOut, user, tenant } = useSimpleAuth();
   const { enabled: isBranchesEnabled } = useBranch();
+  const [userRole, setUserRole] = useState<string>('vendedor');
+
+  // Buscar role real do usuário
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!ENABLE_AUTH || !user || !tenant) {
+        setUserRole(mockUserProfile.role);
+        return;
+      }
+
+      try {
+        // Tentar API user-role
+        try {
+          const roleRes = await fetch(
+            `/next_api/user-role?user_id=${encodeURIComponent(user.id)}&tenant_id=${encodeURIComponent(tenant.id)}&_t=${Date.now()}`,
+            { 
+              cache: 'no-store',
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+              }
+            }
+          );
+          
+          if (roleRes.ok) {
+            const roleData = await roleRes.json();
+            if (roleData.success && roleData.data) {
+              const role = roleData.data.role;
+              if (role === 'admin') {
+                setUserRole('admin');
+                return;
+              }
+            }
+          }
+        } catch (roleError) {
+          console.warn('[MobileHeader] Erro ao buscar via user-role:', roleError);
+        }
+
+        // Fallback para user-branch-info
+        try {
+          const branchRes = await fetch(
+            `/next_api/user-branch-info?user_id=${encodeURIComponent(user.id)}&_t=${Date.now()}`,
+            { 
+              cache: 'no-store',
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+              }
+            }
+          );
+          
+          if (branchRes.ok) {
+            const branchData = await branchRes.json();
+            if (branchData.success && branchData.data) {
+              const role = branchData.data.role;
+              const isMatrixAdmin = branchData.data.isMatrixAdmin;
+              if (role === 'owner' || role === 'admin' || isMatrixAdmin) {
+                setUserRole('admin');
+                return;
+              }
+            }
+          }
+        } catch (branchError) {
+          console.warn('[MobileHeader] Erro ao buscar via user-branch-info:', branchError);
+        }
+
+        // Fallback final: tenant-users
+        const timestamp = Date.now();
+        const res = await fetch(
+          `/next_api/tenant-users?tenant_id=${encodeURIComponent(tenant.id)}&user_id=${encodeURIComponent(user.id)}&_t=${timestamp}`,
+          { 
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache'
+            }
+          }
+        );
+        
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.data)) {
+            const currentUser = data.data.find((u: any) => u.id === user.id);
+            if (currentUser) {
+              if (currentUser.role === 'owner' || currentUser.role === 'admin') {
+                setUserRole('admin');
+                return;
+              }
+            }
+          }
+        }
+
+        // Padrão: vendedor/operador
+        setUserRole('vendedor');
+      } catch (error) {
+        console.error('[MobileHeader] Erro ao buscar role do usuário:', error);
+        setUserRole('vendedor');
+      }
+    };
+
+    fetchUserRole();
+  }, [user, tenant]);
 
   const toggleGroup = (groupTitle: string) => {
     setOpenGroups(prev => 
@@ -155,7 +258,13 @@ export function MobileHeader() {
                   </CollapsibleTrigger>
                   <CollapsibleContent className="space-y-1">
                     {group.items
-                      .filter((item: any) => (item.url === '/filiais' ? isBranchesEnabled : true))
+                      .filter((item: any) => {
+                        // Verificar role do usuário
+                        const hasRole = item.roles ? item.roles.includes(userRole) : true;
+                        const isFiliaisItem = item.url === '/filiais';
+                        const shouldShowFiliais = isFiliaisItem ? isBranchesEnabled : true;
+                        return hasRole && shouldShowFiliais;
+                      })
                       .map((item: any) => (
                       <Link
                         key={item.title}

@@ -37,3 +37,10 @@ COMMENT ON COLUMN cash_sessions.notes IS 'Observações adicionais sobre a sess�
 
 
 
+
+
+
+
+
+
+
