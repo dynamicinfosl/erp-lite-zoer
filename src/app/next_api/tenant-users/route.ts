@@ -258,15 +258,17 @@ export async function GET(request: NextRequest) {
               const { data: newProfile, error: createError } = await supabaseAdmin
                 .from('user_profiles')
                 .insert(insertData)
-                .select('role_type, name, user_id')
+                .select('id, role_type, name, user_id')
                 .single();
               
               if (!createError && newProfile) {
                 profile = newProfile;
+                // Usar user_id como fallback se id não estiver disponível
+                const profileId = (newProfile as any).id || newProfile.user_id;
                 console.log(`[tenant-users GET] ✅ Profile criado automaticamente para ${authUser.user.email}:`, {
                   role_type: autoProfileRoleType,
                   membership_role: membership.role,
-                  profile_id: newProfile.id || newProfile.user_id
+                  profile_id: profileId
                 });
               } else {
                 console.error(`[tenant-users GET] ❌ Erro ao criar profile automaticamente:`, createError);
