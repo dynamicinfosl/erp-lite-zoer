@@ -205,13 +205,18 @@ export default function RelatoriosPage() {
     return () => observer.disconnect();
   }, []);
 
+  // Criar o formatador uma vez e reutilizar
+  const currencyFormatter = useMemo(
+    () => new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }),
+    []
+  );
+
   const formatCurrency = useCallback(
-    (value: number) =>
-      new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      }).format(value),
-    [],
+    (value: number) => currencyFormatter.format(value),
+    [currencyFormatter],
   );
 
   const delimiter = ';';

@@ -30,6 +30,24 @@ export function setupGlobalErrorHandlers() {
     if (message.includes('DialogContent') && message.includes('DialogTitle')) {
       return; // Suprimir este aviso conhecido
     }
+    
+    // Filtrar erros de cancelamento esperados (fetch abortado)
+    if (
+      message.includes('aborted') ||
+      message.includes('cancelled') ||
+      message.includes('Component unmounted') ||
+      message.includes('Request timeout') ||
+      message.includes('AbortError') ||
+      (args[0] instanceof Error && (
+        args[0].name === 'AbortError' ||
+        args[0].message.includes('aborted') ||
+        args[0].message.includes('cancelled') ||
+        args[0].message.includes('Component unmounted')
+      ))
+    ) {
+      return; // Suprimir erros de cancelamento esperados
+    }
+    
     originalConsoleError(...args);
   };
 

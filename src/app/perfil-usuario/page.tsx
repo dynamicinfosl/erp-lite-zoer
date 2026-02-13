@@ -53,7 +53,7 @@ export default function PerfilUsuarioPage() {
   const [originalFormData, setOriginalFormData] = useState(formData);
 
   const loadUserData = useCallback(async () => {
-    if (!user) {
+    if (!user || !user.id) {
       setLoading(false);
       return;
     }
@@ -74,47 +74,69 @@ export default function PerfilUsuarioPage() {
         const response = await fetch(`/next_api/user-profiles?user_id=${encodeURIComponent(user.id)}`);
         if (response.ok) {
           const result = await response.json();
-          const profile = result?.data?.profile;
-          const userMetadata = result?.data?.user_metadata || {};
-          if (profile || userMetadata) {
-            profileData = {
-              name: profile?.name || userMetadata?.name || user.user_metadata?.name || user.email?.split('@')[0] || '',
-              email: user.email || '',
-              phone: profile?.phone || userMetadata?.phone || user.user_metadata?.phone || '',
-              cpf: userMetadata?.cpf || user.user_metadata?.cpf || '',
-              rg: userMetadata?.rg || user.user_metadata?.rg || '',
-              birth_date:
-                normalizeDate(profile?.birth_date) ||
-                normalizeDate(userMetadata?.birth_date) ||
-                normalizeDate(user.user_metadata?.birth_date),
-              gender: userMetadata?.gender || user.user_metadata?.gender || '',
-              role_type: profile?.role_type || userMetadata?.role_type || user.user_metadata?.role_type || 'vendedor',
-            };
-            console.log('👤 Dados carregados de user_profiles:', profileData);
+          if (result && result.data) {
+            const profile = result.data.profile;
+            const userMetadata = result.data.user_metadata || {};
+            if (profile || userMetadata) {
+              profileData = {
+                name: profile?.name || userMetadata?.name || user?.user_metadata?.name || user?.email?.split('@')[0] || '',
+                email: user?.email || '',
+                phone: profile?.phone || userMetadata?.phone || user?.user_metadata?.phone || '',
+                cpf: userMetadata?.cpf || user?.user_metadata?.cpf || '',
+                rg: userMetadata?.rg || user?.user_metadata?.rg || '',
+                birth_date:
+                  normalizeDate(profile?.birth_date) ||
+                  normalizeDate(userMetadata?.birth_date) ||
+                  normalizeDate(user?.user_metadata?.birth_date) ||
+                  '',
+                gender: userMetadata?.gender || user?.user_metadata?.gender || '',
+                role_type: profile?.role_type || userMetadata?.role_type || user?.user_metadata?.role_type || 'vendedor',
+              };
+              console.log('👤 Dados carregados de user_profiles:', profileData);
+            }
           }
+        } else {
+          console.warn('⚠️ Resposta da API não foi OK:', response.status, response.statusText);
         }
       } catch (err) {
         console.warn('⚠️ Não foi possível carregar perfil do banco:', err);
       }
 
-      if (!profileData) {
+      if (!profileData && user) {
         profileData = {
           name: user.user_metadata?.name || user.email?.split('@')[0] || '',
           email: user.email || '',
           phone: user.user_metadata?.phone || '',
           cpf: user.user_metadata?.cpf || '',
           rg: user.user_metadata?.rg || '',
-          birth_date: normalizeDate(user.user_metadata?.birth_date),
+          birth_date: normalizeDate(user.user_metadata?.birth_date) || '',
           gender: user.user_metadata?.gender || '',
           role_type: user.user_metadata?.role_type || 'vendedor',
         };
         console.log('👤 Dados carregados do metadata:', profileData);
       }
 
-      setFormData(profileData);
-      setOriginalFormData({ ...profileData });
+      if (profileData) {
+        setFormData(profileData);
+        setOriginalFormData({ ...profileData });
+      }
     } catch (error) {
       console.error('❌ Erro ao carregar dados do usuário:', error);
+      // Definir dados padrão em caso de erro
+      if (user) {
+        const defaultData = {
+          name: user.user_metadata?.name || user.email?.split('@')[0] || '',
+          email: user.email || '',
+          phone: user.user_metadata?.phone || '',
+          cpf: user.user_metadata?.cpf || '',
+          rg: user.user_metadata?.rg || '',
+          birth_date: '',
+          gender: '',
+          role_type: user.user_metadata?.role_type || 'vendedor',
+        };
+        setFormData(defaultData);
+        setOriginalFormData(defaultData);
+      }
     } finally {
       setLoading(false);
     }
@@ -215,14 +237,14 @@ export default function PerfilUsuarioPage() {
     );
   }
 
-  if (!user) {
+  if (!user || !user.id) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Usuário não encontrado</CardTitle>
             <CardDescription>
-              Não foi possível carregar os dados do usuário.
+              Não foi possível carregar os dados do usuário. Por favor, faça login novamente.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -419,7 +441,7 @@ export default function PerfilUsuarioPage() {
                   <Input
                     id="email"
                     type="email"
-                    value={formData.email}
+                    value={formData.email || user?.email || ''}
                     disabled
                     className="h-11 bg-muted"
                   />

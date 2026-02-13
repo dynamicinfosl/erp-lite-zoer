@@ -126,8 +126,26 @@ export function usePlanLimits(): PlanLimitsHook {
     trial_ends_at: currentSubscription?.trial_ends_at,
     current_period_end: currentSubscription?.current_period_end,
     now: now.toISOString(),
-    tenant_id: tenant?.id
+    tenant_id: tenant?.id,
+    tenant_status: tenant?.status
   });
+  
+  // Se o tenant está suspenso, considerar como expirado
+  if (tenant?.status === 'suspended') {
+    console.warn('❌ [usePlanLimits] Tenant está suspenso');
+    return {
+      subscription: currentSubscription,
+      usage,
+      limits: currentSubscription?.plan?.limits || null,
+      loading,
+      error,
+      isTrialExpired: true, // Bloquear acesso se tenant está suspenso
+      daysLeftInTrial: 0,
+      canCreate: () => false,
+      getUsagePercentage,
+      refreshData: loadUsageData,
+    };
+  }
   
   const isTrialExpired = Boolean(
     currentSubscription?.status === 'trial' && 
@@ -135,19 +153,30 @@ export function usePlanLimits(): PlanLimitsHook {
     new Date(currentSubscription.trial_ends_at) < now
   );
   
-  const isActivePlanExpired = Boolean(
-    currentSubscription?.status === 'active' && 
-    currentSubscription?.current_period_end && 
-    new Date(currentSubscription.current_period_end) < now
+  // IMPORTANTE: Se o status é 'active', considerar válido mesmo se current_period_end não estiver no futuro
+  // Isso permite que planos recém-ativados funcionem imediatamente
+  // Apenas bloquear se o status NÃO for 'active' ou 'trial'
+  // Se o status é 'active', o plano está válido independentemente de current_period_end
+  // (pode ser um plano recém-ativado, ilimitado, ou com data de expiração no futuro)
+  const isActivePlanExpired = false; // Se status é 'active', nunca considerar expirado aqui
+  
+  // Bloquear apenas se:
+  // 1. Status não é 'active' nem 'trial' (suspended, canceled, etc)
+  // 2. Status é 'trial' e trial expirou
+  // NÃO bloquear se status é 'active', mesmo se current_period_end está no passado
+  // (isso permite que planos recém-ativados funcionem imediatamente)
+  const isPlanExpired = Boolean(
+    (currentSubscription?.status && currentSubscription.status !== 'active' && currentSubscription.status !== 'trial') ||
+    isTrialExpired
   );
   
   console.log('📊 [usePlanLimits] Resultado da verificação:', {
     isTrialExpired,
     isActivePlanExpired,
-    isPlanExpired: isTrialExpired || isActivePlanExpired
+    isPlanExpired,
+    subscription_status: currentSubscription?.status,
+    tenant_status: tenant?.status
   });
-  
-  const isPlanExpired = isTrialExpired || isActivePlanExpired;
 
   // Calcular dias restantes no trial ou plano ativo
   const daysLeftInTrial = currentSubscription?.trial_ends_at 

@@ -69,7 +69,9 @@ export async function GET(request: NextRequest) {
         .limit(1);
 
       const subscription = subscriptions && subscriptions.length > 0 ? subscriptions[0] : null;
-      const plan = subscription?.plans || null;
+      // O Supabase pode retornar plans como array ou objeto único, dependendo da relação
+      const planData = subscription?.plans;
+      const plan = Array.isArray(planData) ? (planData.length > 0 ? planData[0] : null) : planData || null;
 
       const now = new Date();
       let statusPlano = 'SEM_SUBSCRIPTION';

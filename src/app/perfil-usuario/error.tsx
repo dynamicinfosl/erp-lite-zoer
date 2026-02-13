@@ -1,44 +1,28 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, RefreshCw, Home } from "lucide-react";
+import { useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 
-export default function Error({
+export default function PerfilUsuarioError({
   error,
   reset,
 }: {
   error: Error & { digest?: string; cause?: any };
-  reset?: () => void;
+  reset: () => void;
 }) {
-  const [errorDetails, setErrorDetails] = useState<Record<string, any>>({});
-
   useEffect(() => {
-    const details: Record<string, any> = {
-      message: error?.message || 'Erro desconhecido',
-      stack: error?.stack,
-      name: error?.name || 'Error',
-      digest: error?.digest,
-    };
-
-    if (typeof window !== 'undefined') {
-      details.url = window.location.href;
-      details.timestamp = new Date().toISOString();
-    }
-
-    setErrorDetails(details);
-    
     // Log do erro no console para debug
-    console.error('❌ Error Boundary capturou um erro:', error);
+    console.error('❌ Erro na página de perfil do usuário:', error);
   }, [error]);
 
   const handleReset = () => {
-    if (reset) {
-      reset();
-    } else {
-      window.location.reload();
-    }
+    reset();
+  };
+
+  const handleGoHome = () => {
+    window.location.href = '/dashboard';
   };
 
   return (
@@ -47,10 +31,12 @@ export default function Error({
         <CardHeader>
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-6 w-6 text-red-500" />
-            <CardTitle className="text-red-600 dark:text-red-400">Erro ao carregar página</CardTitle>
+            <CardTitle className="text-red-600 dark:text-red-400">
+              Erro ao carregar perfil
+            </CardTitle>
           </div>
           <CardDescription>
-            Ocorreu um erro inesperado. Por favor, tente novamente.
+            Não foi possível carregar a página de perfil do usuário. Por favor, tente novamente.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -73,7 +59,7 @@ export default function Error({
             </Button>
             
             <Button
-              onClick={() => window.location.href = '/dashboard'}
+              onClick={handleGoHome}
               variant="outline"
               className="w-full"
             >
@@ -97,3 +83,4 @@ export default function Error({
     </div>
   );
 }
+

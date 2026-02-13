@@ -82,6 +82,22 @@ export function setupFetchInterceptor() {
       
       return response;
     } catch (fetchError) {
+      // Filtrar erros de cancelamento esperados (quando componente é desmontado)
+      const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
+      const errorName = fetchError instanceof Error ? fetchError.name : '';
+      
+      // Não logar erros de cancelamento esperados
+      if (
+        errorName === 'AbortError' ||
+        errorMessage.includes('aborted') ||
+        errorMessage.includes('cancelled') ||
+        errorMessage.includes('Component unmounted') ||
+        errorMessage.includes('Request timeout')
+      ) {
+        // Silenciosamente propagar o erro sem logar
+        throw fetchError;
+      }
+      
       // Se houver erro na chamada fetch original, propagar
       console.error('❌ [Fetch Interceptor] Erro na chamada fetch:', fetchError);
       throw fetchError;

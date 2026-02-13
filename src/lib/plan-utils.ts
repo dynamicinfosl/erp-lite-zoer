@@ -73,26 +73,32 @@ export async function validatePlanLimits(
       }
     }
 
-    // Verificar se plano ativo expirou (current_period_end)
-    if (subscription.status === 'active') {
-      if (subscription.current_period_end) {
-        const periodEnd = new Date(subscription.current_period_end);
-        if (periodEnd < now) {
-          return { 
-            canProceed: false, 
-            reason: 'Plano expirado. Entre em contato com o suporte para renovar.',
-            trialExpired: true 
-          };
-        }
-        // Se chegou aqui, plano está ativo e válido - continuar para verificar limites
-      } else {
-        // Plano ativo mas sem data de expiração - permitir (pode ser plano ilimitado)
-        console.log('⚠️ Plano ativo sem current_period_end, permitindo operação');
-      }
+    // Verificar status do tenant primeiro (se estiver suspended, bloquear)
+    const { data: tenant, error: tenantError } = await supabase
+      .from('tenants')
+      .select('status')
+      .eq('id', tenantId)
+      .maybeSingle();
+    
+    if (!tenantError && tenant?.status === 'suspended') {
+      console.warn('❌ Tenant está suspenso, bloqueando operação');
+      return { 
+        canProceed: false, 
+        reason: 'Sua conta está suspensa. Entre em contato com o suporte.',
+        limitExceeded: true 
+      };
     }
 
-    // Verificar se plano está inativo
-    if (subscription.status !== 'trial' && subscription.status !== 'active') {
+    // IMPORTANTE: Se o status é 'active', considerar válido mesmo se current_period_end não estiver no futuro
+    // Isso permite que planos recém-ativados funcionem imediatamente
+    // Apenas verificar expiração se o status NÃO for 'active'
+    if (subscription.status === 'active') {
+      // Se status é 'active', o plano está válido independentemente de current_period_end
+      // (pode ser um plano recém-ativado, ilimitado, ou com data de expiração no futuro)
+      console.log('✅ Plano ativo detectado, permitindo operação');
+      // Continuar para verificar limites
+    } else if (subscription.status !== 'trial') {
+      // Se não é 'active' nem 'trial', bloquear
       return { 
         canProceed: false, 
         reason: 'Plano inativo. Entre em contato com o suporte.',

@@ -183,9 +183,11 @@ export default function JugaDashboard() {
 
   useEffect(() => {
     let cancelled = false;
+    // Declarar variáveis no escopo do useEffect para acesso no cleanup
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let controller: AbortController | null = null;
     
     const loadDashboardData = async (retryCount = 0) => {
-      let timeoutId: ReturnType<typeof setTimeout> | null = null;
       try {
         setLoading(true);
         
@@ -240,14 +242,24 @@ export default function JugaDashboard() {
           setInitialLoad(false);
         }
 
-        const controller = new AbortController();
-        timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+        controller = new AbortController();
+        const currentController = controller; // Guardar referência para uso seguro
+        
+        timeoutId = setTimeout(() => {
+          if (currentController && !currentController.signal.aborted) {
+            try {
+              currentController.abort('Request timeout after 10 seconds');
+            } catch (e) {
+              // Ignorar erros ao abortar
+            }
+          }
+        }, 10000); // 10 segundos timeout
 
         try {
           // Carregar dados em paralelo com cache desabilitado para garantir dados atualizados
           const tz = -new Date().getTimezoneOffset();
           const fetchOptions = { 
-            signal: controller.signal,
+            signal: controller!.signal,
             cache: 'no-store' as RequestCache,
           };
           
@@ -275,6 +287,7 @@ export default function JugaDashboard() {
           ]);
 
           clearTimeout(timeoutId);
+          controller = null; // Limpar referência após sucesso
           
           if (cancelled) return;
 
@@ -403,7 +416,8 @@ export default function JugaDashboard() {
         } catch (fetchError: any) {
           if (cancelled) return;
           
-          if (fetchError.name === 'AbortError') {
+          // Verificar se é um erro de abort (timeout ou cancelamento)
+          if (fetchError.name === 'AbortError' || fetchError.message?.includes('aborted')) {
             // Timeout do fetch: não tratar como erro para evitar ruído no console
             if (retryCount < 2) {
               setTimeout(() => loadDashboardData(retryCount + 1), 1000);
@@ -443,7 +457,19 @@ export default function JugaDashboard() {
         if (cancelled) return;
         setLoading(false);
       } finally {
-        if (timeoutId) clearTimeout(timeoutId);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        // Garantir que o controller seja abortado se ainda não foi
+        if (controller && !controller.signal.aborted) {
+          try {
+            controller.abort('Request completed or cancelled');
+          } catch (e) {
+            // Ignorar erros ao abortar no cleanup
+          }
+        }
+        controller = null;
       }
     };
 
@@ -451,6 +477,18 @@ export default function JugaDashboard() {
     
     return () => {
       cancelled = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      if (controller && !controller.signal.aborted) {
+        try {
+          controller.abort('Component unmounted or cancelled');
+        } catch (e) {
+          // Ignorar erros ao abortar
+        }
+        controller = null;
+      }
     };
   }, [tenant?.id, branchId, scope, generateRecentActivity, initialLoad, lastFetchTime]);
 

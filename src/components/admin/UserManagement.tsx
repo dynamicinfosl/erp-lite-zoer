@@ -677,14 +677,9 @@ export function UserManagement() {
     }
   };
 
-  // Quando abrir o modal, definir data padrão (1 ano a partir de hoje) e carregar planos
+  // Quando abrir o modal, carregar planos
   useEffect(() => {
     if (dialogOpen && selectedUser) {
-      const defaultDate = new Date();
-      // Definir 1 ano como padrão (365 dias)
-      defaultDate.setDate(defaultDate.getDate() + 365);
-      setExpirationDate(defaultDate.toISOString().split('T')[0]);
-      
       // Garantir que os planos estão carregados
       if (availablePlans.length === 0) {
         console.log('🔄 Carregando planos ao abrir modal...');
@@ -1200,7 +1195,6 @@ export function UserManagement() {
                 <div>
                   <Label className="text-xs sm:text-sm text-gray-300 mb-2 block">
                     Data de Vencimento
-                    <span className="text-yellow-500 ml-2">(Padrão: 1 ano)</span>
                   </Label>
                   <Input
                     type="date"

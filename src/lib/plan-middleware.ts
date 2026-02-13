@@ -177,12 +177,17 @@ export async function checkFeatureAccess(
       }
     }
 
-    // Verificar se plano ativo expirou
-    if (subscription.status === 'active' && subscription.current_period_end) {
-      const periodEnd = new Date(subscription.current_period_end);
-      if (periodEnd < now) {
-        return { hasAccess: false, reason: 'Plano expirado' };
-      }
+    // IMPORTANTE: Se o status é 'active', considerar válido mesmo se current_period_end não estiver no futuro
+    // Isso permite que planos recém-ativados funcionem imediatamente
+    // Apenas verificar expiração se o status NÃO for 'active'
+    if (subscription.status === 'active') {
+      // Se status é 'active', o plano está válido independentemente de current_period_end
+      // (pode ser um plano recém-ativado, ilimitado, ou com data de expiração no futuro)
+      console.log('✅ [checkFeatureAccess] Plano ativo detectado, permitindo acesso');
+      // Continuar para verificar features
+    } else if (subscription.status !== 'trial') {
+      // Se não é 'active' nem 'trial', bloquear
+      return { hasAccess: false, reason: 'Plano inativo' };
     }
 
     // Verificar se plano está inativo
