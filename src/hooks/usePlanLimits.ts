@@ -130,23 +130,6 @@ export function usePlanLimits(): PlanLimitsHook {
     tenant_status: tenant?.status
   });
   
-  // Se o tenant está suspenso, considerar como expirado
-  if (tenant?.status === 'suspended') {
-    console.warn('❌ [usePlanLimits] Tenant está suspenso');
-    return {
-      subscription: currentSubscription,
-      usage,
-      limits: currentSubscription?.plan?.limits || null,
-      loading,
-      error,
-      isTrialExpired: true, // Bloquear acesso se tenant está suspenso
-      daysLeftInTrial: 0,
-      canCreate: () => false,
-      getUsagePercentage,
-      refreshData: loadUsageData,
-    };
-  }
-  
   const isTrialExpired = Boolean(
     currentSubscription?.status === 'trial' && 
     currentSubscription?.trial_ends_at && 
@@ -234,6 +217,23 @@ export function usePlanLimits(): PlanLimitsHook {
     
     return Math.min(100, (current / max) * 100);
   };
+  
+  // Se o tenant está suspenso, considerar como expirado
+  if (tenant?.status === 'suspended') {
+    console.warn('❌ [usePlanLimits] Tenant está suspenso');
+    return {
+      subscription: currentSubscription,
+      usage,
+      limits: currentSubscription?.plan?.limits || null,
+      loading,
+      error,
+      isTrialExpired: true, // Bloquear acesso se tenant está suspenso
+      daysLeftInTrial: 0,
+      canCreate: () => false,
+      getUsagePercentage,
+      refreshData: loadUsageData,
+    };
+  }
 
   return {
     subscription: currentSubscription,
