@@ -105,7 +105,11 @@ export async function GET(request: NextRequest) {
     
     console.log(`🔍 [ADMIN/USERS] Processando ${memberships.length} memberships...`);
     
-    memberships.forEach((membership: any) => {
+    // Filtrar apenas memberships ativos (excluídos têm is_active = false)
+    const activeMemberships = memberships.filter((m: any) => m.is_active !== false);
+    console.log(`📊 [ADMIN/USERS] Memberships ativos: ${activeMemberships.length} de ${memberships.length}`);
+    
+    activeMemberships.forEach((membership: any) => {
       const userId = membership.user_id;
       if (!userId) {
         console.warn('⚠️ [ADMIN/USERS] Membership sem user_id:', membership);
@@ -283,16 +287,16 @@ export async function DELETE(request: NextRequest) {
 
     // Se temos user_id, tentar excluir o perfil do usuário
     if (userId && !userId.startsWith('tenant-') && !userId.startsWith('membership-')) {
-      // Verificar se é um UUID válido (user_profile.id)
+      // Verificar se é um UUID válido (user_profile.user_id corresponde ao auth.users.id)
       if (uuidRegex.test(userId)) {
-        // Soft delete no user_profile
+        // Soft delete no user_profile usando user_id (não id)
         const { error: profileError, data: profileData } = await supabaseAdmin
           .from('user_profiles')
           .update({ 
             is_active: false,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', userId)
+          .eq('user_id', userId)
           .select();
 
         if (profileError) {

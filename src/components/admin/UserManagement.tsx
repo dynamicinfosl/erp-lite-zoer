@@ -702,22 +702,22 @@ export function UserManagement() {
   }
 
   return (
-    <div className="space-y-6 w-full min-w-0">
+    <div className="flex flex-col h-[calc(100vh-120px)] w-full min-w-0 space-y-4 overflow-hidden">
       {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="flex-shrink-0 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Card 
           className={`cursor-pointer transition-all duration-200 hover:shadow-lg bg-gray-900 border-gray-700 ${
             activeFilter === null ? 'ring-2 ring-blue-500 bg-blue-500/10' : 'hover:bg-gray-800/50'
           }`}
           onClick={() => handleCardClick('all')}
         >
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-300">Total de Clientes</p>
-                <p className="text-2xl font-bold text-white">{users.length}</p>
+                <p className="text-xs text-gray-400">Total</p>
+                <p className="text-xl font-bold text-white">{users.length}</p>
               </div>
-              <Users className="h-8 w-8 text-blue-600" />
+              <Users className="h-6 w-6 text-blue-600" />
             </div>
           </CardContent>
         </Card>
@@ -728,15 +728,15 @@ export function UserManagement() {
           }`}
           onClick={() => handleCardClick('active')}
         >
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-300">Ativos</p>
-                <p className="text-2xl font-bold text-green-400">
+                <p className="text-xs text-gray-400">Ativos</p>
+                <p className="text-xl font-bold text-green-400">
                   {users.filter(u => u.tenant_status === 'active').length}
                 </p>
               </div>
-              <Users className="h-8 w-8 text-green-400" />
+              <Users className="h-6 w-6 text-green-400" />
             </div>
           </CardContent>
         </Card>
@@ -747,15 +747,15 @@ export function UserManagement() {
           }`}
           onClick={() => handleCardClick('trial')}
         >
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-300">Trial</p>
-                <p className="text-2xl font-bold text-blue-400">
+                <p className="text-xs text-gray-400">Trial</p>
+                <p className="text-xl font-bold text-blue-400">
                   {users.filter(u => u.tenant_status === 'trial').length}
                 </p>
               </div>
-              <Calendar className="h-8 w-8 text-blue-400" />
+              <Calendar className="h-6 w-6 text-blue-400" />
             </div>
           </CardContent>
         </Card>
@@ -766,15 +766,15 @@ export function UserManagement() {
           }`}
           onClick={() => handleCardClick('pending')}
         >
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-300">Pendentes</p>
-                <p className="text-2xl font-bold text-yellow-400">
+                <p className="text-xs text-gray-400">Pendentes</p>
+                <p className="text-xl font-bold text-yellow-400">
                   {users.filter(u => u.approval_status === 'pending').length}
                 </p>
               </div>
-              <Calendar className="h-8 w-8 text-yellow-400" />
+              <Calendar className="h-6 w-6 text-yellow-400" />
             </div>
           </CardContent>
         </Card>
@@ -785,15 +785,15 @@ export function UserManagement() {
           }`}
           onClick={() => handleCardClick('suspended')}
         >
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-300">Suspensos</p>
-                <p className="text-2xl font-bold text-red-400">
+                <p className="text-xs text-gray-400">Suspensos</p>
+                <p className="text-xl font-bold text-red-400">
                   {users.filter(u => u.tenant_status === 'suspended').length}
                 </p>
               </div>
-              <AlertTriangle className="h-8 w-8 text-red-400" />
+              <AlertTriangle className="h-6 w-6 text-red-400" />
             </div>
           </CardContent>
         </Card>
@@ -804,15 +804,15 @@ export function UserManagement() {
           }`}
           onClick={() => handleCardClick('no_plan')}
         >
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-300">Sem Plano</p>
-                <p className="text-2xl font-bold text-orange-400">
+                <p className="text-xs text-gray-400">Sem Plano</p>
+                <p className="text-xl font-bold text-orange-400">
                   {users.filter(u => !u.subscription_plan_name).length}
                 </p>
               </div>
-              <AlertTriangle className="h-8 w-8 text-orange-400" />
+              <AlertTriangle className="h-6 w-6 text-orange-400" />
             </div>
           </CardContent>
         </Card>
@@ -820,7 +820,7 @@ export function UserManagement() {
 
       {/* Indicador de Filtro Ativo */}
       {activeFilter && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+        <div className="flex-shrink-0 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
           <div className="flex flex-wrap items-center gap-2 text-center sm:text-left">
             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
             <span className="text-sm text-blue-300">
@@ -847,8 +847,8 @@ export function UserManagement() {
       )}
 
       {/* Tabela de Usuários */}
-      <Card className="bg-gray-900 border-gray-700">
-        <CardHeader className="pb-3">
+      <Card className="flex flex-col h-full bg-gray-900 border-gray-700 overflow-y-auto overflow-x-auto">
+        <CardHeader className="flex-shrink-0 pb-3 border-b border-gray-700 bg-gray-900 sticky top-0 z-10">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="flex items-center gap-2 text-white">
               <Users className="h-5 w-5" />
@@ -861,7 +861,7 @@ export function UserManagement() {
           </div>
           
           <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-            <div className="relative w-full sm:w-auto sm:min-w-[250px]">
+            <div className="relative w-full sm:w-auto sm:min-w-[300px]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
                 placeholder="Buscar por email ou empresa..."
@@ -870,20 +870,25 @@ export function UserManagement() {
                 className="pl-10 w-full bg-gray-800 border-gray-700 text-white placeholder-gray-400"
               />
             </div>
+            <div className="text-sm text-gray-400 whitespace-nowrap">
+              {filteredUsers.length} {filteredUsers.length === 1 ? 'cliente' : 'clientes'}
+            </div>
           </div>
         </CardHeader>
 
-        <CardContent className="pt-3">
+        <CardContent className="flex-shrink-0 p-0">
           {filteredUsers.length === 0 ? (
-            <Alert className="bg-yellow-500/10 border-yellow-500/30">
-              <AlertTriangle className="h-4 w-4 text-yellow-400" />
-              <AlertDescription className="text-yellow-300">
-                Nenhum usuário encontrado.
-              </AlertDescription>
-            </Alert>
+            <div className="p-6">
+              <Alert className="bg-yellow-500/10 border-yellow-500/30">
+                <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                <AlertDescription className="text-yellow-300">
+                  Nenhum usuário encontrado.
+                </AlertDescription>
+              </Alert>
+            </div>
           ) : (
-            <div className="overflow-x-auto max-h-[62vh] overflow-y-auto rounded-md">
-              <Table className="text-xs sm:text-sm w-full min-w-[1000px]">
+            <div className="w-full">
+              <Table className="text-xs sm:text-sm w-full min-w-[1200px]">
                 <TableHeader className="sticky top-0 z-10 bg-gray-800/90 backdrop-blur supports-[backdrop-filter]:bg-gray-800/60 border-gray-700">
                   <TableRow className="border-gray-700">
                     <TableHead className="text-gray-300 text-[11px] sm:text-xs whitespace-nowrap">Email</TableHead>
@@ -1006,10 +1011,10 @@ export function UserManagement() {
 
       {/* Dialog de Detalhes */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto bg-gray-900 text-white border-gray-700">
-          <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">Gerenciar Cliente</DialogTitle>
-            <DialogDescription className="text-sm">
+        <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto !bg-gray-900 !text-white !border-gray-700 [&>button]:!text-white [&>button]:hover:!bg-gray-800 [&>button]:hover:!text-white">
+          <DialogHeader className="border-b border-gray-700 pb-4">
+            <DialogTitle className="text-lg sm:text-xl !text-white">Gerenciar Cliente</DialogTitle>
+            <DialogDescription className="text-sm !text-gray-400">
               Visualize e gerencie os detalhes do cliente
             </DialogDescription>
           </DialogHeader>

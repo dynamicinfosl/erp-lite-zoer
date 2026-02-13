@@ -259,6 +259,17 @@ export function MobileHeader() {
                   <CollapsibleContent className="space-y-1">
                     {group.items
                       .filter((item: any) => {
+                        // Item "Usuários" só deve aparecer para SuperAdmin
+                        if (item.url === '/configuracoes/usuarios') {
+                          const isSuperAdmin = user?.email === 'admin@erplite.com' || 
+                                               user?.email === 'mileny@teste.com' || 
+                                               user?.email === 'julga@julga.com' ||
+                                               user?.email === 'julga';
+                          if (!isSuperAdmin) {
+                            return false;
+                          }
+                        }
+                        
                         // Verificar role do usuário
                         const hasRole = item.roles ? item.roles.includes(userRole) : true;
                         const isFiliaisItem = item.url === '/filiais';

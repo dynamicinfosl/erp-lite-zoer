@@ -328,10 +328,24 @@ function SidebarContentInternal() {
       }
   }, [forceCheck, user, tenant]);
 
+  // Verificar se o usuário é SuperAdmin (acesso apenas para emails específicos)
+  const isSuperAdmin = user?.email === 'admin@erplite.com' || 
+                       user?.email === 'mileny@teste.com' || 
+                       user?.email === 'julga@julga.com' ||
+                       user?.email === 'julga';
+
   const filteredGroups = menuGroups.map(group => ({
     title: group.title,
     items: group.items
       .filter(item => {
+        // Item "Usuários" só deve aparecer para SuperAdmin
+        if (item.url === '/configuracoes/usuarios') {
+          if (!isSuperAdmin) {
+            console.log('[Sidebar] 🔒 Item "Usuários" oculto - apenas para SuperAdmin');
+            return false;
+          }
+        }
+        
         const hasRole = item.roles.includes(userRole);
         const isFiliaisItem = item.url === '/filiais';
         const shouldShowFiliais = isFiliaisItem ? isBranchesEnabled : true;
@@ -346,6 +360,8 @@ function SidebarContentInternal() {
             hasRole,
             isBranchesEnabled,
             shouldShow,
+            isSuperAdmin,
+            userEmail: user?.email,
             userExists: !!user,
             tenantExists: !!tenant
           });

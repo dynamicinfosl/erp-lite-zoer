@@ -118,9 +118,17 @@ export default function TenantUsersPage() {
           }
         }
         
-        // Verificação adicional: se o email for admin@erplite.com, forçar admin
-        if (user.email === 'admin@erplite.com' || user.email === 'mileny@teste.com') {
+        // Verificação adicional: se o email for SuperAdmin, forçar admin
+        const isSuperAdmin = user.email === 'admin@erplite.com' || 
+                             user.email === 'mileny@teste.com' || 
+                             user.email === 'julga@julga.com' ||
+                             user.email === 'julga';
+        
+        if (isSuperAdmin) {
           userIsAdmin = true;
+        } else {
+          // Se não for SuperAdmin, bloquear acesso à página de usuários
+          userIsAdmin = false;
         }
         
         setIsAdmin(userIsAdmin);
@@ -505,6 +513,12 @@ export default function TenantUsersPage() {
   };
 
   // Se ainda está verificando acesso, mostrar loading
+  // Verificar se o usuário é SuperAdmin
+  const isSuperAdmin = user?.email === 'admin@erplite.com' || 
+                       user?.email === 'mileny@teste.com' || 
+                       user?.email === 'julga@julga.com' ||
+                       user?.email === 'julga';
+
   if (checkingAccess) {
     return (
       <div className="space-y-6 p-4 sm:p-6">
@@ -514,7 +528,8 @@ export default function TenantUsersPage() {
   }
 
   // Se não é admin, mostrar mensagem de acesso negado
-  if (!isAdmin) {
+  // Bloquear acesso se não for SuperAdmin
+  if (!isAdmin || !isSuperAdmin) {
     return (
       <div className="space-y-6 p-4 sm:p-6">
         <Card>
@@ -525,7 +540,7 @@ export default function TenantUsersPage() {
               </div>
               <h2 className="text-xl font-semibold text-heading mb-2">Acesso Negado</h2>
               <p className="text-body mb-4">
-                Você não tem permissão para acessar esta página. Apenas administradores podem gerenciar usuários do sistema.
+                Você não tem permissão para acessar esta página. Apenas SuperAdmin pode gerenciar usuários do sistema.
               </p>
               <Button onClick={() => window.history.back()} variant="outline">
                 Voltar

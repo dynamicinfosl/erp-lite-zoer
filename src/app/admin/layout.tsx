@@ -29,12 +29,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <SidebarProvider>
       <AdminSidebar />
-      <SidebarInset className="w-full">
-        <div className="lg:hidden sticky top-0 z-30 flex items-center gap-2 border-b border-border bg-background/90 px-4 py-3 backdrop-blur">
+      <SidebarInset className="w-full flex flex-col h-screen overflow-hidden">
+        <div className="lg:hidden sticky top-0 z-30 flex items-center gap-2 border-b border-border bg-background/90 px-4 py-3 backdrop-blur flex-shrink-0">
           <SidebarTrigger className="text-foreground" />
         </div>
-        <main className="flex-1 overflow-auto min-h-screen w-full">
-          <div className="w-full h-full p-4 sm:p-6">
+        <main className="flex-1 min-h-0 w-full flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 w-full p-4 sm:p-6 overflow-y-auto">
             {children}
           </div>
         </main>
