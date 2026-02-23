@@ -19,14 +19,14 @@ async function createSaleHandler(request: NextRequest) {
   try {
 
     const body = await request.json();
-    const { 
-      customer_id, 
-      products, 
-      total, 
-      total_amount, 
-      payment_method, 
-      tenant_id, 
-      user_id, 
+    const {
+      customer_id,
+      products,
+      total,
+      total_amount,
+      payment_method,
+      tenant_id,
+      user_id,
       branch_id,
       sale_type,
       sale_source,
@@ -38,18 +38,18 @@ async function createSaleHandler(request: NextRequest) {
       delivery_address,
       notes
     } = body;
-    
+
     // Usar total_amount se fornecido, senão usar total
     const finalTotal = total_amount || total;
 
-    console.log('📝 Dados recebidos na venda:', { 
-      tenant_id, 
-      total, 
-      finalTotal, 
-      payment_method, 
+    console.log('📝 Dados recebidos na venda:', {
+      tenant_id,
+      total,
+      finalTotal,
+      payment_method,
       productsCount: products?.length,
       customer_name: body.customer_name,
-      user_id: user_id 
+      user_id: user_id
     });
 
     // ✅ DEBUG: Log detalhado do tenant_id
@@ -82,10 +82,10 @@ async function createSaleHandler(request: NextRequest) {
 
     if (tenantError || !tenantExists) {
       console.error('❌ Tenant não encontrado:', tenant_id, tenantError);
-      
+
       // ✅ Tentar criar o tenant se não existir
       console.log('🔄 Tentando criar tenant:', tenant_id);
-      
+
       try {
         const { data: newTenant, error: createError } = await supabaseAdmin
           .from('tenants')
@@ -183,7 +183,7 @@ async function createSaleHandler(request: NextRequest) {
     // Criar a venda (versão simplificada)
     const currentDate = new Date();
     const createdAt = currentDate.toISOString();
-    
+
     console.log('📅 Data da venda sendo criada:', {
       iso: createdAt,
       local: currentDate.toLocaleString('pt-BR'),
@@ -191,7 +191,7 @@ async function createSaleHandler(request: NextRequest) {
       month: currentDate.getMonth() + 1,
       day: currentDate.getDate()
     });
-    
+
     const saleData: any = {
       tenant_id: tenant_id, // ✅ Usar tenant_id validado
       user_id: user_id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
@@ -246,7 +246,7 @@ async function createSaleHandler(request: NextRequest) {
     const saleItems = products.map((product: any) => {
       const discountAmount = (product.price * product.quantity * (product.discount || 0)) / 100;
       const subtotal = (product.price * product.quantity) - discountAmount;
-      
+
       // Permitir product_id como null para vendas importadas ou sem produto específico
       const itemData: any = {
         sale_id: sale.id,
@@ -275,7 +275,7 @@ async function createSaleHandler(request: NextRequest) {
       if (product.price_type_id !== null && product.price_type_id !== undefined) {
         itemData.price_type_id = product.price_type_id;
       }
-      
+
       return itemData;
     });
 
@@ -298,7 +298,7 @@ async function createSaleHandler(request: NextRequest) {
         hint: itemsError.hint,
         code: itemsError.code
       });
-      
+
       // Tentar deletar a venda criada
       await supabaseAdmin.from('sales').delete().eq('id', sale.id);
       return NextResponse.json(
@@ -316,7 +316,7 @@ async function createSaleHandler(request: NextRequest) {
     console.error('❌ Erro no handler de criação:', error);
     console.error('❌ Stack trace:', error?.stack);
     return NextResponse.json(
-      { 
+      {
         error: 'Erro interno do servidor',
         message: error?.message || 'Erro desconhecido',
         details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
@@ -329,7 +329,6 @@ async function createSaleHandler(request: NextRequest) {
 // Handler original para listar vendas
 async function listSalesHandler(request: NextRequest) {
   try {
-
     const { searchParams } = new URL(request.url);
     const today = searchParams.get('today');
     const tenant_id = searchParams.get('tenant_id');
@@ -339,56 +338,49 @@ async function listSalesHandler(request: NextRequest) {
     const tzParam = searchParams.get('tz'); // minutos de offset do fuso (ex: -180 para BRT)
     const user_id = searchParams.get('user_id'); // filtrar por operador/vendedor
 
-    console.log(`💰 [SALES API] GET /sales INICIADO`);
-    console.log(`💰 [SALES API] tenant_id: ${tenant_id}`);
-    console.log(`💰 [SALES API] branch_id: ${branch_id}`);
-    console.log(`💰 [SALES API] branch_scope: ${branch_scope}`);
-    console.log(`💰 [SALES API] today: ${today}`);
-    console.log(`💰 [SALES API] sale_source: ${sale_source}`);
-    console.log(`💰 [SALES API] tz: ${tzParam}`);
-    console.log(`💰 [SALES API] URL completa: ${request.url}`);
+    // Filtros de paginação e busca
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '50', 10);
+    const search = searchParams.get('search');
+    const status = searchParams.get('status');
+    const payment_method = searchParams.get('payment_method');
+    const start_date = searchParams.get('start_date');
+    const end_date = searchParams.get('end_date');
 
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    console.log(`💰 [SALES API] GET /sales INICIADO`);
     // Buscar apenas as vendas (select otimizado com apenas campos essenciais)
+    // Usamos count: 'exact' para obter o total de registros que satisfazem os filtros
     let query = supabaseAdmin
       .from('sales')
-      .select('id, sale_number, customer_id, customer_name, total_amount, final_amount, discount_amount, payment_method, sale_type, sale_source, status, notes, created_at, updated_at, user_id');
+      .select('id, sale_number, customer_id, customer_name, total_amount, final_amount, discount_amount, payment_method, sale_type, sale_source, status, notes, created_at, updated_at, user_id', { count: 'exact' });
 
     // Filtrar por tenant_id se fornecido
     if (tenant_id && tenant_id !== '00000000-0000-0000-0000-000000000000') {
       query = query.eq('tenant_id', tenant_id);
-      console.log(`🔍 Buscando vendas com tenant_id: ${tenant_id}`);
     } else {
       console.log('⚠️ GET /sales - Nenhum tenant_id válido fornecido');
+      return NextResponse.json({ success: true, data: [], total: 0 });
     }
 
     // ✅ Filtrar por branch_id ou branch_scope
-    // - Se branch_scope='all': buscar TODAS as vendas do tenant (sem filtrar por branch_id)
-    // - Se branch_id fornecido: buscar vendas daquela filial específica
     if (branch_scope === 'all') {
-      // Buscar TODAS as vendas do tenant (sem filtrar por branch_id)
-      // Isso inclui vendas da matriz (branch_id IS NULL ou branch_id da HQ) e todas as filiais
       console.log(`🔍 [Matriz] Buscando TODAS as vendas do tenant (branch_scope=all)`);
-      // Não aplicar filtro de branch_id - buscar todas
     } else if (branch_id) {
       const bid = Number(branch_id);
       if (Number.isFinite(bid) && bid > 0) {
         query = query.eq('branch_id', bid);
-        console.log(`🔍 Filtrando vendas da filial: ${bid}`);
       } else {
-        // Se branch_id inválido, não retornar nada
-        console.log(`⚠️ branch_id inválido, retornando array vazio`);
-        return NextResponse.json({ success: true, data: [] });
+        return NextResponse.json({ success: true, data: [], total: 0 });
       }
     } else {
-      // Se não tem branch_id nem branch_scope='all', não retornar vendas
-      console.log(`⚠️ Sem branch_id ou branch_scope='all' fornecido, retornando array vazio`);
-      return NextResponse.json({ success: true, data: [] });
+      return NextResponse.json({ success: true, data: [], total: 0 });
     }
 
-    // Filtrar por sale_source se fornecido
     if (sale_source) {
       query = query.eq('sale_source', sale_source);
-      console.log(`🔍 Filtrando por sale_source: ${sale_source}`);
     }
 
     // Filtrar por operador/usuário (user_id) se fornecido
@@ -397,49 +389,51 @@ async function listSalesHandler(request: NextRequest) {
       console.log(`🔍 Filtrando por operador (user_id): ${user_id}`);
     }
 
-    // Se solicitado apenas vendas de hoje
-    if (today === 'true') {
-      console.log('🗓️ [SALES API] Filtrando vendas de hoje...');
-      
-      // Offset do fuso do cliente em minutos (Brasil = -180, ou seja, UTC-3)
-      const clientOffsetMin = Number.isFinite(Number(tzParam)) ? parseInt(tzParam as string, 10) : 0;
-      console.log('🕐 [SALES API] Client offset (minutos):', clientOffsetMin);
-      
-      // Pegar a hora atual no fuso do cliente
-      const nowUtc = new Date();
-      const nowClientTime = new Date(nowUtc.getTime() + clientOffsetMin * 60000);
-      
-      console.log('🕐 [SALES API] Hora atual UTC:', nowUtc.toISOString());
-      console.log('🕐 [SALES API] Hora atual no cliente:', nowClientTime.toISOString());
-      
-      // Meia-noite de hoje no fuso do cliente
-      const midnightClient = new Date(Date.UTC(
-        nowClientTime.getUTCFullYear(),
-        nowClientTime.getUTCMonth(),
-        nowClientTime.getUTCDate(),
-        0, 0, 0, 0
-      ));
-      
-      // Converter de volta para UTC (subtraindo o offset)
-      const startUtc = new Date(midnightClient.getTime() - clientOffsetMin * 60000);
-      const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000 - 1);
-
-      console.log('📅 [SALES API] Janela de busca:');
-      console.log('   Meia-noite cliente (hora local):', midnightClient.toISOString());
-      console.log('   Start UTC (00:00 cliente):', startUtc.toISOString());
-      console.log('   End UTC (23:59 cliente):', endUtc.toISOString());
-
-      query = query
-        .gte('created_at', startUtc.toISOString())
-        .lte('created_at', endUtc.toISOString());
+    // Filtros de busca (ilike no numero ou nome do cliente)
+    if (search) {
+      query = query.or(`sale_number.ilike.%${search}%,customer_name.ilike.%${search}%`);
     }
 
-    console.log('🔄 [SALES API] Executando query no banco...');
-    let { data, error } = await query.order('created_at', { ascending: false });
+    if (status) {
+      const statusMap: any = {
+        'pendente': null,
+        'paga': 'completed',
+        'cancelada': 'canceled'
+      };
+      const mappedStatus = statusMap[status] !== undefined ? statusMap[status] : status;
+      if (mappedStatus === null) {
+        query = query.is('status', null);
+      } else {
+        query = query.eq('status', mappedStatus);
+      }
+    }
 
-    console.log('📊 [SALES API] Query executada!');
-    console.log('📊 [SALES API] Erro:', error ? JSON.stringify(error) : 'null');
-    console.log('📊 [SALES API] Dados recebidos:', data ? `${data.length} registros` : 'null');
+    if (payment_method) {
+      query = query.eq('payment_method', payment_method);
+    }
+
+    if (start_date) {
+      query = query.gte('created_at', start_date);
+    }
+    if (end_date) {
+      const formattedEndDate = end_date.includes('T') ? end_date : `${end_date}T23:59:59.999Z`;
+      query = query.lte('created_at', formattedEndDate);
+    }
+
+    // Legado 'today'
+    if (today === 'true' && !start_date && !end_date) {
+      const clientOffsetMin = Number.isFinite(Number(tzParam)) ? parseInt(tzParam as string, 10) : 0;
+      const nowUtc = new Date();
+      const nowClientTime = new Date(nowUtc.getTime() + clientOffsetMin * 60000);
+      const midnightClient = new Date(Date.UTC(nowClientTime.getUTCFullYear(), nowClientTime.getUTCMonth(), nowClientTime.getUTCDate(), 0, 0, 0, 0));
+      const startUtc = new Date(midnightClient.getTime() - clientOffsetMin * 60000);
+      const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000 - 1);
+      query = query.gte('created_at', startUtc.toISOString()).lte('created_at', endUtc.toISOString());
+    }
+
+    let { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
     if (error) {
       console.error('❌ [SALES API] Erro ao listar vendas:', error);
@@ -450,32 +444,20 @@ async function listSalesHandler(request: NextRequest) {
     }
 
     console.log(`✅ [SALES API] Vendas encontradas: ${data?.length || 0} para tenant: ${tenant_id}`);
-    if (data && data.length > 0) {
-      console.log('📋 [SALES API] Primeira venda encontrada:', JSON.stringify(data[0], null, 2));
-    }
-    
+
     // Buscar itens de venda para cada venda
-    // Importante: IDs podem ser number OU string/UUID, então trabalhamos sempre com string para compatibilidade.
     if (data && data.length > 0) {
       const saleIds = (data || [])
         .map((sale: any) => sale?.id)
         .filter((id: any) => id !== null && id !== undefined && String(id).trim() !== '');
 
-      console.log(`🔍 Buscando itens para ${saleIds.length} vendas...`);
-
-      if (saleIds.length === 0) {
-        console.warn('⚠️ Nenhum ID de venda válido encontrado para buscar itens');
-      } else {
-        // Supabase/PostgREST costuma aplicar limite (~1000) por request.
-        // Se buscarmos itens de centenas de vendas numa única query, os itens das vendas mais recentes podem ficar fora.
-        // Então buscamos em LOTES (chunks) por sale_id para garantir que venha tudo.
-        const chunkSize = 10; // conservador para evitar estourar o limite de linhas
+      if (saleIds.length > 0) {
+        const chunkSize = 10;
         const chunks: string[][] = [];
         for (let i = 0; i < saleIds.length; i += chunkSize) {
           chunks.push(saleIds.slice(i, i + chunkSize).map((x: any) => String(x)));
         }
 
-        // 🚀 OTIMIZAÇÃO: Buscar chunks em PARALELO (não sequencial)
         const chunkPromises = chunks.map(chunk =>
           supabaseAdmin
             .from('sale_items')
@@ -484,23 +466,14 @@ async function listSalesHandler(request: NextRequest) {
         );
 
         const chunkResults = await Promise.all(chunkPromises);
-        
+
         let allItems: any[] = [];
-        chunkResults.forEach((result, index) => {
-          if (result.error) {
-            console.error('❌ Erro ao buscar itens de venda (chunk):', result.error, { chunkIndex: index });
-          } else {
-            const count = result.data?.length || 0;
-            if (count >= 1000) {
-              console.warn('⚠️ Chunk retornou 1000 itens (pode estar truncado). Considere reduzir chunkSize.', { chunkIndex: index });
-            }
+        chunkResults.forEach((result) => {
+          if (!result.error) {
             allItems = allItems.concat(result.data || []);
           }
         });
 
-        console.log(`✅ Itens encontrados (total): ${allItems.length}`);
-
-        // Agrupar itens por sale_id (usar string para garantir compatibilidade)
         const itemsBySaleId: Record<string, any[]> = {};
         allItems.forEach((item: any) => {
           const saleId = String(item.sale_id || '');
@@ -509,50 +482,31 @@ async function listSalesHandler(request: NextRequest) {
               itemsBySaleId[saleId] = [];
             }
             itemsBySaleId[saleId].push(item);
-          } else {
-            console.warn(`⚠️ sale_id inválido no item:`, item.sale_id, item);
           }
         });
 
-        console.log(`📊 Itens agrupados por sale_id:`, Object.keys(itemsBySaleId).length, 'vendas com itens');
-
-        // Adicionar itens a cada venda
         data = data.map((sale: any) => {
           const saleId = String(sale.id || '');
-          const saleItems = itemsBySaleId[saleId] || [];
-          console.log(`📦 Venda ${sale.sale_number} (ID: ${saleId}): ${saleItems.length} itens`);
           return {
             ...sale,
-            items: saleItems,
+            items: itemsBySaleId[saleId] || [],
           };
         });
       }
     }
-    
-    // Debug: verificar se os itens foram adicionados
-    if (data && data.length > 0) {
-      const totalItems = data.reduce((sum: number, sale: any) => sum + (sale.items?.length || 0), 0);
-      console.log(`✅ Total de itens em todas as vendas: ${totalItems}`);
-    }
-    
-    // Retornar no formato esperado pelo frontend
-    console.log('✅ [SALES API] Preparando resposta...');
-    
-    // 🚀 OTIMIZAÇÃO: Cache com revalidação (30 segundos)
+
     const cacheHeaders = {
       'Cache-Control': 'public, max-age=30, stale-while-revalidate=60'
     };
-    
+
     if (today === 'true') {
-      console.log(`✅ [SALES API] Retornando ${data?.length || 0} vendas no formato 'sales'`);
       return NextResponse.json(
-        { success: true, sales: data },
+        { success: true, sales: data, total: count },
         { headers: cacheHeaders },
       );
     } else {
-      console.log(`✅ [SALES API] Retornando ${data?.length || 0} vendas no formato 'data'`);
       return NextResponse.json(
-        { success: true, data: data },
+        { success: true, data: data, total: count },
         { headers: cacheHeaders },
       );
     }
