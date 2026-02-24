@@ -433,7 +433,7 @@ export default function VendasPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id, branchesEnabled, branchLoading, branches, branchId, scope, currentBranch, page, pageSize, searchTerm, advancedFilters]);
+  }, [tenant?.id, branchesEnabled, branchLoading, branchId, scope, currentBranch, page, pageSize, searchTerm, advancedFilters]);
 
   useEffect(() => {
     loadVendas();
@@ -675,7 +675,7 @@ export default function VendasPage() {
     };
 
     loadEditResources();
-  }, [showEditDialog, selectedVenda?.id, tenant?.id, scope, branchId]);
+  }, [showEditDialog, selectedVenda, tenant?.id, scope, branchId]);
 
   const handleSalvarEdicao = async () => {
     if (!selectedVenda) return;

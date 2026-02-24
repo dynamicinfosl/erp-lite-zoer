@@ -109,10 +109,10 @@ export default function CaixasPage() {
     }
 
     try {
-      const sessionIdStr = typeof session.id === 'number' 
-        ? String(session.id) 
+      const sessionIdStr = typeof session.id === 'number'
+        ? String(session.id)
         : String(session.id).trim();
-      
+
       const opsResponse = await fetch(`/next_api/cash-operations?tenant_id=${encodeURIComponent(tenant.id)}&cash_session_id=${encodeURIComponent(sessionIdStr)}`, {
         cache: 'no-store',
         headers: {
@@ -120,7 +120,7 @@ export default function CaixasPage() {
           'Pragma': 'no-cache'
         }
       });
-      
+
       if (opsResponse.ok) {
         const opsData = await opsResponse.json();
         const operations = (opsData.data || []).map((op: any) => ({
@@ -153,7 +153,7 @@ export default function CaixasPage() {
   // Carregar nomes dos usuários
   const loadUserNames = useCallback(async () => {
     if (!tenant?.id || !user?.id) return;
-    
+
     try {
       const timestamp = Date.now();
       const res = await fetch(
@@ -166,7 +166,7 @@ export default function CaixasPage() {
           }
         }
       );
-      
+
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.data)) {
@@ -293,18 +293,18 @@ export default function CaixasPage() {
       console.log('[Caixas] Sem tenant ou opened_at:', { tenantId: tenant?.id, openedAt: session.opened_at });
       return [];
     }
-    
+
     try {
       const sessionOpenedAt = new Date(session.opened_at);
       const sessionClosedAt = session.closed_at ? new Date(session.closed_at) : new Date();
-      
+
       console.log('[Caixas] Buscando vendas da sessão:', {
         sessionId: session.id,
         openedAt: sessionOpenedAt.toISOString(),
         closedAt: sessionClosedAt.toISOString(),
         userId: session.user_id
       });
-      
+
       // Buscar vendas da sessão: user_id do operador + apenas sale_source=pdv
       // (mesma base do relatório com "Excluir vendas da API", para totais baterem)
       const params = new URLSearchParams({
@@ -315,7 +315,7 @@ export default function CaixasPage() {
       if (session.user_id && String(session.user_id).trim()) {
         params.set('user_id', String(session.user_id).trim());
       }
-      
+
       const res = await fetch(`/next_api/sales?${params.toString()}`, {
         cache: 'no-store',
         headers: {
@@ -323,13 +323,13 @@ export default function CaixasPage() {
           'Pragma': 'no-cache'
         }
       });
-      
+
       if (res.ok) {
         const data = await res.json();
         const sales = data.sales || data.data || [];
-        
+
         console.log('[Caixas] Vendas recebidas da API:', sales.length);
-        
+
         // Filtrar vendas da sessão (após abertura e antes do fechamento, se fechado)
         // Considerar apenas sale_source='pdv' para bater com o relatório (excluir API e vendas sem origem)
         const filteredSales = sales.filter((sale: any) => {
@@ -343,28 +343,28 @@ export default function CaixasPage() {
           if (sale.sale_source !== 'pdv') {
             return false;
           }
-          
+
           // Apenas vendas pagas (incluir null como paga, pois vendas do PDV podem ter status null)
           // Vendas do PDV geralmente têm status null ou 'paga', vendas da API podem ter 'completed' ou 'paid'
-          const isPaid = sale.status === 'paga' || 
-                        sale.status === 'completed' || 
-                        sale.status === 'paid' || 
-                        sale.status === null || 
-                        sale.status === undefined;
-          
+          const isPaid = sale.status === 'paga' ||
+            sale.status === 'completed' ||
+            sale.status === 'paid' ||
+            sale.status === null ||
+            sale.status === undefined;
+
           if (!isPaid) {
             console.log('[Caixas] Venda excluída (status não pago):', sale.id, sale.status);
             return false;
           }
-          
+
           // Verificar se tem created_at
           if (!sale.created_at) {
             console.log('[Caixas] Venda excluída (sem created_at):', sale.id);
             return false;
           }
-          
+
           const saleDate = new Date(sale.created_at);
-          
+
           // Venda deve ser após abertura (com margem de 1 minuto para evitar problemas de timezone)
           const marginMs = 60 * 1000; // 1 minuto
           if (saleDate.getTime() < (sessionOpenedAt.getTime() - marginMs)) {
@@ -376,7 +376,7 @@ export default function CaixasPage() {
             });
             return false;
           }
-          
+
           // Se o caixa foi fechado, venda deve ser antes do fechamento (com margem)
           if (session.closed_at && saleDate.getTime() > (sessionClosedAt.getTime() + marginMs)) {
             console.log('[Caixas] Venda excluída (após fechamento):', {
@@ -387,7 +387,7 @@ export default function CaixasPage() {
             });
             return false;
           }
-          
+
           console.log('[Caixas] ✅ Venda incluída:', {
             saleId: sale.id,
             total: sale.total_amount,
@@ -396,15 +396,15 @@ export default function CaixasPage() {
             saleSource: sale.sale_source || '(sem sale_source)',
             openedAt: sessionOpenedAt.toISOString()
           });
-          
+
           return true;
         });
-        
+
         console.log('[Caixas] Vendas filtradas da sessão:', filteredSales.length);
         if (filteredSales.length > 0) {
           console.log('[Caixas] Primeira venda:', filteredSales[0]);
         }
-        
+
         return filteredSales.map((sale: any) => ({
           id: sale.id,
           total: parseFloat(sale.total_amount || sale.final_amount || sale.total || 0),
@@ -419,7 +419,7 @@ export default function CaixasPage() {
     } catch (error) {
       console.error('[Caixas] Erro ao buscar vendas da sessão:', error);
     }
-    
+
     return [];
   }, [tenant?.id]);
 
@@ -427,19 +427,19 @@ export default function CaixasPage() {
   const prepareCloseSession = useCallback(async (session: CashSession) => {
     setSessionToClose(session);
     setConfirmCloseId(null);
-    
+
     console.log('[Caixas] Preparando fechamento de sessão:', {
       sessionId: session.id,
       openedAt: session.opened_at,
       closedAt: session.closed_at,
       userId: session.user_id
     });
-    
+
     // Buscar vendas da sessão
     const sales = await loadSessionSales(session);
     console.log('[Caixas] Vendas encontradas para a sessão:', sales.length);
     setSessionSales(sales);
-    
+
     // Buscar operações de caixa reais do banco de dados
     const operations: Array<{
       id: string;
@@ -449,7 +449,7 @@ export default function CaixasPage() {
       data: string;
       usuario: string;
     }> = [];
-    
+
     // Adicionar abertura como operação (não está na tabela cash_operations)
     if (session.opening_amount || session.initial_amount) {
       const openingAmount = session.opening_amount || session.initial_amount || 0;
@@ -462,14 +462,14 @@ export default function CaixasPage() {
         usuario: session.opened_by || 'Sistema',
       });
     }
-    
+
     // Buscar operações reais do banco de dados
     try {
       if (tenant?.id) {
-        const sessionIdStr = typeof session.id === 'number' 
-          ? String(session.id) 
+        const sessionIdStr = typeof session.id === 'number'
+          ? String(session.id)
           : String(session.id).trim();
-        
+
         const opsResponse = await fetch(`/next_api/cash-operations?tenant_id=${encodeURIComponent(tenant.id)}&cash_session_id=${encodeURIComponent(sessionIdStr)}`, {
           cache: 'no-store',
           headers: {
@@ -477,7 +477,7 @@ export default function CaixasPage() {
             'Pragma': 'no-cache'
           }
         });
-        
+
         if (opsResponse.ok) {
           const opsData = await opsResponse.json();
           const dbOperations = (opsData.data || []).map((op: any) => ({
@@ -488,7 +488,7 @@ export default function CaixasPage() {
             data: op.created_at,
             usuario: op.created_by || 'Sistema',
           }));
-          
+
           // Adicionar operações do banco (sangrias e reforços)
           operations.push(...dbOperations);
           console.log('[Caixas] Operações de caixa carregadas do banco:', dbOperations.length);
@@ -499,22 +499,22 @@ export default function CaixasPage() {
     } catch (error) {
       console.error('[Caixas] Erro ao buscar operações de caixa:', error);
     }
-    
+
     console.log('[Caixas] Total de operações de caixa:', operations.length);
     setSessionOperations(operations);
-    
+
     // Mostrar modal de fechamento
     setShowCashClosingModal(true);
-  }, [loadSessionSales]);
+  }, [tenant?.id, loadSessionSales]);
 
   // Confirmar fechamento de caixa (chamado pelo modal)
   const handleCashClosing = useCallback(
     async (closingData: CashClosingData) => {
       if (!sessionToClose) return;
-      
+
       if (closingId) return;
       setClosingId(sessionToClose.id);
-      
+
       try {
         // Calcular valores esperados baseados nas vendas
         const vendasDinheiro = sessionSales
@@ -532,15 +532,17 @@ export default function CaixasPage() {
         const expectedOther = sessionSales
           .filter(s => !['dinheiro', 'cartao_debito', 'cartao_credito', 'pix'].includes(s.forma_pagamento))
           .reduce((sum, s) => sum + s.total, 0);
-        
+
         // Calcular sangrias e reforços das operações de caixa
         // IMPORTANTE: Filtrar apenas sangrias e reforços (excluir abertura e fechamento)
         const sangrias = sessionOperations.filter(op => op.tipo === 'sangria');
         const reforcos = sessionOperations.filter(op => op.tipo === 'reforco');
-        
+
         const totalSangrias = sangrias.reduce((sum, op) => sum + op.valor, 0);
         const totalReforcos = reforcos.reduce((sum, op) => sum + op.valor, 0);
-        
+
+        const caixaInicial = Number((sessionToClose as any).opening_amount ?? sessionToClose.initial_amount) || 0;
+
         console.log('[Caixas] Cálculo de fechamento:', {
           caixaInicial,
           vendasDinheiro,
@@ -551,11 +553,10 @@ export default function CaixasPage() {
           sangriasDetalhes: sangrias.map(s => ({ valor: s.valor, descricao: s.descricao })),
           reforcosDetalhes: reforcos.map(r => ({ valor: r.valor, descricao: r.descricao })),
         });
-        
+
         // Calcular valor esperado em dinheiro considerando reforços e sangrias
-        const caixaInicial = Number((sessionToClose as any).opening_amount ?? sessionToClose.initial_amount) || 0;
         const expectedCash = caixaInicial + vendasDinheiro + totalReforcos - totalSangrias;
-        
+
         console.log('[Caixas] Valor esperado em dinheiro:', {
           formula: `caixaInicial (${caixaInicial}) + vendasDinheiro (${vendasDinheiro}) + reforcos (${totalReforcos}) - sangrias (${totalSangrias})`,
           resultado: expectedCash
@@ -586,12 +587,12 @@ export default function CaixasPage() {
             difference_card_credit: closingData.closing_amount_card_credit - expectedCardCredit,
             difference_pix: closingData.closing_amount_pix - expectedPix,
             difference_other: closingData.closing_amount_other - expectedOther,
-            difference_amount: 
-              (closingData.closing_amount_cash + 
-               closingData.closing_amount_card_debit + 
-               closingData.closing_amount_card_credit + 
-               closingData.closing_amount_pix + 
-               closingData.closing_amount_other) - 
+            difference_amount:
+              (closingData.closing_amount_cash +
+                closingData.closing_amount_card_debit +
+                closingData.closing_amount_card_credit +
+                closingData.closing_amount_pix +
+                closingData.closing_amount_other) -
               (expectedCash + expectedCardDebit + expectedCardCredit + expectedPix + expectedOther),
             // Estatísticas
             total_sales: sessionSales.length,
@@ -613,10 +614,10 @@ export default function CaixasPage() {
           try {
             const j = JSON.parse(responseText);
             if (j?.errorMessage) msg = j.errorMessage;
-          } catch (_) {}
+          } catch (_) { }
           throw new Error(msg || 'Erro ao fechar caixa');
         }
-        
+
         toast.success('Caixa fechado com sucesso.');
         setShowCashClosingModal(false);
         setSessionToClose(null);
@@ -900,7 +901,7 @@ export default function CaixasPage() {
                 {detailsSession?.status === 'open' ? 'Visualização do Caixa' : 'Detalhes do Fechamento de Caixa'}
               </DialogTitle>
               <DialogDescription>
-                {detailsSession?.status === 'open' 
+                {detailsSession?.status === 'open'
                   ? 'Visualize as movimentações do caixa em tempo real'
                   : 'Informações completas da sessão de caixa'}
               </DialogDescription>
@@ -942,7 +943,7 @@ export default function CaixasPage() {
                 {detailsOperations.filter(op => op.tipo === 'sangria' || op.tipo === 'reforco').length > 0 && (
                   <div className="border-t pt-4">
                     <h4 className="font-semibold mb-3">Operações de Caixa (Sangrias e Reforços)</h4>
-                    
+
                     {/* Resumo das operações para caixas abertos */}
                     {detailsSession?.status === 'open' && (
                       <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border">
@@ -976,7 +977,7 @@ export default function CaixasPage() {
                         </div>
                       </div>
                     )}
-                    
+
                     <div className="space-y-2 max-h-60 overflow-y-auto">
                       {detailsOperations
                         .filter(op => op.tipo === 'sangria' || op.tipo === 'reforco')
@@ -984,11 +985,10 @@ export default function CaixasPage() {
                         .map((op) => (
                           <div
                             key={op.id}
-                            className={`flex items-center justify-between p-3 rounded-lg border ${
-                              op.tipo === 'reforco'
-                                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-                                : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                            }`}
+                            className={`flex items-center justify-between p-3 rounded-lg border ${op.tipo === 'reforco'
+                              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                              : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                              }`}
                           >
                             <div className="flex-1">
                               <div className="flex items-center gap-2">

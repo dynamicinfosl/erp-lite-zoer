@@ -7,10 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { 
+import {
   ArrowLeft,
-  CreditCard, 
-  Smartphone, 
+  CreditCard,
+  Smartphone,
   Clock,
   DollarSign,
   CheckCircle2,
@@ -94,12 +94,12 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
     setPaymentAmount(remaining.toFixed(2));
   }, [remaining, paymentAmountTouched]);
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = useCallback((value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
     }).format(value);
-  };
+  }, []);
 
   const addPayment = useCallback(() => {
     const amount = parseFloat(paymentAmount);
@@ -212,10 +212,10 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
 
       <div className="p-4 sm:p-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 max-w-6xl mx-auto">
-          
+
           {/* Coluna Esquerda */}
           <div className="space-y-6">
-            
+
             {/* FORMA DE PAGAMENTO */}
             <Card className="bg-white shadow-lg border-0 rounded-xl">
               <CardHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-xl p-4">
@@ -237,11 +237,10 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
                             key={method.value}
                             variant={isSelected ? "default" : "outline"}
                             onClick={() => setSelectedPaymentMethod(method.value)}
-                            className={`h-16 flex flex-col items-center justify-center gap-1.5 ${
-                              isSelected 
-                                ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md' 
+                            className={`h-16 flex flex-col items-center justify-center gap-1.5 ${isSelected
+                                ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md'
                                 : 'hover:bg-gray-50'
-                            }`}
+                              }`}
                           >
                             <div className={`p-2 rounded-full ${method.color} text-white flex-shrink-0`}>
                               <Icon className="h-4 w-4" />
@@ -260,11 +259,10 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
                             key={method.value}
                             variant={isSelected ? "default" : "outline"}
                             onClick={() => setSelectedPaymentMethod(method.value)}
-                            className={`h-16 flex flex-col items-center justify-center gap-1.5 ${
-                              isSelected 
-                                ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md' 
+                            className={`h-16 flex flex-col items-center justify-center gap-1.5 ${isSelected
+                                ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md'
                                 : 'hover:bg-gray-50'
-                            }`}
+                              }`}
                           >
                             <div className={`p-2 rounded-full ${method.color} text-white flex-shrink-0`}>
                               <Icon className="h-4 w-4" />
@@ -293,7 +291,7 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
                         className="text-lg font-semibold h-10"
                         onFocus={(e) => {
                           // Seleciona tudo para sobrescrever rápido (sem precisar apagar)
-                          try { (e.target as HTMLInputElement).select(); } catch {}
+                          try { (e.target as HTMLInputElement).select(); } catch { }
                         }}
                         onKeyPress={(e) => e.key === 'Enter' && addPayment()}
                       />
@@ -371,7 +369,7 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
 
           {/* Coluna Direita */}
           <div className="space-y-6">
-            
+
             {/* % DESCONTOS */}
             <Card className="bg-white shadow-lg border-0 rounded-xl">
               <CardHeader className="bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-t-xl p-4">
@@ -479,35 +477,35 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
                     <span className="text-gray-600 text-sm">SUBTOTAL:</span>
                     <span className="font-bold text-base">{formatCurrency(subtotal)}</span>
                   </div>
-                  
+
                   {calculatedDiscount > 0 && (
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600 text-sm">DESCONTOS:</span>
                       <span className="font-bold text-base text-red-600">-{formatCurrency(calculatedDiscount)}</span>
                     </div>
                   )}
-                  
+
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 text-sm">PAGAMENTOS:</span>
                     <span className="font-bold text-base">{formatCurrency(totalPaid)}</span>
                   </div>
-                  
+
                   <Separator />
-                  
+
                   {change > 0 && (
                     <div className="flex justify-between items-center p-2 bg-green-50 rounded-lg border-2 border-green-200">
                       <span className="font-bold text-green-800 text-sm">TROCO:</span>
                       <span className="font-bold text-xl text-green-600">{formatCurrency(change)}</span>
                     </div>
                   )}
-                  
+
                   {remaining > 0 && (
                     <div className="flex justify-between items-center p-2 bg-orange-50 rounded-lg border-2 border-orange-200">
                       <span className="font-bold text-orange-800 text-sm">VALOR RESTANTE:</span>
                       <span className="font-bold text-xl text-orange-600">{formatCurrency(remaining)}</span>
                     </div>
                   )}
-                  
+
                   <div className="flex justify-between items-center p-2 bg-blue-50 rounded-lg border-2 border-blue-200">
                     <span className="font-bold text-blue-800 text-sm">TOTAL A PAGAR:</span>
                     <span className="font-bold text-xl text-blue-600">
@@ -529,15 +527,14 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
           >
             CANCELAR
           </Button>
-          
+
           <Button
             onClick={finalizePayment}
             disabled={payments.length === 0}
-            className={`px-4 sm:px-6 py-2 text-sm sm:text-base font-bold ${
-              remaining > 0 
-                ? 'bg-orange-600 hover:bg-orange-700 text-white' 
+            className={`px-4 sm:px-6 py-2 text-sm sm:text-base font-bold ${remaining > 0
+                ? 'bg-orange-600 hover:bg-orange-700 text-white'
                 : 'bg-green-600 hover:bg-green-700 text-white'
-            }`}
+              }`}
           >
             <CheckCircle2 className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">{remaining > 0 ? 'PAGAMENTO PARCIAL' : 'FINALIZAR'}</span>
