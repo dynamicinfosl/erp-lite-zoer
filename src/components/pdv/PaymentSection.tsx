@@ -20,7 +20,8 @@ import {
   Minus,
   Plus,
   Trash2,
-  ShoppingCart
+  ShoppingCart,
+  RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -37,6 +38,7 @@ interface PaymentSectionProps {
     quantity: number;
     subtotal: number;
   }>;
+  isSubmitting?: boolean;
 }
 
 interface PaymentData {
@@ -64,7 +66,7 @@ const paymentMethods = [
   { value: 'fiado', label: 'Fiado', icon: Clock, color: 'bg-orange-500' },
 ];
 
-export function PaymentSection({ total, onFinalize, onCancel, customerName, cartItems = [] }: PaymentSectionProps) {
+export function PaymentSection({ total, onFinalize, onCancel, customerName, cartItems = [], isSubmitting = false }: PaymentSectionProps) {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('dinheiro');
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentAmountTouched, setPaymentAmountTouched] = useState(false);
@@ -134,6 +136,7 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
   }, []);
 
   const finalizePayment = useCallback(() => {
+    if (isSubmitting) return;
     if (payments.length === 0) {
       toast.error('Adicione pelo menos um pagamento');
       return;
@@ -151,7 +154,7 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
     };
 
     onFinalize(paymentData);
-  }, [payments, totalPaid, change, remaining, calculatedDiscount, discountPerc, notes, onFinalize]);
+  }, [payments, totalPaid, change, remaining, calculatedDiscount, discountPerc, notes, onFinalize, isSubmitting]);
 
   const getPaymentMethodInfo = (method: string) => {
     return paymentMethods.find(m => m.value === method) || paymentMethods[0];
@@ -238,8 +241,8 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
                             variant={isSelected ? "default" : "outline"}
                             onClick={() => setSelectedPaymentMethod(method.value)}
                             className={`h-16 flex flex-col items-center justify-center gap-1.5 ${isSelected
-                                ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md'
-                                : 'hover:bg-gray-50'
+                              ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md'
+                              : 'hover:bg-gray-50'
                               }`}
                           >
                             <div className={`p-2 rounded-full ${method.color} text-white flex-shrink-0`}>
@@ -260,8 +263,8 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
                             variant={isSelected ? "default" : "outline"}
                             onClick={() => setSelectedPaymentMethod(method.value)}
                             className={`h-16 flex flex-col items-center justify-center gap-1.5 ${isSelected
-                                ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md'
-                                : 'hover:bg-gray-50'
+                              ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md'
+                              : 'hover:bg-gray-50'
                               }`}
                           >
                             <div className={`p-2 rounded-full ${method.color} text-white flex-shrink-0`}>
@@ -530,15 +533,19 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
 
           <Button
             onClick={finalizePayment}
-            disabled={payments.length === 0}
+            disabled={payments.length === 0 || isSubmitting}
             className={`px-4 sm:px-6 py-2 text-sm sm:text-base font-bold ${remaining > 0
-                ? 'bg-orange-600 hover:bg-orange-700 text-white'
-                : 'bg-green-600 hover:bg-green-700 text-white'
+              ? 'bg-orange-600 hover:bg-orange-700 text-white'
+              : 'bg-green-600 hover:bg-green-700 text-white'
               }`}
           >
-            <CheckCircle2 className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">{remaining > 0 ? 'PAGAMENTO PARCIAL' : 'FINALIZAR'}</span>
-            <span className="sm:hidden">{remaining > 0 ? 'PARCIAL' : 'FINALIZAR'}</span>
+            {isSubmitting ? (
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+            )}
+            <span className="hidden sm:inline">{remaining > 0 ? (isSubmitting ? 'PROCESSANDO...' : 'PAGAMENTO PARCIAL') : (isSubmitting ? 'FINALIZANDO...' : 'FINALIZAR')}</span>
+            <span className="sm:hidden">{remaining > 0 ? (isSubmitting ? 'AGUARDE' : 'PARCIAL') : (isSubmitting ? 'AGUARDE' : 'FINALIZAR')}</span>
           </Button>
         </div>
 

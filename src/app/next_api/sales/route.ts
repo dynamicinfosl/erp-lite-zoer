@@ -157,6 +157,10 @@ async function createSaleHandler(request: NextRequest) {
     const customerName = (customer_name || body.customer_name || 'Cliente Avulso').trim();
     const finalTotalNum = parseFloat(finalTotal);
 
+    let finalCustomerId = customer_id || null;
+
+    // Remoção da criação automática de cliente a pedido do usuário (para forçar o uso de clientes cadastrados apenas)
+
     // 🚫 Rejeitar venda duplicada: mesmo cliente + mesmo valor total (últimos 10 min)
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     let dupQuery = supabaseAdmin
@@ -198,7 +202,7 @@ async function createSaleHandler(request: NextRequest) {
       branch_id: branch_id || null,
       sale_type: sale_type || null, // ✅ Usar NULL como padrão
       sale_number: saleNumber,
-      customer_id: customer_id || null,
+      customer_id: finalCustomerId,
       customer_name: customer_name || body.customer_name || 'Cliente Avulso',
       total_amount: parseFloat(finalTotal),
       final_amount: parseFloat(finalTotal),

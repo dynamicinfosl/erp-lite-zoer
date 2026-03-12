@@ -13,14 +13,14 @@ async function createCustomerHandler(request: NextRequest) {
 
     const body = await request.json();
     console.log('📝 Dados recebidos:', body);
-    
-    const { 
-      tenant_id, 
-      name, 
-      email, 
-      phone, 
-      document, 
-      city, 
+
+    const {
+      tenant_id,
+      name,
+      email,
+      phone,
+      document,
+      city,
       type,
       status,
       address,
@@ -71,7 +71,7 @@ async function createCustomerHandler(request: NextRequest) {
     };
 
     console.log('💾 Inserindo dados:', customerData);
-    
+
     const { data, error } = await supabaseAdmin
       .from('customers')
       .insert(customerData)
@@ -125,17 +125,15 @@ async function listCustomersHandler(request: NextRequest) {
     // - Se branch_scope='all' (matriz): retorna apenas clientes cadastrados na matriz
     // - Se branch_id fornecido (filial ou matriz visitando filial): retorna clientes daquela filial
     let query;
-    
+
     // Select de clientes (usando * para compatibilidade com schema variável)
     if (branch_scope === 'all') {
-      // Matriz vê apenas clientes cadastrados na matriz (created_at_branch_id IS NULL)
-      // Não mostra clientes cadastrados em filiais por padrão
+      // Matriz vê todos os clientes cadastrados (matriz e filiais)
       query = supabaseAdmin
         .from('customers')
         .select('*')
-        .eq('tenant_id', tenant_id)
-        .is('created_at_branch_id', null); // ✅ Apenas clientes da matriz
-      console.log(`🔍 [Matriz] Buscando clientes cadastrados na matriz`);
+        .eq('tenant_id', tenant_id);
+      console.log(`🔍 [Matriz] Buscando todos os clientes do tenant`);
     } else if (branch_id) {
       // Filial: buscar apenas clientes compartilhados
       const bid = Number(branch_id);
@@ -147,24 +145,24 @@ async function listCustomersHandler(request: NextRequest) {
           .eq('tenant_id', tenant_id)
           .eq('branch_id', bid)
           .eq('is_active', true);
-        
+
         const customerIds = (sharedCustomers || [])
           .map((c: any) => Number(c.customer_id))
           .filter((id: number) => Number.isFinite(id) && id > 0);
-        
+
         // 🚀 OTIMIZAÇÃO: Buscar clientes compartilhados e da filial em PARALELO
         const allCustomers: any[] = [];
         const seenIds = new Set<number>();
-        
+
         // Fazer as duas queries em paralelo
         const [sharedResult, branchResult] = await Promise.all([
           // Query 1: Clientes compartilhados
           customerIds.length > 0
             ? supabaseAdmin
-                .from('customers')
-                .select('*')
-                .eq('tenant_id', tenant_id)
-                .in('id', customerIds)
+              .from('customers')
+              .select('*')
+              .eq('tenant_id', tenant_id)
+              .in('id', customerIds)
             : Promise.resolve({ data: null, error: null }),
           // Query 2: Clientes cadastrados nesta filial
           supabaseAdmin
@@ -173,7 +171,7 @@ async function listCustomersHandler(request: NextRequest) {
             .eq('tenant_id', tenant_id)
             .eq('created_at_branch_id', bid)
         ]);
-        
+
         // Processar clientes compartilhados
         if (!sharedResult.error && sharedResult.data) {
           for (const customer of sharedResult.data) {
@@ -184,9 +182,9 @@ async function listCustomersHandler(request: NextRequest) {
             }
           }
         }
-        
+
         // Processar clientes da filial
-        
+
         if (!branchResult.error && branchResult.data) {
           for (const customer of branchResult.data) {
             const id = Number(customer.id);
@@ -196,7 +194,7 @@ async function listCustomersHandler(request: NextRequest) {
             }
           }
         }
-        
+
         console.log(`🔍 [Filial ${bid}] Encontrados ${allCustomers.length} clientes (compartilhados + cadastrados aqui)`);
         return NextResponse.json({ success: true, data: allCustomers });
       } else {
@@ -210,7 +208,7 @@ async function listCustomersHandler(request: NextRequest) {
         .eq('tenant_id', tenant_id);
       console.log(`🔍 [Fallback] Buscando todos os clientes do tenant`);
     }
-    
+
     const { data, error } = await query.order('is_active', { ascending: false }).order('created_at', { ascending: false });
 
     if (error) {
@@ -222,7 +220,7 @@ async function listCustomersHandler(request: NextRequest) {
     }
 
     console.log(`✅ GET /customers - ${data?.length || 0} clientes encontrados para tenant ${tenant_id}`);
-    
+
     // 🚀 OTIMIZAÇÃO: Cache com revalidação (45 segundos para clientes)
     return NextResponse.json(
       { success: true, data },
@@ -254,14 +252,14 @@ async function updateCustomerHandler(request: NextRequest) {
     const body = await request.json();
     const allowed: Record<string, any> = {};
     // Campos compatíveis com o schema atual da tabela `customers`
-    const fields = ['name','email','phone','document','city','address','neighborhood','state','zipcode','notes','external_code','is_active'];
+    const fields = ['name', 'email', 'phone', 'document', 'city', 'address', 'neighborhood', 'state', 'zipcode', 'notes', 'external_code', 'is_active'];
     for (const key of fields) if (key in body) allowed[key] = body[key];
-    
+
     // Mapear status para is_active se fornecido
     if ('status' in body) {
       allowed.is_active = body.status === 'active';
     }
-    
+
     allowed.updated_at = new Date().toISOString();
 
     const { error } = await supabaseAdmin

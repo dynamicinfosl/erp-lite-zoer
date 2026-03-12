@@ -248,6 +248,7 @@ export default function PDVPage() {
   const [loadingCashSession, setLoadingCashSession] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<'dinheiro' | 'pix' | 'cartao_debito' | 'cartao_credito' | 'boleto'>('dinheiro');
   const [currentSection, setCurrentSection] = useState<'pdv' | 'payment'>('pdv');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [lastSaleData, setLastSaleData] = useState<any>(null);
   const [deliveryQuickOpen, setDeliveryQuickOpen] = useState(false);
@@ -1098,6 +1099,8 @@ export default function PDVPage() {
   }, [cart.length]);
 
   const finalizeSale = useCallback(async (paymentData?: any) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       // ✅ DEBUG: Verificar tenant antes de criar venda
       console.log('🔍 DEBUG - Tenant atual:', tenant);
@@ -1292,8 +1295,10 @@ export default function PDVPage() {
     } catch (error) {
       console.error('Erro ao finalizar venda:', error);
       toast.error(`Erro ao salvar venda: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [total, customerName, paymentMethod, cart, calculateItemTotal, saveTodaySalesLocal, tenant, user?.id, selectedCustomerId, reloadTodaySales, scope, branchId, restoredSaleId, pendingSales, savePendingSales]);
+  }, [total, customerName, paymentMethod, cart, calculateItemTotal, saveTodaySalesLocal, tenant, user?.id, selectedCustomerId, reloadTodaySales, scope, branchId, restoredSaleId, pendingSales, savePendingSales, isSubmitting]);
 
   const loadCustomers = useCallback(async () => {
     if (!tenant?.id) {
@@ -2188,6 +2193,7 @@ export default function PDVPage() {
           finalizeSale(paymentData);
         }}
         onCancel={backToPDV}
+        isSubmitting={isSubmitting}
       />
     );
   }
@@ -2875,8 +2881,9 @@ export default function PDVPage() {
                             <Input
                               placeholder="Nome do cliente (opcional)"
                               value={customerName}
-                              onChange={(e) => setCustomerName(e.target.value)}
-                              className="h-10 border-none bg-transparent focus-visible:ring-2 focus-visible:ring-primary/40"
+                              readOnly
+                              onClick={openCustomerPicker}
+                              className="h-10 border-none bg-transparent focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer"
                             />
                             <Button
                               type="button"
@@ -3071,8 +3078,8 @@ export default function PDVPage() {
                           .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
                           .map((op) => (
                             <Card key={op.id} className={`juga-card ${op.tipo === 'reforco'
-                                ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/20'
-                                : 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/20'
+                              ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/20'
+                              : 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/20'
                               }`}>
                               <CardContent className="p-3">
                                 <div className="flex items-center justify-between">
@@ -3223,8 +3230,8 @@ export default function PDVPage() {
                             <TableRow
                               key={c.id}
                               className={`cursor-pointer transition-colors border-b border-slate-700/50 ${Number(selectedCustomerId) === Number(c.id)
-                                  ? 'bg-blue-500/20 hover:bg-blue-500/30'
-                                  : 'hover:bg-slate-700/40'
+                                ? 'bg-blue-500/20 hover:bg-blue-500/30'
+                                : 'hover:bg-slate-700/40'
                                 }`}
                               onClick={() => selectCustomer(c)}
                             >
@@ -3248,8 +3255,8 @@ export default function PDVPage() {
                                     selectCustomer(c);
                                   }}
                                   className={`gap-1 ${Number(selectedCustomerId) === Number(c.id)
-                                      ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
-                                      : 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white'
+                                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
+                                    : 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white'
                                     }`}
                                 >
                                   {Number(selectedCustomerId) === Number(c.id) ? (
