@@ -1,9 +1,11 @@
-import { Product, CartItem } from '@/types';
+import { Product, CartItem, Sale, Customer, Delivery } from '@/types';
 
 // Dados mockados para quando a autenticação estiver desabilitada
 export const mockProducts: Product[] = [
   {
     id: 1,
+    user_id: '1',
+    tenant_id: '1',
     name: 'Coca-Cola 350ml',
     sku: 'COCA350',
     barcode: '7891234567890',
@@ -15,12 +17,13 @@ export const mockProducts: Product[] = [
     unit: 'UN',
     is_active: true,
     category_id: 1,
-    user_id: 1,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
   {
     id: 2,
+    user_id: '1',
+    tenant_id: '1',
     name: 'Pepsi 350ml',
     sku: 'PEPSI350',
     barcode: '7891234567891',
@@ -32,12 +35,13 @@ export const mockProducts: Product[] = [
     unit: 'UN',
     is_active: true,
     category_id: 1,
-    user_id: 1,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   },
   {
     id: 3,
+    user_id: '1',
+    tenant_id: '1',
     name: 'Skol 350ml',
     sku: 'SKOL350',
     barcode: '7891234567892',
@@ -49,12 +53,13 @@ export const mockProducts: Product[] = [
     unit: 'UN',
     is_active: true,
     category_id: 2,
-    user_id: 1,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   },
   {
     id: 4,
+    user_id: '1',
+    tenant_id: '1',
     name: 'Água Mineral 500ml',
     sku: 'AGUA500',
     barcode: '7891234567893',
@@ -66,12 +71,13 @@ export const mockProducts: Product[] = [
     unit: 'UN',
     is_active: true,
     category_id: 3,
-    user_id: 1,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   },
   {
     id: 5,
+    user_id: '1',
+    tenant_id: '1',
     name: 'Red Bull 250ml',
     sku: 'REDBULL250',
     barcode: '7891234567894',
@@ -83,15 +89,16 @@ export const mockProducts: Product[] = [
     unit: 'UN',
     is_active: true,
     category_id: 4,
-    user_id: 1,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   }
 ];
 
-export const mockCustomers = [
+export const mockCustomers: Partial<Customer>[] = [
   {
-    id: '1',
+    id: 1,
+    user_id: '1',
+    tenant_id: '1',
     name: 'João Silva',
     email: 'joao@email.com',
     phone: '(11) 99999-9999',
@@ -103,12 +110,13 @@ export const mockCustomers = [
     zipcode: '01234-567',
     notes: 'Cliente preferencial',
     is_active: true,
-    user_id: 1,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
   {
-    id: '2',
+    id: 2,
+    user_id: '1',
+    tenant_id: '1',
     name: 'Maria Santos',
     email: 'maria@email.com',
     phone: '(11) 88888-8888',
@@ -120,17 +128,16 @@ export const mockCustomers = [
     zipcode: '01310-100',
     notes: 'Entrega rápida',
     is_active: true,
-    user_id: 1,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
 ];
 
-export const mockSales = [
+export const mockSales: Partial<Sale>[] = [
   {
-    id: '1',
-    user_id: 1,
-    customer_id: '1',
+    id: 1,
+    user_id: 1 as any, // Mantendo legados internos se necessário
+    customer_id: 1,
     sale_number: 'V001',
     total_amount: 45.5,
     discount_amount: 0,
@@ -144,9 +151,9 @@ export const mockSales = [
     updated_at: new Date().toISOString(),
   },
   {
-    id: '2',
-    user_id: 1,
-    customer_id: '2',
+    id: 2,
+    user_id: 1 as any,
+    customer_id: 2,
     sale_number: 'V002',
     total_amount: 89.0,
     discount_amount: 5.0,
@@ -164,7 +171,7 @@ export const mockSales = [
 export const mockFinancialTransactions = [
   {
     id: '1',
-    user_id: 1,
+    user_id: '1',
     transaction_type: 'receita',
     category: 'Vendas',
     description: 'Venda de produtos',
@@ -181,7 +188,7 @@ export const mockFinancialTransactions = [
   },
   {
     id: '2',
-    user_id: 1,
+    user_id: '1',
     transaction_type: 'despesa',
     category: 'Aluguel',
     description: 'Aluguel do depósito',
@@ -198,12 +205,12 @@ export const mockFinancialTransactions = [
   }
 ];
 
-export const mockDeliveries = [
+export const mockDeliveries: Partial<Delivery>[] = [
   {
-    id: '1',
-    user_id: 1,
-    sale_id: '2',
-    driver_id: '1',
+    id: 1,
+    user_id: 1 as any,
+    sale_id: 2 as any,
+    driver_id: 1 as any,
     customer_name: 'Maria Santos',
     delivery_address: 'Av. Paulista, 456',
     neighborhood: 'Bela Vista',
@@ -211,7 +218,7 @@ export const mockDeliveries = [
     delivery_fee: 5.0,
     status: 'em_rota',
     notes: 'Entregar após 14h',
-    delivered_at: null,
+    delivered_at: undefined,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
