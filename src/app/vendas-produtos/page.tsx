@@ -99,7 +99,7 @@ interface ColumnVisibility {
 
 export default function VendasProdutosPage() {
   const { tenant } = useSimpleAuth();
-  const { scope, branchId } = useBranch();
+  const { enabled: branchesEnabled, scope, branchId, currentBranch, loading: branchLoading } = useBranch();
   const [vendas, setVendas] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -138,9 +138,26 @@ export default function VendasProdutosPage() {
         return;
       }
 
-      console.log('📦 Carregando vendas de produtos para o tenant:', tenant.id, { scope, branchId });
+      if (branchesEnabled && branchId && !currentBranch && branchLoading) {
+        return;
+      }
+
+      const isHeadquarters = Boolean(currentBranch?.is_headquarters);
+      const shouldUseMatrix = scope === 'all' || !branchId || isHeadquarters || !branchesEnabled;
       
-      const res = await fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}&sale_source=produtos&branch_id=${branchId || ''}&branch_scope=${scope || ''}`);
+      const params = new URLSearchParams({
+        tenant_id: tenant.id,
+        sale_source: 'produtos',
+        branch_scope: shouldUseMatrix ? 'all' : (scope || 'all')
+      });
+
+      if (!shouldUseMatrix && branchId) {
+        params.set('branch_id', String(branchId));
+      }
+
+      console.log('📦 Carregando vendas de produtos para o tenant:', tenant.id, { scope, branchId, shouldUseMatrix });
+      
+      const res = await fetch(`/next_api/sales?${params.toString()}`);
       
       // Mapear customer_id da resposta bruta
       // ...
@@ -169,7 +186,13 @@ export default function VendasProdutosPage() {
       
       // Filtrar apenas vendas de produtos
       // NOTA: Vendas canceladas são carregadas mas filtradas na visualização padrão (filteredVendas)
-      const produtosData = data.filter((s: any) => s.sale_source === 'produtos');
+      // Filtrar apenas vendas de produtos (considera source 'produtos' ou tipo 'produtos' se source for null)
+      const produtosData = data.filter((s: any) => {
+        if (s.sale_source === 'produtos') return true;
+        if (s.sale_type === 'produtos') return true;
+        if (!s.sale_source && s.sale_type === 'produtos') return true;
+        return false;
+      });
       
       const mapped: Sale[] = produtosData.map((s: any, i: number) => {
         const items = Array.isArray(s.items) ? s.items : [];
@@ -214,7 +237,7 @@ export default function VendasProdutosPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id, scope, branchId]);
+  }, [tenant?.id, scope, branchId, branchesEnabled, currentBranch, branchLoading]);
 
   useEffect(() => {
     loadVendas();
