@@ -30,7 +30,10 @@ async function createCustomerHandler(request: NextRequest) {
       notes,
       external_code,
       is_active,
-      branch_id // ✅ Novo: ID da filial onde está sendo cadastrado (null = matriz)
+      branch_id,
+      address_number,
+      address_complement,
+      state_registration
     } = body;
 
     if (!tenant_id || !name) {
@@ -40,6 +43,15 @@ async function createCustomerHandler(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Funções de normalização
+    const normalizeDigits = (val: string | null | undefined) => val ? val.replace(/\D/g, '') : null;
+    const normalizeIE = (val: string | null | undefined) => {
+      if (!val) return null;
+      const upper = val.trim().toUpperCase();
+      if (upper === 'ISENTO') return 'ISENTO';
+      return upper.replace(/\D/g, '');
+    };
 
     // Determinar is_active: priorizar status, depois is_active, default é true (ativo)
     let activeStatus = true;
@@ -56,16 +68,19 @@ async function createCustomerHandler(request: NextRequest) {
       name,
       email: email || null,
       phone: phone || null,
-      document: document || null,
+      document: normalizeDigits(document),
       city: city || null,
       address: address || null,
       neighborhood: neighborhood || null,
       state: state || null,
-      zipcode: zipcode || null,
+      zipcode: normalizeDigits(zipcode),
+      address_number: address_number || null,
+      address_complement: address_complement || null,
+      state_registration: normalizeIE(state_registration),
       notes: notes || null,
       external_code: external_code || null,
       is_active: activeStatus,
-      created_at_branch_id: branch_id ? Number(branch_id) : null, // ✅ Salvar onde foi cadastrado
+      created_at_branch_id: branch_id ? Number(branch_id) : null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -251,9 +266,30 @@ async function updateCustomerHandler(request: NextRequest) {
 
     const body = await request.json();
     const allowed: Record<string, any> = {};
-    // Campos compatíveis com o schema atual da tabela `customers`
-    const fields = ['name', 'email', 'phone', 'document', 'city', 'address', 'neighborhood', 'state', 'zipcode', 'notes', 'external_code', 'is_active'];
-    for (const key of fields) if (key in body) allowed[key] = body[key];
+
+    // Funções de normalização para update
+    const normalizeDigitsUpdate = (val: string | null | undefined) => val ? val.replace(/\D/g, '') : null;
+    const normalizeIEUpdate = (val: string | null | undefined) => {
+      if (!val) return null;
+      const upper = val.trim().toUpperCase();
+      if (upper === 'ISENTO') return 'ISENTO';
+      return upper.replace(/\D/g, '');
+    };
+
+    const fields = [
+      'name', 'email', 'phone', 'document', 'city', 'address', 
+      'address_number', 'address_complement', 'neighborhood', 
+      'state', 'zipcode', 'state_registration', 'notes', 
+      'external_code', 'is_active'
+    ];
+    for (const key of fields) {
+      if (key in body) {
+        let val = body[key];
+        if (key === 'document' || key === 'zipcode') val = normalizeDigitsUpdate(val);
+        if (key === 'state_registration') val = normalizeIEUpdate(val);
+        allowed[key] = val;
+      }
+    }
 
     // Mapear status para is_active se fornecido
     if ('status' in body) {

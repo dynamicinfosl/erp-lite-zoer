@@ -353,7 +353,16 @@ export default function ConfiguracaoFiscalPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Erro ao provisionar empresa');
+        let msg = result.error || 'Erro ao provisionar empresa';
+        if (result.provider_error) {
+          if (result.provider_error.mensagem) {
+            msg += ': ' + result.provider_error.mensagem;
+          } else if (result.provider_error.errors) {
+            const extra = JSON.stringify(result.provider_error.errors);
+            msg += ': ' + extra;
+          }
+        }
+        throw new Error(msg);
       }
 
       toast.success('Empresa provisionada com sucesso na FocusNFe!');
@@ -361,7 +370,7 @@ export default function ConfiguracaoFiscalPage() {
     } catch (error) {
       console.error('Erro ao provisionar:', error);
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      toast.error('Erro ao provisionar: ' + errorMessage);
+      toast.error('Erro: ' + errorMessage, { duration: 10000 });
     } finally {
       setProvisioning(false);
     }

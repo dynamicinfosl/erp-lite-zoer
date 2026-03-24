@@ -15,6 +15,7 @@ import {
   DialogTrigger,
   DialogFooter
 } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,13 +47,18 @@ import {
   Eye,
   Phone,
   Mail,
-  RefreshCw
+  RefreshCw,
+  Pencil,
+  MapPin,
+  User,
+  Package
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ImportPreviewModal } from '@/components/ui/ImportPreviewModal';
 // XLSX carregado dinamicamente para reduzir bundle inicial
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { useBranch } from '@/contexts/BranchContext';
+import { AddCustomerDialog } from '@/components/clientes/AddCustomerDialog';
 
 interface Customer {
   id: string;
@@ -60,7 +66,15 @@ interface Customer {
   email: string;
   phone: string;
   document: string;
+  address?: string;
+  address_number?: string;
+  address_complement?: string;
+  neighborhood?: string;
   city: string;
+  state?: string;
+  zipcode?: string;
+  state_registration?: string;
+  notes?: string;
   type: 'PF' | 'PJ';
   status: 'active' | 'inactive';
   created_at: string;
@@ -130,23 +144,7 @@ export default function ClientesPage() {
     status: ''
   });
 
-  // Estados para formulário
-  const [newCustomer, setNewCustomer] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    document: '',
-    city: '',
-    address: '',
-    neighborhood: '',
-    state: '',
-    zipcode: '',
-    notes: '',
-    type: 'PF' as 'PF' | 'PJ',
-    status: 'active' as 'active' | 'inactive',
-  });
-
-  // Estados para edição
+  // Diálogo de edição (editCustomer continua aqui para edições na tabela)
   const [editCustomer, setEditCustomer] = useState({
     name: '',
     email: '',
@@ -154,9 +152,12 @@ export default function ClientesPage() {
     document: '',
     city: '',
     address: '',
+    address_number: '',
+    address_complement: '',
     neighborhood: '',
     state: '',
     zipcode: '',
+    state_registration: '',
     notes: '',
     type: 'PF' as 'PF' | 'PJ',
     status: 'active' as 'active' | 'inactive',
@@ -419,50 +420,9 @@ export default function ClientesPage() {
     return matchesSearch && matchesAdvanced;
   }) : [];
 
-  // Adicionar cliente
-  const handleAddCustomer = async () => {
-    if (!tenant?.id) {
-      toast.error('Tenant não disponível');
-      return;
-    }
-
-    try {
-      const response = await fetch('/next_api/customers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...newCustomer,
-          tenant_id: tenant.id,
-          branch_id: scope === 'branch' && branchId ? branchId : null, // ✅ Incluir branch_id se estiver em filial
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
-        throw new Error(errorData.error || 'Erro ao adicionar cliente');
-      }
-
-      await loadCustomers();
-      setShowAddDialog(false);
-      setNewCustomer({ 
-        name: '', 
-        email: '', 
-        phone: '', 
-        document: '', 
-        city: '', 
-        address: '',
-        neighborhood: '',
-        state: '',
-        zipcode: '',
-        notes: '',
-        type: 'PF', 
-        status: 'active' 
-      });
-      toast.success('Cliente adicionado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao adicionar cliente:', error);
-      toast.error(error instanceof Error ? error.message : 'Erro ao adicionar cliente');
-    }
+  // Diálogo de adição agora é gerenciado pelo componente externo
+  const handleAddSuccess = async () => {
+    await loadCustomers();
   };
 
   // Abrir modal de edição
@@ -475,9 +435,12 @@ export default function ClientesPage() {
       document: customer.document || '',
       city: customer.city || '',
       address: (customer as any).address || '',
+      address_number: (customer as any).address_number || '',
+      address_complement: (customer as any).address_complement || '',
       neighborhood: (customer as any).neighborhood || '',
       state: (customer as any).state || '',
       zipcode: (customer as any).zipcode || '',
+      state_registration: (customer as any).state_registration || '',
       notes: (customer as any).notes || '',
       type: customer.type,
       status: customer.status,
@@ -1084,368 +1047,255 @@ export default function ClientesPage() {
       </Card>
 
       {/* Dialog Adicionar Cliente */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Adicionar Novo Cliente</DialogTitle>
-            <DialogDescription>
-              Preencha as informações do cliente abaixo
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {/* Informações Básicas */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">Informações Básicas</h3>
-              <div className="grid gap-2">
-                <label htmlFor="name" className="text-sm font-medium text-gray-700">Nome *</label>
-                <Input
-                  id="name"
-                  value={newCustomer.name}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Digite o nome completo do cliente"
-                  className={newCustomer.name ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic"}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <label htmlFor="type" className="text-sm font-medium text-gray-700">Tipo</label>
-                  <select 
-                    className="px-3 py-2 border rounded-md text-gray-900 font-medium bg-white"
-                    value={newCustomer.type}
-                    onChange={(e) => setNewCustomer(prev => ({ ...prev, type: e.target.value as 'PF' | 'PJ' }))}
-                  >
-                    <option value="PF">Pessoa Física</option>
-                    <option value="PJ">Pessoa Jurídica</option>
-                  </select>
-                </div>
-                <div className="grid gap-2">
-                  <label htmlFor="status" className="text-sm font-medium text-gray-700">Status</label>
-                  <select 
-                    className="px-3 py-2 border rounded-md text-gray-900 font-medium bg-white"
-                    value={newCustomer.status}
-                    onChange={(e) => setNewCustomer(prev => ({ ...prev, status: e.target.value as 'active' | 'inactive' }))}
-                  >
-                    <option value="active">Ativo</option>
-                    <option value="inactive">Inativo</option>
-                  </select>
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="document" className="text-sm font-medium text-gray-700">CPF/CNPJ</label>
-                <Input
-                  id="document"
-                  value={newCustomer.document}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, document: e.target.value }))}
-                  placeholder="Ex: 000.000.000-00 ou 00.000.000/0000-00"
-                  className={newCustomer.document ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                />
-              </div>
-            </div>
-
-            {/* Contato */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">Contato</h3>
-              <div className="grid gap-2">
-                <label htmlFor="email" className="text-sm font-medium text-gray-700">E-mail</label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={newCustomer.email}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="Ex: cliente@exemplo.com"
-                  className={newCustomer.email ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="phone" className="text-sm font-medium text-gray-700">Telefone</label>
-                <Input
-                  id="phone"
-                  value={newCustomer.phone}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="Ex: (11) 99999-9999"
-                  className={newCustomer.phone ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                />
-              </div>
-            </div>
-
-            {/* Endereço */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">Endereço</h3>
-              <div className="grid gap-2">
-                <label htmlFor="zipcode" className="text-sm font-medium text-gray-700">CEP</label>
-                <Input
-                  id="zipcode"
-                  value={newCustomer.zipcode}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, zipcode: e.target.value }))}
-                  placeholder="Ex: 00000-000"
-                  className={newCustomer.zipcode ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="address" className="text-sm font-medium text-gray-700">Endereço (Rua, Avenida, etc.)</label>
-                <Input
-                  id="address"
-                  value={newCustomer.address}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, address: e.target.value }))}
-                  placeholder="Ex: Rua das Flores, 123"
-                  className={newCustomer.address ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <label htmlFor="neighborhood" className="text-sm font-medium text-gray-700">Bairro</label>
-                  <Input
-                    id="neighborhood"
-                    value={newCustomer.neighborhood}
-                    onChange={(e) => setNewCustomer(prev => ({ ...prev, neighborhood: e.target.value }))}
-                    placeholder="Ex: Centro"
-                    className={newCustomer.neighborhood ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label htmlFor="city" className="text-sm font-medium text-gray-700">Cidade</label>
-                  <Input
-                    id="city"
-                    value={newCustomer.city}
-                    onChange={(e) => setNewCustomer(prev => ({ ...prev, city: e.target.value }))}
-                    placeholder="Ex: São Paulo"
-                    className={newCustomer.city ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                  />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="state" className="text-sm font-medium text-gray-700">Estado (UF)</label>
-                <Input
-                  id="state"
-                  value={newCustomer.state}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, state: e.target.value.toUpperCase() }))}
-                  placeholder="Ex: SP"
-                  maxLength={2}
-                  className={newCustomer.state ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                />
-              </div>
-            </div>
-
-            {/* Observações */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">Observações</h3>
-              <div className="grid gap-2">
-                <label htmlFor="notes" className="text-sm font-medium text-gray-700">Observações</label>
-                <textarea
-                  id="notes"
-                  className={`px-3 py-2 border rounded-md min-h-[80px] resize-none ${newCustomer.notes ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}`}
-                  value={newCustomer.notes}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, notes: e.target.value }))}
-                  placeholder="Digite informações adicionais sobre o cliente (opcional)..."
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleAddCustomer} className="bg-emerald-600 hover:bg-emerald-700">
-              Adicionar Cliente
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Modal Adicionar Cliente */}
+      <AddCustomerDialog 
+        open={showAddDialog} 
+        onOpenChange={setShowAddDialog} 
+        onSuccess={handleAddSuccess}
+      />
 
       {/* Dialog Editar Cliente */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar Cliente</DialogTitle>
-            <DialogDescription>
-              Atualize as informações do cliente
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {/* Informações Básicas */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">Informações Básicas</h3>
-              <div className="grid gap-2">
-                <label htmlFor="edit-name" className="text-sm font-medium text-gray-700">Nome *</label>
-                <Input
-                  id="edit-name"
-                  value={editCustomer.name}
-                  onChange={(e) => setEditCustomer(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Digite o nome completo do cliente"
-                  className={editCustomer.name ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic"}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <label htmlFor="edit-type" className="text-sm font-medium text-gray-700">Tipo</label>
-                  <select 
-                    className="px-3 py-2 border rounded-md text-gray-900 font-medium bg-white"
-                    value={editCustomer.type}
-                    onChange={(e) => setEditCustomer(prev => ({ ...prev, type: e.target.value as 'PF' | 'PJ' }))}
-                  >
-                    <option value="PF">Pessoa Física</option>
-                    <option value="PJ">Pessoa Jurídica</option>
-                  </select>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+          <div className="relative">
+            {/* Header com gradiente */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-t-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
+                  <Pencil className="h-6 w-6 text-white" />
                 </div>
-                <div className="grid gap-2">
-                  <label htmlFor="edit-status" className="text-sm font-medium text-gray-700">Status</label>
-                  <select 
-                    className="px-3 py-2 border rounded-md text-gray-900 font-medium bg-white"
-                    value={editCustomer.status}
-                    onChange={(e) => setEditCustomer(prev => ({ ...prev, status: e.target.value as 'active' | 'inactive' }))}
-                  >
-                    <option value="active">Ativo</option>
-                    <option value="inactive">Inativo</option>
-                  </select>
+                <div>
+                  <DialogTitle className="text-xl font-bold text-white">Editar Cliente</DialogTitle>
+                  <DialogDescription className="text-blue-100 mt-1">
+                    Atualize as informações do cliente abaixo.
+                  </DialogDescription>
                 </div>
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="edit-document" className="text-sm font-medium text-gray-700">CPF/CNPJ</label>
-                <Input
-                  id="edit-document"
-                  value={editCustomer.document}
-                  onChange={(e) => setEditCustomer(prev => ({ ...prev, document: e.target.value }))}
-                  placeholder="Ex: 000.000.000-00 ou 00.000.000/0000-00"
-                  className={editCustomer.document ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                />
               </div>
             </div>
 
-            {/* Contato */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">Contato</h3>
-              <div className="grid gap-2">
-                <label htmlFor="edit-email" className="text-sm font-medium text-gray-700">E-mail</label>
-                <Input
-                  id="edit-email"
-                  type="email"
-                  value={editCustomer.email}
-                  onChange={(e) => setEditCustomer(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="Ex: cliente@exemplo.com"
-                  className={editCustomer.email ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                />
+            <div className="p-6 bg-slate-800/50 backdrop-blur-sm space-y-8">
+              {/* Informações Básicas */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-2 flex items-center gap-2">
+                  <User className="h-3.5 w-3.5" />
+                  Informações Básicas
+                </h3>
+                <div className="grid gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-name" className="text-sm font-medium text-slate-200">Nome *</Label>
+                    <Input
+                      id="edit-name"
+                      value={editCustomer.name}
+                      onChange={(e) => setEditCustomer(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Nome completo"
+                      className="h-11 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-type" className="text-sm font-medium text-slate-200">Tipo</Label>
+                      <select 
+                        className="h-11 w-full bg-slate-700/50 border border-slate-600 rounded-md text-white px-3"
+                        value={editCustomer.type}
+                        onChange={(e) => setEditCustomer(prev => ({ ...prev, type: e.target.value as 'PF' | 'PJ' }))}
+                      >
+                        <option value="PF" className="bg-slate-800">Pessoa Física</option>
+                        <option value="PJ" className="bg-slate-800">Pessoa Jurídica</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-status" className="text-sm font-medium text-slate-200">Status</Label>
+                      <select 
+                        className="h-11 w-full bg-slate-700/50 border border-slate-600 rounded-md text-white px-3"
+                        value={editCustomer.status}
+                        onChange={(e) => setEditCustomer(prev => ({ ...prev, status: e.target.value as 'active' | 'inactive' }))}
+                      >
+                        <option value="active" className="bg-slate-800">Ativo</option>
+                        <option value="inactive" className="bg-slate-800">Inativo</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-document" className="text-sm font-medium text-slate-200">CPF/CNPJ</Label>
+                      <Input
+                        id="edit-document"
+                        value={editCustomer.document}
+                        onChange={(e) => setEditCustomer(prev => ({ ...prev, document: e.target.value.replace(/\D/g, '') }))}
+                        className="h-11 bg-slate-700/50 border-slate-600 text-white font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-state_registration" className="text-sm font-medium text-slate-200">Inscrição Estadual</Label>
+                      <Input
+                        id="edit-state_registration"
+                        value={editCustomer.state_registration}
+                        onChange={(e) => {
+                          const val = e.target.value.toUpperCase();
+                          setEditCustomer(prev => ({ ...prev, state_registration: val === 'ISENTO' ? 'ISENTO' : val.replace(/\D/g, '') }));
+                        }}
+                        className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="grid gap-2">
-                <label htmlFor="edit-phone" className="text-sm font-medium text-gray-700">Telefone</label>
-                <Input
-                  id="edit-phone"
-                  value={editCustomer.phone}
-                  onChange={(e) => setEditCustomer(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="Ex: (11) 99999-9999"
-                  className={editCustomer.phone ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                />
+
+              {/* Contato */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-2 flex items-center gap-2">
+                  <Mail className="h-3.5 w-3.5" />
+                  Contato
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-email" className="text-sm font-medium text-slate-200">E-mail</Label>
+                    <Input
+                      id="edit-email"
+                      type="email"
+                      value={editCustomer.email}
+                      onChange={(e) => setEditCustomer(prev => ({ ...prev, email: e.target.value }))}
+                      className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-phone" className="text-sm font-medium text-slate-200">Telefone</Label>
+                    <Input
+                      id="edit-phone"
+                      value={editCustomer.phone}
+                      onChange={(e) => setEditCustomer(prev => ({ ...prev, phone: e.target.value }))}
+                      className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Endereço */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-2 flex items-center gap-2">
+                  <MapPin className="h-3.5 w-3.5" />
+                  Endereço
+                </h3>
+                <div className="grid gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-zipcode" className="text-sm font-medium text-slate-200">CEP</Label>
+                      <Input
+                        id="edit-zipcode"
+                        value={editCustomer.zipcode}
+                        onChange={(e) => setEditCustomer(prev => ({ ...prev, zipcode: e.target.value.replace(/\D/g, '') }))}
+                        className="h-11 bg-slate-700/50 border-slate-600 text-white font-mono"
+                      />
+                    </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-2 space-y-1.5">
+                      <Label htmlFor="edit-address" className="text-sm font-medium text-slate-200">Logradouro</Label>
+                      <Input
+                        id="edit-address"
+                        value={editCustomer.address}
+                        onChange={(e) => setEditCustomer(prev => ({ ...prev, address: e.target.value }))}
+                        className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-address_number" className="text-sm font-medium text-slate-200">Número</Label>
+                      <Input
+                        id="edit-address_number"
+                        value={editCustomer.address_number}
+                        onChange={(e) => setEditCustomer(prev => ({ ...prev, address_number: e.target.value }))}
+                        className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-address_complement" className="text-sm font-medium text-slate-200">Complemento</Label>
+                    <Input
+                      id="edit-address_complement"
+                      value={editCustomer.address_complement}
+                      onChange={(e) => setEditCustomer(prev => ({ ...prev, address_complement: e.target.value }))}
+                      className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-neighborhood" className="text-sm font-medium text-slate-200">Bairro</Label>
+                      <Input
+                        id="edit-neighborhood"
+                        value={editCustomer.neighborhood}
+                        onChange={(e) => setEditCustomer(prev => ({ ...prev, neighborhood: e.target.value }))}
+                        className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-city" className="text-sm font-medium text-slate-200">Cidade</Label>
+                      <Input
+                        id="edit-city"
+                        value={editCustomer.city}
+                        onChange={(e) => setEditCustomer(prev => ({ ...prev, city: e.target.value }))}
+                        className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-state" className="text-sm font-medium text-slate-200">UF</Label>
+                      <Input
+                        id="edit-state"
+                        value={editCustomer.state}
+                        onChange={(e) => setEditCustomer(prev => ({ ...prev, state: e.target.value.toUpperCase() }))}
+                        className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Endereço */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">Endereço</h3>
-              <div className="grid gap-2">
-                <label htmlFor="edit-zipcode" className="text-sm font-medium text-gray-700">CEP</label>
-                <Input
-                  id="edit-zipcode"
-                  value={editCustomer.zipcode}
-                  onChange={(e) => setEditCustomer(prev => ({ ...prev, zipcode: e.target.value }))}
-                  placeholder="Ex: 00000-000"
-                  className={editCustomer.zipcode ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="edit-address" className="text-sm font-medium text-gray-700">Endereço (Rua, Avenida, etc.)</label>
-                <Input
-                  id="edit-address"
-                  value={editCustomer.address}
-                  onChange={(e) => setEditCustomer(prev => ({ ...prev, address: e.target.value }))}
-                  placeholder="Ex: Rua das Flores, 123"
-                  className={editCustomer.address ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <label htmlFor="edit-neighborhood" className="text-sm font-medium text-gray-700">Bairro</label>
-                  <Input
-                    id="edit-neighborhood"
-                    value={editCustomer.neighborhood}
-                    onChange={(e) => setEditCustomer(prev => ({ ...prev, neighborhood: e.target.value }))}
-                    placeholder="Ex: Centro"
-                    className={editCustomer.neighborhood ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label htmlFor="edit-city" className="text-sm font-medium text-gray-700">Cidade</label>
-                  <Input
-                    id="edit-city"
-                    value={editCustomer.city}
-                    onChange={(e) => setEditCustomer(prev => ({ ...prev, city: e.target.value }))}
-                    placeholder="Ex: São Paulo"
-                    className={editCustomer.city ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                  />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="edit-state" className="text-sm font-medium text-gray-700">Estado (UF)</label>
-                <Input
-                  id="edit-state"
-                  value={editCustomer.state}
-                  onChange={(e) => setEditCustomer(prev => ({ ...prev, state: e.target.value.toUpperCase() }))}
-                  placeholder="Ex: SP"
-                  maxLength={2}
-                  className={editCustomer.state ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}
-                />
-              </div>
-            </div>
-
-            {/* Observações */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">Observações</h3>
-              <div className="grid gap-2">
-                <label htmlFor="edit-notes" className="text-sm font-medium text-gray-700">Observações</label>
-                <textarea
-                  id="edit-notes"
-                  className={`px-3 py-2 border rounded-md min-h-[80px] resize-none ${editCustomer.notes ? "text-gray-900 font-medium" : "text-gray-400 placeholder:italic placeholder:text-gray-400"}`}
-                  value={editCustomer.notes}
-                  onChange={(e) => setEditCustomer(prev => ({ ...prev, notes: e.target.value }))}
-                  placeholder="Digite informações adicionais sobre o cliente (opcional)..."
-                />
+            <div className="bg-gradient-to-r from-slate-800 to-slate-700 p-6 rounded-b-lg border-t border-slate-600/50">
+              <div className="flex flex-col sm:flex-row gap-3 justify-end">
+                <Button variant="ghost" onClick={() => {
+                  setShowEditDialog(false);
+                  setEditingCustomer(null);
+                }} className="text-slate-300 hover:text-white hover:bg-slate-700">
+                  Cancelar
+                </Button>
+                <Button onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-700 text-white px-8 font-bold uppercase tracking-wider shadow-lg shadow-blue-500/20">
+                  Salvar Alterações
+                </Button>
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowEditDialog(false);
-              setEditingCustomer(null);
-            }}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveEdit} className="bg-emerald-600 hover:bg-emerald-700">
-              Salvar Alterações
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Dialog Importar */}
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Importar Clientes</DialogTitle>
-            <DialogDescription>
-              Selecione um arquivo CSV ou Excel com os dados dos clientes
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
+        <DialogContent className="p-0 border-0 shadow-2xl bg-slate-900">
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-700 p-6 rounded-t-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
+                <Upload className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-bold text-white">Importar Clientes</DialogTitle>
+                <DialogDescription className="text-emerald-100 mt-1">
+                  Selecione um arquivo CSV ou Excel com os dados dos clientes.
+                </DialogDescription>
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-6 space-y-4">
             <div className="grid gap-2">
-              <label htmlFor="file">Arquivo</label>
+              <Label htmlFor="file" className="text-slate-200">Selecione o Arquivo</Label>
               <Input
                 id="file"
                 type="file"
                 accept=".csv,.xlsx,.xls"
                 onChange={handleFileUpload}
+                className="bg-slate-800 border-slate-700 text-white"
               />
             </div>
-            <div className="text-sm text-muted-foreground">
-              <p>O arquivo deve conter as colunas:</p>
-              <ul className="list-disc pl-4 mt-2">
+            <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm text-blue-200">
+              <p className="font-bold mb-2">Colunas esperadas:</p>
+              <ul className="list-disc pl-4 space-y-1">
                 <li>nome (obrigatório)</li>
                 <li>email</li>
                 <li>telefone</li>
@@ -1455,14 +1305,15 @@ export default function ClientesPage() {
               </ul>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowImportDialog(false)}>
+          
+          <div className="p-6 bg-slate-800/50 flex justify-end gap-3 rounded-b-lg">
+            <Button variant="ghost" onClick={() => setShowImportDialog(false)} className="text-slate-400 hover:text-white hover:bg-slate-700">
               Cancelar
             </Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => document.getElementById('file')?.click()}>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 font-bold" onClick={() => document.getElementById('file')?.click()}>
               Selecionar Arquivo
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -1568,45 +1419,49 @@ export default function ClientesPage() {
 
       {/* Dialog Importar Endereços */}
       <Dialog open={showImportAddressDialog} onOpenChange={setShowImportAddressDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Importar Endereços</DialogTitle>
-            <DialogDescription>
-              Selecione um arquivo CSV ou Excel com os endereços dos clientes. O arquivo deve conter a coluna "Código" para vincular aos clientes.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
+        <DialogContent className="p-0 border-0 shadow-2xl bg-slate-900">
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-700 p-6 rounded-t-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
+                <MapPin className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-bold text-white">Importar Endereços</DialogTitle>
+                <DialogDescription className="text-emerald-100 mt-1">
+                  Vincule endereços aos seus clientes via arquivo.
+                </DialogDescription>
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-6 space-y-4">
             <div className="grid gap-2">
-              <label htmlFor="address-file">Arquivo de Endereços</label>
+              <Label htmlFor="address-file" className="text-slate-200">Arquivo de Endereços</Label>
               <Input
                 id="address-file"
                 type="file"
                 accept=".csv,.xlsx,.xls"
                 onChange={handleAddressFileUpload}
+                className="bg-slate-800 border-slate-700 text-white"
               />
             </div>
-            <div className="text-sm text-muted-foreground">
-              <p>O arquivo deve conter as colunas:</p>
-              <ul className="list-disc pl-4 mt-2">
+            <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm text-blue-200">
+              <p className="font-bold mb-2">Colunas esperadas:</p>
+              <ul className="list-disc pl-4 space-y-1">
                 <li><strong>Código</strong> (obrigatório) - código do cliente para vincular</li>
-                <li>CEP</li>
-                <li>Logradouro</li>
-                <li>Número</li>
-                <li>Complemento</li>
-                <li>Bairro</li>
-                <li>Cidade</li>
-                <li>UF</li>
+                <li>CEP, Logradouro, Número, Complemento, Bairro, Cidade, UF</li>
               </ul>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowImportAddressDialog(false)}>
+          
+          <div className="p-6 bg-slate-800/50 flex justify-end gap-3 rounded-b-lg">
+            <Button variant="ghost" onClick={() => setShowImportAddressDialog(false)} className="text-slate-400 hover:text-white hover:bg-slate-700">
               Cancelar
             </Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => document.getElementById('address-file')?.click()}>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 font-bold" onClick={() => document.getElementById('address-file')?.click()}>
               Selecionar Arquivo
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

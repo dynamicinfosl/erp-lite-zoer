@@ -455,8 +455,8 @@ export function SaleConfirmationModal({
                   className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1.5 text-xs"
                 >
                   <FileText className="h-3.5 w-3.5 mr-1" />
-                  <span className="hidden sm:inline">NFe</span>
-                  <span className="sm:hidden">NFe</span>
+                  <span className="hidden sm:inline">NFC-e</span>
+                  <span className="sm:hidden">NFC-e</span>
                 </Button>
               )}
               

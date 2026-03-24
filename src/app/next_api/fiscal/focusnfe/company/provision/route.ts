@@ -176,13 +176,21 @@ export async function POST(request: NextRequest) {
 
     const method = integration.focus_empresa_id ? 'PUT' : 'POST';
 
+    console.log('🚀 Provisionando empresa na FocusNFe:', {
+      url,
+      method,
+      tenant_name: payload.nome,
+      cnpj: payload.cnpj,
+      environment
+    });
+
     const resp = await fetch(url, {
       method,
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Basic ${Buffer.from(`${masterToken}:`).toString('base64')}`,
       },
-      body: JSON.stringify({ empresa: payload }),
+      body: JSON.stringify(payload),
     });
 
     const http_status = resp.status;

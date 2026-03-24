@@ -372,15 +372,16 @@ async function listSalesHandler(request: NextRequest) {
     // ✅ Filtrar por branch_id ou branch_scope
     if (branch_scope === 'all') {
       console.log(`🔍 [Matriz] Buscando TODAS as vendas do tenant (branch_scope=all)`);
-    } else if (branch_id) {
-      const bid = Number(branch_id);
-      if (Number.isFinite(bid) && bid > 0) {
-        query = query.eq('branch_id', bid);
-      } else {
-        return NextResponse.json({ success: true, data: [], total: 0 });
-      }
     } else {
-      return NextResponse.json({ success: true, data: [], total: 0 });
+      const bid = branch_id ? Number(branch_id) : null;
+      if (bid && bid > 0) {
+        query = query.eq('branch_id', bid);
+        console.log(`🔍 [Filial] Buscando vendas da filial ${bid}`);
+      } else {
+        // Se branch_scope for 'branch' mas não tiver ID, busca vendas da Matriz (branch_id IS NULL)
+        query = query.is('branch_id', null);
+        console.log(`🔍 [Matriz] Buscando vendas sem filial definida (Matriz)`);
+      }
     }
 
     if (sale_source) {

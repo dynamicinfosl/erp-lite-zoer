@@ -2,18 +2,30 @@
 // Tipos principais do sistema
 export interface Product {
   id: number;
-  user_id: number;
+  user_id: string; // Mudando para string pois UUIDs do Supabase são strings
+  tenant_id: string;
   category_id?: number;
   name: string;
   sku?: string;
   barcode?: string;
   description?: string;
-  // novos campos opcionais
   internal_code?: string;
   product_group?: string;
   has_variations?: boolean;
-  fiscal_note?: string; // NCM/CFOP ou referência fiscal
-  unit_conversion?: string; // ex.: 1 CX = 12 UN
+  fiscal_note?: string; 
+  ncm?: string;
+  cest?: string;
+  cfop_default?: string;
+  tax_origem?: string;
+  tax_icms_cst?: string;
+  tax_icms_aliquota?: number;
+  tax_pis_cst?: string;
+  tax_pis_aliquota?: number;
+  tax_cofins_cst?: string;
+  tax_cofins_aliquota?: number;
+  tax_ipi_cst?: string;
+  tax_ipi_aliquota?: number;
+  unit_conversion?: string;
   moves_stock?: boolean;
   width_cm?: number;
   height_cm?: number;
@@ -87,16 +99,20 @@ export interface SaleItem {
 
 export interface Customer {
   id: number;
-  user_id: number;
+  user_id: string;
+  tenant_id: string;
   name: string;
   email?: string;
   phone?: string;
   document?: string;
   address?: string;
+  address_number?: string;
+  address_complement?: string;
   neighborhood?: string;
   city?: string;
   state?: string;
   zipcode?: string;
+  state_registration?: string;
   notes?: string;
   responsible_seller?: string;
   responsible_financial?: string;

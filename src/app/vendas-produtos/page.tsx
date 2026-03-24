@@ -55,15 +55,24 @@ import {
 import { toast } from 'sonner';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
+import { useBranch } from '@/contexts/BranchContext';
 import { TenantPageWrapper } from '@/components/layout/PageWrapper';
 import { NewSaleForm } from '@/components/vendas-produtos/NewSaleForm';
+import { 
+  mapSaleToNFePayload, 
+  mapSaleToNFCePayload, 
+  emitFiscalDocument 
+} from '@/lib/fiscal-utils';
+import { api } from '@/lib/api-client';
 
 interface Sale {
   id: string;
   numero: string;
+  customer_id?: string;
   cliente: string;
   vendedor?: string;
   itens: Array<{
+    product_id?: string;
     produto: string;
     quantidade: number;
     preco_unitario: number;
@@ -90,6 +99,7 @@ interface ColumnVisibility {
 
 export default function VendasProdutosPage() {
   const { tenant } = useSimpleAuth();
+  const { scope, branchId } = useBranch();
   const [vendas, setVendas] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -128,9 +138,12 @@ export default function VendasProdutosPage() {
         return;
       }
 
-      console.log('📦 Carregando vendas de produtos para o tenant:', tenant.id);
+      console.log('📦 Carregando vendas de produtos para o tenant:', tenant.id, { scope, branchId });
       
-      const res = await fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}&sale_source=produtos`);
+      const res = await fetch(`/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}&sale_source=produtos&branch_id=${branchId || ''}&branch_scope=${scope || ''}`);
+      
+      // Mapear customer_id da resposta bruta
+      // ...
       if (!res.ok) {
         const errorText = await res.text();
         console.error('❌ Erro na resposta da API:', res.status, errorText);
@@ -165,8 +178,10 @@ export default function VendasProdutosPage() {
           id: String(s.id ?? i + 1),
           numero: s.sale_number ?? s.numero ?? `VND-${String(i + 1).padStart(6, '0')}`,
           cliente: s.customer?.name ?? s.customer_name ?? s.cliente ?? 'Cliente Avulso',
+          customer_id: s.customer_id,
           vendedor: s.seller_name ?? s.vendedor ?? '',
           itens: items.map((it: any) => ({
+            product_id: it.product_id,
             produto: it.product?.name ?? it.product_name ?? it.produto ?? 'Produto',
             quantidade: Number(it.quantity ?? it.quantidade ?? 1),
             preco_unitario: Number(it.unit_price ?? it.price ?? it.preco_unitario ?? 0),
@@ -199,7 +214,7 @@ export default function VendasProdutosPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, scope, branchId]);
 
   useEffect(() => {
     loadVendas();
@@ -363,6 +378,58 @@ export default function VendasProdutosPage() {
   const handleSaleCreated = () => {
     setShowNewSaleDialog(false);
     loadVendas();
+  };
+
+  const handleEmitirNFe = async (venda: Sale, type: 'nfe' | 'nfce') => {
+    if (!tenant?.id) return;
+    
+    const toastId = toast.loading(`Preparando emissão de ${type.toUpperCase()}...`);
+    
+    try {
+      // 1. Buscar dados completos do cliente
+      let customer = undefined;
+      if (venda.customer_id) {
+        try {
+          customer = await api.get(`/customers/${venda.customer_id}?tenant_id=${tenant.id}`);
+        } catch (e) {
+          console.error("Erro ao carregar dados do cliente:", e);
+        }
+      }
+
+      // 2. Buscar detalhes dos produtos para NCM/CFOP
+      const itemsWithProducts = await Promise.all(venda.itens.map(async (item) => {
+        if (!item.product_id) return item;
+        try {
+          const product = await api.get(`/products/${item.product_id}?tenant_id=${tenant.id}`);
+          return { ...item, product };
+        } catch (e) {
+          return item;
+        }
+      }));
+
+      // 3. Mapear payload
+      const payload = type === 'nfe' 
+        ? mapSaleToNFePayload(venda as any, itemsWithProducts as any, customer)
+        : mapSaleToNFCePayload(venda as any, itemsWithProducts as any, customer);
+
+      // 4. Emitir
+      const result = await emitFiscalDocument({
+        tenant_id: tenant.id,
+        doc_type: type,
+        payload,
+        ref: `sale_${venda.id}_${Date.now()}`
+      });
+
+      toast.success(`${type.toUpperCase()} enviada com sucesso!`, { id: toastId });
+      
+      // Opcional: abrir link se disponível
+      if (result.provider_response?.pdf_url) {
+        window.open(result.provider_response.pdf_url, '_blank');
+      }
+    } catch (error: any) {
+      console.error(`Erro ao emitir ${type.toUpperCase()}:`, error);
+      toast.error(`Erro: ${error.message}`, { id: toastId });
+    }
   };
 
   return (
@@ -657,6 +724,11 @@ export default function VendasProdutosPage() {
                           <DropdownMenuItem onClick={() => handleImprimirCupom(venda)}>
                             <Receipt className="h-4 w-4 mr-2" />
                             Imprimir Cupom
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleEmitirNFe(venda, 'nfe')}>
+                            <FileText className="h-4 w-4 mr-2" />
+                            Emitir NF-e
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {venda.status === 'cancelada' ? (

@@ -61,6 +61,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
+import { mapSaleToNFCePayload, emitFiscalDocument } from '@/lib/fiscal-utils';
+import { api } from '@/lib/api-client';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { useBranch } from '@/contexts/BranchContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -997,6 +999,55 @@ export default function VendasPage() {
   };
 
   // Importar vendas
+  const handleEmitirNFCe = async (venda: Sale) => {
+    if (!tenant?.id) return;
+    
+    const toastId = toast.loading("Preparando emissão de NFC-e...");
+    
+    try {
+      // 1. Buscar dados completos do cliente
+      let customer = undefined;
+      if (venda.customer_id) {
+        try {
+          customer = await api.get(`/customers/${venda.customer_id}?tenant_id=${tenant.id}`);
+        } catch (e) {
+          console.error("Erro ao carregar dados do cliente:", e);
+        }
+      }
+
+      // 2. Buscar detalhes dos produtos para NCM/CFOP
+      const itemsWithProducts = await Promise.all(venda.itens.map(async (item) => {
+        if (!item.product_id) return item;
+        try {
+          const product = await api.get(`/products/${item.product_id}?tenant_id=${tenant.id}`);
+          return { ...item, product };
+        } catch (e) {
+          return item;
+        }
+      }));
+
+      // 3. Mapear payload
+      const payload = mapSaleToNFCePayload(venda as any, itemsWithProducts as any, customer);
+
+      // 4. Emitir
+      const result = await emitFiscalDocument({
+        tenant_id: tenant.id,
+        doc_type: 'nfce',
+        payload,
+        ref: `sale_${venda.id}_${Date.now()}`
+      });
+
+      toast.success("NFC-e enviada com sucesso!", { id: toastId });
+      
+      if (result.provider_response?.pdf_url) {
+        window.open(result.provider_response.pdf_url, '_blank');
+      }
+    } catch (error: any) {
+      console.error("Erro ao emitir NFC-e:", error);
+      toast.error(`Erro: ${error.message}`, { id: toastId });
+    }
+  };
+
   const handleImportarVendas = () => {
     fileInputRef.current?.click();
   };
@@ -1743,9 +1794,9 @@ export default function VendasPage() {
                                   Editar
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => handleMarcarEntrega(venda)}>
-                                  <Truck className="h-4 w-4 mr-2" />
-                                  Marcar como Entrega
+                                <DropdownMenuItem onClick={() => handleEmitirNFCe(venda)}>
+                                  <Receipt className="h-4 w-4 mr-2" />
+                                  Emitir NFC-e
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 {venda.status === 'cancelada' ? (

@@ -56,6 +56,11 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
+import { 
+  mapOSToNFSeNacionalPayload, 
+  emitFiscalDocument 
+} from '@/lib/fiscal-utils';
+import { api } from '@/lib/api-client';
 
 interface OrdemServico {
   id: string;
@@ -447,6 +452,44 @@ export default function OrdemServicosPage() {
     }
   };
 
+  const handleEmitirNFSe = async (ordem: OrdemServico) => {
+    if (!tenant?.id) return;
+    
+    const toastId = toast.loading("Buscando dados do cliente e preparando NFS-e...");
+    
+    try {
+      // 1. Tentar encontrar o cliente pelo nome (já que não temos customer_id na tabela orders)
+      const customers = await api.get(`/customers?tenant_id=${tenant.id}&search=${encodeURIComponent(ordem.cliente)}`);
+      const customer = Array.isArray(customers.data) 
+        ? customers.data.find((c: any) => c.name.toLowerCase() === ordem.cliente.toLowerCase()) 
+        : undefined;
+
+      if (!customer) {
+        throw new Error(`Cliente "${ordem.cliente}" não encontrado no cadastro detalhado. É necessário cadastrar o cliente com CPF/CNPJ e endereço para emitir nota.`);
+      }
+
+      // 2. Mapear payload
+      const payload = mapOSToNFSeNacionalPayload(ordem, customer);
+
+      // 3. Emitir
+      const result = await emitFiscalDocument({
+        tenant_id: tenant.id,
+        doc_type: 'nfse_nacional',
+        payload,
+        ref: `os_${ordem.id}_${Date.now()}`
+      });
+
+      toast.success("NFS-e enviada com sucesso!", { id: toastId });
+      
+      if (result.provider_response?.pdf_url) {
+        window.open(result.provider_response.pdf_url, '_blank');
+      }
+    } catch (error: any) {
+      console.error("Erro ao emitir NFS-e:", error);
+      toast.error(`Erro: ${error.message}`, { id: toastId });
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -783,8 +826,16 @@ export default function OrdemServicosPage() {
                               className="cursor-pointer text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800"
                             >
                               <Edit className="h-4 w-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+                            <DropdownMenuItem 
+                              onClick={() => handleEmitirNFSe(ordem)}
+                              className="cursor-pointer text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800"
+                            >
+                              <FileText className="h-4 w-4 mr-2" />
+                              Emitir NFS-e
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
                             <DropdownMenuItem 
                               className="cursor-pointer text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 focus:bg-red-50 dark:focus:bg-red-950/30"

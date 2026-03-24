@@ -171,6 +171,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    return NextResponse.json({ error: 'Erro interno do servidor', details: error?.message }, { status: 500 });
+    console.error('❌ Erro na rota POST certificate:', error);
+    return NextResponse.json({ 
+      error: 'Erro interno do servidor', 
+      details: error?.message || 'Erro desconhecido' 
+    }, { status: 500 });
   }
 }

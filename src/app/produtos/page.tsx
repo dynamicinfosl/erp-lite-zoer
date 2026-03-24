@@ -86,6 +86,17 @@ interface Product {
   stock_quantity: number;
   barcode?: string;
   ncm?: string;
+  cest?: string;
+  cfop_default?: string;
+  tax_origem?: string;
+  tax_icms_cst?: string;
+  tax_icms_aliquota?: number;
+  tax_pis_cst?: string;
+  tax_pis_aliquota?: number;
+  tax_cofins_cst?: string;
+  tax_cofins_aliquota?: number;
+  tax_ipi_cst?: string;
+  tax_ipi_aliquota?: number;
   unit: string;
   status: 'active' | 'inactive';
   created_at: string;
@@ -149,6 +160,17 @@ export default function ProdutosPage() {
     barcode: '',
     ncm: '',
     unit: 'UN',
+    cest: '',
+    cfop_default: '',
+    tax_origem: '0',
+    tax_icms_cst: '',
+    tax_icms_aliquota: '',
+    tax_pis_cst: '',
+    tax_pis_aliquota: '',
+    tax_cofins_cst: '',
+    tax_cofins_aliquota: '',
+    tax_ipi_cst: '',
+    tax_ipi_aliquota: '',
   });
   const [extraSalePrices, setExtraSalePrices] = useState<Array<{ name: string; price: string }>>([]);
 
@@ -520,6 +542,17 @@ export default function ProdutosPage() {
         stock: parseInt(newProduct.stock_quantity) || 0,
         barcode: newProduct.barcode || null,
         ncm: newProduct.ncm || null,
+        cest: (newProduct as any).cest || null,
+        cfop_default: (newProduct as any).cfop_default || null,
+        tax_origem: (newProduct as any).tax_origem || '0',
+        tax_icms_cst: (newProduct as any).tax_icms_cst || null,
+        tax_icms_aliquota: (newProduct as any).tax_icms_aliquota || null,
+        tax_pis_cst: (newProduct as any).tax_pis_cst || null,
+        tax_pis_aliquota: (newProduct as any).tax_pis_aliquota || null,
+        tax_cofins_cst: (newProduct as any).tax_cofins_cst || null,
+        tax_cofins_aliquota: (newProduct as any).tax_cofins_aliquota || null,
+        tax_ipi_cst: (newProduct as any).tax_ipi_cst || null,
+        tax_ipi_aliquota: (newProduct as any).tax_ipi_aliquota || null,
         unit: newProduct.unit || 'UN',
         price_tiers: [
           // Preço padrão (equivalente ao "Valor Varejo")
@@ -589,6 +622,17 @@ export default function ProdutosPage() {
         barcode: '',
         ncm: '',
         unit: 'UN',
+        cest: '',
+        cfop_default: '',
+        tax_origem: '0',
+        tax_icms_cst: '',
+        tax_icms_aliquota: '',
+        tax_pis_cst: '',
+        tax_pis_aliquota: '',
+        tax_cofins_cst: '',
+        tax_cofins_aliquota: '',
+        tax_ipi_cst: '',
+        tax_ipi_aliquota: '',
       });
       setExtraSalePrices([]);
       setFormErrors({}); // Limpar erros
@@ -1361,6 +1405,17 @@ export default function ProdutosPage() {
       barcode: p.barcode || '',
       ncm: p.ncm || '',
       unit: p.unit || 'UN',
+      cest: (p as any).cest || '',
+      cfop_default: (p as any).cfop_default || '',
+      tax_origem: (p as any).tax_origem || '0',
+      tax_icms_cst: (p as any).tax_icms_cst || '',
+      tax_icms_aliquota: String((p as any).tax_icms_aliquota ?? ''),
+      tax_pis_cst: (p as any).tax_pis_cst || '',
+      tax_pis_aliquota: String((p as any).tax_pis_aliquota ?? ''),
+      tax_cofins_cst: (p as any).tax_cofins_cst || '',
+      tax_cofins_aliquota: String((p as any).tax_cofins_aliquota ?? ''),
+      tax_ipi_cst: (p as any).tax_ipi_cst || '',
+      tax_ipi_aliquota: String((p as any).tax_ipi_aliquota ?? ''),
     });
 
     // ✅ Carregar valores de venda diferentes cadastrados/importados
@@ -1414,6 +1469,18 @@ export default function ProdutosPage() {
           description: newProduct.description,
           price: parseFloat(newProduct.sale_price) || 0,
           stock: parseInt(newProduct.stock_quantity) || 0,
+          ncm: newProduct.ncm,
+          cest: (newProduct as any).cest,
+          cfop_default: (newProduct as any).cfop_default,
+          tax_origem: (newProduct as any).tax_origem,
+          tax_icms_cst: (newProduct as any).tax_icms_cst,
+          tax_icms_aliquota: (newProduct as any).tax_icms_aliquota,
+          tax_pis_cst: (newProduct as any).tax_pis_cst,
+          tax_pis_aliquota: (newProduct as any).tax_pis_aliquota,
+          tax_cofins_cst: (newProduct as any).tax_cofins_cst,
+          tax_cofins_aliquota: (newProduct as any).tax_cofins_aliquota,
+          tax_ipi_cst: (newProduct as any).tax_ipi_cst,
+          tax_ipi_aliquota: (newProduct as any).tax_ipi_aliquota,
           price_tiers: [
             ...(parseFloat(newProduct.sale_price) > 0
               ? [{ name: 'Valor Varejo', price: parseFloat(newProduct.sale_price) }]
@@ -2312,10 +2379,107 @@ export default function ProdutosPage() {
                     <Input
                       id="ncm"
                       value={newProduct.ncm}
-                      onChange={(e) => setNewProduct(prev => ({ ...prev, ncm: e.target.value }))}
+                      onChange={(e) => setNewProduct(prev => ({ ...prev, ncm: e.target.value.replace(/\D/g, '') }))}
                       placeholder="12345678"
                       className="h-11 bg-slate-700/50 border-slate-600 focus:border-blue-400 focus:ring-blue-400/20 text-white placeholder:text-slate-400"
                     />
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-600/50 mt-2">
+                  <h3 className="text-sm font-semibold text-blue-400 mb-4 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Informações Fiscais (NF-e)
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-slate-200">CEST</Label>
+                      <Input
+                        value={(newProduct as any).cest}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, cest: e.target.value.replace(/\D/g, '') }))}
+                        placeholder="0000000"
+                        className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-slate-200">CFOP Padrão</Label>
+                      <Input
+                        value={(newProduct as any).cfop_default}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, cfop_default: e.target.value.replace(/\D/g, '') }))}
+                        placeholder="5102"
+                        className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-slate-200">Origem</Label>
+                      <select 
+                        className="h-11 w-full bg-slate-700/50 border border-slate-600 rounded-md text-white px-3"
+                        value={(newProduct as any).tax_origem}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, tax_origem: e.target.value }))}
+                      >
+                        <option value="0">0 - Nacional</option>
+                        <option value="1">1 - Estrangeira (Importação Direta)</option>
+                        <option value="2">2 - Estrangeira (Adquirida no Mercado Interno)</option>
+                        <option value="3">3 - Nacional (Conteúdo Importado &gt; 40%)</option>
+                        <option value="4">4 - Nacional (Processos Básicos de Fabricação)</option>
+                        <option value="5">5 - Nacional (Conteúdo Importado &lt;= 40%)</option>
+                        <option value="6">6 - Estrangeira (Importação Direta, sem similar nacional)</option>
+                        <option value="7">7 - Estrangeira (Adquirida no Int., sem similar nacional)</option>
+                        <option value="8">8 - Nacional (Conteúdo Importado &gt; 70%)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4 p-4 rounded-lg bg-blue-500/5 border border-blue-500/10">
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">ICMS (Imposto sobre Circulação)</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-slate-400 uppercase">CST/CSOSN</Label>
+                          <Input
+                            value={(newProduct as any).tax_icms_cst}
+                            onChange={(e) => setNewProduct(prev => ({ ...prev, tax_icms_cst: e.target.value }))}
+                            placeholder="102"
+                            className="h-9 bg-slate-700/30 border-slate-600 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-slate-400 uppercase">Alíquota %</Label>
+                          <Input
+                            type="number"
+                            value={(newProduct as any).tax_icms_aliquota}
+                            onChange={(e) => setNewProduct(prev => ({ ...prev, tax_icms_aliquota: e.target.value }))}
+                            placeholder="0.00"
+                            className="h-9 bg-slate-700/30 border-slate-600 text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">PIS / COFINS</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-slate-400 uppercase">PIS CST</Label>
+                          <Input
+                            value={(newProduct as any).tax_pis_cst}
+                            onChange={(e) => setNewProduct(prev => ({ ...prev, tax_pis_cst: e.target.value }))}
+                            placeholder="07"
+                            className="h-9 bg-slate-700/30 border-slate-600 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-slate-400 uppercase">COFINS CST</Label>
+                          <Input
+                            value={(newProduct as any).tax_cofins_cst}
+                            onChange={(e) => setNewProduct(prev => ({ ...prev, tax_cofins_cst: e.target.value }))}
+                            placeholder="07"
+                            className="h-9 bg-slate-700/30 border-slate-600 text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2342,6 +2506,17 @@ export default function ProdutosPage() {
                       barcode: '',
                       ncm: '',
                       unit: 'UN',
+                      cest: '',
+                      cfop_default: '',
+                      tax_origem: '0',
+                      tax_icms_cst: '',
+                      tax_icms_aliquota: '',
+                      tax_pis_cst: '',
+                      tax_pis_aliquota: '',
+                      tax_cofins_cst: '',
+                      tax_cofins_aliquota: '',
+                      tax_ipi_cst: '',
+                      tax_ipi_aliquota: '',
                     });
                   }}
                   className="w-full sm:w-auto border-slate-500 bg-slate-700/50 hover:bg-slate-600 text-slate-200 hover:text-white h-11 font-medium transition-all duration-200 hover:shadow-md"

@@ -60,18 +60,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Extrair informações do webhook
-    const { ref, status, doc_type, empresa_id } = body;
+    const { ref, status, doc_type, empresa_id, chave_nfe, chave, situacao } = body;
+    const finalStatus = status || situacao || body.status;
+    const finalChave = chave_nfe || chave || body.chave;
 
-    if (!ref) {
-      return NextResponse.json({ error: 'ref é obrigatório no webhook' }, { status: 400 });
+    if (!ref && !finalChave) {
+      return NextResponse.json({ error: 'ref ou chave é obrigatório no webhook' }, { status: 400 });
     }
 
-    // Buscar documento fiscal pelo ref
-    const { data: fiscalDoc, error: docError } = await supabaseAdmin
-      .from('fiscal_documents')
-      .select('id, tenant_id, doc_type, ref, status')
-      .eq('ref', ref)
-      .maybeSingle();
+    // Buscar documento fiscal pelo ref ou pela chave
+    let query = supabaseAdmin.from('fiscal_documents').select('id, tenant_id, doc_type, ref, status, chave');
+
+    if (ref) {
+      query = query.eq('ref', ref);
+    } else if (finalChave) {
+      query = query.eq('chave', finalChave);
+    }
+
+    const { data: fiscalDoc, error: docError } = await query.maybeSingle();
 
     if (docError) {
       console.error('Erro ao buscar documento:', docError);
@@ -79,27 +85,26 @@ export async function POST(request: NextRequest) {
     }
 
     if (!fiscalDoc) {
-      console.warn(`Documento não encontrado para ref: ${ref}`);
-      // Retornar 200 mesmo se não encontrar, para não gerar retry infinito
-      return NextResponse.json({ success: true, message: 'Documento não encontrado, mas webhook processado' });
+      console.warn(`Documento não encontrado para ref: ${ref} ou chave: ${finalChave}`);
+      
+      // Se for Ciência Automática (Received NFe), talvez possamos criar um registro novo no futuro. 
+      // Por ora, apenas registramos no histórico se possível, mas retornamos 200.
+      return NextResponse.json({ success: true, message: 'Documento não encontrado para atualização, mas evento registrado' });
     }
 
     // Atualizar status do documento se fornecido
-    if (status && status !== fiscalDoc.status) {
+    if (finalStatus && finalStatus !== fiscalDoc.status) {
       const updateData: any = {
-        status,
+        status: finalStatus,
         updated_at: new Date().toISOString(),
       };
 
       // Atualizar campos adicionais se presentes no webhook
       if (body.numero) updateData.numero = String(body.numero);
       if (body.serie) updateData.serie = String(body.serie);
-      if (body.chave_nfe) updateData.chave = String(body.chave_nfe);
-      if (body.chave) updateData.chave = String(body.chave);
-      if (body.caminho_xml_nota_fiscal) updateData.xml_path = String(body.caminho_xml_nota_fiscal);
-      if (body.caminho_danfe) updateData.pdf_path = String(body.caminho_danfe);
-      if (body.caminho_xml) updateData.xml_path = String(body.caminho_xml);
-      if (body.caminho_pdf) updateData.pdf_path = String(body.caminho_pdf);
+      if (finalChave) updateData.chave = String(finalChave);
+      if (body.caminho_xml_nota_fiscal || body.caminho_xml) updateData.xml_path = String(body.caminho_xml_nota_fiscal || body.caminho_xml);
+      if (body.caminho_danfe || body.caminho_pdf) updateData.pdf_path = String(body.caminho_danfe || body.caminho_pdf);
 
       await supabaseAdmin
         .from('fiscal_documents')

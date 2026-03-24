@@ -38,7 +38,32 @@ async function createProductHandler(request: NextRequest) {
     }
 
     const body = await request.json();
-    let { tenant_id, user_id, sku, name, description, category, brand, price, cost_price, stock, barcode, ncm, unit } = body;
+    let { 
+      tenant_id, 
+      user_id, 
+      sku, 
+      name, 
+      description, 
+      category, 
+      brand, 
+      price, 
+      cost_price, 
+      stock, 
+      barcode, 
+      ncm, 
+      unit,
+      cest,
+      cfop_default,
+      tax_origem,
+      tax_icms_cst,
+      tax_icms_aliquota,
+      tax_pis_cst,
+      tax_pis_aliquota,
+      tax_cofins_cst,
+      tax_cofins_aliquota,
+      tax_ipi_cst,
+      tax_ipi_aliquota
+    } = body;
     const price_tiers = Array.isArray(body?.price_tiers) ? body.price_tiers : [];
 
     if (!name || price === undefined || price === null) {
@@ -177,23 +202,41 @@ async function createProductHandler(request: NextRequest) {
       user_id: user_id || '00000000-0000-0000-0000-000000000000'
     });
 
+    const normalizeCode = (val: string | null | undefined) => val ? val.replace(/\D/g, '') : null;
+    const safeFloat = (val: any) => {
+      if (val === undefined || val === null || val === '') return null;
+      const f = parseFloat(val);
+      return isNaN(f) ? null : f;
+    };
+
     const { data, error } = await supabaseAdmin
       .from('products')
       .insert({
-        tenant_id: tenant_id, // ✅ Garantir que tenant_id está presente
-        user_id: user_id || '00000000-0000-0000-0000-000000000000', // UUID padrão se não fornecido
+        tenant_id: tenant_id,
+        user_id: user_id || '00000000-0000-0000-0000-000000000000',
         sku: finalSku,
         name,
         description: description || null,
         category: category || null,
         brand: brand || null,
-        cost_price: parseFloat(cost_price) || 0,
-        sale_price: parseFloat(price),
+        cost_price: safeFloat(cost_price) || 0,
+        sale_price: safeFloat(price) || 0,
         stock_quantity: stockQty,
         barcode: barcode || null,
-        ncm: ncm || null,
+        ncm: normalizeCode(ncm),
+        cest: normalizeCode(cest),
+        cfop_default: normalizeCode(cfop_default),
+        tax_origem: tax_origem || '0',
+        tax_icms_cst: tax_icms_cst || null,
+        tax_icms_aliquota: safeFloat(tax_icms_aliquota),
+        tax_pis_cst: tax_pis_cst || null,
+        tax_pis_aliquota: safeFloat(tax_pis_aliquota),
+        tax_cofins_cst: tax_cofins_cst || null,
+        tax_cofins_aliquota: safeFloat(tax_cofins_aliquota),
+        tax_ipi_cst: tax_ipi_cst || null,
+        tax_ipi_aliquota: safeFloat(tax_ipi_aliquota),
         unit: unit || 'UN',
-        is_active: true, // ✅ Garantir que is_active também seja true (caso o banco use este campo)
+        is_active: true,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -577,15 +620,62 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, name, description, price, stock, tenant_id, has_variations } = body;
+    const { 
+      id, 
+      name, 
+      sku,
+      description, 
+      category,
+      brand,
+      price, 
+      cost_price,
+      stock, 
+      barcode,
+      unit,
+      tenant_id, 
+      has_variations,
+      ncm,
+      cest,
+      cfop_default,
+      tax_origem,
+      tax_icms_cst,
+      tax_icms_aliquota,
+      tax_pis_cst,
+      tax_pis_aliquota,
+      tax_cofins_cst,
+      tax_cofins_aliquota,
+      tax_ipi_cst,
+      tax_ipi_aliquota
+    } = body;
     const price_tiers = Array.isArray(body?.price_tiers) ? body.price_tiers : [];
     if (!id) return NextResponse.json({ error: 'ID é obrigatório' }, { status: 400 });
+
+    const normalizeCodeUpdate = (val: string | null | undefined) => val ? val.replace(/\D/g, '') : null;
+    const safeFloatUpdate = (val: any) => {
+      if (val === undefined || val === null || val === '') return null;
+      const f = parseFloat(val);
+      return isNaN(f) ? null : f;
+    };
 
     const updatePayload: any = {
       name,
       description,
-      sale_price: price !== undefined ? parseFloat(price) : undefined,
-      stock_quantity: stock !== undefined ? parseInt(stock) : undefined,
+      cost_price: safeFloatUpdate(cost_price),
+      sale_price: safeFloatUpdate(price),
+      stock_quantity: (stock !== undefined && stock !== null) ? parseInt(stock) : undefined,
+      barcode: barcode || null,
+      ncm: normalizeCodeUpdate(ncm),
+      cest: normalizeCodeUpdate(cest),
+      cfop_default: normalizeCodeUpdate(cfop_default),
+      tax_origem: tax_origem || '0',
+      tax_icms_cst: tax_icms_cst || null,
+      tax_icms_aliquota: safeFloatUpdate(tax_icms_aliquota),
+      tax_pis_cst: tax_pis_cst || null,
+      tax_pis_aliquota: safeFloatUpdate(tax_pis_aliquota),
+      tax_cofins_cst: tax_cofins_cst || null,
+      tax_cofins_aliquota: safeFloatUpdate(tax_cofins_aliquota),
+      tax_ipi_cst: tax_ipi_cst || null,
+      tax_ipi_aliquota: safeFloatUpdate(tax_ipi_aliquota),
       updated_at: new Date().toISOString(),
     };
     if (has_variations !== undefined) {

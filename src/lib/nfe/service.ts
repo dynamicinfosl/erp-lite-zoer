@@ -4,6 +4,7 @@ import { NFEPayload, NFEEmitResponse, SaleInvoiceHook } from '@/types/nfe';
 
 export interface SaleItemForInvoice {
   id: string | number;
+  sku?: string;
   name: string;
   quantity: number;
   unit: string;
@@ -11,6 +12,16 @@ export interface SaleItemForInvoice {
   discount?: number;
   ncm?: string;
   cfop?: string;
+  cest?: string;
+  tax_origem?: string;
+  tax_icms_cst?: string;
+  tax_icms_aliquota?: number;
+  tax_pis_cst?: string;
+  tax_pis_aliquota?: number;
+  tax_cofins_cst?: string;
+  tax_cofins_aliquota?: number;
+  tax_ipi_cst?: string;
+  tax_ipi_aliquota?: number;
 }
 
 export interface SaleForInvoice {
@@ -45,6 +56,7 @@ export function mapSaleToPayload(sale: SaleForInvoice): NFEPayload {
     operationNature: 'Venda de mercadorias',
     customer: sale.customer,
     items: sale.items.map((item) => ({
+      sku: item.sku,
       description: item.name,
       quantity: item.quantity,
       unit: item.unit,
@@ -52,7 +64,19 @@ export function mapSaleToPayload(sale: SaleForInvoice): NFEPayload {
       totalPrice: item.price * item.quantity - (item.discount ?? 0),
       ncm: item.ncm,
       cfop: item.cfop,
+      cest: item.cest,
       discount: item.discount,
+      tax: item.tax_icms_cst || item.tax_pis_cst || item.tax_cofins_cst || item.tax_ipi_cst ? {
+        icms: item.tax_icms_cst,
+        icms_aliquota: item.tax_icms_aliquota,
+        pis: item.tax_pis_cst,
+        pis_aliquota: item.tax_pis_aliquota,
+        cofins: item.tax_cofins_cst,
+        cofins_aliquota: item.tax_cofins_aliquota,
+        ipi: item.tax_ipi_cst,
+        ipi_aliquota: item.tax_ipi_aliquota,
+        origem: item.tax_origem
+      } as any : undefined
     })),
     payments: sale.payments,
     totals: sale.totals,
