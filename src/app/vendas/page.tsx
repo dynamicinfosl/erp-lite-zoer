@@ -1799,6 +1799,11 @@ export default function VendasPage() {
                                   Emitir NFC-e
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleMarcarEntrega(venda)}>
+                                  <Truck className="h-4 w-4 mr-2" />
+                                  Configurar Entrega
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
                                 {venda.status === 'cancelada' ? (
                                   <DropdownMenuItem
                                     className="text-red-600 dark:text-red-400"

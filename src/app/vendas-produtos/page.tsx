@@ -50,7 +50,8 @@ import {
   TrendingUp,
   Clock,
   Printer,
-  FileText
+  FileText,
+  Truck
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
@@ -108,6 +109,14 @@ export default function VendasProdutosPage() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showNewSaleDialog, setShowNewSaleDialog] = useState(false);
   const [selectedVendas, setSelectedVendas] = useState<Set<string>>(new Set());
+
+  // Estados para modal de entrega
+  const [showDeliveryDialog, setShowDeliveryDialog] = useState(false);
+  const [deliveryDrivers, setDeliveryDrivers] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedDriverId, setSelectedDriverId] = useState<string>('');
+  const [isDelivery, setIsDelivery] = useState(false);
+  const [savingDelivery, setSavingDelivery] = useState(false);
+  const [loadingDrivers, setLoadingDrivers] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
     numero: true,
     cliente: true,
@@ -397,6 +406,149 @@ export default function VendasProdutosPage() {
       toast.error(error instanceof Error ? error.message : 'Erro ao excluir venda. Tente novamente.');
     }
   };
+
+  const loadDeliveryDrivers = useCallback(async () => {
+    if (!tenant?.id) {
+      setDeliveryDrivers([]);
+      return;
+    }
+    try {
+      setLoadingDrivers(true);
+      const res = await fetch(`/next_api/delivery-drivers?tenant_id=${encodeURIComponent(tenant.id)}`);
+      if (!res.ok) {
+        setDeliveryDrivers([]);
+        return;
+      }
+      const json = await res.json();
+      const rows = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
+      const list = Array.isArray(rows) ? rows : [];
+      const driversList = list
+        .filter((d: any) => d.id && d.name && d.is_active !== false)
+        .map((d: any) => ({ id: Number(d.id), name: String(d.name) }));
+      setDeliveryDrivers(driversList);
+    } catch (error) {
+      console.error('Erro ao carregar entregadores:', error);
+      setDeliveryDrivers([]);
+    } finally {
+      setLoadingDrivers(false);
+    }
+  }, [tenant?.id]);
+
+  const handleMarcarEntrega = async (venda: Sale) => {
+    setSelectedVenda(venda);
+    setShowDeliveryDialog(true);
+    await loadDeliveryDrivers();
+
+    // Verificar se já existe entrega para esta venda
+    try {
+      const res = await fetch(
+        `/next_api/deliveries?tenant_id=${encodeURIComponent(tenant?.id || '')}&sale_id=${encodeURIComponent(venda.id)}&limit=1`
+      );
+      if (res.ok) {
+        const json = await res.json();
+        const rows = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
+        const existing = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+        if (existing?.id) {
+          setIsDelivery(true);
+          setSelectedDriverId(existing.driver_id ? String(existing.driver_id) : '');
+        } else {
+          setIsDelivery(false);
+          setSelectedDriverId('');
+        }
+      }
+    } catch {
+      setIsDelivery(false);
+      setSelectedDriverId('');
+    }
+  };
+
+  const saveDeliveryConfig = async () => {
+    if (!selectedVenda || !tenant?.id) {
+      toast.error('Dados insuficientes para configurar entrega');
+      return;
+    }
+
+    if (!isDelivery) {
+      // Desmarcar entrega
+      try {
+        setSavingDelivery(true);
+        const res = await fetch('/next_api/deliveries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenant_id: tenant.id,
+            sale_id: selectedVenda.id,
+            customer_id: null,
+            status: 'cancelada',
+            driver_id: null,
+            notes: 'Entrega desmarcada na página de vendas-produtos',
+          }),
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ errorMessage: 'Erro desconhecido' }));
+          throw new Error(errorData.errorMessage || `Erro ${res.status}`);
+        }
+
+        toast.success('Entrega desmarcada com sucesso');
+        setShowDeliveryDialog(false);
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : 'Erro ao desmarcar entrega';
+        console.error('Erro ao desmarcar entrega:', e);
+        toast.error(errorMessage);
+      } finally {
+        setSavingDelivery(false);
+      }
+      return;
+    }
+
+    try {
+      setSavingDelivery(true);
+      const driverIdValue = selectedDriverId && selectedDriverId.trim() !== '' && selectedDriverId !== '__none__'
+        ? Number(selectedDriverId)
+        : null;
+
+      const res = await fetch('/next_api/deliveries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant_id: tenant.id,
+          sale_id: selectedVenda.id,
+          customer_id: (selectedVenda as any).customer_id || null,
+          driver_id: driverIdValue,
+          status: 'aguardando',
+          notes: driverIdValue
+            ? `Vinculada na página de vendas-produtos para entregador: ${deliveryDrivers.find(d => d.id === driverIdValue)?.name || selectedDriverId}`
+            : 'Vinculada na página de vendas-produtos (sem entregador definido)',
+        }),
+      });
+
+      if (!res.ok) {
+        let errorMessage = 'Erro ao salvar entrega';
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.errorMessage || errorMessage;
+          if (errorMessage.includes('Endereço de entrega é obrigatório')) {
+            errorMessage = 'O cliente desta venda não possui endereço cadastrado. Por favor, cadastre o endereço do cliente antes de marcar como entrega.';
+          }
+        } catch {
+          errorMessage = `Erro ${res.status}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      toast.success('Venda marcada para entrega com sucesso!');
+      setShowDeliveryDialog(false);
+      loadVendas();
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : 'Erro ao salvar entrega';
+      console.error('Erro ao salvar entrega:', e);
+      toast.error(errorMessage);
+    } finally {
+      setSavingDelivery(false);
+    }
+  };
+
 
   const handleSaleCreated = () => {
     setShowNewSaleDialog(false);
@@ -752,6 +904,11 @@ export default function VendasProdutosPage() {
                           <DropdownMenuItem onClick={() => handleEmitirNFe(venda, 'nfe')}>
                             <FileText className="h-4 w-4 mr-2" />
                             Emitir NF-e
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleMarcarEntrega(venda)}>
+                            <Truck className="h-4 w-4 mr-2" />
+                            Configurar Entrega
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {venda.status === 'cancelada' ? (
