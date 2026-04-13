@@ -659,7 +659,11 @@ export async function PUT(request: NextRequest) {
 
     const updatePayload: any = {
       name,
+      sku,
       description,
+      category,
+      brand,
+      unit,
       cost_price: safeFloatUpdate(cost_price),
       sale_price: safeFloatUpdate(price),
       stock_quantity: (stock !== undefined && stock !== null) ? parseInt(stock) : undefined,
