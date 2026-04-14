@@ -737,7 +737,7 @@ export default function ClientesPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] overflow-hidden space-y-3">
+    <div className="flex flex-col min-h-full space-y-3 pb-8 lg:pb-0">
       {/* Header */}
       <Card className="border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-white flex-shrink-0">
         <CardContent className="pt-4 pb-3">
@@ -761,9 +761,9 @@ export default function ClientesPage() {
       {/* Toolbar */}
       <Card className="border-blue-100 flex-shrink-0">
         <CardContent className="pt-3 pb-3">
-          <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
             {/* Lado esquerdo - Botões de ação */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
               <Button 
                 className="juga-gradient text-white"
                 onClick={() => setShowAddDialog(true)}
@@ -869,14 +869,14 @@ export default function ClientesPage() {
             </div>
 
             {/* Lado direito - Busca */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
                   placeholder="Buscar clientes..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-80"
+                  className="pl-10 w-full md:w-64 lg:w-80"
                 />
               </div>
               <Button
@@ -890,6 +890,7 @@ export default function ClientesPage() {
               <Button 
                 variant="outline" 
                 onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                className="w-full sm:w-auto"
               >
                 <Filter className="h-4 w-4 mr-2" />
                 Busca Avançada
@@ -941,7 +942,7 @@ export default function ClientesPage() {
       </Card>
 
       {/* Tabela */}
-      <Card className="border-blue-100 flex-1 flex flex-col min-h-0 overflow-hidden">
+      <Card className="border-blue-100 flex-1 flex flex-col min-h-[400px] lg:min-h-0 overflow-hidden">
         <CardHeader className="flex-shrink-0 pb-2 pt-3">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Users className="h-4 w-4" />
@@ -1147,7 +1148,7 @@ export default function ClientesPage() {
                   <Mail className="h-3.5 w-3.5" />
                   Contato
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="edit-email" className="text-sm font-medium text-slate-200">E-mail</Label>
                     <Input
@@ -1187,7 +1188,7 @@ export default function ClientesPage() {
                       />
                     </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="md:col-span-2 space-y-1.5">
+                    <div className="sm:col-span-2 space-y-1.5">
                       <Label htmlFor="edit-address" className="text-sm font-medium text-slate-200">Logradouro</Label>
                       <Input
                         id="edit-address"
@@ -1215,7 +1216,7 @@ export default function ClientesPage() {
                       className="h-11 bg-slate-700/50 border-slate-600 text-white"
                     />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <div className="space-y-1.5">
                       <Label htmlFor="edit-neighborhood" className="text-sm font-medium text-slate-200">Bairro</Label>
                       <Input

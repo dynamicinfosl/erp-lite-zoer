@@ -147,7 +147,7 @@ export function AddCustomerDialog({ open, onOpenChange, onSuccess }: AddCustomer
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="type" className="text-sm font-medium text-slate-200">Tipo de Pessoa</Label>
                     <select 
@@ -174,7 +174,7 @@ export function AddCustomerDialog({ open, onOpenChange, onSuccess }: AddCustomer
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2">
                       <Label htmlFor="document" className="text-sm font-medium text-slate-200">CPF / CNPJ</Label>
@@ -221,7 +221,7 @@ export function AddCustomerDialog({ open, onOpenChange, onSuccess }: AddCustomer
                 Contato e Comunicação
               </h3>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="email" className="text-sm font-medium text-slate-200">E-mail Principal</Label>
                   <div className="relative">
@@ -260,7 +260,7 @@ export function AddCustomerDialog({ open, onOpenChange, onSuccess }: AddCustomer
               </h3>
               
               <div className="grid gap-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="zipcode" className="text-sm font-medium text-slate-200">CEP</Label>
                     <Input
@@ -271,7 +271,7 @@ export function AddCustomerDialog({ open, onOpenChange, onSuccess }: AddCustomer
                       className="h-11 bg-slate-700/50 border-slate-600 focus:border-emerald-400 focus:ring-emerald-400/20 text-white placeholder:text-slate-500"
                     />
                   </div>
-                  <div className="md:col-span-2 space-y-1.5">
+                  <div className="sm:col-span-2 space-y-1.5">
                     <Label htmlFor="address" className="text-sm font-medium text-slate-200">Logradouro (Rua, Av.)</Label>
                     <Input
                       id="address"
@@ -283,8 +283,8 @@ export function AddCustomerDialog({ open, onOpenChange, onSuccess }: AddCustomer
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="space-y-1.5 md:col-span-1">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="space-y-1.5 sm:col-span-1">
                     <Label htmlFor="address_number" className="text-sm font-medium text-slate-200">Número</Label>
                     <Input
                       id="address_number"
@@ -294,7 +294,7 @@ export function AddCustomerDialog({ open, onOpenChange, onSuccess }: AddCustomer
                       className="h-11 bg-slate-700/50 border-slate-600 focus:border-emerald-400 focus:ring-emerald-400/20 text-white placeholder:text-slate-500"
                     />
                   </div>
-                  <div className="space-y-1.5 md:col-span-3">
+                  <div className="space-y-1.5 sm:col-span-3">
                     <Label htmlFor="address_complement" className="text-sm font-medium text-slate-200">Complemento</Label>
                     <Input
                       id="address_complement"
@@ -306,7 +306,7 @@ export function AddCustomerDialog({ open, onOpenChange, onSuccess }: AddCustomer
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="neighborhood" className="text-sm font-medium text-slate-200">Bairro</Label>
                     <Input
