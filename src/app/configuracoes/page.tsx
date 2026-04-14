@@ -16,6 +16,7 @@ import { Plus, Search, Edit, Trash2, User, Settings, Shield, Key } from 'lucide-
 import { UserProfile, Category } from '@/types';
 import { toast } from 'sonner';
 import { useCouponSettings } from '@/hooks/useCouponSettings';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 
 export default function ConfiguracoesPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
