@@ -66,41 +66,26 @@ function handleSchemaCacheError(
 export const GET = requestMiddleware(async (request: NextRequest, context) => {
   try {
     console.log('🔍 GET /user-profiles - Iniciando busca...');
-    const { limit, offset, user_id } = parseQueryParams(request);
-    console.log('🔍 Parâmetros:', { limit, offset, user_id });
+    const { limit, offset, user_id, tenant_id } = parseQueryParams(request);
+    console.log('🔍 Parâmetros:', { limit, offset, user_id, tenant_id });
 
-    let query = supabaseAdmin
-      .from('user_profiles')
-      .select('*')
-      .eq('is_active', true);
-
+    // Se user_id foi fornecido, buscar perfil específico (sem filtro de tenant)
     if (user_id) {
-      query = query.eq('user_id', user_id).limit(1);
-    } else {
-      query = query.order('name', { ascending: true })
-        .range(offset || 0, (offset || 0) + (limit || 50) - 1);
-    }
+      const { data: profiles, error } = await supabaseAdmin
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', user_id)
+        .limit(1);
 
-    const { data: profiles, error } = await query;
+      if (error) throw error;
 
-    if (error) {
-      console.error('❌ Erro ao buscar perfis do Supabase:', error);
-      throw error;
-    }
-
-    console.log('✅ Perfis encontrados:', profiles?.length || 0);
-    if (user_id) {
       let userMetadata: Record<string, any> | null = null;
       try {
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.getUserById(user_id);
-        if (authError) {
-          console.warn('⚠️ Não foi possível buscar metadata do usuário:', authError);
-        } else {
+        if (!authError) {
           userMetadata = authData?.user?.user_metadata ?? null;
         }
-      } catch (authErr) {
-        console.warn('⚠️ Erro inesperado ao buscar metadata:', authErr);
-      }
+      } catch {}
 
       return createSuccessResponse({
         profile: profiles && profiles.length > 0 ? profiles[0] : null,
@@ -108,6 +93,52 @@ export const GET = requestMiddleware(async (request: NextRequest, context) => {
       });
     }
 
+    // Se tenant_id foi fornecido, filtrar usuários por tenant via user_memberships
+    if (tenant_id) {
+      console.log('🔍 Buscando usuários do tenant:', tenant_id);
+
+      // Buscar user_ids do tenant
+      const { data: memberships, error: memError } = await supabaseAdmin
+        .from('user_memberships')
+        .select('user_id')
+        .eq('tenant_id', tenant_id)
+        .eq('is_active', true);
+
+      if (memError) throw memError;
+
+      const userIds = (memberships || []).map((m: any) => m.user_id);
+
+      if (userIds.length === 0) {
+        return createSuccessResponse([]);
+      }
+
+      const { data: profiles, error } = await supabaseAdmin
+        .from('user_profiles')
+        .select('*')
+        .in('user_id', userIds)
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+
+      console.log('✅ Perfis do tenant encontrados:', profiles?.length || 0);
+      return createSuccessResponse(profiles || []);
+    }
+
+    // Sem filtros — retornar lista geral (uso interno/admin)
+    const { data: profiles, error } = await supabaseAdmin
+      .from('user_profiles')
+      .select('*')
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+      .range(offset || 0, (offset || 0) + (limit || 50) - 1);
+
+    if (error) {
+      console.error('❌ Erro ao buscar perfis do Supabase:', error);
+      throw error;
+    }
+
+    console.log('✅ Perfis encontrados:', profiles?.length || 0);
     return createSuccessResponse(profiles || []);
   } catch (error) {
     console.error('❌ Erro ao buscar perfis:', error);
