@@ -338,14 +338,6 @@ function SidebarContentInternal() {
     title: group.title,
     items: group.items
       .filter(item => {
-        // Item "Usuários" só deve aparecer para SuperAdmin
-        if (item.url === '/configuracoes/usuarios') {
-          if (!isSuperAdmin) {
-            console.log('[Sidebar] 🔒 Item "Usuários" oculto - apenas para SuperAdmin');
-            return false;
-          }
-        }
-        
         const hasRole = item.roles.includes(userRole);
         const isFiliaisItem = item.url === '/filiais';
         const shouldShowFiliais = isFiliaisItem ? isBranchesEnabled : true;

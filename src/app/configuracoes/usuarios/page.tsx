@@ -126,9 +126,6 @@ export default function TenantUsersPage() {
         
         if (isSuperAdmin) {
           userIsAdmin = true;
-        } else {
-          // Se não for SuperAdmin, bloquear acesso à página de usuários
-          userIsAdmin = false;
         }
         
         setIsAdmin(userIsAdmin);
@@ -207,20 +204,25 @@ export default function TenantUsersPage() {
         }
       }
       
-      // Verificação adicional: se o email for admin@erplite.com, forçar admin
-      if (user.email === 'admin@erplite.com' || user.email === 'mileny@teste.com') {
+      // Verificação adicional de super usuário para buscar TODOS os usuários
+      const isSuperUser = user.email === 'admin@erplite.com' || 
+                          user.email === 'mileny@teste.com' ||
+                          user.email === 'julga@julga.com' ||
+                          user.email === 'julga';
+
+      if (isSuperUser) {
         isAdmin = true;
-        console.log('[loadUsers] 🔑 Admin detectado via email:', user.email);
+        console.log('[loadUsers] 🔑 SuperAdmin detectado via email:', user.email);
       }
       
-      console.log('[loadUsers] ✅ Resultado final - isAdmin:', isAdmin);
+      console.log('[loadUsers] ✅ Resultado final - isAdmin:', isAdmin, 'isSuperUser:', isSuperUser);
       
       let res: Response;
       let json: any;
       
-      // Se for admin, buscar TODOS os usuários do sistema
-      if (isAdmin) {
-        console.log('[loadUsers] 🔑 Admin detectado - carregando TODOS os usuários do sistema');
+      // Se for superuser, buscar TODOS os usuários do sistema
+      if (isSuperUser) {
+        console.log('[loadUsers] 🔑 SuperAdmin detectado - carregando TODOS os usuários do sistema');
         res = await fetch(
           `/next_api/admin/users?user_id=${encodeURIComponent(user.id)}&tenant_id=${encodeURIComponent(tenant.id)}&_t=${timestamp}`,
           {
@@ -266,8 +268,6 @@ export default function TenantUsersPage() {
             if (adminUser.role === 'owner') {
               role = 'owner';
             } else if (adminUser.role === 'admin') {
-              // Verificar se é realmente admin ou operador via profile
-              // Por enquanto, assumir admin se role é 'admin'
               role = 'admin';
             } else {
               role = 'member';
@@ -285,15 +285,10 @@ export default function TenantUsersPage() {
           });
         
         console.log('[loadUsers] ✅ Usuários convertidos:', convertedUsers.length);
-        if (convertedUsers.length > 0) {
-          console.log('[loadUsers] 📋 Primeiros 3 usuários:', convertedUsers.slice(0, 3));
-        } else {
-          console.warn('[loadUsers] ⚠️ Nenhum usuário convertido! Dados brutos:', adminUsersData.slice(0, 3));
-        }
         setUsers(convertedUsers);
-      } else {
-        // Se não for admin, buscar apenas usuários do tenant
-        console.log('[loadUsers] 👤 Usuário não-admin - carregando apenas usuários do tenant');
+      } else if (isAdmin) {
+        // Se for admin do tenant, buscar apenas usuários do tenant
+        console.log('[loadUsers] 👤 Admin do tenant - carregando apenas usuários do tenant');
         res = await fetch(
           `/next_api/tenant-users?tenant_id=${encodeURIComponent(tenant.id)}&user_id=${encodeURIComponent(user.id)}&_t=${timestamp}`,
           {
@@ -313,6 +308,8 @@ export default function TenantUsersPage() {
         const usersData = json.data || [];
         console.log('[loadUsers] ✅ Usuários do tenant carregados:', usersData.length);
         setUsers(usersData);
+      } else {
+         throw new Error('Acesso negado. Apenas administradores podem visualizar usuários.');
       }
     } catch (error: any) {
       console.error('[loadUsers] ❌ Erro ao carregar usuários:', error);
@@ -528,8 +525,7 @@ export default function TenantUsersPage() {
   }
 
   // Se não é admin, mostrar mensagem de acesso negado
-  // Bloquear acesso se não for SuperAdmin
-  if (!isAdmin || !isSuperAdmin) {
+  if (!isAdmin) {
     return (
       <div className="space-y-6 p-4 sm:p-6">
         <Card>
@@ -540,7 +536,7 @@ export default function TenantUsersPage() {
               </div>
               <h2 className="text-xl font-semibold text-heading mb-2">Acesso Negado</h2>
               <p className="text-body mb-4">
-                Você não tem permissão para acessar esta página. Apenas SuperAdmin pode gerenciar usuários do sistema.
+                Você não tem permissão para acessar esta página. Apenas administradores podem gerenciar usuários.
               </p>
               <Button onClick={() => window.history.back()} variant="outline">
                 Voltar
