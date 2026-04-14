@@ -13,15 +13,25 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 export const GET = requestMiddleware(async (request: NextRequest, context) => {
   try {
     console.log('🔍 GET /categories - Iniciando busca...');
-    const { limit, offset } = parseQueryParams(request);
-    console.log('🔍 Parâmetros:', { limit, offset });
+    const { limit, offset, tenant_id } = parseQueryParams(request);
+    console.log('🔍 Parâmetros:', { limit, offset, tenant_id });
     
-    const { data: categories, error } = await supabaseAdmin
+    if (!tenant_id) {
+       return createErrorResponse({
+        errorMessage: "tenant_id é obrigatório",
+        status: 400,
+      });
+    }
+    
+    let query = supabaseAdmin
       .from('categories')
       .select('*')
       .eq('is_active', true)
+      .eq('tenant_id', tenant_id)
       .order('name', { ascending: true })
       .range(offset || 0, (offset || 0) + (limit || 50) - 1);
+
+    const { data: categories, error } = await query;
 
     if (error) {
       console.error('❌ Erro ao buscar categorias do Supabase:', error);
@@ -51,12 +61,20 @@ export const POST = requestMiddleware(async (request: NextRequest, context) => {
         status: 400,
       });
     }
+    
+    if (!body.tenant_id) {
+       return createErrorResponse({
+        errorMessage: "tenant_id é obrigatório",
+        status: 400,
+      });
+    }
 
     const categoryData = {
       name: body.name,
       description: body.description || null,
       color: body.color || '#2c3e50',
       is_active: body.is_active !== false,
+      tenant_id: body.tenant_id,
     };
 
     const { data: category, error } = await supabaseAdmin
@@ -83,11 +101,11 @@ export const POST = requestMiddleware(async (request: NextRequest, context) => {
 // PUT - atualizar categoria (não requer token, usa service role)
 export const PUT = requestMiddleware(async (request: NextRequest, context) => {
   try {
-    const { id } = parseQueryParams(request);
+    const { id, tenant_id } = parseQueryParams(request);
     
-    if (!id) {
+    if (!id || !tenant_id) {
       return createErrorResponse({
-        errorMessage: "ID da categoria é obrigatório",
+        errorMessage: "ID da categoria e tenant_id são obrigatórios",
         status: 400,
       });
     }
@@ -99,11 +117,12 @@ export const PUT = requestMiddleware(async (request: NextRequest, context) => {
       .from('categories')
       .select('*')
       .eq('id', id)
+      .eq('tenant_id', tenant_id)
       .single();
 
     if (findError || !existing) {
       return createErrorResponse({
-        errorMessage: "Categoria não encontrada",
+        errorMessage: "Categoria não encontrada para este tenant",
         status: 404,
       });
     }
@@ -120,6 +139,7 @@ export const PUT = requestMiddleware(async (request: NextRequest, context) => {
       .from('categories')
       .update(updateData)
       .eq('id', id)
+      .eq('tenant_id', tenant_id)
       .select()
       .single();
 
@@ -141,11 +161,11 @@ export const PUT = requestMiddleware(async (request: NextRequest, context) => {
 // DELETE - excluir categoria (não requer token, usa service role)
 export const DELETE = requestMiddleware(async (request: NextRequest, context) => {
   try {
-    const { id } = parseQueryParams(request);
+    const { id, tenant_id } = parseQueryParams(request);
     
-    if (!id) {
+    if (!id || !tenant_id) {
       return createErrorResponse({
-        errorMessage: "ID da categoria é obrigatório",
+        errorMessage: "ID da categoria e tenant_id são obrigatórios",
         status: 400,
       });
     }
@@ -155,11 +175,12 @@ export const DELETE = requestMiddleware(async (request: NextRequest, context) =>
       .from('categories')
       .select('*')
       .eq('id', id)
+      .eq('tenant_id', tenant_id)
       .single();
 
     if (findError || !existing) {
       return createErrorResponse({
-        errorMessage: "Categoria não encontrada",
+        errorMessage: "Categoria não encontrada para este tenant",
         status: 404,
       });
     }
@@ -171,7 +192,8 @@ export const DELETE = requestMiddleware(async (request: NextRequest, context) =>
         is_active: false,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('tenant_id', tenant_id);
 
     if (error) {
       console.error('❌ Erro ao excluir categoria no Supabase:', error);

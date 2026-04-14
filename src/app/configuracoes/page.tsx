@@ -40,11 +40,14 @@ export default function ConfiguracoesPage() {
 
   // Hook para configurações de cupom
   const { settings: couponSettings, updateSettings: updateCouponSettings, saveSettings } = useCouponSettings();
+  const { tenant } = useSimpleAuth();
 
   useEffect(() => {
     fetchUsers();
-    fetchCategories();
-  }, []);
+    if (tenant?.id) {
+      fetchCategories();
+    }
+  }, [tenant?.id]);
 
   const fetchUsers = async () => {
     try {
@@ -77,8 +80,9 @@ export default function ConfiguracoesPage() {
   };
 
   const fetchCategories = async () => {
+    if (!tenant?.id) return;
     try {
-      const res = await fetch('/next_api/categories', {
+      const res = await fetch(`/next_api/categories?tenant_id=${tenant.id}`, {
         cache: 'no-store',
       });
       const json = await res.json();
@@ -176,17 +180,27 @@ export default function ConfiguracoesPage() {
       toast.error('Nome da categoria é obrigatório');
       return;
     }
+    
+    if (!tenant?.id) {
+      toast.error('Empresa não identificada');
+      return;
+    }
 
     try {
       const method = editingCategory ? 'PUT' : 'POST';
       const url = editingCategory 
-        ? `/next_api/categories?id=${editingCategory.id}`
+        ? `/next_api/categories?id=${editingCategory.id}&tenant_id=${tenant.id}`
         : '/next_api/categories';
+      
+      const payload = {
+        ...categoryFormData,
+        tenant_id: tenant.id
+      };
       
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(categoryFormData),
+        body: JSON.stringify(payload),
       });
       
       const json = await res.json();
@@ -252,9 +266,13 @@ export default function ConfiguracoesPage() {
 
   const handleDeleteCategory = async (id: number) => {
     if (!confirm('Tem certeza que deseja excluir esta categoria?')) return;
+    if (!tenant?.id) {
+       toast.error('Empresa não identificada');
+       return;
+    }
 
     try {
-      const res = await fetch(`/next_api/categories?id=${id}`, {
+      const res = await fetch(`/next_api/categories?id=${id}&tenant_id=${tenant.id}`, {
         method: 'DELETE',
       });
       
