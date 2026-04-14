@@ -236,11 +236,7 @@ async function listCustomersHandler(request: NextRequest) {
 
     console.log(`✅ GET /customers - ${data?.length || 0} clientes encontrados para tenant ${tenant_id}`);
 
-    // 🚀 OTIMIZAÇÃO: Cache com revalidação (45 segundos para clientes)
-    return NextResponse.json(
-      { success: true, data },
-      { headers: { 'Cache-Control': 'public, max-age=45, stale-while-revalidate=90' } }
-    );
+    return NextResponse.json({ success: true, data });
 
   } catch (error) {
     console.error('Erro no handler de listagem:', error);
@@ -265,6 +261,14 @@ async function updateCustomerHandler(request: NextRequest) {
     }
 
     const body = await request.json();
+    const tenant_id = body.tenant_id;
+    if (!tenant_id) {
+      return NextResponse.json(
+        { error: 'tenant_id é obrigatório para atualizar cliente' },
+        { status: 400 }
+      );
+    }
+
     const allowed: Record<string, any> = {};
 
     // Funções de normalização para update
@@ -301,7 +305,8 @@ async function updateCustomerHandler(request: NextRequest) {
     const { error } = await supabaseAdmin
       .from('customers')
       .update(allowed)
-      .eq('id', id);
+      .eq('id', id)
+      .eq('tenant_id', tenant_id);
 
     if (error) {
       return NextResponse.json(
