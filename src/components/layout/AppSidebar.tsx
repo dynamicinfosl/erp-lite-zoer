@@ -48,7 +48,6 @@ import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { ENABLE_AUTH } from '@/constants/auth';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { mockUserProfile } from '@/lib/mock-data';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { BranchSelector } from '@/components/branches/BranchSelector';
 import { useBranch } from '@/contexts/BranchContext';
@@ -146,9 +145,9 @@ function SidebarContentInternal() {
   // Buscar role real do usuário
   useEffect(() => {
     const fetchUserRole = async () => {
-      if (!ENABLE_AUTH || !user || !tenant) {
-        console.log('[Sidebar] Sem auth/user/tenant, usando role padrão:', mockUserProfile.role);
-        setUserRole(mockUserProfile.role);
+      if (!user || !tenant) {
+        console.log('[Sidebar] Sem user/tenant, usando role padrão: vendedor');
+        setUserRole('vendedor');
         return;
       }
 
@@ -460,7 +459,7 @@ function SidebarContentInternal() {
           <div className="flex items-center justify-between">
             <div className="flex flex-col min-w-0">
               <span className="text-xs font-semibold text-white dark:text-white truncate">
-                {user?.email || mockUserProfile.email}
+                {user?.email || ''}
               </span>
               <span className="text-xs text-white/60 dark:text-white font-medium capitalize">
                 {displayName}

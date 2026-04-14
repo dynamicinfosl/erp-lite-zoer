@@ -33,7 +33,6 @@ import { ENABLE_AUTH } from '@/constants/auth';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { BranchSelector } from '@/components/branches/BranchSelector';
 import { useBranch } from '@/contexts/BranchContext';
-import { mockUserProfile } from '@/lib/mock-data';
 
 const menuGroups = [
   {
@@ -88,8 +87,8 @@ export function MobileHeader() {
   // Buscar role real do usuário
   useEffect(() => {
     const fetchUserRole = async () => {
-      if (!ENABLE_AUTH || !user || !tenant) {
-        setUserRole(mockUserProfile.role);
+      if (!user || !tenant) {
+        setUserRole('vendedor');
         return;
       }
 

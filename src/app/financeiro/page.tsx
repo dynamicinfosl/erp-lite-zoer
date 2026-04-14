@@ -17,53 +17,8 @@ import { Plus, Search, DollarSign, TrendingUp, TrendingDown, Calendar, CreditCar
 import { FinancialTransaction } from '@/types';
 import { api } from '@/lib/api-client';
 import { toast } from 'sonner';
-import { ENABLE_AUTH } from '@/constants/auth';
-import { mockFinancialTransactions } from '@/lib/mock-data';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 
-interface FinancialRecord {
-  id: string
-  type: 'receita' | 'despesa'
-  description: string
-  amount: number
-  userId: string
-  category: string
-  date: string
-  status: 'pendente' | 'pago'
-}
-
-const mockFinancialRecords: FinancialRecord[] = [
-  {
-    id: '1',
-    type: 'receita',
-    description: 'Venda PDV 2541',
-    amount: 259.9,
-    userId: '5f34ff91-dc0f-4fe2-a5c7-6e8f9a6fdc01',
-    category: 'Venda',
-    date: '2025-09-24',
-    status: 'pago',
-  },
-  {
-    id: '2',
-    type: 'despesa',
-    description: 'Pagamento fornecedor',
-    amount: 1299.0,
-    userId: '5f34ff91-dc0f-4fe2-a5c7-6e8f9a6fdc01',
-    category: 'Fornecedores',
-    date: '2025-09-23',
-    status: 'pendente',
-  },
-  {
-    id: '3',
-    type: 'receita',
-    description: 'Venda online 8891',
-    amount: 899.9,
-    userId: '5f34ff91-dc0f-4fe2-a5c7-6e8f9a6fdc01',
-    category: 'E-commerce',
-    date: '2025-09-22',
-    status: 'pago',
-  },
-]
 
 export default function FinanceiroPage() {
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
@@ -85,34 +40,11 @@ export default function FinanceiroPage() {
   const fetchTransactions = useCallback(async () => {
     try {
       setLoading(true);
-
-      if (ENABLE_AUTH) {
-        const data = await api.get<FinancialTransaction[]>('/financial-transactions');
-        setTransactions(data);
-      } else {
-        setTransactions(
-          mockFinancialRecords.map((record) => ({
-            id: Number(record.id),
-            transaction_type: record.type,
-            description: record.description,
-            amount: record.amount,
-            user_id: Number(record.userId) || 0,
-            category: record.category,
-            created_at: record.date,
-            status: record.status,
-            notes: '',
-            payment_method: '',
-            updated_at: record.date,
-            due_date: record.date,
-            paid_date: record.status === 'pago' ? record.date : undefined,
-          })),
-        );
-      }
+      const data = await api.get<FinancialTransaction[]>('/financial-transactions');
+      setTransactions(data);
     } catch (error) {
       console.error('Erro ao carregar transações:', error);
-      if (ENABLE_AUTH) {
-        toast.error('Erro ao carregar transações');
-      }
+      toast.error('Erro ao carregar transações');
     } finally {
       setLoading(false);
     }
@@ -319,7 +251,7 @@ export default function FinanceiroPage() {
         description: monthlyStats.saldoMensal >= 0 ? 'Situação saudável' : 'Despesas acima das receitas',
         color: monthlyStats.saldoMensal >= 0 ? 'accent' as const : 'error' as const,
         trend: monthlyStats.saldoMensal >= 0 ? 'up' as const : 'down' as const,
-        trendValue: monthlyStats.saldoMensal >= 0 ? '+8.4%' : '-4.2%',
+        trendValue: monthlyStats.saldoMensal >= 0 ? 'Positivo' : 'Negativo',
         icon: <DollarSign className="h-5 w-5" />,
       },
       {
