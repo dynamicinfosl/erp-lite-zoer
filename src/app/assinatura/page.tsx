@@ -88,7 +88,7 @@ const plans: Plan[] = [
     name: 'Básico',
     price: 79.9,
     description: 'Ideal para pequenas empresas',
-    features: ['Até 1.000 clientes', 'Até 500 produtos', 'Vendas ilimitadas', 'Relatórios básicos', 'Suporte por email'],
+    features: ['Até 500 clientes', 'Até 1.000 produtos', 'Vendas ilimitadas', 'Relatórios básicos', 'Suporte por email'],
   },
   {
     id: 'pro',
@@ -98,7 +98,7 @@ const plans: Plan[] = [
     popular: true,
     features: [
       'Até 10.000 clientes',
-      'Até 5.000 produtos',
+      'Até 10.000 produtos',
       'Vendas ilimitadas',
       'Relatórios avançados',
       'Suporte prioritário',

@@ -365,53 +365,59 @@ async function listProductsHandler(request: NextRequest) {
     // - Se branch_scope='all' (matriz): retorna todos os produtos do tenant
     // - Se branch_id fornecido (filial): retorna TODOS os produtos do tenant (compartilhados automaticamente)
     //   O estoque será separado por filial via product_stocks
-    let query;
-    
-    // Select de produtos (usando * para compatibilidade com schema variável)
-    if (branch_scope === 'all') {
-      // Matriz vê todos os produtos
-      query = supabaseAdmin
-        .from('products')
-        .select('*')
-        .eq('tenant_id', tenant_id);
-      console.log(`🔍 [Matriz] Buscando todos os produtos do tenant`);
-    } else if (branch_id) {
-      // Filial: ver TODOS os produtos do tenant (compartilhados automaticamente)
-      // O estoque será separado por filial via product_stocks
+
+    if (branch_id) {
       const bid = Number(branch_id);
-      if (Number.isFinite(bid) && bid > 0) {
-        query = supabaseAdmin
-          .from('products')
-          .select('*')
-          .eq('tenant_id', tenant_id);
-        console.log(`🔍 [Filial ${bid}] Buscando todos os produtos do tenant (compartilhados automaticamente)`);
-      } else {
+      if (!Number.isFinite(bid) || bid <= 0) {
         return NextResponse.json({ success: true, data: [] });
       }
-    } else {
-      // Fallback: retornar todos (compatibilidade com código antigo)
-      query = supabaseAdmin
+    }
+
+    let allData: any[] = [];
+    let from = 0;
+    const pageSize = 1000;
+    
+    while (true) {
+      let q = supabaseAdmin
         .from('products')
         .select('*')
         .eq('tenant_id', tenant_id);
-      console.log(`🔍 [Fallback] Buscando todos os produtos do tenant`);
+
+      if (sku && sku.trim()) {
+        q = q.eq('sku', sku.trim());
+      }
+
+      const { data: pageData, error } = await q
+        .order('created_at', { ascending: false })
+        .range(from, from + pageSize - 1);
+
+      if (error) {
+        console.error('❌ Erro ao listar produtos:', error);
+        return NextResponse.json(
+          { error: 'Erro ao listar produtos: ' + error.message },
+          { status: 400 }
+        );
+      }
+
+      if (pageData && pageData.length > 0) {
+        allData = allData.concat(pageData);
+      }
+
+      if (!pageData || pageData.length < pageSize) {
+        break;
+      }
+
+      from += pageSize;
+      
+      // Limite de segurança: se tiver mais de 20.000 produtos, parar
+      if (allData.length >= 20000) {
+        console.warn(`⚠️ Limite de segurança atingido: tenant ${tenant_id} tem mais de 20.000 produtos.`);
+        break;
+      }
     }
 
-    // Se SKU foi fornecido, filtrar por SKU DENTRO DO TENANT
-    if (sku && sku.trim()) {
-      query = query.eq('sku', sku.trim());
-      console.log(`🔍 Buscando produto com SKU "${sku.trim()}" no tenant ${tenant_id}`);
-    }
-
-    const { data, error } = await query.order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('❌ Erro ao listar produtos:', error);
-      return NextResponse.json(
-        { error: 'Erro ao listar produtos: ' + error.message },
-        { status: 400 }
-      );
-    }
+    const data = allData;
+    const error = null;
 
     // ✅ Branch-aware stock: se branch_id ou branch_scope=all, substituir stock_quantity usando product_stocks
     try {

@@ -39,10 +39,10 @@ const fallbackPlans = [
     description: 'Para empresas em crescimento',
     price_monthly: 139.9,
     price_yearly: 1399,
-    features: ['5 usuários', '1000 produtos', 'Relatórios avançados', 'Integrações'],
+    features: ['10 usuários', '10.000 produtos', 'Relatórios avançados', 'Integrações'],
     limits: {
-      max_users: 5,
-      max_products: 1000,
+      max_users: 10,
+      max_products: 10000,
       max_customers: 10000,
     },
   },

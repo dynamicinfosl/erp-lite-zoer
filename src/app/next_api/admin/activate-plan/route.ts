@@ -1,39 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Headers JSON padrão
-const jsonHeaders = {
-  'Content-Type': 'application/json',
-};
+const jsonHeaders = { 'Content-Type': 'application/json' }
 
-// Função para obter o cliente Supabase (com fallback)
 function getSupabaseAdmin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co'
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10'
-  
-  if (!supabaseUrl || !supabaseServiceKey) {
-    return null;
-  }
-  
+  if (!supabaseUrl || !supabaseServiceKey) return null
   return createClient(supabaseUrl, supabaseServiceKey)
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Verificar se o Supabase está configurado
-    const supabaseAdmin = getSupabaseAdmin();
+    const supabaseAdmin = getSupabaseAdmin()
     if (!supabaseAdmin) {
       return NextResponse.json(
-        { 
-          success: false,
-          error: 'Supabase não configurado. Configure NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY' 
-        },
+        { success: false, error: 'Supabase não configurado' },
         { status: 500, headers: jsonHeaders }
-      );
+      )
     }
-    
+
     const body = await request.json()
-    const { tenant_id, days, plan_id, expiration_date } = body
+    const { 
+      tenant_id, 
+      plan_id, 
+      expiration_date, 
+      days,
+      payment_amount,
+      payment_method,
+      payment_reference,
+      admin_notes,
+      admin_name
+    } = body
 
     if (!tenant_id) {
       return NextResponse.json(
@@ -56,126 +54,138 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Normalizar plan_id para UUID (aceitar slug como entrada)
+    // ============================================================
+    // 1. Resolver plan_id (aceitar UUID ou slug)
+    // ============================================================
     let finalPlanId = plan_id
-    if (plan_id && !plan_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(plan_id)
+    
+    if (!isUUID) {
       const { data: planData, error: planError } = await supabaseAdmin
         .from('plans')
         .select('id')
         .eq('slug', plan_id)
+        .eq('is_active', true)
         .single()
 
       if (planError || !planData?.id) {
         return NextResponse.json(
-          { success: false, error: `Plano inválido: ${plan_id}` },
+          { success: false, error: `Plano não encontrado: ${plan_id}` },
           { status: 400, headers: jsonHeaders }
         )
       }
-
       finalPlanId = planData.id
     }
 
-    // Buscar subscription existente
-    const { data: existingSub, error: subError } = await supabaseAdmin
-      .from('subscriptions')
+    // ============================================================
+    // 2. Buscar dados do plano selecionado
+    // ============================================================
+    const { data: selectedPlan, error: planFetchError } = await supabaseAdmin
+      .from('plans')
       .select('*')
+      .eq('id', finalPlanId)
+      .single()
+
+    if (planFetchError || !selectedPlan) {
+      return NextResponse.json(
+        { success: false, error: 'Plano não encontrado no banco de dados' },
+        { status: 400, headers: jsonHeaders }
+      )
+    }
+
+    // ============================================================
+    // 3. VALIDAÇÃO: Não permitir "renovar" com plano Trial
+    // ============================================================
+    if (selectedPlan.slug === 'trial' || selectedPlan.slug === 'free') {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `Não é possível ativar o plano "${selectedPlan.name}". Selecione um plano pago (Básico, Profissional ou Enterprise).` 
+        },
+        { status: 400, headers: jsonHeaders }
+      )
+    }
+
+    if (!selectedPlan.is_active) {
+      return NextResponse.json(
+        { success: false, error: `O plano "${selectedPlan.name}" está desativado` },
+        { status: 400, headers: jsonHeaders }
+      )
+    }
+
+    // ============================================================
+    // 4. Calcular período
+    // ============================================================
+    const now = new Date()
+    const periodEnd = expiration_date
+      ? new Date(expiration_date + 'T23:59:59')
+      : new Date(now.getTime() + (days || 30) * 24 * 60 * 60 * 1000)
+
+    if (periodEnd <= now) {
+      return NextResponse.json(
+        { success: false, error: 'A data de expiração deve ser futura' },
+        { status: 400, headers: jsonHeaders }
+      )
+    }
+
+    const daysDiff = Math.ceil((periodEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+    // ============================================================
+    // 5. Buscar ou criar subscription
+    // ============================================================
+    const { data: existingSub } = await supabaseAdmin
+      .from('subscriptions')
+      .select('*, plan:plans(id, name, slug)')
       .eq('tenant_id', tenant_id)
       .single()
 
-    const now = new Date()
-    // Se expiration_date foi fornecida, usar ela; senão calcular a partir de days
-    const periodEnd = expiration_date 
-      ? new Date(expiration_date + 'T23:59:59') // Adicionar hora final do dia
-      : new Date(now.getTime() + (days || 30) * 24 * 60 * 60 * 1000)
-
-    console.log('📅 [ACTIVATE-PLAN] Calculando data de expiração:', {
-      expiration_date_input: expiration_date,
-      periodEnd_calculated: periodEnd.toISOString(),
-      now: now.toISOString(),
-      tenant_id,
-      plan_id: finalPlanId
-    });
+    const previousPlanId = existingSub?.plan_id || null
+    let subscriptionResult: any
+    let action: string
 
     if (existingSub) {
-      // Atualizar subscription existente
-      const updateData: any = {
-        status: 'active',
-        current_period_start: now.toISOString(),
-        current_period_end: periodEnd.toISOString(),
-        trial_end: null,
-        updated_at: now.toISOString(),
-        plan_id: finalPlanId
+      // Determinar ação
+      if (existingSub.status === 'trialing' || existingSub.plan?.slug === 'trial') {
+        action = 'upgraded'
+      } else if (previousPlanId === finalPlanId) {
+        action = 'renewed'
+      } else {
+        const { data: prevPlan } = await supabaseAdmin
+          .from('plans')
+          .select('price_monthly')
+          .eq('id', previousPlanId)
+          .single()
+        
+        action = (prevPlan && selectedPlan.price_monthly > prevPlan.price_monthly) ? 'upgraded' : 'downgraded'
       }
 
-      console.log('🔄 [ACTIVATE-PLAN] Atualizando subscription no banco:', {
-        subscription_id: existingSub.id,
-        updateData
-      });
-
+      // Atualizar subscription existente
       const { data: updatedSub, error: updateError } = await supabaseAdmin
         .from('subscriptions')
-        .update(updateData)
+        .update({
+          status: 'active',
+          plan_id: finalPlanId,
+          current_period_start: now.toISOString(),
+          current_period_end: periodEnd.toISOString(),
+          trial_end: null,
+          updated_at: now.toISOString(),
+        })
         .eq('tenant_id', tenant_id)
-        .select(`
-          *,
-          plan:plans(id, name, slug)
-        `)
+        .select('*, plan:plans(id, name, slug, price_monthly)')
         .single()
 
       if (updateError) {
-        console.error('❌ [ACTIVATE-PLAN] Erro ao atualizar subscription:', {
-          error: updateError,
-          message: updateError.message,
-          code: updateError.code,
-          details: updateError.details
-        });
+        console.error('❌ [ACTIVATE-PLAN] Erro ao atualizar subscription:', updateError)
         return NextResponse.json(
           { success: false, error: 'Erro ao atualizar subscription: ' + updateError.message },
           { status: 400, headers: jsonHeaders }
         )
       }
 
-      console.log('✅ [ACTIVATE-PLAN] Subscription atualizada no banco:', {
-        id: updatedSub?.id,
-        status: updatedSub?.status,
-        current_period_end: updatedSub?.current_period_end,
-        plan_id: updatedSub?.plan_id
-      });
-
-      // Atualizar status do tenant também
-      const { error: tenantUpdateError } = await supabaseAdmin
-        .from('tenants')
-        .update({ 
-          status: 'active',
-          trial_ends_at: null // Limpar trial_ends_at quando ativar plano
-        })
-        .eq('id', tenant_id)
-      
-      if (tenantUpdateError) {
-        console.error('⚠️ Erro ao atualizar tenant:', tenantUpdateError);
-        // Não falhar a requisição, apenas logar o erro
-      } else {
-        console.log('✅ Tenant atualizado para status: active');
-      }
-
-      const daysDiff = Math.ceil((periodEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-      
-      // Log detalhado para debug
-      console.log('✅ Subscription atualizada:', {
-        tenant_id,
-        status: updateData.status,
-        current_period_end: updateData.current_period_end,
-        plan_id: updateData.plan_id,
-        daysDiff
-      });
-      
-      return NextResponse.json({
-        success: true,
-        message: `Plano ativado até ${periodEnd.toLocaleDateString('pt-BR')} (${daysDiff} dias)`,
-        data: updatedSub,
-        requiresRefresh: true // Indicar que o cliente precisa recarregar
-      }, { headers: jsonHeaders })
+      subscriptionResult = updatedSub
     } else {
+      action = 'created'
+
       // Criar nova subscription
       const { data: newSub, error: createError } = await supabaseAdmin
         .from('subscriptions')
@@ -187,82 +197,88 @@ export async function POST(request: NextRequest) {
           current_period_end: periodEnd.toISOString(),
           trial_end: null,
         })
-        .select(`
-          *,
-          plan:plans(id, name, slug)
-        `)
+        .select('*, plan:plans(id, name, slug, price_monthly)')
         .single()
 
       if (createError) {
-        console.error('Erro ao criar subscription:', createError)
+        console.error('❌ [ACTIVATE-PLAN] Erro ao criar subscription:', createError)
         return NextResponse.json(
           { success: false, error: 'Erro ao criar subscription: ' + createError.message },
           { status: 400, headers: jsonHeaders }
         )
       }
 
-      // Atualizar status do tenant
-      const { error: tenantUpdateError } = await supabaseAdmin
-        .from('tenants')
-        .update({ 
-          status: 'active',
-          trial_ends_at: null // Limpar trial_ends_at quando ativar plano
-        })
-        .eq('id', tenant_id)
-      
-      if (tenantUpdateError) {
-        console.error('⚠️ Erro ao atualizar tenant:', tenantUpdateError);
-        // Não falhar a requisição, apenas logar o erro
-      } else {
-        console.log('✅ Tenant atualizado para status: active');
-      }
+      subscriptionResult = newSub
+    }
 
-      const daysDiff = Math.ceil((periodEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-      
-      // Log detalhado para debug
-      console.log('✅ Subscription criada:', {
+    // ============================================================
+    // 6. Atualizar status do tenant
+    // ============================================================
+    await supabaseAdmin
+      .from('tenants')
+      .update({ status: 'active', trial_ends_at: null })
+      .eq('id', tenant_id)
+
+    // ============================================================
+    // 7. Registrar no subscription_history
+    // ============================================================
+    await supabaseAdmin
+      .from('subscription_history')
+      .insert({
+        subscription_id: subscriptionResult.id,
         tenant_id,
-        status: 'active',
-        current_period_end: periodEnd.toISOString(),
-        plan_id: finalPlanId,
-        daysDiff
-      });
-      
-      return NextResponse.json({
-        success: true,
-        message: `Plano criado e ativado até ${periodEnd.toLocaleDateString('pt-BR')} (${daysDiff} dias)`,
-        data: newSub,
-        requiresRefresh: true // Indicar que o cliente precisa recarregar
-      }, { headers: jsonHeaders })
+        action,
+        plan_id_from: previousPlanId,
+        plan_id_to: finalPlanId,
+        period_start: now.toISOString(),
+        period_end: periodEnd.toISOString(),
+        amount: payment_amount || selectedPlan.price_monthly || 0,
+        payment_method: payment_method || 'manual',
+        payment_reference: payment_reference || null,
+        performed_by_name: admin_name || 'Admin',
+        notes: admin_notes || `${action === 'renewed' ? 'Renovação' : action === 'upgraded' ? 'Upgrade' : 'Ativação'} do plano ${selectedPlan.name} por ${daysDiff} dias`,
+      })
+
+    // ============================================================
+    // 8. Registrar pagamento (se informado valor ou se é plano pago)
+    // ============================================================
+    const amount = payment_amount || selectedPlan.price_monthly || 0
+    if (amount > 0) {
+      await supabaseAdmin
+        .from('payment_records')
+        .insert({
+          tenant_id,
+          subscription_id: subscriptionResult.id,
+          amount,
+          payment_method: payment_method || 'manual',
+          payment_date: now.toISOString(),
+          reference_period_start: now.toISOString(),
+          reference_period_end: periodEnd.toISOString(),
+          status: 'confirmed',
+          gateway: 'manual',
+          recorded_by_name: admin_name || 'Admin',
+          notes: admin_notes || `Pagamento registrado na ativação do plano ${selectedPlan.name}`,
+        })
     }
+
+    // ============================================================
+    // 9. Resposta
+    // ============================================================
+    console.log(`✅ [ACTIVATE-PLAN] ${action}: tenant=${tenant_id}, plan=${selectedPlan.name}, até=${periodEnd.toISOString()}, dias=${daysDiff}`)
+
+    return NextResponse.json({
+      success: true,
+      message: `Plano ${selectedPlan.name} ${action === 'renewed' ? 'renovado' : 'ativado'} até ${periodEnd.toLocaleDateString('pt-BR')} (${daysDiff} dias)`,
+      data: subscriptionResult,
+      action,
+      requiresRefresh: true,
+    }, { headers: jsonHeaders })
+
   } catch (error: any) {
-    console.error('Erro no handler de ativação de plano:', error)
-    
-    // Garantir que sempre retornamos JSON, mesmo em caso de erro inesperado
-    try {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'Erro interno do servidor: ' + (error?.message || 'Erro desconhecido')
-        },
-        { 
-          status: 500,
-          headers: jsonHeaders
-        }
-      );
-    } catch (jsonError) {
-      // Se até mesmo o NextResponse.json falhar, criar resposta manual
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Erro crítico no servidor'
-        }),
-        {
-          status: 500,
-          headers: jsonHeaders
-        }
-      );
-    }
+    console.error('❌ [ACTIVATE-PLAN] Erro:', error)
+    return NextResponse.json(
+      { success: false, error: 'Erro interno: ' + (error?.message || 'Desconhecido') },
+      { status: 500, headers: jsonHeaders }
+    )
   }
 }
-

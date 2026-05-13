@@ -68,6 +68,8 @@ export function UserManagement() {
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [expirationDate, setExpirationDate] = useState<string>('');
   const [availablePlans, setAvailablePlans] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+  const [paymentAmount, setPaymentAmount] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<string>('pix');
 
   // Feature flags por tenant (controlado pelo SuperAdmin)
   const [tenantFeatures, setTenantFeatures] = useState<Record<string, any>>({});
@@ -240,25 +242,30 @@ export function UserManagement() {
           const plansMap = new Map<string, { id: string; name: string; slug: string }>();
           
           result.data.forEach((plan: any) => {
+            // FILTRAR: NÃO mostrar planos Trial/Free na lista de renovação
+            if (plan.slug === 'trial' || plan.slug === 'free') {
+              console.log(`⏭️ Plano gratuito ignorado na lista de renovação: ${plan.name}`);
+              return;
+            }
+            // Ignorar planos inativos
+            if (plan.is_active === false) {
+              return;
+            }
             const key = (plan.name?.toLowerCase() || plan.slug?.toLowerCase() || plan.id).trim();
-            // Se já existe um plano com o mesmo nome, manter apenas o primeiro
             if (!plansMap.has(key)) {
               plansMap.set(key, {
                 id: plan.id,
-                name: plan.name,
+                name: `${plan.name} - R$ ${Number(plan.price_monthly || 0).toFixed(2)}/mês`,
                 slug: plan.slug
               });
-            } else {
-              console.warn(`⚠️ Plano duplicado ignorado: ${plan.name} (ID: ${plan.id})`);
             }
           });
           
-          // Converter para array e ordenar por nome
           const plans = Array.from(plansMap.values()).sort((a, b) => 
             a.name.localeCompare(b.name, 'pt-BR')
           );
           
-          console.log('✅ Planos carregados (sem duplicatas):', plans);
+          console.log('✅ Planos pagos carregados:', plans);
           setAvailablePlans(plans);
         }
       } else {
@@ -641,6 +648,9 @@ export function UserManagement() {
           tenant_id: user.tenant_id,
           plan_id: selectedPlanId,
           expiration_date: expirationDate,
+          payment_amount: paymentAmount ? parseFloat(paymentAmount) : undefined,
+          payment_method: paymentMethod || 'manual',
+          admin_name: 'Admin',
         }),
       });
 
@@ -651,23 +661,23 @@ export function UserManagement() {
       }
 
       toast.success(result.message || 'Plano ativado com sucesso!');
-      await loadUsers(); // Recarregar lista
+      await loadUsers();
       
-      // Log detalhado para debug
       console.log('✅ Plano ativado com sucesso:', {
         tenant_id: user.tenant_id,
         plan_id: selectedPlanId,
         expiration_date: expirationDate,
-        response: result
+        action: result.action,
       });
       
       // Resetar campos
       setSelectedPlanId('');
       setExpirationDate('');
+      setPaymentAmount('');
+      setPaymentMethod('pix');
       
-      // Notificar o cliente para fazer logout e login novamente
-      toast.success('Plano ativado! IMPORTANTE: O cliente deve fazer LOGOUT e LOGIN novamente para que as mudanças sejam aplicadas.', {
-        duration: 10000,
+      toast.success(`Plano ${result.action === 'renewed' ? 'renovado' : 'ativado'}! O cliente deve fazer LOGOUT e LOGIN novamente.`, {
+        duration: 8000,
       });
     } catch (error: any) {
       console.error('Erro ao ativar plano:', error);
@@ -1221,6 +1231,41 @@ export function UserManagement() {
                   </p>
                 </div>
               </div>
+
+              {/* Dados do Pagamento */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                  <Label className="text-xs sm:text-sm text-gray-300 mb-2 block">Valor Pago (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    placeholder="Ex: 139.90"
+                    className="w-full bg-gray-800 border-gray-700 text-white text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Opcional - será registrado no histórico</p>
+                </div>
+                <div>
+                  <Label className="text-xs sm:text-sm text-gray-300 mb-2 block">Método de Pagamento</Label>
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700 z-[100]">
+                      <SelectItem value="pix" className="text-white focus:bg-blue-600">PIX</SelectItem>
+                      <SelectItem value="boleto" className="text-white focus:bg-blue-600">Boleto</SelectItem>
+                      <SelectItem value="cartao_credito" className="text-white focus:bg-blue-600">Cartão de Crédito</SelectItem>
+                      <SelectItem value="cartao_debito" className="text-white focus:bg-blue-600">Cartão de Débito</SelectItem>
+                      <SelectItem value="cora_pix" className="text-white focus:bg-blue-600">Cora - PIX</SelectItem>
+                      <SelectItem value="cora_boleto" className="text-white focus:bg-blue-600">Cora - Boleto</SelectItem>
+                      <SelectItem value="manual" className="text-white focus:bg-blue-600">Manual / Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               {selectedUser && !selectedUser.subscription_plan_name && (
                 <Alert className="bg-yellow-500/10 border-yellow-500/30">
                   <AlertTriangle className="h-4 w-4 text-yellow-400 shrink-0" />

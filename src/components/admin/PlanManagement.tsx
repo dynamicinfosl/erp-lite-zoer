@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -31,9 +31,7 @@ import {
   RefreshCw,
   DollarSign,
   Users,
-  Database,
   Star,
-  CheckCircle,
   Menu,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -41,16 +39,18 @@ import { toast } from 'sonner';
 interface Plan {
   id: string;
   name: string;
+  slug: string;
   description: string;
-  price: number;
-  billing_cycle: 'monthly' | 'yearly';
-  features: string[];
-  max_users: number;
-  max_products: number;
-  max_customers: number;
+  price_monthly: number;
+  price_yearly: number;
+  billing_cycle: string;
+  features: Record<string, any>;
+  limits: Record<string, any>;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  subscriber_count?: number;
+  total_subscriber_count?: number;
 }
 
 export function PlanManagement() {
@@ -61,96 +61,54 @@ export function PlanManagement() {
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
+    slug: '',
     description: '',
-    price: 0,
-    billing_cycle: 'monthly' as 'monthly' | 'yearly',
-    features: '',
+    price_monthly: 0,
+    price_yearly: 0,
+    billing_cycle: 'monthly',
+    features_text: '',
     max_users: 1,
     max_products: 100,
     max_customers: 1000,
     is_active: true,
   });
 
-  useEffect(() => {
-    loadPlans();
-  }, []);
-
-  const loadPlans = async () => {
+  const loadPlans = useCallback(async () => {
     setLoading(true);
-    
     try {
-      console.log('🔍 Carregando planos (versão corrigida - sem Supabase)...');
-      
-      // Dados mockados que sempre funcionam
-      const mockPlans: Plan[] = [
-        {
-          id: '1',
-          name: 'Básico',
-          description: 'Plano ideal para pequenas empresas',
-          price: 79.90,
-          billing_cycle: 'monthly',
-          features: ['Gestão de produtos', 'Gestão de clientes', 'Relatórios básicos', 'Suporte por email'],
-          max_users: 1,
-          max_products: 100,
-          max_customers: 1000,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          name: 'Profissional',
-          description: 'Para empresas em crescimento',
-          price: 139.90,
-          billing_cycle: 'monthly',
-          features: ['Tudo do Básico', 'Múltiplos usuários', 'Relatórios avançados', 'Integração com APIs', 'Suporte prioritário'],
-          max_users: 5,
-          max_products: 1000,
-          max_customers: 10000,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '3',
-          name: 'Enterprise',
-          description: 'Solução completa para grandes empresas',
-          price: 99.90,
-          billing_cycle: 'monthly',
-          features: ['Tudo do Profissional', 'Usuários ilimitados', 'Produtos ilimitados', 'Clientes ilimitados', 'Suporte 24/7', 'Customizações'],
-          max_users: -1,
-          max_products: -1,
-          max_customers: -1,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ];
-      
-      // Simular carregamento
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      console.log('✅ Planos carregados com sucesso (dados mockados):', mockPlans);
-      setPlans(mockPlans);
-      toast.success('Planos carregados com sucesso!');
-      
-    } catch (error) {
-      console.log('⚠️ Erro ao carregar planos (tratado):', error);
+      const response = await fetch('/next_api/admin/plans?include_inactive=true');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const result = await response.json();
+      if (result.success) {
+        setPlans(result.data || []);
+      } else {
+        throw new Error(result.error || 'Erro ao carregar planos');
+      }
+    } catch (error: any) {
+      console.error('❌ Erro ao carregar planos:', error);
+      toast.error(error.message || 'Erro ao carregar planos');
       setPlans([]);
-      toast.info('Nenhum plano encontrado. Clique em "Novo Plano" para criar o primeiro.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadPlans();
+  }, [loadPlans]);
 
   const handleCreatePlan = () => {
     setEditingPlan(null);
     setFormData({
       name: '',
+      slug: '',
       description: '',
-      price: 0,
+      price_monthly: 0,
+      price_yearly: 0,
       billing_cycle: 'monthly',
-      features: '',
+      features_text: '',
       max_users: 1,
       max_products: 100,
       max_customers: 1000,
@@ -161,105 +119,138 @@ export function PlanManagement() {
 
   const handleEditPlan = (plan: Plan) => {
     setEditingPlan(plan);
+
+    // Converter features JSONB em texto legível (uma feature por linha)
+    let featuresText = '';
+    if (plan.features && typeof plan.features === 'object') {
+      featuresText = Object.entries(plan.features)
+        .map(([key, value]) => {
+          if (typeof value === 'boolean') return value ? key : null;
+          return `${key}: ${value}`;
+        })
+        .filter(Boolean)
+        .join('\n');
+    }
+
     setFormData({
       name: plan.name,
-      description: plan.description,
-      price: plan.price,
-      billing_cycle: plan.billing_cycle,
-      features: plan.features.join('\n'),
-      max_users: plan.max_users,
-      max_products: plan.max_products,
-      max_customers: plan.max_customers,
+      slug: plan.slug,
+      description: plan.description || '',
+      price_monthly: plan.price_monthly || 0,
+      price_yearly: plan.price_yearly || 0,
+      billing_cycle: plan.billing_cycle || 'monthly',
+      features_text: featuresText,
+      max_users: plan.limits?.max_users || 1,
+      max_products: plan.limits?.max_products || 100,
+      max_customers: plan.limits?.max_customers || 1000,
       is_active: plan.is_active,
     });
     setDialogOpen(true);
   };
 
   const handleSavePlan = async () => {
+    if (!formData.name || !formData.slug) {
+      toast.error('Nome e slug são obrigatórios');
+      return;
+    }
+
     setIsSaving(true);
-    
     try {
-      // Simular salvamento
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const planData = {
-        ...formData,
-        features: formData.features.split('\n').filter(f => f.trim()),
+      // Converter features_text em JSONB
+      const features: Record<string, any> = {};
+      formData.features_text.split('\n').filter(l => l.trim()).forEach(line => {
+        const parts = line.split(':');
+        if (parts.length >= 2) {
+          const key = parts[0].trim();
+          const value = parts.slice(1).join(':').trim();
+          features[key] = value;
+        } else {
+          features[line.trim()] = true;
+        }
+      });
+
+      const payload = {
+        ...(editingPlan ? { id: editingPlan.id } : {}),
+        name: formData.name,
+        slug: formData.slug,
+        description: formData.description,
+        price_monthly: formData.price_monthly,
+        price_yearly: formData.price_yearly,
+        billing_cycle: formData.billing_cycle,
+        features,
+        limits: {
+          max_users: formData.max_users,
+          max_products: formData.max_products,
+          max_customers: formData.max_customers,
+        },
+        is_active: formData.is_active,
       };
 
-      if (editingPlan) {
-        // Atualizar plano existente
-        setPlans(prev => prev.map(plan => 
-          plan.id === editingPlan.id 
-            ? { ...plan, ...planData, updated_at: new Date().toISOString() }
-            : plan
-        ));
-        toast.success('Plano atualizado com sucesso!');
-      } else {
-        // Criar novo plano
-        const newPlan: Plan = {
-          id: Date.now().toString(),
-          ...planData,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        setPlans(prev => [...prev, newPlan]);
-        toast.success('Plano criado com sucesso!');
+      const response = await fetch('/next_api/admin/plans', {
+        method: editingPlan ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Erro ao salvar plano');
       }
-      
+
+      toast.success(result.message || 'Plano salvo com sucesso!');
       setDialogOpen(false);
-    } catch (error) {
-      console.log('⚠️ Erro ao salvar plano (tratado):', error);
-      toast.error('Erro ao salvar plano');
+      await loadPlans();
+    } catch (error: any) {
+      console.error('❌ Erro ao salvar plano:', error);
+      toast.error(error.message || 'Erro ao salvar plano');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDeletePlan = async (planId: string) => {
-    if (!confirm('Tem certeza que deseja excluir este plano?')) return;
-    
+    if (!confirm('Tem certeza que deseja desativar este plano?')) return;
+
     try {
-      setPlans(prev => prev.filter(plan => plan.id !== planId));
-      toast.success('Plano excluído com sucesso!');
-    } catch (error) {
-      console.log('⚠️ Erro ao excluir plano (tratado):', error);
-      toast.error('Erro ao excluir plano');
+      const response = await fetch(`/next_api/admin/plans?id=${planId}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Erro ao desativar plano');
+      }
+
+      toast.success(result.message || 'Plano desativado!');
+      await loadPlans();
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao desativar plano');
     }
   };
 
   const togglePlanStatus = async (plan: Plan) => {
     try {
-      setPlans(prev => prev.map(p => 
-        p.id === plan.id 
-          ? { ...p, is_active: !p.is_active, updated_at: new Date().toISOString() }
-          : p
-      ));
-      toast.success(`Plano ${!plan.is_active ? 'ativado' : 'desativado'} com sucesso!`);
-    } catch (error) {
-      console.log('⚠️ Erro ao alterar status (tratado):', error);
-      toast.error('Erro ao alterar status do plano');
+      const response = await fetch('/next_api/admin/plans', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: plan.id, is_active: !plan.is_active }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Erro ao alterar status');
+      }
+
+      toast.success(`Plano ${!plan.is_active ? 'ativado' : 'desativado'}!`);
+      await loadPlans();
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao alterar status');
     }
   };
 
-  const getBillingCycleBadge = (cycle: string) => {
-    const styles = {
-      monthly: 'bg-blue-500 text-white',
-      yearly: 'bg-green-500 text-white',
-    };
-    return (
-      <Badge className={styles[cycle as keyof typeof styles] || 'bg-gray-500'}>
-        {cycle === 'monthly' ? 'Mensal' : 'Anual'}
-      </Badge>
-    );
-  };
-
-  const getStatusBadge = (isActive: boolean) => {
-    return (
-      <Badge className={isActive ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}>
-        {isActive ? 'Ativo' : 'Inativo'}
-      </Badge>
-    );
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
   if (loading) {
@@ -268,7 +259,7 @@ export function PlanManagement() {
         <CardContent className="p-6">
           <div className="flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600 mr-2" />
-            <span className="text-white">Carregando planos...</span>
+            <span className="text-white">Carregando planos do banco de dados...</span>
           </div>
         </CardContent>
       </Card>
@@ -284,6 +275,9 @@ export function PlanManagement() {
             <CardTitle className="flex items-center gap-2 text-white">
               <CreditCard className="h-5 w-5" />
               Planos de Assinatura
+              <Badge variant="outline" className="text-gray-400 border-gray-600 ml-2">
+                {plans.filter(p => p.is_active).length} ativos
+              </Badge>
             </CardTitle>
             <div className="flex items-center gap-2">
               <div className="hidden sm:flex gap-2">
@@ -298,36 +292,18 @@ export function PlanManagement() {
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="sm:hidden border-gray-700 text-gray-300 hover:bg-gray-800"
-                  >
+                  <Button variant="outline" size="icon" className="sm:hidden border-gray-700 text-gray-300 hover:bg-gray-800">
                     <Menu className="h-4 w-4" />
-                    <span className="sr-only">Abrir ações rápidas</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-48 border-gray-700 bg-gray-900 text-white"
-                >
-                  <DropdownMenuLabel className="text-xs text-gray-300">
-                    Ações rápidas
-                  </DropdownMenuLabel>
+                <DropdownMenuContent align="end" className="w-48 border-gray-700 bg-gray-900 text-white">
+                  <DropdownMenuLabel className="text-xs text-gray-300">Ações</DropdownMenuLabel>
                   <DropdownMenuSeparator className="bg-gray-700" />
-                  <DropdownMenuItem
-                    className="hover:bg-gray-800 focus:bg-gray-800"
-                    onSelect={() => loadPlans()}
-                  >
-                    <RefreshCw className="h-4 w-4 text-gray-300" />
-                    Atualizar
+                  <DropdownMenuItem className="hover:bg-gray-800 focus:bg-gray-800" onSelect={() => loadPlans()}>
+                    <RefreshCw className="h-4 w-4 text-gray-300" /> Atualizar
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="hover:bg-gray-800 focus:bg-gray-800"
-                    onSelect={() => handleCreatePlan()}
-                  >
-                    <Plus className="h-4 w-4 text-gray-300" />
-                    Novo Plano
+                  <DropdownMenuItem className="hover:bg-gray-800 focus:bg-gray-800" onSelect={() => handleCreatePlan()}>
+                    <Plus className="h-4 w-4 text-gray-300" /> Novo Plano
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -340,7 +316,7 @@ export function PlanManagement() {
             <Alert className="bg-yellow-500/10 border-yellow-500/30">
               <AlertTriangle className="h-4 w-4 text-yellow-400" />
               <AlertDescription className="text-yellow-300">
-                Nenhum plano encontrado. Clique em "Novo Plano" para criar o primeiro.
+                Nenhum plano encontrado. Clique em &quot;Novo Plano&quot; para criar o primeiro.
               </AlertDescription>
             </Alert>
           ) : (
@@ -349,62 +325,76 @@ export function PlanManagement() {
                 <TableHeader>
                   <TableRow className="border-gray-700 hover:bg-gray-800/50">
                     <TableHead className="text-gray-300">Nome</TableHead>
-                    <TableHead className="text-gray-300">Preço</TableHead>
-                    <TableHead className="text-gray-300">Ciclo</TableHead>
-                    <TableHead className="text-gray-300">Usuários</TableHead>
+                    <TableHead className="text-gray-300">Slug</TableHead>
+                    <TableHead className="text-gray-300">Preço/mês</TableHead>
+                    <TableHead className="text-gray-300">Preço/ano</TableHead>
+                    <TableHead className="text-gray-300">Limites</TableHead>
+                    <TableHead className="text-gray-300">Assinantes</TableHead>
                     <TableHead className="text-gray-300">Status</TableHead>
                     <TableHead className="text-gray-300">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {plans.map((plan) => (
-                    <TableRow key={plan.id} className="border-gray-700 hover:bg-gray-800/50">
+                    <TableRow key={plan.id} className={`border-gray-700 hover:bg-gray-800/50 ${!plan.is_active ? 'opacity-50' : ''}`}>
                       <TableCell className="text-white">
                         <div>
-                          <div className="font-medium">{plan.name}</div>
-                          <div className="text-sm text-gray-400">{plan.description}</div>
+                          <div className="font-medium flex items-center gap-2">
+                            {plan.name}
+                            {plan.slug === 'trial' && <Badge className="bg-yellow-500/20 text-yellow-400 text-[10px]">TRIAL</Badge>}
+                          </div>
+                          <div className="text-sm text-gray-400 truncate max-w-[200px]">{plan.description}</div>
                         </div>
                       </TableCell>
+                      <TableCell className="text-gray-400 font-mono text-sm">{plan.slug}</TableCell>
                       <TableCell className="text-white">
                         <div className="flex items-center gap-1">
                           <DollarSign className="h-4 w-4 text-green-400" />
-                          <span className="font-medium">R$ {plan.price.toFixed(2)}</span>
+                          <span className="font-medium">{formatCurrency(plan.price_monthly)}</span>
                         </div>
                       </TableCell>
-                      <TableCell>{getBillingCycleBadge(plan.billing_cycle)}</TableCell>
+                      <TableCell className="text-gray-300">{formatCurrency(plan.price_yearly)}</TableCell>
                       <TableCell className="text-white">
-                        <div className="flex items-center gap-1">
-                          <Users className="h-3 w-3 text-gray-400" />
-                          <span>{plan.max_users === -1 ? 'Ilimitado' : plan.max_users}</span>
+                        <div className="text-xs space-y-0.5">
+                          <div className="flex items-center gap-1">
+                            <Users className="h-3 w-3 text-gray-400" />
+                            {plan.limits?.max_users === -1 ? '∞' : plan.limits?.max_users || '?'}
+                          </div>
+                          <div className="text-gray-400">
+                            Prod: {plan.limits?.max_products === -1 ? '∞' : plan.limits?.max_products || '?'}
+                          </div>
+                          <div className="text-gray-400">
+                            Cli: {plan.limits?.max_customers === -1 ? '∞' : plan.limits?.max_customers || '?'}
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell>{getStatusBadge(plan.is_active)}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditPlan(plan)}
-                            className="text-gray-300 hover:text-white hover:bg-gray-800"
-                          >
+                        <div className="text-center">
+                          <span className="text-white font-medium">{plan.subscriber_count || 0}</span>
+                          <span className="text-gray-500 text-xs"> / {plan.total_subscriber_count || 0}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={plan.is_active ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}>
+                          {plan.is_active ? 'Ativo' : 'Inativo'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => handleEditPlan(plan)}
+                            className="text-gray-300 hover:text-white hover:bg-gray-800 h-8 w-8 p-0">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => togglePlanStatus(plan)}
-                            className={plan.is_active ? 'text-red-400 hover:text-red-300 hover:bg-gray-800' : 'text-green-400 hover:text-green-300 hover:bg-gray-800'}
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => togglePlanStatus(plan)}
+                            className={`h-8 w-8 p-0 ${plan.is_active ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'} hover:bg-gray-800`}>
                             {plan.is_active ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeletePlan(plan.id)}
-                            className="text-red-400 hover:text-red-300 hover:bg-gray-800"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {plan.slug !== 'trial' && (
+                            <Button variant="ghost" size="sm" onClick={() => handleDeletePlan(plan.id)}
+                              className="text-red-400 hover:text-red-300 hover:bg-gray-800 h-8 w-8 p-0">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -416,126 +406,109 @@ export function PlanManagement() {
         </CardContent>
       </Card>
 
-      {/* Dialog para criar/editar plano - Padrão do sistema */}
+      {/* Dialog para criar/editar plano */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="w-[98vw] h-[95vh] max-w-none max-h-[95vh] p-0 overflow-hidden flex flex-col bg-neutral-900 text-white">
-          {/* Header */}
           <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/10 bg-neutral-900/95 flex-shrink-0">
-            <div className="flex items-center justify-between gap-4">
-              <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl font-semibold text-white">
-                <div className="p-1.5 sm:p-2 bg-white/10 rounded-lg">
-                  <CreditCard className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-base sm:text-xl">{editingPlan ? 'Editar Plano' : 'Criar Novo Plano'}</span>
-                  <span className="text-xs sm:text-sm font-normal text-white/60 truncate">
-                    {editingPlan ? 'Atualize as informações do plano.' : 'Preencha as informações para criar um novo plano.'}
-                  </span>
-                </div>
-              </DialogTitle>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/10 rounded-lg">
+                <CreditCard className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
+                  {editingPlan ? 'Editar Plano' : 'Criar Novo Plano'}
+                </DialogTitle>
+                <span className="text-xs sm:text-sm font-normal text-white/60">
+                  {editingPlan ? `Editando: ${editingPlan.name}` : 'Preencha todos os campos'}
+                </span>
+              </div>
             </div>
           </DialogHeader>
 
-          {/* Body scrollável */}
           <div className="flex-1 overflow-auto bg-neutral-900">
             <div className="px-4 sm:px-6 py-4 sm:py-6 grid gap-6">
-              <div className="text-sm text-white/80 bg-white/5 border border-white/10 px-3 py-2 rounded-md">
-                Preencha os campos abaixo. Os itens com valores numéricos aceitam apenas números.
-              </div>
-
+              {/* Informações Básicas */}
               <h3 className="text-sm font-semibold text-white/90">Informações Básicas</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="name" className="text-white/90">Nome do Plano</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
+                  <Label htmlFor="name" className="text-white/90">Nome do Plano *</Label>
+                  <Input id="name" value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Ex: Básico"
-                    className="bg-gray-800 border-gray-700 text-white placeholder-gray-400"
-                  />
+                    placeholder="Ex: Profissional" className="bg-gray-800 border-gray-700 text-white" />
                 </div>
                 <div>
-                  <Label htmlFor="price" className="text-white/90">Preço (R$)</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                    placeholder="79.90"
-                    className="bg-gray-800 border-gray-700 text-white placeholder-gray-400"
-                  />
+                  <Label htmlFor="slug" className="text-white/90">Slug (identificador) *</Label>
+                  <Input id="slug" value={formData.slug}
+                    onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') })}
+                    placeholder="Ex: pro" className="bg-gray-800 border-gray-700 text-white font-mono"
+                    disabled={!!editingPlan && (editingPlan.subscriber_count || 0) > 0} />
+                </div>
+                <div>
+                  <Label className="text-white/90">Status</Label>
+                  <div className="flex items-center gap-3 mt-2">
+                    <Switch id="is_active" checked={formData.is_active}
+                      onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
+                    <Label htmlFor="is_active" className="text-white/80">{formData.is_active ? 'Ativo' : 'Inativo'}</Label>
+                  </div>
                 </div>
               </div>
 
-              <h3 className="text-sm font-semibold text-white/90">Descrição</h3>
+              {/* Descrição */}
               <div>
                 <Label htmlFor="description" className="text-white/90">Descrição</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
+                <Textarea id="description" value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Descreva o plano..."
-                  rows={3}
-                  className="bg-neutral-800 border border-white/10 text-white placeholder-white/50"
-                />
+                  placeholder="Descreva o plano..." rows={2}
+                  className="bg-neutral-800 border border-white/10 text-white" />
               </div>
 
-              <h3 className="text-sm font-semibold text-white/90">Funcionalidades</h3>
-              <div>
-                <Label htmlFor="features" className="text-white/90">Funcionalidades (uma por linha)</Label>
-                <Textarea
-                  id="features"
-                  value={formData.features}
-                  onChange={(e) => setFormData({ ...formData, features: e.target.value })}
-                  placeholder="Gestão de produtos&#10;Gestão de clientes&#10;Relatórios básicos"
-                  rows={6}
-                  className="bg-neutral-800 border border-white/10 text-white placeholder-white/50"
-                />
+              {/* Preços */}
+              <h3 className="text-sm font-semibold text-white/90">Preços</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="price_monthly" className="text-white/90">Preço Mensal (R$)</Label>
+                  <Input id="price_monthly" type="number" step="0.01" value={formData.price_monthly}
+                    onChange={(e) => setFormData({ ...formData, price_monthly: parseFloat(e.target.value) || 0 })}
+                    className="bg-gray-800 border-gray-700 text-white" />
+                </div>
+                <div>
+                  <Label htmlFor="price_yearly" className="text-white/90">Preço Anual (R$)</Label>
+                  <Input id="price_yearly" type="number" step="0.01" value={formData.price_yearly}
+                    onChange={(e) => setFormData({ ...formData, price_yearly: parseFloat(e.target.value) || 0 })}
+                    className="bg-gray-800 border-gray-700 text-white" />
+                </div>
               </div>
 
-              <h3 className="text-sm font-semibold text-white/90">Limites</h3>
+              {/* Limites */}
+              <h3 className="text-sm font-semibold text-white/90">Limites (-1 = ilimitado)</h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="max_users" className="text-white/90">Máx. Usuários</Label>
-                  <Input
-                    id="max_users"
-                    type="number"
-                    value={formData.max_users}
+                  <Input id="max_users" type="number" value={formData.max_users}
                     onChange={(e) => setFormData({ ...formData, max_users: parseInt(e.target.value) || 1 })}
-                    className="bg-gray-800 border-gray-700 text-white placeholder-gray-400"
-                  />
+                    className="bg-gray-800 border-gray-700 text-white" />
                 </div>
                 <div>
                   <Label htmlFor="max_products" className="text-white/90">Máx. Produtos</Label>
-                  <Input
-                    id="max_products"
-                    type="number"
-                    value={formData.max_products}
+                  <Input id="max_products" type="number" value={formData.max_products}
                     onChange={(e) => setFormData({ ...formData, max_products: parseInt(e.target.value) || 100 })}
-                    className="bg-gray-800 border-gray-700 text-white placeholder-gray-400"
-                  />
+                    className="bg-gray-800 border-gray-700 text-white" />
                 </div>
                 <div>
                   <Label htmlFor="max_customers" className="text-white/90">Máx. Clientes</Label>
-                  <Input
-                    id="max_customers"
-                    type="number"
-                    value={formData.max_customers}
+                  <Input id="max_customers" type="number" value={formData.max_customers}
                     onChange={(e) => setFormData({ ...formData, max_customers: parseInt(e.target.value) || 1000 })}
-                    className="bg-gray-800 border-gray-700 text-white placeholder-gray-400"
-                  />
+                    className="bg-gray-800 border-gray-700 text-white" />
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <Switch
-                  id="is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                />
-                <Label htmlFor="is_active" className="text-white/90">Plano ativo</Label>
+              {/* Features */}
+              <h3 className="text-sm font-semibold text-white/90">Funcionalidades (chave: valor, uma por linha)</h3>
+              <div>
+                <Textarea id="features" value={formData.features_text}
+                  onChange={(e) => setFormData({ ...formData, features_text: e.target.value })}
+                  placeholder={"users: Até 10 usuários\nsupport: Prioritário\nreports\nintegrations"}
+                  rows={6} className="bg-neutral-800 border border-white/10 text-white font-mono text-sm" />
               </div>
             </div>
           </div>

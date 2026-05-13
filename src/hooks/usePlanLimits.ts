@@ -95,14 +95,25 @@ export function usePlanLimits(): PlanLimitsHook {
       setLoading(true);
       setError(null);
 
-      // Para simplificar, usar dados mockados
-      // Em produção, isso seria buscado do banco
-      setUsage({
-        users: 1,
-        customers: 0,
-        products: 0,
-        sales_this_month: 0,
-      });
+      // Buscar contagem real de uso do tenant
+      const response = await fetch(`/next_api/tenant-usage?tenant_id=${encodeURIComponent(tenant.id)}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setUsage({
+            users: result.data.users || 0,
+            customers: result.data.customers || 0,
+            products: result.data.products || 0,
+            sales_this_month: result.data.sales_this_month || 0,
+          });
+        } else {
+          // Fallback se a API retornar erro
+          setUsage({ users: 1, customers: 0, products: 0, sales_this_month: 0 });
+        }
+      } else {
+        // Fallback se a API não existir ainda
+        setUsage({ users: 1, customers: 0, products: 0, sales_this_month: 0 });
+      }
 
     } catch (err) {
       console.error('Erro ao carregar dados de uso:', err instanceof Error ? err.message : err);
