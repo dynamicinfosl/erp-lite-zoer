@@ -312,6 +312,86 @@ async function createSaleHandler(request: NextRequest) {
     }
 
     console.log('✅ Itens da venda criados com sucesso');
+
+    // Decrementar estoque para cada produto com product_id válido
+    const productsWithId = products.filter(
+      (product: any) => product.id !== null && product.id !== undefined
+    );
+
+    if (productsWithId.length > 0) {
+      const bid = branch_id ? Number(branch_id) : null;
+      const hasBranch = bid && Number.isFinite(bid);
+
+      const stockDecrementPromises = productsWithId.map(async (product: any) => {
+        const qty = parseInt(product.quantity);
+        if (isNaN(qty) || qty <= 0) return;
+
+        try {
+          if (hasBranch) {
+            const { data: stockRow } = await supabaseAdmin
+              .from('product_stocks')
+              .select('id, quantity')
+              .eq('tenant_id', tenant_id)
+              .eq('branch_id', bid)
+              .eq('product_id', product.id)
+              .maybeSingle();
+
+            const currentQty = Number(stockRow?.quantity || 0);
+            const nextQty = currentQty - qty;
+
+            await supabaseAdmin
+              .from('product_stocks')
+              .upsert({
+                tenant_id,
+                branch_id: bid,
+                product_id: product.id,
+                quantity: nextQty,
+                updated_at: new Date().toISOString(),
+              }, { onConflict: 'tenant_id,branch_id,product_id' });
+          } else {
+            const { data: productData } = await supabaseAdmin
+              .from('products')
+              .select('stock_quantity')
+              .eq('id', product.id)
+              .eq('tenant_id', tenant_id)
+              .maybeSingle();
+
+            if (productData) {
+              const newQty = (productData.stock_quantity || 0) - qty;
+              await supabaseAdmin
+                .from('products')
+                .update({ stock_quantity: newQty, updated_at: new Date().toISOString() })
+                .eq('id', product.id);
+            }
+          }
+
+          await supabaseAdmin
+            .from('stock_movements')
+            .insert({
+              tenant_id,
+              branch_id: hasBranch ? bid : null,
+              product_id: product.id,
+              user_id: user_id || '00000000-0000-0000-0000-000000000000',
+              movement_type: 'saida',
+              quantity: qty,
+              notes: `Venda #${saleNumber}`,
+              reference_type: 'venda',
+              reference_id: String(sale.id),
+              created_at: new Date().toISOString(),
+            });
+        } catch (err) {
+          console.error(`⚠️ Erro ao decrementar estoque do produto ${product.id}:`, err);
+        }
+      });
+
+      try {
+        await Promise.all(stockDecrementPromises);
+        console.log(`✅ Estoque decrementado para ${productsWithId.length} produto(s) da venda ${saleNumber}`);
+      } catch (stockError) {
+        console.error('⚠️ Erro ao decrementar estoque (venda criada com sucesso):', stockError);
+      }
+    }
+
     console.log('✅ Venda completa criada:', sale.id);
 
     return NextResponse.json({ success: true, data: sale });

@@ -23,11 +23,6 @@ export async function validatePlanLimits(
 ): Promise<PlanValidationResult> {
 
   try {
-    // Para vendas, permitir sempre (modo trial/desenvolvimento)
-    if (operation === 'create_sale') {
-      return { canProceed: true };
-    }
-
     // Buscar subscription atual
     console.log(`🔍 Validando plano para tenant: ${tenantId}, operação: ${operation}`);
     const { data: subscription, error: subError } = await supabase
@@ -89,14 +84,19 @@ export async function validatePlanLimits(
       };
     }
 
-    // IMPORTANTE: Se o status é 'active', considerar válido mesmo se current_period_end não estiver no futuro
-    // Isso permite que planos recém-ativados funcionem imediatamente
-    // Apenas verificar expiração se o status NÃO for 'active'
+    // Verificar se plano ativo tem current_period_end vencido
     if (subscription.status === 'active') {
-      // Se status é 'active', o plano está válido independentemente de current_period_end
-      // (pode ser um plano recém-ativado, ilimitado, ou com data de expiração no futuro)
+      if (subscription.current_period_end) {
+        const periodEnd = new Date(subscription.current_period_end);
+        if (periodEnd < now) {
+          return {
+            canProceed: false,
+            reason: 'Seu plano expirou. Renove para continuar usando o sistema.',
+            trialExpired: true
+          };
+        }
+      }
       console.log('✅ Plano ativo detectado, permitindo operação');
-      // Continuar para verificar limites
     } else if (subscription.status !== 'trial') {
       // Se não é 'active' nem 'trial', bloquear
       return { 
