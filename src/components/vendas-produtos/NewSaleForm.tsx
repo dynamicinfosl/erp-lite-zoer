@@ -98,9 +98,10 @@ interface PaymentItem {
 interface NewSaleFormProps {
   onSuccess: () => void;
   onCancel: () => void;
+  saleId?: string;
 }
 
-export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
+export function NewSaleForm({ onSuccess, onCancel, saleId }: NewSaleFormProps) {
   const { tenant, user } = useSimpleAuth();
   const { scope, branchId } = useBranch();
   const tenantId = tenant?.id;
@@ -208,6 +209,103 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
     loadProducts();
     loadCustomers();
   }, [tenantId, loadProducts, loadCustomers]);
+
+  // Load sale details if editing
+  useEffect(() => {
+    console.log('📝 [NewSaleForm] useEffect triggered with:', { saleId, tenantId });
+    async function loadSaleData() {
+      if (!saleId || !tenantId) {
+        console.log('📝 [NewSaleForm] loadSaleData skipped:', { saleId, tenantId });
+        return;
+      }
+      console.log('📝 [NewSaleForm] Loading sale data for saleId:', saleId, 'tenantId:', tenantId);
+      setLoading(true);
+      try {
+        const response = await fetch(`/next_api/sales/${saleId}`);
+        console.log('📝 [NewSaleForm] Fetch response status:', response.status);
+        if (!response.ok) throw new Error('Erro ao carregar dados da venda');
+        const result = await response.json();
+        console.log('📝 [NewSaleForm] Fetch response result:', result);
+        if (result.success && result.data) {
+          const sale = result.data;
+          
+          let mappedStatus = 'concretizada';
+          if (sale.status === 'pendente') {
+            mappedStatus = 'pendente';
+          } else if (sale.status === 'cancelada' || sale.status === 'canceled') {
+            mappedStatus = 'cancelada';
+          }
+
+          setFormData({
+            sale_number: sale.sale_number || '',
+            customer_id: sale.customer_id ? String(sale.customer_id) : '',
+            customer_name: sale.customer_name || '',
+            seller_name: sale.seller_name || '',
+            status: mappedStatus,
+            sale_date: sale.created_at ? sale.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+            delivery_date: sale.delivery_date ? sale.delivery_date.split('T')[0] : '',
+            sales_channel: sale.sales_channel || 'presencial',
+            cost_center: sale.cost_center || '',
+            freight_value: sale.freight_value || 0,
+            carrier_name: sale.carrier_name || '',
+            discount_amount: sale.discount_amount || 0,
+            discount_percentage: sale.discount_percentage || 0,
+            notes: sale.notes || '',
+            internal_notes: sale.internal_notes || '',
+          });
+
+          if (sale.delivery_address) {
+            let parsedAddr = sale.delivery_address;
+            if (typeof parsedAddr === 'string') {
+              try {
+                parsedAddr = JSON.parse(parsedAddr);
+              } catch (e) {
+                // Ignore parsing error
+              }
+            }
+            if (parsedAddr && typeof parsedAddr === 'object') {
+              setDeliveryAddress({
+                cep: parsedAddr.cep || '',
+                address: parsedAddr.address || '',
+                number: parsedAddr.number || '',
+                complement: parsedAddr.complement || '',
+                neighborhood: parsedAddr.neighborhood || '',
+                city: parsedAddr.city || '',
+                state: parsedAddr.state || '',
+              });
+              setShowDeliveryAddress(true);
+            }
+          }
+
+          if (Array.isArray(sale.items)) {
+            setItems(sale.items.map((item: any) => ({
+              product_id: item.product_id || 0,
+              product_name: item.product_name || '',
+              details: '',
+              quantity: Number(item.quantity) || 1,
+              unit_price: Number(item.unit_price) || 0,
+              discount: Number(item.discount) || 0,
+              subtotal: Number(item.subtotal) || (Number(item.unit_price) * Number(item.quantity)),
+            })));
+          }
+
+          setPayments([{
+            due_date: sale.created_at ? sale.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+            value: Number(sale.final_amount || sale.total_amount || 0),
+            payment_method: sale.payment_method || '',
+            chart_of_accounts: 'Vendas de produtos',
+            observation: '',
+          }]);
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error('Erro ao carregar dados da venda.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadSaleData();
+  }, [saleId, tenantId]);
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchProduct.toLowerCase()) ||
@@ -422,7 +520,7 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
     setLoading(true);
 
     try {
-      const saleData = {
+      const saleData: any = {
         tenant_id: tenant.id,
         user_id: user?.id || '00000000-0000-0000-0000-000000000000',
         branch_id: scope === 'branch' && branchId ? branchId : null,
@@ -457,8 +555,15 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
         payments: generatePaymentConditions ? payments : [],
       };
 
-      const response = await fetch('/next_api/sales', {
-        method: 'POST',
+      if (saleId) {
+        saleData.status = formData.status === 'concretizada' ? 'completed' : (formData.status === 'cancelada' ? 'canceled' : formData.status);
+      }
+
+      const url = saleId ? `/next_api/sales/${saleId}` : '/next_api/sales';
+      const method = saleId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
         },
@@ -467,14 +572,14 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao criar venda');
+        throw new Error(errorData.error || `Erro ao ${saleId ? 'atualizar' : 'criar'} venda`);
       }
 
-      toast.success('Venda criada com sucesso!');
+      toast.success(`Venda ${saleId ? 'atualizada' : 'criada'} com sucesso!`);
       onSuccess();
     } catch (error) {
-      console.error('Erro ao criar venda:', error);
-      toast.error(error instanceof Error ? error.message : 'Erro ao criar venda');
+      console.error('Erro ao processar venda:', error);
+      toast.error(error instanceof Error ? error.message : `Erro ao ${saleId ? 'atualizar' : 'criar'} venda`);
     } finally {
       setLoading(false);
     }
@@ -1357,7 +1462,9 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
       <div className="flex items-center justify-between pt-8 border-t-2 border-slate-100 dark:border-slate-800">
         <div className="hidden md:flex flex-col">
           <span className="text-xs text-slate-400 font-medium uppercase tracking-widest">Confirme os dados antes de</span>
-          <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Finalizar o Registro da Venda</span>
+          <span className="text-sm font-bold text-slate-600 dark:text-slate-300">
+            {saleId ? 'Finalizar a Edição da Venda' : 'Finalizar o Registro da Venda'}
+          </span>
         </div>
         <div className="flex gap-4 w-full md:w-auto">
           <Button 
@@ -1379,7 +1486,7 @@ export function NewSaleForm({ onSuccess, onCancel }: NewSaleFormProps) {
                 <span>Salvando...</span>
               </div>
             ) : (
-              <span>Cadastrar Venda</span>
+              <span>{saleId ? 'Salvar Alterações' : 'Cadastrar Venda'}</span>
             )}
           </Button>
         </div>

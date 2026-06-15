@@ -84,20 +84,43 @@ export default function RelatoriosPage() {
       }
 
       const tz = -new Date().getTimezoneOffset();
+      
+      // Calculate date range that includes both the selected date range and the current semester
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth(); // 0-11
+      const semesterStart = currentMonth < 6 
+        ? `${currentYear}-01-01` 
+        : `${currentYear}-07-01`;
+      const semesterEnd = currentMonth < 6 
+        ? `${currentYear}-06-30` 
+        : `${currentYear}-12-31`;
+
+      const queryStart = dateRange.start < semesterStart ? dateRange.start : semesterStart;
+      const queryEnd = dateRange.end > semesterEnd ? dateRange.end : semesterEnd;
+
       const salesParams = new URLSearchParams({
         tenant_id: tenant.id,
         tz: String(tz),
         branch_scope: 'all',
+        start_date: queryStart,
+        end_date: queryEnd,
+        limit: '5000',
       });
       if (operatorUserId) salesParams.set('user_id', operatorUserId);
-      if (excludeApiSales) salesParams.set('sale_source', 'pdv');
+      if (excludeApiSales) {
+        salesParams.set('exclude_api', 'true');
+      }
+      
       const reportParams = new URLSearchParams({
         tenant_id: tenant.id,
         start: dateRange.start,
         end: dateRange.end,
       });
       if (operatorUserId) reportParams.set('user_id', operatorUserId);
-      if (excludeApiSales) reportParams.set('sale_source', 'pdv');
+      if (excludeApiSales) {
+        reportParams.set('exclude_api', 'true');
+      }
 
       const [salesRes, productsRes, transactionsRes, deliveriesRes, reportRes] = await Promise.allSettled([
         fetch(`/next_api/sales?${salesParams.toString()}`),

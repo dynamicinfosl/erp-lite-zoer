@@ -133,12 +133,26 @@ export function ApiSaleNotification({ tenantId }: ApiSaleNotificationProps) {
         }));
 
         // Usar função de atualização que recebe o estado anterior
+        const isInitial = isInitialLoadRef.current;
+        if (isInitial) {
+          isInitialLoadRef.current = false;
+        }
+
+        const latestId = Math.max(...formattedSales.map((s) => s.id));
+        setLastCheckedId(latestId);
+
+        if (isInitial) {
+          // No carregamento inicial, marcar todos os pedidos existentes como visualizados
+          // para não disparar notificações antigas nem mostrar contagem de não lidos.
+          setViewedSaleIds(new Set(formattedSales.map((s) => s.id)));
+          setNotifications(formattedSales);
+          return;
+        }
+
         setNotifications((prev) => {
-          // Se é o carregamento inicial, apenas definir os pedidos
-          if (isInitialLoadRef.current) {
-            isInitialLoadRef.current = false;
-            const latestId = Math.max(...formattedSales.map((s) => s.id));
-            setLastCheckedId(latestId);
+          // Se o estado anterior for vazio, tratar como se fosse inicial
+          if (prev.length === 0) {
+            setViewedSaleIds(new Set(formattedSales.map((s) => s.id)));
             return formattedSales;
           }
 
@@ -165,15 +179,8 @@ export function ApiSaleNotification({ tenantId }: ApiSaleNotificationProps) {
               });
             });
 
-            // Atualizar último ID verificado
-            const latestId = Math.max(...formattedSales.map((s) => s.id));
-            setLastCheckedId(latestId);
-
             return unique;
           } else {
-            // Atualizar lista mesmo sem novos pedidos (para manter sincronizado)
-            const latestId = Math.max(...formattedSales.map((s) => s.id));
-            setLastCheckedId(latestId);
             return formattedSales;
           }
         });

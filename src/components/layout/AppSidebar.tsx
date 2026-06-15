@@ -43,6 +43,7 @@ import {
   FileText,
   UsersRound,
   Wallet,
+  Database,
 } from 'lucide-react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { ENABLE_AUTH } from '@/constants/auth';
@@ -124,11 +125,13 @@ const menuGroups = [
       { title: 'Relatórios', url: '/relatorios', icon: BarChart3, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Filiais', url: '/filiais', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Perfil da Empresa', url: '/perfil-empresa', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Notas Fiscais', url: '/notas-fiscais', icon: Receipt, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Configuração Fiscal', url: '/configuracao-fiscal', icon: FileText, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Perfil do Usuário', url: '/perfil-usuario', icon: UserCog, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Usuários', url: '/configuracoes/usuarios', icon: Users, roles: ['admin'] },
       { title: 'Assinatura', url: '/assinatura', icon: CreditCard, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Configurações', url: '/configuracoes', icon: Settings, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Migrar Dados', url: '/migrar', icon: Database, roles: ['admin'] },
       // Botão Administração oculto - acesso restrito apenas para usuário "julga"
       // { title: 'Administração', url: '/admin', icon: Shield, roles: ['admin'] },
     ],
