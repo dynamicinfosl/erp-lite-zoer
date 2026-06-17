@@ -61,6 +61,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
+import { NewSaleForm } from '@/components/vendas-produtos/NewSaleForm';
 import { mapSaleToNFCePayload, emitFiscalDocument } from '@/lib/fiscal-utils';
 import { api } from '@/lib/api-client';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
@@ -207,10 +208,6 @@ export default function VendasPage() {
   const [selectedVenda, setSelectedVenda] = useState<Sale | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [editFormData, setEditFormData] = useState<Partial<Sale>>({});
-  const [loadingEditDetails, setLoadingEditDetails] = useState(false);
-  const [customersForEdit, setCustomersForEdit] = useState<QuickCustomer[]>([]);
-  const [productsForEdit, setProductsForEdit] = useState<QuickProduct[]>([]);
   const [selectedVendas, setSelectedVendas] = useState<Set<string>>(new Set());
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -387,7 +384,6 @@ export default function VendasPage() {
 
       const json = await res.json();
       const allData = Array.isArray(json?.data) ? json.data : (json?.rows || json?.sales || []);
-      setTotalSales(json?.total || allData.length);
 
       const data = allData.filter((s: any) => {
         if (s.sale_source === 'pdv') return true;
@@ -397,6 +393,8 @@ export default function VendasPage() {
         if (s.sale_source === 'produtos' || s.sale_type === 'produtos') return false;
         return !s.sale_source;
       });
+
+      setTotalSales(data.length);
 
       const mapped: Sale[] = data.map((s: any, i: number) => {
         let items = Array.isArray(s.items) ? s.items : [];
@@ -417,7 +415,7 @@ export default function VendasPage() {
           total: Number(s.total_amount ?? s.final_amount ?? s.total ?? 0),
           forma_pagamento: (s.payment_method ?? 'dinheiro') as Sale['forma_pagamento'],
           status: (() => {
-            if (s.status === null || s.status === 'completed' || s.status === 'paga') return 'paga';
+            if (s.status === null || s.status === 'completed' || s.status === 'paga' || s.status === 'finalizada') return 'paga';
             if (s.status === 'canceled' || s.status === 'cancelada') return 'cancelada';
             return 'pendente';
           })(),
@@ -582,154 +580,6 @@ export default function VendasPage() {
   const handleEditar = (venda: Sale) => {
     setSelectedVenda(venda);
     setShowEditDialog(true);
-    // Inicial rápido (fallback) enquanto carrega detalhes/itens
-    setEditFormData({
-      cliente: venda.cliente,
-      customer_id: venda.customer_id ?? null,
-      forma_pagamento: venda.forma_pagamento,
-      status: venda.status,
-      observacoes: venda.observacoes || '',
-      total: venda.total,
-      itens: venda.itens || [],
-    });
-  };
-
-  // Carregar detalhes completos (inclui itens) e listas de clientes/produtos ao abrir o modal de edição
-  useEffect(() => {
-    const loadEditResources = async () => {
-      if (!showEditDialog || !selectedVenda || !tenant?.id) return;
-
-      try {
-        setLoadingEditDetails(true);
-
-        // 1) Detalhe da venda (itens + customer_id)
-        const saleRes = await fetch(`/next_api/sales/${selectedVenda.id}`);
-        if (saleRes.ok) {
-          const saleJson = await saleRes.json().catch(() => ({}));
-          const data = saleJson?.data;
-          if (data) {
-            const items = Array.isArray(data.items) ? data.items : [];
-            const mappedItems = items.map((it: any) => ({
-              produto: String(it?.product_name || it?.produto || '').trim(),
-              quantidade: Number(it?.quantity) || 1,
-              preco_unitario: Number(it?.unit_price) || 0,
-              subtotal: Number(it?.subtotal) || (Number(it?.unit_price) || 0) * (Number(it?.quantity) || 1),
-              product_id: null as any, // detalhe atual não retorna product_id; usuário pode escolher no combo
-            }));
-
-            setEditFormData((prev) => ({
-              ...prev,
-              cliente: String(data.customer_name || prev.cliente || ''),
-              customer_id: data.customer_id ?? null,
-              delivery_address: String(data.delivery_address || ''),
-              total: Number(data.total_amount ?? prev.total ?? 0),
-              itens: mappedItems,
-            }));
-          }
-        }
-
-        // 2) Clientes (para selecionar/pesquisar)
-        try {
-          const cParams = new URLSearchParams({ tenant_id: tenant.id });
-          if (scope === 'all') cParams.set('branch_scope', 'all');
-          if (scope === 'branch' && branchId) cParams.set('branch_id', String(branchId));
-          const cRes = await fetch(`/next_api/customers?${cParams.toString()}`);
-          if (cRes.ok) {
-            const cJson = await cRes.json().catch(() => ({}));
-            const rows = Array.isArray(cJson?.data) ? cJson.data : [];
-            setCustomersForEdit(
-              rows
-                .filter((c: any) => c?.id && c?.name)
-                .map((c: any) => ({
-                  id: Number(c.id),
-                  name: String(c.name),
-                  document: c.document || null,
-                  phone: c.phone || null,
-                }))
-            );
-          }
-        } catch { }
-
-        // 3) Produtos (para selecionar/pesquisar nos itens)
-        try {
-          const pParams = new URLSearchParams({ tenant_id: tenant.id });
-          // Mantemos o comportamento atual: matriz vê todos
-          pParams.set('branch_scope', 'all');
-          const pRes = await fetch(`/next_api/products?${pParams.toString()}`);
-          if (pRes.ok) {
-            const pJson = await pRes.json().catch(() => ({}));
-            const rows = Array.isArray(pJson?.data) ? pJson.data : [];
-            setProductsForEdit(
-              rows
-                .filter((p: any) => p?.id && p?.name)
-                .map((p: any) => ({
-                  id: Number(p.id),
-                  name: String(p.name),
-                  sku: p.sku || null,
-                  sale_price: typeof p.sale_price === 'number' ? p.sale_price : Number(p.sale_price) || null,
-                }))
-            );
-          }
-        } catch { }
-      } finally {
-        setLoadingEditDetails(false);
-      }
-    };
-
-    loadEditResources();
-  }, [showEditDialog, selectedVenda, tenant?.id, scope, branchId]);
-
-  const handleSalvarEdicao = async () => {
-    if (!selectedVenda) return;
-
-    try {
-      const updateData: any = {
-        customer_name: editFormData.cliente,
-        customer_id: editFormData.customer_id ?? null,
-        delivery_address: editFormData.delivery_address || '',
-        payment_method: editFormData.forma_pagamento,
-        status: editFormData.status,
-        notes: editFormData.observacoes || '',
-      };
-
-      if (editFormData.total !== undefined) {
-        updateData.total_amount = editFormData.total;
-      }
-
-      // Atualizar itens (produto vendido) se existirem no form
-      if (Array.isArray(editFormData.itens)) {
-        updateData.products = editFormData.itens
-          .map((it: any) => ({
-            id: it?.product_id ?? null,
-            name: String(it?.produto || '').trim(),
-            price: Number(it?.preco_unitario),
-            quantity: Number(it?.quantidade),
-            discount: 0,
-          }))
-          .filter((p: any) => p.name && Number.isFinite(p.price) && Number.isFinite(p.quantity) && p.quantity > 0);
-      }
-
-      const response = await fetch(`/next_api/sales/${selectedVenda.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updateData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao atualizar venda');
-      }
-
-      toast.success('Venda atualizada com sucesso');
-      setShowEditDialog(false);
-      setEditFormData({});
-      loadVendas(); // Recarregar lista
-    } catch (error) {
-      console.error('Erro ao atualizar venda:', error);
-      toast.error(error instanceof Error ? error.message : 'Erro ao atualizar venda');
-    }
   };
 
   const loadDeliveryDrivers = useCallback(async () => {
@@ -2028,288 +1878,26 @@ export default function VendasPage() {
         </Dialog>
 
         {/* Dialog de Edição da Venda */}
-        < Dialog open={showEditDialog} onOpenChange={setShowEditDialog} >
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Editar Venda</DialogTitle>
+        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+          <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden p-0">
+            <DialogHeader className="px-6 pt-6 pb-4 border-b bg-muted/30">
+              <DialogTitle className="text-xl font-bold">Editar Venda de Balcão</DialogTitle>
               <DialogDescription>
                 Edite as informações da venda {selectedVenda?.numero}
               </DialogDescription>
             </DialogHeader>
-            {selectedVenda && (
-              <div className="space-y-4 py-4">
-                <div className="grid gap-2">
-                  <Label>Cliente</Label>
-                  <div className="space-y-2">
-                    <AutocompleteInput
-                      value={editFormData.cliente || ''}
-                      onChange={(text) => {
-                        // Ao digitar, vira cliente avulso automaticamente
-                        setEditFormData((prev) => ({ ...prev, cliente: text, customer_id: null }));
-                      }}
-                      onPick={(opt) => {
-                        if (opt.value === '__walkin__') {
-                          setEditFormData((prev) => ({ ...prev, customer_id: null }));
-                          return;
-                        }
-                        const id = Number(opt.value);
-                        const c = customersForEdit.find((x) => x.id === id);
-                        setEditFormData((prev) => ({
-                          ...prev,
-                          customer_id: Number.isFinite(id) ? id : null,
-                          cliente: c?.name || opt.label || prev.cliente,
-                        }));
-                      }}
-                      placeholder={loadingEditDetails ? 'Carregando...' : 'Pesquisar cliente (ou digitar avulso)...'}
-                      disabled={loadingEditDetails}
-                      options={[
-                        { value: '__walkin__', label: 'Cliente avulso (não vincular)', keywords: 'avulso' },
-                        ...customersForEdit.map((c) => ({
-                          value: String(c.id),
-                          label: `${c.name}${c.document ? ` — ${c.document}` : ''}${c.phone ? ` — ${c.phone}` : ''}`,
-                          keywords: `${c.name} ${c.document || ''} ${c.phone || ''}`,
-                        })),
-                      ]}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="delivery_address">Endereço do Cliente / Entrega</Label>
-                  <Input
-                    id="delivery_address"
-                    type="text"
-                    value={editFormData.delivery_address || ''}
-                    onChange={(e) => setEditFormData(prev => ({ ...prev, delivery_address: e.target.value }))}
-                    placeholder="Rua, número, bairro, cidade..."
-                    className="col-span-full"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Se preenchido, aparece no cupom. Caso contrário, usa o endereço cadastrado do cliente.
-                  </p>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label>Produtos vendidos</Label>
-                  <div className="space-y-2 rounded-md border p-3">
-                    {Array.isArray(editFormData.itens) && editFormData.itens.length > 0 ? (
-                      (editFormData.itens as any[]).map((it, idx) => (
-                        <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                          <div className="col-span-6">
-                            <AutocompleteInput
-                              value={it.produto || ''}
-                              onChange={(text) => {
-                                // Ao digitar, vira produto manual automaticamente
-                                setEditFormData((prev) => {
-                                  const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
-                                  const qty = Number((itens[idx] as any)?.quantidade) || 1;
-                                  const price = Number((itens[idx] as any)?.preco_unitario) || 0;
-                                  (itens[idx] as any) = {
-                                    ...(itens[idx] as any),
-                                    product_id: null,
-                                    produto: text,
-                                    subtotal: qty * price,
-                                  };
-                                  return { ...prev, itens };
-                                });
-                              }}
-                              onPick={(opt) => {
-                                if (opt.value === '__custom__') {
-                                  setEditFormData((prev) => {
-                                    const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
-                                    (itens[idx] as any) = { ...(itens[idx] as any), product_id: null };
-                                    return { ...prev, itens };
-                                  });
-                                  return;
-                                }
-                                const id = Number(opt.value);
-                                const p = productsForEdit.find((x) => x.id === id);
-                                setEditFormData((prev) => {
-                                  const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
-                                  const qty = Number((itens[idx] as any)?.quantidade) || 1;
-                                  const price = Number(p?.sale_price) || Number((itens[idx] as any)?.preco_unitario) || 0;
-                                  (itens[idx] as any) = {
-                                    ...(itens[idx] as any),
-                                    product_id: Number.isFinite(id) ? id : null,
-                                    produto: p?.name || opt.label || (itens[idx] as any)?.produto || '',
-                                    preco_unitario: price,
-                                    subtotal: qty * price,
-                                  };
-                                  return { ...prev, itens };
-                                });
-                              }}
-                              placeholder={loadingEditDetails ? 'Carregando...' : 'Pesquisar produto (ou digitar manual)...'}
-                              disabled={loadingEditDetails}
-                              options={[
-                                { value: '__custom__', label: 'Produto manual (não vincular)', keywords: 'manual' },
-                                ...productsForEdit.map((p) => ({
-                                  value: String(p.id),
-                                  label: `${p.name}${p.sku ? ` — ${p.sku}` : ''}${p.sale_price ? ` — R$ ${Number(p.sale_price).toFixed(2)}` : ''}`,
-                                  keywords: `${p.name} ${p.sku || ''}`,
-                                })),
-                              ]}
-                            />
-                          </div>
-                          <div className="col-span-3">
-                            <Label className="text-xs text-muted-foreground">Qtd</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={it.quantidade ?? 1}
-                              onChange={(e) => {
-                                const q = Number(e.target.value) || 0;
-                                setEditFormData((prev) => {
-                                  const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
-                                  const price = Number((itens[idx] as any)?.preco_unitario) || 0;
-                                  (itens[idx] as any) = { ...(itens[idx] as any), quantidade: q, subtotal: q * price };
-                                  return { ...prev, itens };
-                                });
-                              }}
-                            />
-                          </div>
-                          <div className="col-span-3">
-                            <Label className="text-xs text-muted-foreground">R$ Unit.</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={it.preco_unitario ?? 0}
-                              onChange={(e) => {
-                                const pr = Number(e.target.value) || 0;
-                                setEditFormData((prev) => {
-                                  const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
-                                  const qty = Number((itens[idx] as any)?.quantidade) || 0;
-                                  (itens[idx] as any) = { ...(itens[idx] as any), preco_unitario: pr, subtotal: qty * pr };
-                                  return { ...prev, itens };
-                                });
-                              }}
-                            />
-                          </div>
-                          <div className="col-span-12 flex justify-between items-center">
-                            <span className="text-xs text-muted-foreground">
-                              Subtotal: R$ {Number(it.subtotal ?? (Number(it.quantidade) || 0) * (Number(it.preco_unitario) || 0)).toFixed(2)}
-                            </span>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                setEditFormData((prev) => {
-                                  const itens = Array.isArray(prev.itens) ? [...prev.itens] : [];
-                                  itens.splice(idx, 1);
-                                  return { ...prev, itens };
-                                })
-                              }
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          {idx < (editFormData.itens as any[]).length - 1 ? <div className="col-span-12 border-t my-2" /> : null}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-sm text-muted-foreground">Nenhum item encontrado nesta venda.</div>
-                    )}
-
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() =>
-                          setEditFormData((prev) => ({
-                            ...prev,
-                            itens: [
-                              ...(Array.isArray(prev.itens) ? prev.itens : []),
-                              { produto: '', quantidade: 1, preco_unitario: 0, subtotal: 0, product_id: null },
-                            ],
-                          }))
-                        }
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Adicionar item
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          const itens = Array.isArray(editFormData.itens) ? (editFormData.itens as any[]) : [];
-                          const total = itens.reduce((acc, it) => acc + (Number(it.subtotal) || (Number(it.quantidade) || 0) * (Number(it.preco_unitario) || 0)), 0);
-                          setEditFormData((prev) => ({ ...prev, total }));
-                        }}
-                      >
-                        Recalcular total
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="forma_pagamento">Forma de Pagamento</Label>
-                  <select
-                    id="forma_pagamento"
-                    className="px-3 py-2 border rounded-md bg-background text-foreground border-input"
-                    value={editFormData.forma_pagamento || 'dinheiro'}
-                    onChange={(e) => setEditFormData(prev => ({ ...prev, forma_pagamento: e.target.value as Sale['forma_pagamento'] }))}
-                  >
-                    <option value="dinheiro">Dinheiro</option>
-                    <option value="cartao_debito">Cartão Débito</option>
-                    <option value="cartao_credito">Cartão Crédito</option>
-                    <option value="pix">PIX</option>
-                    <option value="boleto">Boleto</option>
-                  </select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="status">Status</Label>
-                  <select
-                    id="status"
-                    className="px-3 py-2 border rounded-md bg-background text-foreground border-input"
-                    value={editFormData.status || 'pendente'}
-                    onChange={(e) => setEditFormData(prev => ({ ...prev, status: e.target.value as Sale['status'] }))}
-                  >
-                    <option value="pendente">Pendente</option>
-                    <option value="paga">Paga</option>
-                    <option value="cancelada">Cancelada</option>
-                  </select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="total">Total (R$)</Label>
-                  <Input
-                    id="total"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={editFormData.total || 0}
-                    onChange={(e) => setEditFormData(prev => ({ ...prev, total: parseFloat(e.target.value) || 0 }))}
-                    placeholder="0.00"
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="observacoes">Observações</Label>
-                  <textarea
-                    id="observacoes"
-                    className="px-3 py-2 border rounded-md min-h-[80px] bg-background text-foreground border-input"
-                    value={editFormData.observacoes || ''}
-                    onChange={(e) => setEditFormData(prev => ({ ...prev, observacoes: e.target.value }))}
-                    placeholder="Observações adicionais..."
-                  />
-                </div>
-              </div>
-            )}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => {
-                setShowEditDialog(false);
-                setEditFormData({});
-              }}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSalvarEdicao} className="bg-emerald-600 hover:bg-emerald-700">
-                Salvar Alterações
-              </Button>
-            </DialogFooter>
+            <div className="p-6 overflow-y-auto max-h-[calc(95vh-120px)]">
+              {showEditDialog && (
+                <NewSaleForm
+                  saleId={selectedVenda?.id}
+                  onSuccess={() => {
+                    setShowEditDialog(false);
+                    loadVendas();
+                  }}
+                  onCancel={() => setShowEditDialog(false)}
+                />
+              )}
+            </div>
           </DialogContent>
         </Dialog>
 

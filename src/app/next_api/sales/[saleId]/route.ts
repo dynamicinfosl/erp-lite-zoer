@@ -175,12 +175,20 @@ export async function GET(
       tenant_id: sale.tenant_id,
       sale_source: sale.sale_source,
       sale_type: sale.sale_type,
-      items: items?.map(item => ({
-        product_name: item.product_name,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        subtotal: item.subtotal || item.total_price || (item.unit_price * item.quantity)
-      })) || []
+      items: items?.map(item => {
+        const itemUnitPrice = Number(item.unit_price) || 0;
+        const itemQuantity = Number(item.quantity) || 0;
+        const itemSubtotal = Number(item.subtotal || item.total_price || (itemUnitPrice * itemQuantity));
+        const itemDiscount = Math.max(0, (itemUnitPrice * itemQuantity) - itemSubtotal);
+        return {
+          product_id: item.product_id || null,
+          product_name: item.product_name,
+          quantity: itemQuantity,
+          unit_price: itemUnitPrice,
+          discount: itemDiscount,
+          subtotal: itemSubtotal
+        };
+      }) || []
     };
 
     console.log('✅ Retornando dados da venda:', saleData);
@@ -256,6 +264,9 @@ export async function PUT(
     if (body.payment_method !== undefined) updateData.payment_method = body.payment_method;
     if (body.status !== undefined) updateData.status = body.status;
     if (body.notes !== undefined) updateData.notes = body.notes;
+    if (body.seller_name !== undefined) updateData.seller_name = body.seller_name;
+    if (body.delivery_date !== undefined) updateData.delivery_date = body.delivery_date === null ? null : body.delivery_date;
+    if (body.carrier_name !== undefined) updateData.carrier_name = body.carrier_name;
     if (body.delivery_address !== undefined) {
       const addr = String(body.delivery_address || '').trim();
       updateData.delivery_address = addr.length > 0 ? addr : null;

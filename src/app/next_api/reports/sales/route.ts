@@ -27,6 +27,7 @@ async function handler(request: NextRequest): Promise<Response> {
   const end = searchParams.get('end') || ''
   const user_id = searchParams.get('user_id') || ''
   const sale_source = searchParams.get('sale_source') || ''
+  const exclude_api = searchParams.get('exclude_api') === 'true'
 
   if (!tenantId) {
     return NextResponse.json({ error: 'tenant_id é obrigatório' }, { status: 400 })
@@ -42,7 +43,9 @@ async function handler(request: NextRequest): Promise<Response> {
     let query = supabase
       .from('sales')
       .select('id, total_amount, final_amount, created_at')
-      .eq('tenant_id', tenantId);
+      .eq('tenant_id', tenantId)
+      // Excluir vendas canceladas (mantém status NULL, que são vendas válidas do PDV)
+      .or('status.is.null,and(status.neq.canceled,status.neq.cancelada)');
 
     // Filtrar por operador (user_id) se fornecido
     if (user_id && user_id.trim() !== '') {
@@ -50,7 +53,9 @@ async function handler(request: NextRequest): Promise<Response> {
     }
 
     // Filtrar por origem (ex.: apenas vendas do PDV, excluindo API)
-    if (sale_source && sale_source.trim() !== '') {
+    if (exclude_api) {
+      query = query.or('sale_source.is.null,sale_source.neq.api');
+    } else if (sale_source && sale_source.trim() !== '') {
       query = query.eq('sale_source', sale_source.trim());
     }
 

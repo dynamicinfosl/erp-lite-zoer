@@ -101,10 +101,10 @@ export default function EntregasPage() {
     try {
       setLoading(true);
       
-      // Carregar entregas e vendas canceladas em paralelo
+      // Carregar entregas e vendas canceladas em paralelo (com limite maior para cobrir histórico recente)
       const [deliveriesRes, salesRes] = await Promise.all([
-        fetch(`/next_api/deliveries?tenant_id=${tenant.id}`),
-        fetch(`/next_api/sales?tenant_id=${tenant.id}`)
+        fetch(`/next_api/deliveries?tenant_id=${tenant.id}&limit=1000`),
+        fetch(`/next_api/sales?tenant_id=${tenant.id}&limit=1000`)
       ]);
       
       if (!deliveriesRes.ok) {
@@ -120,7 +120,7 @@ export default function EntregasPage() {
       if (salesRes.ok) {
         const salesData = await salesRes.json();
         const sales = Array.isArray(salesData?.sales) ? salesData.sales : (salesData?.data || []);
-        const cancelledSales = sales.filter((s: any) => s.status === 'cancelada');
+        const cancelledSales = sales.filter((s: any) => s.status === 'cancelada' || s.status === 'canceled');
         const cancelledIds = new Set<number>(cancelledSales.map((s: any) => Number(s.id)));
         console.log('🔍 Vendas canceladas encontradas:', cancelledSales.length, 'IDs:', Array.from(cancelledIds));
         setCancelledSaleIds(cancelledIds);
@@ -157,7 +157,7 @@ export default function EntregasPage() {
     }
     try {
       setLoadingManifests(true);
-      const res = await fetch(`/next_api/delivery-manifests?tenant_id=${encodeURIComponent(tenant.id)}&status=aberta`);
+      const res = await fetch(`/next_api/delivery-manifests?tenant_id=${encodeURIComponent(tenant.id)}&status=aberta&limit=200`);
       if (!res.ok) {
         setManifests([]);
       } else {

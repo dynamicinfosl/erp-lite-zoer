@@ -27,6 +27,7 @@ import {
   CreditCard,
   Building2,
   UsersRound,
+  Database,
 } from 'lucide-react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { ENABLE_AUTH } from '@/constants/auth';
@@ -49,6 +50,7 @@ const menuGroups = [
       { title: 'Relatórios', url: '/relatorios', icon: BarChart3, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Estoque', url: '/estoque', icon: Warehouse, roles: ['admin', 'vendedor'] },
       { title: 'Filiais', url: '/filiais', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Notas Fiscais', url: '/notas-fiscais', icon: Receipt, roles: ['admin', 'vendedor', 'financeiro'] },
     ],
   },
   {
@@ -70,6 +72,7 @@ const menuGroups = [
       { title: 'Assinatura', url: '/assinatura', icon: CreditCard, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Usuários', url: '/configuracoes/usuarios', icon: Users, roles: ['admin'] },
       { title: 'Configurações', url: '/configuracoes', icon: Settings, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Migrar Dados', url: '/migrar', icon: Database, roles: ['admin'] },
       { title: 'Perfil Empresa', url: '/perfil-empresa', icon: Store, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Perfil Usuário', url: '/perfil-usuario', icon: UserCog, roles: ['admin', 'vendedor', 'financeiro'] },
     ],

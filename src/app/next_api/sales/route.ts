@@ -36,7 +36,8 @@ async function createSaleHandler(request: NextRequest) {
       payment_condition,
       delivery_date,
       delivery_address,
-      notes
+      notes,
+      cash_session_id
     } = body;
 
     // Usar total_amount se fornecido, senão usar total
@@ -203,7 +204,7 @@ async function createSaleHandler(request: NextRequest) {
       tenant_id: tenant_id, // ✅ Usar tenant_id validado
       user_id: user_id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
       branch_id: branch_id || null,
-      sale_type: sale_type || null, // ✅ Usar NULL como padrão
+      sale_type: sale_type || (sale_source === 'produtos' ? 'produtos' : null), // ✅ Usar NULL como padrão
       sale_number: saleNumber,
       customer_id: finalCustomerId,
       customer_name: customer_name || body.customer_name || 'Cliente Avulso',
@@ -233,6 +234,13 @@ async function createSaleHandler(request: NextRequest) {
     }
     if (delivery_address) {
       saleData.delivery_address = delivery_address;
+    }
+    // Vincular a venda à sessão de caixa aberta (evita dupla contagem em sessões sobrepostas)
+    if (cash_session_id) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(String(cash_session_id))) {
+        saleData.cash_session_id = String(cash_session_id);
+      }
     }
 
     const { data: sale, error: saleError } = await supabaseAdmin
@@ -424,6 +432,9 @@ async function listSalesHandler(request: NextRequest) {
     const branch_scope = searchParams.get('branch_scope'); // 'all' | 'branch'
     const tzParam = searchParams.get('tz'); // minutos de offset do fuso (ex: -180 para BRT)
     const user_id = searchParams.get('user_id'); // filtrar por operador/vendedor
+    const cash_session_id = searchParams.get('cash_session_id'); // filtrar por sessão de caixa
+    const sale_type = searchParams.get('sale_type'); // filtrar por tipo de venda (ex: produtos, balcao)
+    const exclude_api = searchParams.get('exclude_api') === 'true';
 
     // Filtros de paginação e busca
     const page = parseInt(searchParams.get('page') || '1', 10);
@@ -442,7 +453,7 @@ async function listSalesHandler(request: NextRequest) {
     // Usamos count: 'exact' para obter o total de registros que satisfazem os filtros
     let query = supabaseAdmin
       .from('sales')
-      .select('id, sale_number, customer_id, customer_name, total_amount, final_amount, discount_amount, payment_method, sale_type, sale_source, status, notes, created_at, updated_at, user_id', { count: 'exact' });
+      .select('id, sale_number, customer_id, customer_name, total_amount, final_amount, discount_amount, payment_method, sale_type, sale_source, status, notes, created_at, updated_at, user_id, cash_session_id', { count: 'exact' });
 
     // Filtrar por tenant_id se fornecido
     if (tenant_id && tenant_id !== '00000000-0000-0000-0000-000000000000') {
@@ -467,14 +478,26 @@ async function listSalesHandler(request: NextRequest) {
       }
     }
 
-    if (sale_source) {
+    if (exclude_api) {
+      query = query.or('sale_source.is.null,sale_source.neq.api');
+    } else if (sale_source) {
       query = query.eq('sale_source', sale_source);
+    }
+
+    if (sale_type) {
+      query = query.eq('sale_type', sale_type);
     }
 
     // Filtrar por operador/usuário (user_id) se fornecido
     if (user_id && user_id.trim() !== '') {
       query = query.eq('user_id', user_id.trim());
       console.log(`🔍 Filtrando por operador (user_id): ${user_id}`);
+    }
+
+    // Filtrar por sessão de caixa se fornecido (vínculo direto venda↔sessão)
+    if (cash_session_id && cash_session_id.trim() !== '') {
+      query = query.eq('cash_session_id', cash_session_id.trim());
+      console.log(`🔍 Filtrando por sessão de caixa (cash_session_id): ${cash_session_id}`);
     }
 
     // Filtros de busca (ilike no numero ou nome do cliente)

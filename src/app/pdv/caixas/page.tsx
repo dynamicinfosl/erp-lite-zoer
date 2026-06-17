@@ -294,6 +294,53 @@ export default function CaixasPage() {
       return [];
     }
 
+    // Mapeia uma linha de venda da API para o formato usado no fechamento
+    const mapSaleRow = (sale: any) => ({
+      id: sale.id,
+      total: parseFloat(sale.total_amount || sale.final_amount || sale.total || 0),
+      forma_pagamento: sale.payment_method || sale.forma_pagamento || 'dinheiro',
+      status: sale.status === 'completed' || sale.status === 'paid' ? 'paga' : (sale.status || 'paga'),
+      created_at: sale.created_at,
+    });
+
+    // Considera paga: PDV grava status null; também aceitamos paga/completed/paid
+    const isPaidSale = (sale: any) =>
+      sale.status === 'paga' || sale.status === 'completed' || sale.status === 'paid' ||
+      sale.status === null || sale.status === undefined;
+
+    // 1) Tentativa preferencial: vendas vinculadas diretamente à sessão (cash_session_id).
+    //    Elimina a dupla contagem em sessões sobrepostas do mesmo operador.
+    try {
+      const sessionIdStr = String(session.id).trim();
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(sessionIdStr)) {
+        const linkedParams = new URLSearchParams({
+          tenant_id: tenant.id,
+          branch_scope: 'all',
+          cash_session_id: sessionIdStr,
+          limit: '1000',
+        });
+        const linkedRes = await fetch(`/next_api/sales?${linkedParams.toString()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' },
+        });
+        if (linkedRes.ok) {
+          const linkedData = await linkedRes.json();
+          const linkedSales = (linkedData.sales || linkedData.data || []).filter((sale: any) =>
+            sale.sale_source === 'pdv' && isPaidSale(sale)
+          );
+          if (linkedSales.length > 0) {
+            console.log('[Caixas] Vendas vinculadas por cash_session_id:', linkedSales.length);
+            return linkedSales.map(mapSaleRow);
+          }
+          console.log('[Caixas] Nenhuma venda vinculada por cash_session_id; usando fallback por janela de tempo.');
+        }
+      }
+    } catch (error) {
+      console.warn('[Caixas] Falha ao buscar vendas vinculadas; usando fallback:', error);
+    }
+
+    // 2) Fallback (sessões antigas sem vínculo): janela de tempo por operador.
     try {
       const sessionOpenedAt = new Date(session.opened_at);
       const sessionClosedAt = session.closed_at ? new Date(session.closed_at) : new Date();

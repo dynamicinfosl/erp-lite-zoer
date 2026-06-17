@@ -51,8 +51,11 @@ import {
   Clock,
   Printer,
   FileText,
-  Truck
+  Truck,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { JugaKPICard } from '@/components/dashboard/JugaComponents';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
@@ -104,10 +107,15 @@ export default function VendasProdutosPage() {
   const [vendas, setVendas] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalSales, setTotalSales] = useState(0);
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [selectedVenda, setSelectedVenda] = useState<Sale | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showNewSaleDialog, setShowNewSaleDialog] = useState(false);
+  const [showEditSaleDialog, setShowEditSaleDialog] = useState(false);
+  const [selectedVendaId, setSelectedVendaId] = useState<string | undefined>(undefined);
   const [selectedVendas, setSelectedVendas] = useState<Set<string>>(new Set());
 
   // Estados para modal de entrega
@@ -156,8 +164,9 @@ export default function VendasProdutosPage() {
       
       const params = new URLSearchParams({
         tenant_id: tenant.id,
-        sale_source: 'produtos',
-        branch_scope: shouldUseMatrix ? 'all' : (scope || 'all')
+        sale_type: 'produtos',
+        branch_scope: shouldUseMatrix ? 'all' : (scope || 'all'),
+        limit: '5000'
       });
 
       if (!shouldUseMatrix && branchId) {
@@ -224,7 +233,7 @@ export default function VendasProdutosPage() {
           total: Number(s.total_amount ?? s.final_amount ?? s.total ?? 0),
           forma_pagamento: (s.payment_method ?? 'dinheiro') as Sale['forma_pagamento'],
           status: (() => {
-            if (s.status === null || s.status === 'completed' || s.status === 'paga') {
+            if (s.status === null || s.status === 'completed' || s.status === 'paga' || s.status === 'finalizada') {
               return 'paga' as Sale['status'];
             }
             if (s.status === 'canceled' || s.status === 'cancelada') {
@@ -275,6 +284,97 @@ export default function VendasProdutosPage() {
 
     return matchesSearch && matchesAdvanced;
   });
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, advancedFilters]);
+
+  const paginatedVendas = filteredVendas.slice((page - 1) * pageSize, page * pageSize);
+
+  const renderPagination = () => {
+    const totalSales = filteredVendas.length;
+    const totalPages = Math.max(1, Math.ceil(totalSales / pageSize));
+    const startRange = totalSales === 0 ? 0 : (page - 1) * pageSize + 1;
+    const endRange = Math.min(page * pageSize, totalSales);
+
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-3 border border-border bg-slate-50/10 dark:bg-slate-900/10 px-4 rounded-lg my-3">
+        <div className="text-sm text-muted-foreground order-2 sm:order-1">
+          Mostrando <span className="font-medium text-foreground">{startRange}</span> a <span className="font-medium text-foreground">{endRange}</span> de <span className="font-medium text-foreground">{totalSales}</span> vendas
+        </div>
+
+        <div className="flex items-center gap-2 order-1 sm:order-2">
+          <div className="flex items-center gap-2 mr-4">
+            <span className="text-sm text-muted-foreground hidden sm:inline">Itens por página:</span>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(val) => {
+                setPageSize(Number(val));
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="h-8 w-[70px]">
+                <SelectValue placeholder={String(pageSize)} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setPage(1)}
+              disabled={page === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-4 w-4 -ml-2" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setPage(prev => Math.max(1, prev - 1))}
+              disabled={page === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+
+            <div className="flex items-center px-3 h-8 rounded-md border border-border bg-background text-sm font-medium">
+              Página {page} de {totalPages}
+            </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={page >= totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setPage(totalPages)}
+              disabled={page >= totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4 -ml-2" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -346,6 +446,11 @@ export default function VendasProdutosPage() {
   const handleVerDetalhes = (venda: Sale) => {
     setSelectedVenda(venda);
     setShowDetailsDialog(true);
+  };
+
+  const handleEditar = (venda: Sale) => {
+    setSelectedVendaId(venda.id);
+    setShowEditSaleDialog(true);
   };
 
   const handleImprimirA4 = (venda: Sale) => {
@@ -808,6 +913,7 @@ export default function VendasProdutosPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {!loading && filteredVendas.length > 0 && renderPagination()}
           {loading ? (
             <div className="text-center py-8 text-muted-foreground">Carregando vendas...</div>
           ) : (
@@ -828,7 +934,7 @@ export default function VendasProdutosPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredVendas.map((venda) => (
+                {paginatedVendas.map((venda) => (
                   <TableRow key={venda.id}>
                     {columnVisibility.numero && (
                       <TableCell className="font-mono text-sm font-medium">
@@ -888,10 +994,14 @@ export default function VendasProdutosPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleVerDetalhes(venda)}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            Ver Detalhes
-                          </DropdownMenuItem>
+                           <DropdownMenuItem onClick={() => handleVerDetalhes(venda)}>
+                             <Eye className="h-4 w-4 mr-2" />
+                             Ver Detalhes
+                           </DropdownMenuItem>
+                           <DropdownMenuItem onClick={() => handleEditar(venda)}>
+                             <Edit className="h-4 w-4 mr-2" />
+                             Editar
+                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleImprimirA4(venda)}>
                             <FileText className="h-4 w-4 mr-2" />
                             Imprimir A4
@@ -938,6 +1048,8 @@ export default function VendasProdutosPage() {
               </div>
             </div>
           )}
+
+          {!loading && filteredVendas.length > 0 && renderPagination()}
 
           {filteredVendas.length === 0 && !loading && (
             <div className="text-center py-8 text-muted-foreground">
@@ -1069,6 +1181,30 @@ export default function VendasProdutosPage() {
           </DialogHeader>
           <div className="overflow-y-auto max-h-[calc(95vh-120px)] px-6 py-4">
             <NewSaleForm onSuccess={handleSaleCreated} onCancel={() => setShowNewSaleDialog(false)} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Editar Venda */}
+      <Dialog open={showEditSaleDialog} onOpenChange={setShowEditSaleDialog}>
+        <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden p-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b bg-muted/30">
+            <DialogTitle className="text-xl font-bold">Editar Venda de Produtos</DialogTitle>
+            <DialogDescription>
+              Modifique as informações da venda de produtos
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto max-h-[calc(95vh-120px)] px-6 py-4">
+            {showEditSaleDialog && (
+              <NewSaleForm 
+                saleId={selectedVendaId} 
+                onSuccess={() => {
+                  setShowEditSaleDialog(false);
+                  loadVendas();
+                }} 
+                onCancel={() => setShowEditSaleDialog(false)} 
+              />
+            )}
           </div>
         </DialogContent>
       </Dialog>
