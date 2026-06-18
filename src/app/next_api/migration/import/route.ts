@@ -305,10 +305,14 @@ async function importSales(tenantId: string, userId: string, data: any): Promise
       else status = 'completed';
     }
 
+    // 'Data' = data real da venda; 'Cadastrado em' = data de registro no sistema (podem divergir)
+    const soldAt =
+      parseBrazilianDate(g('Data')) ||
+      parseBrazilianDate(g('Cadastrado em')) ||
+      new Date().toISOString();
     const createdAt =
       parseBrazilianDate(g('Cadastrado em')) ||
-      parseBrazilianDate(g('Data')) ||
-      new Date().toISOString();
+      soldAt;
 
     newSales.push({
       pedido,
@@ -329,7 +333,7 @@ async function importSales(tenantId: string, userId: string, data: any): Promise
         status,
         notes: cleanString(g('Observações', 'Observacoes')),
         internal_notes: cleanString(g('Observações interna', 'Observacoes interna')),
-        sold_at: createdAt,
+        sold_at: soldAt,
         created_at: createdAt,
         updated_at: new Date().toISOString(),
       },
