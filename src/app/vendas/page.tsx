@@ -889,8 +889,9 @@ export default function VendasPage() {
 
       toast.success("NFC-e enviada com sucesso!", { id: toastId });
       
-      if (result.provider_response?.pdf_url) {
-        window.open(result.provider_response.pdf_url, '_blank');
+      const pdfUrl = result.provider_response?.pdf_url || result.provider_response?.caminho_danfe || result.provider_response?.caminho_pdf;
+      if (pdfUrl) {
+        window.open(pdfUrl, '_blank');
       }
     } catch (error: any) {
       console.error("Erro ao emitir NFC-e:", error);

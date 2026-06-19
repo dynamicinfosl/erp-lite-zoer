@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { tenant_id, api_token, environment = 'homologacao', cnpj_emitente, enabled = true } = body as {
+    const { tenant_id, api_token, environment, cnpj_emitente, enabled = true } = body as {
       tenant_id?: string;
       api_token?: string;
       environment?: Environment;
@@ -51,14 +51,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'api_token é obrigatório' }, { status: 400, headers: jsonHeaders });
     }
 
-    if (environment !== 'homologacao' && environment !== 'producao') {
+    if (environment && environment !== 'homologacao' && environment !== 'producao') {
       return NextResponse.json({ error: 'environment inválido (use homologacao ou producao)' }, { status: 400, headers: jsonHeaders });
+    }
+
+    // Buscar ambiente existente se não foi enviado no payload
+    let finalEnvironment = environment;
+    if (!finalEnvironment) {
+      const { data: existing } = await supabaseAdmin
+        .from('fiscal_integrations')
+        .select('environment')
+        .eq('tenant_id', tenant_id)
+        .eq('provider', 'focusnfe')
+        .maybeSingle();
+      finalEnvironment = existing?.environment || 'homologacao';
     }
 
     const payload: any = {
       tenant_id,
       provider: 'focusnfe',
-      environment,
+      environment: finalEnvironment,
       api_token,
       enabled,
       updated_at: new Date().toISOString(),
@@ -96,16 +108,17 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const tenant_id = searchParams.get('tenant_id');
+    const rawTenantId = searchParams.get('tenant_id');
+    const tenant_id = rawTenantId ? rawTenantId.trim() : '';
 
     if (!tenant_id) {
-      return NextResponse.json({ error: 'tenant_id é obrigatório' }, { status: 400, headers: jsonHeaders });
+      return NextResponse.json({ success: true, data: null }, { headers: jsonHeaders });
     }
 
     // Validar formato UUID básico
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(tenant_id)) {
-      return NextResponse.json({ error: 'tenant_id deve ser um UUID válido' }, { status: 400, headers: jsonHeaders });
+      return NextResponse.json({ success: true, data: null }, { headers: jsonHeaders });
     }
 
     const { data, error } = await supabaseAdmin
@@ -117,15 +130,16 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Erro ao buscar integração:', error);
-      return NextResponse.json({ error: 'Erro ao buscar integração', details: error.message }, { status: 400, headers: jsonHeaders });
+      return NextResponse.json({ success: true, data: null }, { headers: jsonHeaders });
     }
 
     return NextResponse.json({ success: true, data: data || null }, { headers: jsonHeaders });
   } catch (error: any) {
     console.error('Erro interno na rota GET integration:', error);
     return NextResponse.json({ 
-      error: 'Erro interno do servidor', 
-      details: error?.message || 'Erro desconhecido' 
-    }, { status: 500, headers: jsonHeaders });
+      success: true,
+      data: null,
+      error_logged: error?.message || 'Erro desconhecido'
+    }, { headers: jsonHeaders });
   }
 }

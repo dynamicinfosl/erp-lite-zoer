@@ -525,6 +525,7 @@ export function NewSaleForm({ onSuccess, onCancel, saleId }: NewSaleFormProps) {
         user_id: user?.id || '00000000-0000-0000-0000-000000000000',
         branch_id: scope === 'branch' && branchId ? branchId : null,
         sale_source: 'produtos',
+        customer_id: formData.customer_id ? Number(formData.customer_id) : null,
         customer_name: formData.customer_name,
         seller_name: formData.seller_name,
         carrier_name: formData.carrier_name || null,
@@ -537,6 +538,7 @@ export function NewSaleForm({ onSuccess, onCancel, saleId }: NewSaleFormProps) {
         discount_amount: totals.total_discount,
         notes: formData.notes || null,
         internal_notes: formData.internal_notes || null,
+        created_at: formData.sale_date ? new Date(formData.sale_date + 'T12:00:00').toISOString() : undefined,
         products: items.map(item => ({
           id: item.product_id,
           name: item.product_name,

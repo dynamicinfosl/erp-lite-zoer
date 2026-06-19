@@ -63,9 +63,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'payload é obrigatório' }, { status: 400, headers: jsonHeaders });
     }
 
+    // 1. Buscar a configuração global (para obter o api_token e environment)
+    const { data: globalConfig, error: globalError } = await supabaseAdmin
+      .from('fiscal_integrations')
+      .select('environment, api_token, enabled')
+      .eq('tenant_id', '00000000-0000-0000-0000-000000000000')
+      .eq('provider', 'focusnfe')
+      .maybeSingle();
+
+    if (globalError) {
+      return NextResponse.json({ error: 'Erro ao buscar configuração global', details: globalError.message }, { status: 400, headers: jsonHeaders });
+    }
+
+    if (!globalConfig || !globalConfig.enabled || !globalConfig.api_token) {
+      return NextResponse.json({ error: 'Emissão fiscal global desabilitada ou credenciais do ERP ausentes.' }, { status: 400, headers: jsonHeaders });
+    }
+
     const { data: integration, error: integrationError } = await supabaseAdmin
       .from('fiscal_integrations')
-      .select('environment, api_token, enabled, focus_empresa_id')
+      .select('enabled, focus_empresa_id, focus_token_homologacao, focus_token_producao, cnpj_emitente, cert_cnpj')
       .eq('tenant_id', tenant_id)
       .eq('provider', 'focusnfe')
       .maybeSingle();
@@ -77,7 +93,7 @@ export async function POST(request: NextRequest) {
     if (!integration || !integration.enabled) {
       return NextResponse.json({ 
         error: 'Integração FocusNFe não configurada ou desabilitada para este tenant',
-        details: 'Configure a integração na página de Configuração Fiscal antes de emitir documentos'
+        details: 'Acesse a página de Configuração Fiscal antes de emitir documentos'
       }, { status: 400, headers: jsonHeaders });
     }
 
@@ -85,14 +101,20 @@ export async function POST(request: NextRequest) {
     if (!integration.focus_empresa_id) {
       return NextResponse.json({ 
         error: 'Empresa não provisionada na FocusNFe',
-        details: 'É necessário provisionar a empresa na FocusNFe antes de emitir documentos. Acesse a página de Configuração Fiscal e clique em "Provisionar Empresa"'
+        details: 'É necessário provisionar a empresa na FocusNFe antes de emitir documentos. Acesse a página de Configuração Fiscal e clique em "Ativar Faturamento"'
       }, { status: 400, headers: jsonHeaders });
     }
 
-    const environment = (integration.environment as Environment) || 'homologacao';
+    const environment = (globalConfig.environment as Environment) || 'homologacao';
     const baseUrl = getBaseUrl(environment);
 
     const finalRef = (ref && String(ref).trim()) ? String(ref).trim() : `fd_${randomUUID().replace(/-/g, '').slice(0, 24)}`;
+
+    // Injetar o CNPJ do emitente no payload se disponível e não preenchido
+    const issuerCnpj = (integration.cnpj_emitente || integration.cert_cnpj || '').replace(/\D/g, '');
+    if (issuerCnpj && payload && typeof payload === 'object' && !payload.cnpj_emitente) {
+      payload.cnpj_emitente = issuerCnpj;
+    }
 
     const { data: fiscalDoc, error: insertError } = await supabaseAdmin
       .from('fiscal_documents')
@@ -114,7 +136,9 @@ export async function POST(request: NextRequest) {
     }
 
     const url = `${baseUrl}/v2/${doc_type}?ref=${encodeURIComponent(finalRef)}`;
-    const token = integration.api_token;
+    const token = environment === 'producao'
+      ? (integration.focus_token_producao || globalConfig.api_token)
+      : (integration.focus_token_homologacao || globalConfig.api_token);
 
     let responseStatus = 0;
     let responseBody: any = null;
@@ -162,6 +186,13 @@ export async function POST(request: NextRequest) {
           },
           { status: 400, headers: jsonHeaders }
         );
+      }
+
+      if (responseBody) {
+        const path = responseBody.caminho_danfe || responseBody.caminho_pdf || responseBody.caminho_pdf_nota_fiscal;
+        if (path) {
+          responseBody.pdf_url = path.startsWith('http') ? path : `${baseUrl}${path}`;
+        }
       }
 
       return NextResponse.json({

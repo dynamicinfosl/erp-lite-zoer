@@ -88,7 +88,7 @@ export async function GET(
       console.log('🔍 Buscando dados do cliente:', sale.customer_id);
       const { data: customer, error: customerError } = await supabaseAdmin
         .from('customers')
-        .select('id, name, address, neighborhood, city, state, zipcode, phone, document')
+        .select('id, name, address, address_number, neighborhood, city, state, zipcode, phone, document')
         .eq('id', Number(sale.customer_id))
         .eq('tenant_id', sale.tenant_id)
         .single();
@@ -117,7 +117,7 @@ export async function GET(
         // 1) tentar match “exato” (sem curingas)
         let { data: customerByName, error: byNameError } = await supabaseAdmin
           .from('customers')
-          .select('id, name, address, neighborhood, city, state, zipcode, phone, document')
+          .select('id, name, address, address_number, neighborhood, city, state, zipcode, phone, document')
           .eq('tenant_id', sale.tenant_id)
           .ilike('name', name)
           .limit(1);
@@ -128,7 +128,7 @@ export async function GET(
           console.log('🔎 Fallback: tentando match parcial:', pattern);
           const res = await supabaseAdmin
             .from('customers')
-            .select('id, name, address, neighborhood, city, state, zipcode, phone, document')
+            .select('id, name, address, address_number, neighborhood, city, state, zipcode, phone, document')
             .eq('tenant_id', sale.tenant_id)
             .ilike('name', pattern)
             .limit(1);
@@ -155,6 +155,7 @@ export async function GET(
         id: customerData.id,
         name: customerData.name,
         address: customerData.address,
+        address_number: customerData.address_number,
         neighborhood: customerData.neighborhood,
         city: customerData.city,
         state: customerData.state,
@@ -267,22 +268,48 @@ export async function PUT(
     if (body.seller_name !== undefined) updateData.seller_name = body.seller_name;
     if (body.delivery_date !== undefined) updateData.delivery_date = body.delivery_date === null ? null : body.delivery_date;
     if (body.carrier_name !== undefined) updateData.carrier_name = body.carrier_name;
+    if (body.created_at !== undefined) {
+      updateData.created_at = body.created_at ? new Date(body.created_at).toISOString() : null;
+    }
     if (body.delivery_address !== undefined) {
       const addr = String(body.delivery_address || '').trim();
       updateData.delivery_address = addr.length > 0 ? addr : null;
     }
-    // Se vier total_amount explicitamente e não vier products, respeitar.
-    // Se vier products, o total será recalculado a partir dos itens (mais confiável).
+    if (body.discount_amount !== undefined) updateData.discount_amount = body.discount_amount === null ? null : Number(body.discount_amount);
+    if (body.internal_notes !== undefined) updateData.internal_notes = body.internal_notes;
+    if (body.payment_condition !== undefined) updateData.payment_condition = body.payment_condition;
+    if (body.branch_id !== undefined) updateData.branch_id = body.branch_id === null ? null : Number(body.branch_id);
+
     const hasProductsArray = Array.isArray(body?.products);
-    if (!hasProductsArray && body.total_amount !== undefined) {
+
+    // Se total_amount vier no body, priorizar. Caso contrário, recalcular a partir dos produtos.
+    if (body.total_amount !== undefined) {
       const total = parseFloat(body.total_amount);
       if (!isNaN(total) && total >= 0) {
         updateData.total_amount = total;
-        updateData.final_amount = total;
+        updateData.final_amount = body.final_amount !== undefined ? parseFloat(body.final_amount) : total;
       }
+    } else if (hasProductsArray) {
+      const products = body.products as any[];
+      const cleanedForTotal = products
+        .map((p) => ({
+          name: String(p?.name || p?.product_name || '').trim(),
+          price: Number(p?.price ?? p?.unit_price),
+          quantity: Number(p?.quantity),
+          discount: Number(p?.discount || 0),
+        }))
+        .filter((p) => p.name && Number.isFinite(p.price) && Number.isFinite(p.quantity) && p.quantity > 0);
+
+      const computedTotal = cleanedForTotal.reduce((acc, p) => {
+        const subtotal = (p.price * p.quantity) - p.discount;
+        return acc + subtotal;
+      }, 0);
+
+      updateData.total_amount = computedTotal;
+      updateData.final_amount = computedTotal;
     }
 
-    // ✅ Se vier products/items, atualizar também os itens da venda (sale_items) e recalcular total.
+    // ✅ Se vier products/items, atualizar também os itens da venda (sale_items)
     if (hasProductsArray) {
       const products = body.products as any[];
       const cleaned = products
@@ -295,16 +322,6 @@ export async function PUT(
         }))
         .filter((p) => p.name && Number.isFinite(p.price) && Number.isFinite(p.quantity) && p.quantity > 0);
 
-      // Recalcular total a partir dos itens
-      const computedTotal = cleaned.reduce((acc, p) => {
-        const discountAmount = (p.price * p.quantity * (p.discount || 0)) / 100;
-        const subtotal = (p.price * p.quantity) - discountAmount;
-        return acc + subtotal;
-      }, 0);
-
-      updateData.total_amount = computedTotal;
-      updateData.final_amount = computedTotal;
-
       // Substituir itens: apagar e inserir novamente
       const saleIdNum = Number(sale.id);
       await supabaseAdmin.from('sale_items').delete().eq('sale_id', saleIdNum);
@@ -314,8 +331,8 @@ export async function PUT(
       const now = new Date().toISOString();
 
       const saleItems = cleaned.map((p) => {
-        const discountAmount = (p.price * p.quantity * (p.discount || 0)) / 100;
-        const subtotal = (p.price * p.quantity) - discountAmount;
+        // p.discount is treated as an absolute monetary value (R$), matching frontend
+        const subtotal = (p.price * p.quantity) - p.discount;
         const itemData: any = {
           sale_id: saleIdNum,
           tenant_id: tenantId,
@@ -327,7 +344,10 @@ export async function PUT(
           total_price: subtotal,
           created_at: now,
         };
-        if (p.id !== null && Number.isFinite(p.id)) itemData.product_id = p.id;
+        // Se p.id for um número válido (> 0), salvar como product_id
+        if (p.id !== null && Number.isFinite(p.id) && p.id > 0) {
+          itemData.product_id = p.id;
+        }
         return itemData;
       });
 

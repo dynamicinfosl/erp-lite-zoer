@@ -60,28 +60,47 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Documento fiscal não encontrado', details: docError?.message }, { status: 404, headers: jsonHeaders });
     }
 
-    const { data: integration, error: integrationError } = await supabaseAdmin
+    // 1. Buscar a configuração global (para obter o api_token e environment)
+    const { data: globalConfig, error: globalError } = await supabaseAdmin
       .from('fiscal_integrations')
       .select('environment, api_token, enabled')
+      .eq('tenant_id', '00000000-0000-0000-0000-000000000000')
+      .eq('provider', 'focusnfe')
+      .maybeSingle();
+
+    if (globalError) {
+      return NextResponse.json({ error: 'Erro ao buscar configuração global', details: globalError.message }, { status: 400, headers: jsonHeaders });
+    }
+
+    if (!globalConfig || !globalConfig.enabled || !globalConfig.api_token) {
+      return NextResponse.json({ error: 'Emissão fiscal global desabilitada ou credenciais do ERP ausentes.' }, { status: 400, headers: jsonHeaders });
+    }
+
+    // 2. Buscar integração específica do tenant
+    const { data: integration, error: integrationError } = await supabaseAdmin
+      .from('fiscal_integrations')
+      .select('enabled, focus_token_homologacao, focus_token_producao')
       .eq('tenant_id', fiscalDoc.tenant_id)
       .eq('provider', 'focusnfe')
       .maybeSingle();
 
     if (integrationError) {
-      return NextResponse.json({ error: 'Erro ao buscar integração', details: integrationError.message }, { status: 400, headers: jsonHeaders });
+      return NextResponse.json({ error: 'Erro ao buscar integração do tenant', details: integrationError.message }, { status: 400, headers: jsonHeaders });
     }
 
     if (!integration || !integration.enabled) {
       return NextResponse.json({ error: 'Integração FocusNFe não configurada ou desabilitada para este tenant' }, { status: 400, headers: jsonHeaders });
     }
 
-    const environment = (integration.environment as Environment) || 'homologacao';
+    const environment = (globalConfig.environment as Environment) || 'homologacao';
     const baseUrl = getBaseUrl(environment);
 
     const docType = fiscalDoc.doc_type as DocType;
     const url = `${baseUrl}/v2/${docType}/${encodeURIComponent(fiscalDoc.ref)}${completa ? `?completa=${encodeURIComponent(completa)}` : ''}`;
 
-    const token = integration.api_token;
+    const token = environment === 'producao'
+      ? (integration.focus_token_producao || globalConfig.api_token)
+      : (integration.focus_token_homologacao || globalConfig.api_token);
 
     const resp = await fetch(url, {
       method: 'GET',
@@ -101,7 +120,7 @@ export async function GET(request: NextRequest) {
     }
 
     let nextStatus = fiscalDoc.status;
-    if (resp.ok) {
+    if (resp.ok || (body && typeof body.status === 'string')) {
       const providerStatus = body?.status;
       if (typeof providerStatus === 'string' && providerStatus.trim()) {
         nextStatus = providerStatus;
@@ -139,7 +158,14 @@ export async function GET(request: NextRequest) {
           created_at: new Date().toISOString(),
         });
 
-      return NextResponse.json({ success: true, data: { ...fiscalDoc, status: nextStatus }, http_status, provider_response: body }, { headers: jsonHeaders });
+      if (body) {
+        const path = body.caminho_danfe || body.caminho_pdf || body.caminho_pdf_nota_fiscal;
+        if (path) {
+          body.pdf_url = path.startsWith('http') ? path : `${baseUrl}${path}`;
+        }
+      }
+
+      return NextResponse.json({ success: true, data: { ...fiscalDoc, status: nextStatus, provider_response: body }, http_status, provider_response: body }, { headers: jsonHeaders });
     }
 
     await supabaseAdmin

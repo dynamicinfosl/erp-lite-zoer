@@ -92,20 +92,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Tenant sem CNPJ válido (tenants.document)' }, { status: 400, headers: jsonHeaders });
     }
 
-    const { data: integration, error: integrationError } = await supabaseAdmin
+    // 1. Buscar a configuração global de integração (api_token e environment)
+    const { data: globalConfig, error: globalError } = await supabaseAdmin
       .from('fiscal_integrations')
-      .select('environment, api_token, enabled, focus_empresa_id')
-      .eq('tenant_id', tenant_id)
+      .select('environment, api_token, enabled')
+      .eq('tenant_id', '00000000-0000-0000-0000-000000000000')
       .eq('provider', 'focusnfe')
       .maybeSingle();
 
-    if (integrationError) {
-      return NextResponse.json({ error: 'Erro ao buscar integração', details: integrationError.message }, { status: 400, headers: jsonHeaders });
+    if (globalError) {
+      return NextResponse.json({ error: 'Erro ao buscar configuração global', details: globalError.message }, { status: 400, headers: jsonHeaders });
     }
 
-    if (!integration || !integration.enabled) {
-      return NextResponse.json({ error: 'Integração FocusNFe não configurada ou desabilitada' }, { status: 400, headers: jsonHeaders });
+    if (!globalConfig || !globalConfig.enabled || !globalConfig.api_token) {
+      return NextResponse.json({ error: 'Emissão fiscal global não está ativada ou credenciais do ERP ausentes.' }, { status: 400, headers: jsonHeaders });
     }
+
+    // 2. Buscar integração específica do tenant (para obter focus_empresa_id se já existir)
+    const { data: integration } = await supabaseAdmin
+      .from('fiscal_integrations')
+      .select('focus_empresa_id')
+      .eq('tenant_id', tenant_id)
+      .eq('provider', 'focusnfe')
+      .maybeSingle();
 
     const { data: cert, error: certError } = await supabaseAdmin
       .from('fiscal_certificates')
@@ -138,8 +147,16 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await downloadRes.data.arrayBuffer();
     const certBase64 = Buffer.from(arrayBuffer).toString('base64');
 
-    const environment = (integration.environment as Environment) || 'homologacao';
-    const baseUrl = getBaseUrl(environment);
+    const environment = (globalConfig.environment as Environment) || 'homologacao';
+    // A API de Empresas da Focus NFe (API de Revenda) opera exclusivamente em produção
+    const baseUrl = 'https://api.focusnfe.com.br';
+
+    let regimeTributario = 1; // 1 - Simples Nacional (Padrão)
+    if (tenant.regime_tributario === 'presumido' || tenant.regime_tributario === 'real') {
+      regimeTributario = 3; // 3 - Regime Normal
+    } else if (tenant.regime_tributario === 'mei') {
+      regimeTributario = 4; // 4 - MEI
+    }
 
     const payload: any = {
       nome: tenant.razao_social || tenant.nome_fantasia || tenant.name || 'Empresa',
@@ -157,6 +174,7 @@ export async function POST(request: NextRequest) {
 
       inscricao_estadual: tenant.inscricao_estadual || null,
       inscricao_municipal: tenant.inscricao_municipal || null,
+      regime_tributario: regimeTributario,
 
       arquivo_certificado_base64: certBase64,
       senha_certificado: password,
@@ -165,16 +183,16 @@ export async function POST(request: NextRequest) {
       habilita_nfce: true,
       habilita_nfse: true,
       habilita_nfsen_homologacao: true,
-      habilita_nfsen_producao: false,
+      habilita_nfsen_producao: environment === 'producao',
     };
 
-    const masterToken = integration.api_token;
+    const masterToken = globalConfig.api_token;
 
-    const url = integration.focus_empresa_id
+    const url = integration?.focus_empresa_id
       ? `${baseUrl}/v2/empresas/${encodeURIComponent(String(integration.focus_empresa_id))}`
       : `${baseUrl}/v2/empresas`;
 
-    const method = integration.focus_empresa_id ? 'PUT' : 'POST';
+    const method = integration?.focus_empresa_id ? 'PUT' : 'POST';
 
     console.log('🚀 Provisionando empresa na FocusNFe:', {
       url,
@@ -184,7 +202,7 @@ export async function POST(request: NextRequest) {
       environment
     });
 
-    const resp = await fetch(url, {
+    let resp = await fetch(url, {
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -193,8 +211,41 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(payload),
     });
 
-    const http_status = resp.status;
-    const providerBody = await fetchJsonOrText(resp);
+    let http_status = resp.status;
+    let providerBody = await fetchJsonOrText(resp);
+
+    // Se falhar e for erro de CNPJ já cadastrado, tentar recuperar o ID existente via API
+    if (!resp.ok) {
+      const errorsList = providerBody?.erros || providerBody?.errors;
+      const isAlreadyRegistered = Array.isArray(errorsList) && errorsList.some((e: any) => 
+        e.codigo === 'ja_cadastrado' || 
+        String(e.mensagem || '').toLowerCase().includes('já cadastrado') || 
+        String(e.mensagem || '').toLowerCase().includes('ja cadastrado')
+      );
+
+      if (isAlreadyRegistered) {
+        console.log('🔄 CNPJ já cadastrado na Focus NFe. Buscando empresa cadastrada...');
+        const listResp = await fetch(`${baseUrl}/v2/empresas`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Basic ${Buffer.from(`${masterToken}:`).toString('base64')}`,
+          },
+        });
+        if (listResp.ok) {
+          const companies = await listResp.json();
+          if (Array.isArray(companies)) {
+            const matched = companies.find((c: any) => String(c.cnpj).replace(/\D/g, '') === cnpj);
+            if (matched) {
+              console.log('✅ Empresa recuperada com sucesso da Focus NFe:', matched);
+              providerBody = matched;
+              http_status = 200;
+              // Simulamos um response de sucesso para o fluxo continuar
+              resp = new Response(JSON.stringify(matched), { status: 200 });
+            }
+          }
+        }
+      }
+    }
 
     if (!resp.ok) {
       return NextResponse.json(
@@ -209,19 +260,33 @@ export async function POST(request: NextRequest) {
 
     const focusEmpresaId = providerBody?.id;
 
-    await supabaseAdmin
+    const { error: dbError } = await supabaseAdmin
       .from('fiscal_integrations')
-      .update({
-        focus_empresa_id: focusEmpresaId || integration.focus_empresa_id || null,
+      .upsert({
+        tenant_id,
+        provider: 'focusnfe',
+        environment,
+        api_token: masterToken, // A coluna api_token é NOT NULL no banco de dados
+        enabled: true,
+        focus_empresa_id: focusEmpresaId || integration?.focus_empresa_id || null,
         focus_token_homologacao: providerBody?.token_homologacao ?? null,
         focus_token_producao: providerBody?.token_producao ?? null,
         cert_valid_from: providerBody?.certificado_valido_de ?? null,
         cert_valid_to: providerBody?.certificado_valido_ate ?? null,
         cert_cnpj: providerBody?.certificado_cnpj ?? null,
         updated_at: new Date().toISOString(),
-      })
-      .eq('tenant_id', tenant_id)
-      .eq('provider', 'focusnfe');
+      }, { onConflict: 'tenant_id,provider' });
+
+    if (dbError) {
+      console.error('❌ Erro ao salvar integração no banco de dados:', dbError);
+      return NextResponse.json(
+        {
+          error: 'Erro ao salvar os dados de integração no banco de dados local.',
+          details: dbError.message,
+        },
+        { status: 500, headers: jsonHeaders }
+      );
+    }
 
     return NextResponse.json({
       success: true,

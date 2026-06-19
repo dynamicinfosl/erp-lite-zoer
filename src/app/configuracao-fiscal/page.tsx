@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   FileText, 
-  Save, 
   Loader2, 
   Upload, 
   CheckCircle2, 
@@ -24,8 +23,7 @@ import {
   Download,
   RefreshCw,
   Eye,
-  Search,
-  Filter
+  Search
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -35,6 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { TenantPageWrapper } from '@/components/layout/PageWrapper';
 
 interface FiscalIntegration {
   id?: string;
@@ -101,12 +100,10 @@ interface FiscalDocumentEvent {
 export default function ConfiguracaoFiscalPage() {
   const { user, tenant: authTenant, loading: authLoading } = useSimpleAuth();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
   const [integration, setIntegration] = useState<FiscalIntegration | null>(null);
   const [certificate, setCertificate] = useState<FiscalCertificate | null>(null);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const [documents, setDocuments] = useState<FiscalDocument[]>([]);
@@ -119,9 +116,6 @@ export default function ConfiguracaoFiscalPage() {
   const [eventsLoading, setEventsLoading] = useState(false);
 
   const [formData, setFormData] = useState({
-    api_token: '',
-    environment: 'homologacao' as 'homologacao' | 'producao',
-    enabled: true,
     certificate_password: '',
   });
 
@@ -182,10 +176,6 @@ export default function ConfiguracaoFiscalPage() {
         if (integrationResult?.data) {
           setIntegration(integrationResult.data);
           setFormData({
-            // Não preencher o token por segurança - usuário precisa digitar novamente se quiser alterar
-            api_token: '',
-            environment: integrationResult.data.environment || 'homologacao',
-            enabled: integrationResult.data.enabled !== false,
             certificate_password: '',
           });
         }
@@ -228,56 +218,6 @@ export default function ConfiguracaoFiscalPage() {
     if (authLoading) return;
     loadFiscalData();
   }, [authTenant, authLoading, loadFiscalData]);
-
-  const handleSaveIntegration = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const fallbackTenantId = user?.id || '00000000-0000-0000-0000-000000000000';
-    const tenantId = authTenant?.id || fallbackTenantId;
-
-    // Se não há token configurado e não foi digitado um novo, não permitir salvar
-    if (!integration?.api_token && !formData.api_token) {
-      toast.error('Token da API é obrigatório');
-      return;
-    }
-    
-    // Se já existe token configurado mas não foi digitado um novo, usar o existente
-    const tokenToSave = formData.api_token || integration?.api_token;
-    if (!tokenToSave) {
-      toast.error('Token da API é obrigatório');
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      const response = await fetch('/next_api/fiscal/focusnfe/integration', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenant_id: tenantId,
-          api_token: formData.api_token || integration?.api_token,
-          environment: formData.environment,
-          enabled: formData.enabled,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Erro ao salvar integração');
-      }
-
-      toast.success('Configuração salva com sucesso!');
-      setShowSuccessMessage(true);
-      await loadFiscalData();
-    } catch (error) {
-      console.error('Erro ao salvar:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      toast.error('Erro ao salvar: ' + errorMessage);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -353,19 +293,24 @@ export default function ConfiguracaoFiscalPage() {
       const result = await response.json();
 
       if (!response.ok) {
+        console.error('Provider error details:', result.provider_error);
         let msg = result.error || 'Erro ao provisionar empresa';
         if (result.provider_error) {
           if (result.provider_error.mensagem) {
             msg += ': ' + result.provider_error.mensagem;
-          } else if (result.provider_error.errors) {
-            const extra = JSON.stringify(result.provider_error.errors);
-            msg += ': ' + extra;
+          }
+          const errorsList = result.provider_error.erros || result.provider_error.errors;
+          if (errorsList) {
+            const extra = Array.isArray(errorsList)
+              ? errorsList.map((e: any) => `${e.campo || ''}: ${e.mensagem || JSON.stringify(e)}`).join(', ')
+              : JSON.stringify(errorsList);
+            msg += ' (' + extra + ')';
           }
         }
         throw new Error(msg);
       }
 
-      toast.success('Empresa provisionada com sucesso na FocusNFe!');
+      toast.success('Empresa provisionada com sucesso!');
       await loadFiscalData();
     } catch (error) {
       console.error('Erro ao provisionar:', error);
@@ -460,16 +405,6 @@ export default function ConfiguracaoFiscalPage() {
     loadDocuments();
   }, [loadDocuments]);
 
-  // Auto-esconder mensagem de sucesso após 5 segundos
-  useEffect(() => {
-    if (showSuccessMessage) {
-      const timer = setTimeout(() => {
-        setShowSuccessMessage(false);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [showSuccessMessage]);
-
   if (authLoading || loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -484,732 +419,673 @@ export default function ConfiguracaoFiscalPage() {
   const tenantId = authTenant?.id || user?.id || '00000000-0000-0000-0000-000000000000';
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <FileText className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Configuração Fiscal</h1>
-            <p className="text-muted-foreground">
-              Configure a integração com FocusNFe para emissão de documentos fiscais
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {configError && (
-        <div className="mb-8 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <h3 className="text-red-900 dark:text-red-100 font-semibold mb-2">Erro de Configuração do Servidor</h3>
-              <p className="text-red-700 dark:text-red-300 text-sm mb-3">{configError}</p>
-              <div className="bg-red-100 dark:bg-red-900/40 rounded p-3 text-xs font-mono text-red-900 dark:text-red-200">
-                <p className="mb-1">Certifique-se de que o arquivo <code>.env.local</code> contém:</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li><code>NEXT_PUBLIC_SUPABASE_URL</code></li>
-                  <li><code>SUPABASE_SERVICE_ROLE_KEY</code></li>
-                </ul>
-                <p className="mt-2 text-red-800 dark:text-red-300">Após configurar, reinicie o servidor de desenvolvimento.</p>
+    <TenantPageWrapper>
+      <div className="space-y-6">
+        {/* Header com gradiente */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 sm:p-8 text-white shadow-xl">
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYSIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVHJhbnNmb3JtPSJyb3RhdGUoNDUpIj48cGF0aCBkPSJNLTEwIDMwaDYwVjEwSC0xMHoiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2EpIi8+PC9zdmc+')] opacity-30" />
+          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl border border-white/10">
+                <FileText className="h-7 w-7 text-white" />
               </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Emissão Fiscal</h1>
+                <p className="text-blue-100 mt-1 text-sm sm:text-base">
+                  Gerencie seu certificado digital e acompanhe seus documentos fiscais
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge className="bg-white/20 backdrop-blur-sm text-white border border-white/20 px-3 py-1.5 font-semibold text-xs">
+                <Shield className="h-3.5 w-3.5 mr-1.5" />
+                {certificate ? 'Certificado Ativo' : 'Sem Certificado'}
+              </Badge>
+              <Badge className="bg-emerald-500/90 text-white border-0 px-3 py-1.5 font-semibold text-xs">
+                Produção
+              </Badge>
             </div>
           </div>
         </div>
-      )}
 
-      {showSuccessMessage && (
-        <div className="mb-8 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
-          <div className="flex items-center">
-            <CheckCircle2 className="w-6 h-6 text-green-600 mr-3" />
-            <span className="text-green-800 font-medium">Configuração salva com sucesso!</span>
+        {/* KPIs rápidos */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="juga-card p-5 flex items-center gap-4 border-l-4 border-l-blue-500">
+            <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/30">
+              <Shield className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Certificado</p>
+              <p className="text-lg font-bold text-foreground">
+                {certificate ? 'Enviado' : 'Pendente'}
+              </p>
+            </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowSuccessMessage(false)}
-            className="text-green-600 hover:bg-green-100"
-          >
-            ✕
-          </Button>
+          <div className="juga-card p-5 flex items-center gap-4 border-l-4 border-l-emerald-500">
+            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/30">
+              <Building2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Faturamento</p>
+              <p className="text-lg font-bold text-foreground">
+                {integration?.focus_empresa_id ? 'Ativado' : 'Pendente'}
+              </p>
+            </div>
+          </div>
+          <div className="juga-card p-5 flex items-center gap-4 border-l-4 border-l-purple-500">
+            <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-900/30">
+              <Receipt className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notas Emitidas</p>
+              <p className="text-lg font-bold text-foreground">{documents.length}</p>
+            </div>
+          </div>
         </div>
-      )}
 
-      <Tabs defaultValue="integracao" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-6">
-          <TabsTrigger value="integracao">Integração</TabsTrigger>
-          <TabsTrigger value="certificado">Certificado</TabsTrigger>
-          <TabsTrigger value="status">Status</TabsTrigger>
-          <TabsTrigger value="documentos">Documentos</TabsTrigger>
-        </TabsList>
+        {configError && (
+          <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-5">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/40">
+                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-red-900 dark:text-red-100 font-semibold mb-1">Erro de Configuração</h3>
+                <p className="text-red-700 dark:text-red-300 text-sm">{configError}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
-        {/* ABA: INTEGRAÇÃO */}
-        <TabsContent value="integracao" className="space-y-6">
-          <Card className="border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
-                <Key className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-                Configuração da API FocusNFe
-              </CardTitle>
-              <CardDescription>
-                Configure o token de acesso e o ambiente (homologação ou produção)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSaveIntegration} className="space-y-6">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="api_token">
-                      Token da API FocusNFe<span className="text-red-500">*</span>
-                    </Label>
-                    {integration?.api_token && (
-                      <Badge className="bg-green-600">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Token configurado
+        <Tabs defaultValue="certificado" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-6 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl shadow-inner border border-slate-200/50 dark:border-slate-700/50">
+            <TabsTrigger value="certificado" className="rounded-lg font-semibold py-3 transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md">
+              <Shield className="h-4 w-4 mr-2" />
+              Certificado Digital
+            </TabsTrigger>
+            <TabsTrigger value="status" className="rounded-lg font-semibold py-3 transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md">
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Status da Emissão
+            </TabsTrigger>
+            <TabsTrigger value="documentos" className="rounded-lg font-semibold py-3 transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md">
+              <Receipt className="h-4 w-4 mr-2" />
+              Histórico de Notas
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ABA: CERTIFICADO */}
+          <TabsContent value="certificado" className="space-y-6">
+            <Card className="juga-card-elevated overflow-hidden">
+              <div className="h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-foreground font-bold text-lg">
+                  <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md">
+                    <Shield className="h-5 w-5 text-white" />
+                  </div>
+                  Certificado Digital A1
+                </CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Faça upload do seu certificado digital (.pfx ou .p12) e informe a senha
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {certificate && (
+                  <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-200 dark:border-emerald-800 p-5">
+                    <div className="flex items-start gap-4">
+                      <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/40">
+                        <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-emerald-900 dark:text-emerald-100">
+                          ✅ Certificado cadastrado com sucesso
+                        </p>
+                        <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">
+                          Arquivo: <span className="font-medium">{certificate.original_filename}</span>
+                        </p>
+                        {certificate.size_bytes && (
+                          <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                            Tamanho: {(certificate.size_bytes / 1024).toFixed(2)} KB
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <Label htmlFor="certificate_file" className="text-sm font-semibold text-foreground">
+                    Arquivo do Certificado (.pfx ou .p12)<span className="text-red-500 ml-0.5">*</span>
+                  </Label>
+                  <div 
+                    onClick={() => document.getElementById('certificate_file')?.click()}
+                    className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-8 text-center hover:border-blue-500 dark:hover:border-blue-400 transition-colors bg-slate-50/50 dark:bg-slate-900/10 cursor-pointer group"
+                  >
+                    <Upload className="h-10 w-10 mx-auto mb-3 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                    <Input
+                      id="certificate_file"
+                      type="file"
+                      accept=".pfx,.p12"
+                      onChange={handleFileSelect}
+                      onClick={(e) => e.stopPropagation()}
+                      className="hidden"
+                    />
+                    <div className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white dark:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 shadow-sm group-hover:border-blue-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all mb-2">
+                      Escolher arquivo
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {selectedFile ? `Selecionado: ${selectedFile.name}` : 'Nenhum arquivo escolhido'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Formatos aceitos: .pfx, .p12
+                    </p>
+                  </div>
+                  {selectedFile && (
+                    <div className="flex items-center gap-2 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-2.5">
+                      <CheckCircle2 className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                      <span className="font-medium text-blue-900 dark:text-blue-100">{selectedFile.name}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedFile(null)}
+                        className="h-6 px-2 text-xs ml-auto text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+                      >
+                        Remover
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="certificate_password" className="text-sm font-semibold text-foreground">
+                    Senha do Certificado<span className="text-red-500 ml-0.5">*</span>
+                  </Label>
+                  <Input
+                    id="certificate_password"
+                    type="password"
+                    value={formData.certificate_password}
+                    onChange={(e) => setFormData({ ...formData, certificate_password: e.target.value })}
+                    placeholder="Digite a senha do certificado"
+                    className="h-12 text-base border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Informe a senha usada para proteger o arquivo do certificado
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <Button
+                    type="button"
+                    onClick={handleUploadCertificate}
+                    disabled={uploading || !selectedFile || !formData.certificate_password}
+                    className="min-w-[180px] h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg shadow-blue-500/25 transition-all hover:shadow-xl hover:shadow-blue-500/30"
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Enviar Certificado
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="juga-card-elevated overflow-hidden">
+              <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500" />
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-foreground font-bold text-lg">
+                  <div className="p-2.5 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl shadow-md">
+                    <Building2 className="h-5 w-5 text-white" />
+                  </div>
+                  Ativar Faturamento Fiscal
+                </CardTitle>
+                <CardDescription>
+                  Ative a emissão de notas fiscais diretamente pela sua empresa no ERP
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-5">
+                  <div className="rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/15 dark:to-orange-900/15 border border-amber-200 dark:border-amber-800 p-5">
+                    <div className="flex items-start gap-4">
+                      <div className="p-2.5 rounded-xl bg-amber-100 dark:bg-amber-900/40">
+                        <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-amber-900 dark:text-amber-100">
+                          Pré-requisitos para ativação
+                        </p>
+                        <ul className="text-sm text-amber-700 dark:text-amber-300 mt-2 space-y-2">
+                          <li className="flex items-center gap-2">
+                            {certificate ? (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                            ) : (
+                              <XCircle className="h-4 w-4 text-red-400 flex-shrink-0" />
+                            )}
+                            Envie o certificado digital na seção acima
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                            Certifique-se de que os dados da empresa estão completos em &quot;Perfil da Empresa&quot;
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <Button
+                      type="button"
+                      onClick={handleProvisionCompany}
+                      disabled={provisioning || !certificate}
+                      className="min-w-[180px] h-12 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold shadow-lg shadow-emerald-500/25 transition-all hover:shadow-xl hover:shadow-emerald-500/30 disabled:opacity-50"
+                    >
+                      {provisioning ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Ativando...
+                        </>
+                      ) : (
+                        <>
+                          <Building2 className="mr-2 h-4 w-4" />
+                          Ativar Faturamento
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ABA: STATUS */}
+          <TabsContent value="status" className="space-y-6">
+            <Card className="juga-card-elevated overflow-hidden">
+              <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500" />
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-foreground font-bold text-lg">
+                  <div className="p-2.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-md">
+                    <CheckCircle2 className="h-5 w-5 text-white" />
+                  </div>
+                  Status da Emissão
+                </CardTitle>
+                <CardDescription>
+                  Informações sobre o faturamento e validade do certificado da sua empresa
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Status da Emissão */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="p-5 rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/50 dark:from-slate-900/50 dark:to-blue-900/20 border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Faturamento Fiscal</p>
+                    {integration?.focus_empresa_id ? (
+                      <Badge className="bg-emerald-600 font-bold text-white px-4 py-1.5 text-sm shadow-sm">
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                        Ativado
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive" className="font-bold text-white px-4 py-1.5 text-sm shadow-sm">
+                        <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                        Pendente
                       </Badge>
                     )}
                   </div>
-                  <Input
-                    id="api_token"
-                    type="password"
-                    value={formData.api_token}
-                    onChange={(e) => setFormData({ ...formData, api_token: e.target.value })}
-                    placeholder={integration?.api_token ? "Digite um novo token para alterar" : "Cole seu token da API FocusNFe aqui"}
-                    required={!integration?.api_token}
-                    className="h-11"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    {integration?.api_token 
-                      ? "Token já configurado. Digite um novo token apenas se desejar alterar."
-                      : "Você pode obter o token no painel da FocusNFe: https://app-v2.focusnfe.com.br/"
-                    }
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="environment">Ambiente<span className="text-red-500">*</span></Label>
-                  <select
-                    id="environment"
-                    value={formData.environment}
-                    onChange={(e) => setFormData({ ...formData, environment: e.target.value as 'homologacao' | 'producao' })}
-                    className="flex h-11 w-full rounded-md border border-input bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 px-3 py-2 text-sm text-gray-900 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    required
-                  >
-                    <option value="homologacao">Homologação (Testes)</option>
-                    <option value="producao">Produção</option>
-                  </select>
-                  <p className="text-sm text-muted-foreground">
-                    Use homologação para testes e produção para documentos reais
-                  </p>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="enabled"
-                    checked={formData.enabled}
-                    onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-                    className="h-4 w-4 rounded border-gray-300"
-                  />
-                  <Label htmlFor="enabled" className="text-sm font-normal cursor-pointer">
-                    Habilitar integração
-                  </Label>
-                </div>
-
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button
-                    type="submit"
-                    disabled={saving}
-                    className="min-w-[120px] bg-green-600 hover:bg-green-700"
-                  >
-                    {saving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Salvando...
-                      </>
+                  <div className="p-5 rounded-xl bg-gradient-to-br from-slate-50 to-emerald-50/50 dark:from-slate-900/50 dark:to-emerald-900/20 border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Ambiente de Operação</p>
+                    {integration?.environment === 'producao' ? (
+                      <Badge className="bg-emerald-600 font-bold text-white px-4 py-1.5 text-sm shadow-sm">
+                        <Shield className="h-3.5 w-3.5 mr-1.5" />
+                        Produção (Real)
+                      </Badge>
                     ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Salvar
-                      </>
+                      <Badge className="bg-amber-600 font-bold text-white px-4 py-1.5 text-sm shadow-sm">
+                        <AlertCircle className="h-3.5 w-3.5 mr-1.5" />
+                        Homologação (Testes)
+                      </Badge>
                     )}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ABA: CERTIFICADO */}
-        <TabsContent value="certificado" className="space-y-6">
-          <Card className="border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
-                <Shield className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-                Certificado Digital A1
-              </CardTitle>
-              <CardDescription>
-                Faça upload do seu certificado digital (.pfx ou .p12) e informe a senha
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {certificate && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                        Certificado já cadastrado
-                      </p>
-                      <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                        Arquivo: {certificate.original_filename}
-                      </p>
-                      {certificate.size_bytes && (
-                        <p className="text-sm text-blue-700 dark:text-blue-300">
-                          Tamanho: {(certificate.size_bytes / 1024).toFixed(2)} KB
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="certificate_file">
-                  Arquivo do Certificado (.pfx ou .p12)<span className="text-red-500">*</span>
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="certificate_file"
-                    type="file"
-                    accept=".pfx,.p12"
-                    onChange={handleFileSelect}
-                    className="h-11"
-                  />
-                </div>
-                {selectedFile && (
-                  <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    <span>{selectedFile.name}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedFile(null)}
-                      className="h-6 px-2 text-xs"
-                    >
-                      Remover
-                    </Button>
-                  </div>
-                )}
-                <p className="text-sm text-muted-foreground">
-                  Selecione o arquivo do certificado digital A1 (.pfx ou .p12)
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="certificate_password">
-                  Senha do Certificado<span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="certificate_password"
-                  type="password"
-                  value={formData.certificate_password}
-                  onChange={(e) => setFormData({ ...formData, certificate_password: e.target.value })}
-                  placeholder="Digite a senha do certificado"
-                  className="h-11"
-                />
-                <p className="text-sm text-muted-foreground">
-                  Informe a senha usada para proteger o arquivo do certificado
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
-                <Button
-                  type="button"
-                  onClick={handleUploadCertificate}
-                  disabled={uploading || !selectedFile || !formData.certificate_password}
-                  className="min-w-[120px] bg-green-600 hover:bg-green-700"
-                >
-                  {uploading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Enviando...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Enviar Certificado
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
-                <Building2 className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-                Provisionar Empresa
-              </CardTitle>
-              <CardDescription>
-                Após configurar o token e enviar o certificado, provisione a empresa na FocusNFe
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
-                        Antes de provisionar
-                      </p>
-                      <ul className="text-sm text-yellow-700 dark:text-yellow-300 mt-2 list-disc list-inside space-y-1">
-                        <li>Configure o token da API na aba "Integração"</li>
-                        <li>Envie o certificado digital na seção acima</li>
-                        <li>Certifique-se de que os dados da empresa estão completos em "Perfil da Empresa"</li>
-                      </ul>
-                    </div>
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button
-                    type="button"
-                    onClick={handleProvisionCompany}
-                    disabled={provisioning || !integration?.enabled || !certificate}
-                    className="min-w-[120px] bg-blue-600 hover:bg-blue-700"
-                  >
-                    {provisioning ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Provisionando...
-                      </>
-                    ) : (
-                      <>
-                        <Building2 className="mr-2 h-4 w-4" />
-                        Provisionar Empresa
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ABA: STATUS */}
-        <TabsContent value="status" className="space-y-6">
-          <Card className="border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
-                <CheckCircle2 className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-                Status da Integração
-              </CardTitle>
-              <CardDescription>
-                Informações sobre a configuração e status da integração com FocusNFe
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Status da Integração */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Integração</h3>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">Status</Label>
-                    <div>
-                      {integration?.enabled ? (
-                        <Badge className="bg-green-600">Habilitada</Badge>
-                      ) : (
-                        <Badge variant="destructive">Desabilitada</Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">Ambiente</Label>
-                    <div>
-                      {integration?.environment === 'producao' ? (
-                        <Badge className="bg-red-600">Produção</Badge>
-                      ) : (
-                        <Badge className="bg-yellow-600">Homologação</Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">Token Configurado</Label>
-                    <div>
-                      {integration?.api_token ? (
-                        <Badge className="bg-green-600">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Sim
-                        </Badge>
-                      ) : (
-                        <Badge variant="destructive">
-                          <XCircle className="h-3 w-3 mr-1" />
-                          Não
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status da Empresa na FocusNFe */}
-              <div className="space-y-4 pt-4 border-t">
-                <h3 className="text-lg font-semibold">Empresa na FocusNFe</h3>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">ID da Empresa</Label>
-                    <div>
-                      {integration?.focus_empresa_id ? (
-                        <Badge className="bg-blue-600">{integration.focus_empresa_id}</Badge>
-                      ) : (
-                        <Badge variant="outline">Não provisionada</Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">Token Homologação</Label>
-                    <div>
-                      {integration?.focus_token_homologacao ? (
-                        <Badge className="bg-green-600">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Configurado
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">Não disponível</Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">Token Produção</Label>
-                    <div>
-                      {integration?.focus_token_producao ? (
-                        <Badge className="bg-green-600">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Configurado
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">Não disponível</Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status do Certificado */}
-              <div className="space-y-4 pt-4 border-t">
-                <h3 className="text-lg font-semibold">Certificado Digital</h3>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">Status</Label>
-                    <div>
-                      {certificate ? (
-                        <Badge className="bg-green-600">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Enviado
-                        </Badge>
-                      ) : (
-                        <Badge variant="destructive">
-                          <XCircle className="h-3 w-3 mr-1" />
-                          Não enviado
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  {certificate?.original_filename && (
-                    <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground">Arquivo</Label>
-                      <p className="text-sm font-medium">{certificate.original_filename}</p>
-                    </div>
-                  )}
-                  {integration?.cert_cnpj && (
-                    <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground">CNPJ do Certificado</Label>
-                      <p className="text-sm font-medium">{integration.cert_cnpj}</p>
-                    </div>
-                  )}
-                  {integration?.cert_valid_from && (
-                    <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        Válido de
-                      </Label>
-                      <p className="text-sm font-medium">
-                        {new Date(integration.cert_valid_from).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                  )}
-                  {integration?.cert_valid_to && (
-                    <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        Válido até
-                      </Label>
-                      <p className="text-sm font-medium">
-                        {new Date(integration.cert_valid_to).toLocaleDateString('pt-BR')}
-                        {new Date(integration.cert_valid_to) < new Date() && (
-                          <Badge variant="destructive" className="ml-2">
-                            Expirado
+                {/* Status do Certificado */}
+                <div className="space-y-4 pt-5 border-t border-slate-200 dark:border-slate-700">
+                  <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                    <Key className="h-5 w-5 text-blue-600" />
+                    Certificado Digital
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Status</Label>
+                      <div className="mt-2">
+                        {certificate ? (
+                          <Badge className="bg-emerald-600 text-white font-semibold">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Enviado
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" className="font-semibold">
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Não enviado
                           </Badge>
                         )}
-                      </p>
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ABA: DOCUMENTOS */}
-        <TabsContent value="documentos" className="space-y-6">
-          <Card className="border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
-                <Receipt className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-                Documentos Fiscais
-              </CardTitle>
-              <CardDescription>
-                Liste, consulte status e faça download dos documentos fiscais emitidos
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Filtros e Busca */}
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por ref, número, chave..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <select
-                  value={documentsFilter}
-                  onChange={(e) => setDocumentsFilter(e.target.value)}
-                  className="flex h-10 w-full md:w-[200px] rounded-md border border-input bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 px-3 py-2 text-sm"
-                >
-                  <option value="all">Todos os tipos</option>
-                  <option value="nfe">NFe</option>
-                  <option value="nfce">NFCe</option>
-                  <option value="nfse">NFSe</option>
-                  <option value="nfse_nacional">NFSe Nacional</option>
-                </select>
-                <Button
-                  onClick={loadDocuments}
-                  disabled={documentsLoading}
-                  variant="outline"
-                >
-                  {documentsLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-
-              {/* Tabela de Documentos */}
-              {documentsLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : documents.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Receipt className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Nenhum documento fiscal encontrado</p>
-                </div>
-              ) : (
-                <div className="border rounded-lg overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-muted">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-sm font-semibold">Tipo</th>
-                          <th className="px-4 py-3 text-left text-sm font-semibold">Ref</th>
-                          <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
-                          <th className="px-4 py-3 text-left text-sm font-semibold">Número</th>
-                          <th className="px-4 py-3 text-left text-sm font-semibold">Chave</th>
-                          <th className="px-4 py-3 text-left text-sm font-semibold">Data</th>
-                          <th className="px-4 py-3 text-left text-sm font-semibold">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {documents
-                          .filter((doc) => {
-                            if (!searchTerm) return true;
-                            const search = searchTerm.toLowerCase();
-                            return (
-                              doc.ref?.toLowerCase().includes(search) ||
-                              doc.numero?.toLowerCase().includes(search) ||
-                              doc.chave?.toLowerCase().includes(search)
-                            );
-                          })
-                          .map((doc) => (
-                            <tr key={doc.id} className="border-t hover:bg-muted/50">
-                              <td className="px-4 py-3">
-                                <Badge variant="outline" className="uppercase">
-                                  {doc.doc_type}
-                                </Badge>
-                              </td>
-                              <td className="px-4 py-3 text-sm font-mono text-xs">
-                                {doc.ref}
-                              </td>
-                              <td className="px-4 py-3">
-                                <Badge
-                                  className={
-                                    doc.status === 'autorizado' || doc.status === 'processado'
-                                      ? 'bg-green-600'
-                                      : doc.status === 'cancelado' || doc.status === 'erro'
-                                      ? 'bg-red-600'
-                                      : doc.status === 'submitted'
-                                      ? 'bg-yellow-600'
-                                      : 'bg-gray-600'
-                                  }
-                                >
-                                  {doc.status || 'Pendente'}
-                                </Badge>
-                              </td>
-                              <td className="px-4 py-3 text-sm">
-                                {doc.numero || '-'}
-                              </td>
-                              <td className="px-4 py-3 text-sm font-mono text-xs">
-                                {doc.chave ? (
-                                  <span className="truncate block max-w-[200px]" title={doc.chave}>
-                                    {doc.chave}
-                                  </span>
-                                ) : (
-                                  '-'
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">
-                                {new Date(doc.created_at).toLocaleDateString('pt-BR')}
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleViewEvents(doc.id)}
-                                    title="Ver histórico de eventos"
-                                  >
-                                    <Eye className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleRefreshDocument(doc.id, doc.ref)}
-                                    disabled={refreshingDoc === doc.id}
-                                    title="Consultar status"
-                                  >
-                                    {refreshingDoc === doc.id ? (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : (
-                                      <RefreshCw className="h-3 w-3" />
-                                    )}
-                                  </Button>
-                                  {doc.xml_path && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleDownloadFile(doc.xml_path!, `doc_${doc.ref}.xml`)}
-                                      title="Download XML"
-                                    >
-                                      <Download className="h-3 w-3" />
-                                    </Button>
-                                  )}
-                                  {doc.pdf_path && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleDownloadFile(doc.pdf_path!, `doc_${doc.ref}.pdf`)}
-                                      title="Download PDF"
-                                    >
-                                      <FileText className="h-3 w-3" />
-                                    </Button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
+                    {certificate?.original_filename && (
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
+                        <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Arquivo</Label>
+                        <p className="text-sm font-medium mt-2 text-foreground">{certificate.original_filename}</p>
+                      </div>
+                    )}
+                    {integration?.cert_cnpj && (
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
+                        <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">CNPJ do Certificado</Label>
+                        <p className="text-sm font-medium mt-2 text-foreground font-mono">{integration.cert_cnpj}</p>
+                      </div>
+                    )}
+                    {integration?.cert_valid_from && (
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
+                        <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5" />
+                          Válido de
+                        </Label>
+                        <p className="text-sm font-medium mt-2 text-foreground">
+                          {new Date(integration.cert_valid_from).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                    )}
+                    {integration?.cert_valid_to && (
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
+                        <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5" />
+                          Válido até
+                        </Label>
+                        <div className="mt-2 flex items-center gap-2">
+                          <p className="text-sm font-medium text-foreground">
+                            {new Date(integration.cert_valid_to).toLocaleDateString('pt-BR')}
+                          </p>
+                          {new Date(integration.cert_valid_to) < new Date() && (
+                            <Badge variant="destructive" className="text-xs">
+                              Expirado
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-      {/* Modal de Histórico de Eventos */}
-      <Dialog open={selectedDocForEvents !== null} onOpenChange={(open) => !open && setSelectedDocForEvents(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>Histórico de Eventos</DialogTitle>
-            <DialogDescription>
-              Eventos e notificações recebidas para este documento fiscal
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto pr-4">
-            {eventsLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : docEvents.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Nenhum evento registrado para este documento</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {docEvents.map((event) => (
-                  <Card key={event.id} className="border-l-4 border-l-blue-500">
-                    <CardContent className="pt-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            className={
-                              event.event_status === 'autorizado' || event.event_status === 'processado'
-                                ? 'bg-green-600'
-                                : event.event_status === 'cancelado' || event.event_status === 'erro'
-                                ? 'bg-red-600'
-                                : 'bg-yellow-600'
-                            }
-                          >
-                            {event.event_status || 'N/A'}
-                          </Badge>
-                          <Badge variant="outline">{event.event_type}</Badge>
+          {/* ABA: DOCUMENTOS */}
+          <TabsContent value="documentos" className="space-y-6">
+            <Card className="juga-card-elevated overflow-hidden">
+              <div className="h-1.5 bg-gradient-to-r from-purple-500 via-violet-500 to-indigo-500" />
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-foreground font-bold text-lg">
+                  <div className="p-2.5 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl shadow-md">
+                    <Receipt className="h-5 w-5 text-white" />
+                  </div>
+                  Documentos Fiscais
+                </CardTitle>
+                <CardDescription>
+                  Liste, consulte status e faça download dos documentos fiscais emitidos
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Filtros e Busca */}
+                <div className="flex flex-col md:flex-row gap-3">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar por ref, número, chave..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 h-11 border-slate-300 dark:border-slate-600"
+                    />
+                  </div>
+                  <select
+                    value={documentsFilter}
+                    onChange={(e) => setDocumentsFilter(e.target.value)}
+                    className="flex h-11 w-full md:w-[200px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="all">Todos os tipos</option>
+                    <option value="nfe">NFe</option>
+                    <option value="nfce">NFCe</option>
+                    <option value="nfse">NFSe</option>
+                    <option value="nfse_nacional">NFSe Nacional</option>
+                  </select>
+                  <Button
+                    onClick={loadDocuments}
+                    disabled={documentsLoading}
+                    variant="outline"
+                    className="h-11 px-4 border-slate-300 dark:border-slate-600"
+                  >
+                    {documentsLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+
+                {/* Tabela de Documentos */}
+                {documentsLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="flex flex-col items-center gap-3">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                      <p className="text-sm text-muted-foreground">Carregando documentos...</p>
+                    </div>
+                  </div>
+                ) : documents.length === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="p-4 rounded-full bg-slate-100 dark:bg-slate-800 w-fit mx-auto mb-4">
+                      <Receipt className="h-10 w-10 text-slate-400" />
+                    </div>
+                    <p className="text-muted-foreground font-medium">Nenhum documento fiscal encontrado</p>
+                    <p className="text-xs text-muted-foreground mt-1">Os documentos emitidos aparecerão aqui</p>
+                  </div>
+                ) : (
+                  <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-800/80">
+                          <tr>
+                            <th className="px-4 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Tipo</th>
+                            <th className="px-4 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Ref</th>
+                            <th className="px-4 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Status</th>
+                            <th className="px-4 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Número</th>
+                            <th className="px-4 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Chave</th>
+                            <th className="px-4 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Data</th>
+                            <th className="px-4 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {documents
+                            .filter((doc) => {
+                              if (!searchTerm) return true;
+                              const search = searchTerm.toLowerCase();
+                              return (
+                                doc.ref?.toLowerCase().includes(search) ||
+                                doc.numero?.toLowerCase().includes(search) ||
+                                doc.chave?.toLowerCase().includes(search)
+                              );
+                            })
+                            .map((doc) => (
+                              <tr key={doc.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">
+                                <td className="px-4 py-3.5">
+                                  <Badge variant="outline" className="uppercase font-bold text-xs border-blue-300 text-blue-700 dark:border-blue-700 dark:text-blue-400">
+                                    {doc.doc_type}
+                                  </Badge>
+                                </td>
+                                <td className="px-4 py-3.5 text-sm font-mono text-xs text-muted-foreground">
+                                  {doc.ref}
+                                </td>
+                                <td className="px-4 py-3.5">
+                                  <Badge
+                                    className={`font-semibold text-white ${
+                                      doc.status === 'autorizado' || doc.status === 'processado'
+                                        ? 'bg-emerald-600'
+                                        : doc.status === 'cancelado' || doc.status === 'erro'
+                                        ? 'bg-red-600'
+                                        : doc.status === 'submitted'
+                                        ? 'bg-amber-500'
+                                        : 'bg-slate-500'
+                                    }`}
+                                  >
+                                    {doc.status || 'Pendente'}
+                                  </Badge>
+                                </td>
+                                <td className="px-4 py-3.5 text-sm font-medium text-foreground">
+                                  {doc.numero || '-'}
+                                </td>
+                                <td className="px-4 py-3.5 text-sm font-mono text-xs text-muted-foreground">
+                                  {doc.chave ? (
+                                    <span className="truncate block max-w-[200px]" title={doc.chave}>
+                                      {doc.chave}
+                                    </span>
+                                  ) : (
+                                    '-'
+                                  )}
+                                </td>
+                                <td className="px-4 py-3.5 text-sm text-muted-foreground">
+                                  {new Date(doc.created_at).toLocaleDateString('pt-BR')}
+                                </td>
+                                <td className="px-4 py-3.5">
+                                  <div className="flex items-center gap-1.5">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleViewEvents(doc.id)}
+                                      title="Ver histórico de eventos"
+                                      className="h-8 w-8 p-0 border-slate-300 dark:border-slate-600 hover:bg-blue-50 hover:border-blue-300"
+                                    >
+                                      <Eye className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleRefreshDocument(doc.id, doc.ref)}
+                                      disabled={refreshingDoc === doc.id}
+                                      title="Consultar status"
+                                      className="h-8 w-8 p-0 border-slate-300 dark:border-slate-600 hover:bg-blue-50 hover:border-blue-300"
+                                    >
+                                      {refreshingDoc === doc.id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <RefreshCw className="h-3.5 w-3.5" />
+                                      )}
+                                    </Button>
+                                    {doc.xml_path && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleDownloadFile(doc.xml_path!, `doc_${doc.ref}.xml`)}
+                                        title="Download XML"
+                                        className="h-8 w-8 p-0 border-slate-300 dark:border-slate-600 hover:bg-emerald-50 hover:border-emerald-300"
+                                      >
+                                        <Download className="h-3.5 w-3.5" />
+                                      </Button>
+                                    )}
+                                    {doc.pdf_path && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleDownloadFile(doc.pdf_path!, `doc_${doc.ref}.pdf`)}
+                                        title="Download PDF"
+                                        className="h-8 w-8 p-0 border-slate-300 dark:border-slate-600 hover:bg-red-50 hover:border-red-300"
+                                      >
+                                        <FileText className="h-3.5 w-3.5" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Modal de Histórico de Eventos */}
+        <Dialog open={selectedDocForEvents !== null} onOpenChange={(open) => !open && setSelectedDocForEvents(null)}>
+          <DialogContent className="max-w-4xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+                <Eye className="h-5 w-5 text-blue-600" />
+                Histórico de Eventos
+              </DialogTitle>
+              <DialogDescription>
+                Eventos e notificações recebidas para este documento fiscal
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto pr-4">
+              {eventsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                </div>
+              ) : docEvents.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <div className="p-4 rounded-full bg-slate-100 dark:bg-slate-800 w-fit mx-auto mb-4">
+                    <AlertCircle className="h-10 w-10 text-slate-400" />
+                  </div>
+                  <p className="font-medium">Nenhum evento registrado para este documento</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {docEvents.map((event) => (
+                    <Card key={event.id} className="border-l-4 border-l-blue-500 shadow-sm">
+                      <CardContent className="pt-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              className={`font-semibold text-white ${
+                                event.event_status === 'autorizado' || event.event_status === 'processado'
+                                  ? 'bg-emerald-600'
+                                  : event.event_status === 'cancelado' || event.event_status === 'erro'
+                                  ? 'bg-red-600'
+                                  : 'bg-amber-500'
+                              }`}
+                            >
+                              {event.event_status || 'N/A'}
+                            </Badge>
+                            <Badge variant="outline" className="font-medium">{event.event_type}</Badge>
+                          </div>
+                          <span className="text-xs text-muted-foreground font-medium">
+                            {new Date(event.created_at).toLocaleString('pt-BR')}
+                          </span>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(event.created_at).toLocaleString('pt-BR')}
-                        </span>
-                      </div>
-                      {event.provider_response && (
-                        <div className="mt-3">
-                          <details className="cursor-pointer">
-                            <summary className="text-sm font-medium text-muted-foreground hover:text-foreground">
-                              Ver detalhes do evento
-                            </summary>
-                            <pre className="mt-2 p-3 bg-muted rounded text-xs overflow-x-auto">
-                              {JSON.stringify(event.provider_response, null, 2)}
-                            </pre>
-                          </details>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+                        {event.provider_response && (
+                          <div className="mt-3">
+                            <details className="cursor-pointer">
+                              <summary className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                                Ver detalhes do evento
+                              </summary>
+                              <pre className="mt-2 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg text-xs overflow-x-auto border border-slate-200 dark:border-slate-700">
+                                {JSON.stringify(event.provider_response, null, 2)}
+                              </pre>
+                            </details>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </TenantPageWrapper>
   );
 }
 

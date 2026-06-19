@@ -37,7 +37,8 @@ async function createSaleHandler(request: NextRequest) {
       delivery_date,
       delivery_address,
       notes,
-      cash_session_id
+      cash_session_id,
+      created_at
     } = body;
 
     // Usar total_amount se fornecido, senão usar total
@@ -50,7 +51,8 @@ async function createSaleHandler(request: NextRequest) {
       payment_method,
       productsCount: products?.length,
       customer_name: body.customer_name,
-      user_id: user_id
+      user_id: user_id,
+      created_at
     });
 
     // ✅ DEBUG: Log detalhado do tenant_id
@@ -189,8 +191,8 @@ async function createSaleHandler(request: NextRequest) {
     }
 
     // Criar a venda (versão simplificada)
-    const currentDate = new Date();
-    const createdAt = currentDate.toISOString();
+    const createdAt = created_at ? new Date(created_at).toISOString() : new Date().toISOString();
+    const currentDate = new Date(createdAt);
 
     console.log('📅 Data da venda sendo criada:', {
       iso: createdAt,
@@ -607,7 +609,7 @@ async function listSalesHandler(request: NextRequest) {
     }
 
     const cacheHeaders = {
-      'Cache-Control': 'public, max-age=30, stale-while-revalidate=60'
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate'
     };
 
     if (today === 'true') {

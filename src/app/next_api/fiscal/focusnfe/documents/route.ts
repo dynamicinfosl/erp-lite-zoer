@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabaseAdmin
       .from('fiscal_documents')
-      .select('id, tenant_id, provider, doc_type, ref, status, payload, xml_path, pdf_path, created_at, updated_at')
+      .select('id, tenant_id, provider, doc_type, ref, status, payload, caminho_xml, caminho_pdf, created_at, updated_at')
       .eq('tenant_id', tenant_id)
       .eq('provider', 'focusnfe')
       .order('created_at', { ascending: false })
@@ -78,9 +78,16 @@ export async function GET(request: NextRequest) {
 
     const { count } = await countQuery;
 
+    // Mapear caminho_xml e caminho_pdf para xml_path e pdf_path esperados pelo frontend
+    const mappedData = data?.map((doc) => ({
+      ...doc,
+      xml_path: doc.caminho_xml,
+      pdf_path: doc.caminho_pdf,
+    })) || [];
+
     return NextResponse.json({ 
       success: true, 
-      data: data || [],
+      data: mappedData,
       pagination: {
         total: count || 0,
         limit,

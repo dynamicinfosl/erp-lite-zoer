@@ -62,10 +62,11 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const tenant_id = searchParams.get('tenant_id');
+    const rawTenantId = searchParams.get('tenant_id');
+    const tenant_id = rawTenantId ? rawTenantId.trim() : '';
 
     if (!tenant_id || !isUuid(tenant_id)) {
-      return NextResponse.json({ error: 'tenant_id inválido' }, { status: 400 });
+      return NextResponse.json({ success: true, data: null }, { headers: jsonHeaders });
     }
 
     const { data, error } = await supabaseAdmin
@@ -81,16 +82,17 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Erro ao buscar certificado:', error);
-      return NextResponse.json({ error: 'Erro ao buscar certificado', details: error.message }, { status: 400 });
+      return NextResponse.json({ success: true, data: null }, { headers: jsonHeaders });
     }
 
-    return NextResponse.json({ success: true, data: data || null });
+    return NextResponse.json({ success: true, data: data || null }, { headers: jsonHeaders });
   } catch (error: any) {
     console.error('Erro interno na rota GET certificate:', error);
     return NextResponse.json({ 
-      error: 'Erro interno do servidor', 
-      details: error?.message || 'Erro desconhecido' 
-    }, { status: 500 });
+      success: true,
+      data: null,
+      error_logged: error?.message || 'Erro desconhecido' 
+    }, { headers: jsonHeaders });
   }
 }
 

@@ -56,9 +56,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'payload é obrigatório' }, { status: 400, headers: jsonHeaders });
     }
 
+    // 1. Buscar a configuração global (para obter o api_token e environment)
+    const { data: globalConfig, error: globalError } = await supabaseAdmin
+      .from('fiscal_integrations')
+      .select('environment, api_token, enabled')
+      .eq('tenant_id', '00000000-0000-0000-0000-000000000000')
+      .eq('provider', 'focusnfe')
+      .maybeSingle();
+
+    if (globalError) {
+      return NextResponse.json({ error: 'Erro ao buscar configuração global', details: globalError.message }, { status: 400, headers: jsonHeaders });
+    }
+
+    if (!globalConfig || !globalConfig.enabled || !globalConfig.api_token) {
+      return NextResponse.json({ error: 'Emissão fiscal global desabilitada ou credenciais do ERP ausentes.' }, { status: 400, headers: jsonHeaders });
+    }
+
+    // 2. Buscar integração específica do tenant (para obter focus_empresa_id)
     const { data: integration, error: integrationError } = await supabaseAdmin
       .from('fiscal_integrations')
-      .select('environment, api_token, enabled, focus_empresa_id')
+      .select('enabled, focus_empresa_id, focus_token_homologacao, focus_token_producao')
       .eq('tenant_id', tenant_id)
       .eq('provider', 'focusnfe')
       .maybeSingle();
@@ -70,7 +87,7 @@ export async function POST(request: NextRequest) {
     if (!integration || !integration.enabled) {
       return NextResponse.json({ 
         error: 'Integração FocusNFe não configurada ou desabilitada para este tenant',
-        details: 'Configure a integração na página de Configuração Fiscal antes de emitir documentos'
+        details: 'Acesse a página de Configuração Fiscal antes de emitir documentos'
       }, { status: 400, headers: jsonHeaders });
     }
 
@@ -81,7 +98,7 @@ export async function POST(request: NextRequest) {
       console.warn('⚠️ Certifique-se de que o certificado foi enviado manualmente no painel da FocusNFe');
     }
 
-    const environment = (integration.environment as Environment) || 'homologacao';
+    const environment = (globalConfig.environment as Environment) || 'homologacao';
     const baseUrl = getBaseUrl(environment);
 
     const finalRef = (ref && String(ref).trim()) ? String(ref).trim() : `fdn_${randomUUID().replace(/-/g, '').slice(0, 24)}`;
@@ -106,7 +123,9 @@ export async function POST(request: NextRequest) {
     }
 
     const url = `${baseUrl}/v2/nfsen?ref=${encodeURIComponent(finalRef)}`;
-    const token = integration.api_token;
+    const token = environment === 'producao'
+      ? (integration.focus_token_producao || globalConfig.api_token)
+      : (integration.focus_token_homologacao || globalConfig.api_token);
 
     let responseStatus = 0;
     let responseBody: any = null;
@@ -154,6 +173,13 @@ export async function POST(request: NextRequest) {
           },
           { status: 400, headers: jsonHeaders }
         );
+      }
+
+      if (responseBody) {
+        const path = responseBody.caminho_danfe || responseBody.caminho_pdf || responseBody.caminho_pdf_nota_fiscal;
+        if (path) {
+          responseBody.pdf_url = path.startsWith('http') ? path : `${baseUrl}${path}`;
+        }
       }
 
       return NextResponse.json({

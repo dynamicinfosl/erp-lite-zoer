@@ -325,11 +325,11 @@ export default function EmitirNotaPage() {
           if (result.provider_error.mensagem) {
             errorMsg = result.provider_error.mensagem;
           } else if (result.provider_error.erros && Array.isArray(result.provider_error.erros)) {
-            // FocusNFe retorna erros em um array
+            // Os erros retornam em um array
             const erros = result.provider_error.erros.map((e: any) => 
               typeof e === 'string' ? e : e.mensagem || JSON.stringify(e)
             ).join('; ');
-            errorMsg = `FocusNFe: ${erros}`;
+            errorMsg = `Servidor Fiscal: ${erros}`;
           } else if (typeof result.provider_error === 'string') {
             errorMsg = result.provider_error;
           } else {
@@ -420,13 +420,13 @@ export default function EmitirNotaPage() {
       } else if (errorType === 'empresa_nao_provisionada') {
         toast.error(
           <div className="space-y-2">
-            <p className="font-semibold">⚠️ Empresa Não Provisionada</p>
-            <p className="text-sm">A empresa precisa ser provisionada no FocusNFe antes de emitir notas.</p>
+            <p className="font-semibold">⚠️ Empresa Não Ativada</p>
+            <p className="text-sm">O faturamento fiscal da empresa precisa estar ativo antes de emitir notas.</p>
             <button
               onClick={() => window.location.href = '/configuracao-fiscal'}
               className="mt-2 px-3 py-1 bg-white text-red-600 rounded text-sm font-medium hover:bg-gray-100"
             >
-              Provisionar Agora
+              Ativar Agora
             </button>
           </div>,
           {
@@ -473,7 +473,7 @@ export default function EmitirNotaPage() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Emitir Nota Fiscal</h1>
               <p className="text-muted-foreground">
-                Preencha os dados e emita NF-e, NFC-e ou NFS-e via FocusNFe
+                Preencha os dados e emita NF-e, NFC-e ou NFS-e
               </p>
             </div>
           </div>
@@ -491,7 +491,7 @@ export default function EmitirNotaPage() {
                     ) : (
                       <AlertCircle className="h-5 w-5 text-yellow-600" />
                     )}
-                    <CardTitle>Status da Integração FocusNFe</CardTitle>
+                    <CardTitle>Status da Integração Fiscal</CardTitle>
                   </div>
                   <Button
                     variant="ghost"
@@ -531,7 +531,7 @@ export default function EmitirNotaPage() {
                     ) : (
                       <XCircle className="h-4 w-4 text-red-600" />
                     )}
-                    <span>Empresa {configStatus.focus_empresa_id ? 'Provisionada' : 'Não provisionada'}</span>
+                    <span>Empresa {configStatus.focus_empresa_id ? 'Ativa' : 'Não ativada'}</span>
                   </div>
                 </div>
                 {(!configStatus.enabled || !configStatus.focus_empresa_id) && (
@@ -540,9 +540,9 @@ export default function EmitirNotaPage() {
                       ⚠️ Para emitir notas fiscais, você precisa:
                     </p>
                     <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1 ml-2">
-                      {!configStatus.api_token && <li>Configurar o token da API FocusNFe</li>}
+                      {!configStatus.api_token && <li>Configurar o token da API Fiscal</li>}
                       {!configStatus.focus_empresa_id && <li>Enviar o certificado digital</li>}
-                      {!configStatus.focus_empresa_id && <li>Provisionar a empresa na FocusNFe</li>}
+                      {!configStatus.focus_empresa_id && <li>Ativar o faturamento fiscal da empresa</li>}
                       {!configStatus.enabled && <li>Habilitar a integração</li>}
                     </ol>
                     <Button
@@ -1314,7 +1314,7 @@ export default function EmitirNotaPage() {
                           Atenção antes de emitir:
                         </p>
                         <ul className="text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-1">
-                          <li>Verifique se a integração FocusNFe está configurada</li>
+                          <li>Verifique se a integração fiscal está configurada</li>
                           <li>Certifique-se de que todos os dados estão corretos</li>
                           <li>Após a emissão, a nota não pode ser alterada, apenas cancelada</li>
                         </ul>
@@ -1337,7 +1337,7 @@ export default function EmitirNotaPage() {
               Nota Fiscal Emitida com Sucesso!
             </DialogTitle>
             <DialogDescription>
-              A nota fiscal foi enviada para processamento no FocusNFe
+              A nota fiscal foi enviada para processamento no Servidor Fiscal
             </DialogDescription>
           </DialogHeader>
           
