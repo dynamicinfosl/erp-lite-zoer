@@ -28,6 +28,7 @@ export function mapSaleToNFePayload(sale: Sale, items: (SaleItem & { product?: P
     })(),
     presenca_comprador: 1, // 1 - Operação presencial
     modalidade_frete: '9', // 9 - Sem frete
+    informacoes_adicionais_contribuinte: (sale.notes || (sale as any).observacoes || '').trim().substring(0, 5000) || undefined,
     ...customerFields,
     items: items.map((item, index) => mapItemToFocus(item, index + 1)),
     formas_pagamento: [
@@ -52,6 +53,7 @@ export function mapSaleToNFCePayload(sale: Sale, items: (SaleItem & { product?: 
     data_emissao: new Date().toISOString(),
     presenca_comprador: 1,
     modalidade_frete: '9', // 9 - Sem frete
+    informacoes_adicionais_contribuinte: (sale.notes || (sale as any).observacoes || '').trim().substring(0, 5000) || undefined,
     ...customerFields,
     items: items.map((item, index) => mapItemToFocus(item, index + 1)),
     formas_pagamento: [
