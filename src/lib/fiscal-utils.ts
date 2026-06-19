@@ -13,7 +13,19 @@ export function mapSaleToNFePayload(sale: Sale, items: (SaleItem & { product?: P
     data_emissao: new Date().toISOString(),
     tipo_documento: 1, // 1 - Saída
     finalidade_emissao: 1, // 1 - Normal
-    consumidor_final: customer ? (customer.document?.length === 11 ? 1 : 0) : 1,
+    consumidor_final: (() => {
+      if (!customer) return 1;
+      const docClean = (customer.document || '').replace(/\D/g, '');
+      const isCPF = docClean.length === 11;
+      const ieClean = customer.state_registration ? customer.state_registration.replace(/\D/g, '') : '';
+      const isIsento = customer.state_registration?.trim().toUpperCase() === 'ISENTO';
+      
+      // Se for CPF, não contribuinte (sem IE) ou Isento, obrigatoriamente é consumidor final (1).
+      if (isCPF || (!ieClean && !isIsento)) {
+        return 1;
+      }
+      return 0; // Contribuinte do ICMS com IE ativa (revenda/outros)
+    })(),
     presenca_comprador: 1, // 1 - Operação presencial
     modalidade_frete: '9', // 9 - Sem frete
     ...customerFields,
@@ -114,9 +126,25 @@ function mapCustomerToFocusV2(customer?: Customer) {
   if (docClean) {
     if (isCPF) {
       data.cpf_destinatario = docClean;
+      data.indicador_inscricao_estadual_destinatario = '9'; // CPF é sempre Não Contribuinte
     } else {
       data.cnpj_destinatario = docClean;
+      
+      const ieClean = customer.state_registration ? customer.state_registration.replace(/\D/g, '') : '';
+      const isIsento = customer.state_registration?.trim().toUpperCase() === 'ISENTO';
+
+      if (ieClean) {
+        data.inscricao_estadual_destinatario = ieClean;
+        data.indicador_inscricao_estadual_destinatario = '1'; // Contribuinte ICMS
+      } else if (isIsento) {
+        data.inscricao_estadual_destinatario = 'ISENTO';
+        data.indicador_inscricao_estadual_destinatario = '2'; // Isento de IE
+      } else {
+        data.indicador_inscricao_estadual_destinatario = '9'; // Não contribuinte
+      }
     }
+  } else {
+    data.indicador_inscricao_estadual_destinatario = '9';
   }
 
   if (customer.email) {
