@@ -5,7 +5,12 @@ export type FocusNFEDocType = 'nfe' | 'nfce' | 'nfse' | 'nfse_nacional';
 /**
  * Mapeia uma venda para o payload de NF-e (Produto) da Focus NFe
  */
-export function mapSaleToNFePayload(sale: Sale, items: (SaleItem & { product?: Product })[], customer?: Customer) {
+export function mapSaleToNFePayload(
+  sale: Sale,
+  items: (SaleItem & { product?: Product })[],
+  customer?: Customer,
+  tenantState?: string
+) {
   const customerFields = mapCustomerToFocusV2(customer);
 
   return {
@@ -30,7 +35,7 @@ export function mapSaleToNFePayload(sale: Sale, items: (SaleItem & { product?: P
     modalidade_frete: '9', // 9 - Sem frete
     informacoes_adicionais_contribuinte: (sale.notes || (sale as any).observacoes || '').trim().substring(0, 5000) || undefined,
     ...customerFields,
-    items: items.map((item, index) => mapItemToFocus(item, index + 1)),
+    items: items.map((item, index) => mapItemToFocus(item, index + 1, tenantState, customer?.state)),
     formas_pagamento: [
       {
         forma_pagamento: mapPaymentMethod((sale as any).forma_pagamento || (sale as any).payment_method),
@@ -45,7 +50,12 @@ export function mapSaleToNFePayload(sale: Sale, items: (SaleItem & { product?: P
 /**
  * Mapeia uma venda para o payload de NFC-e (Consumidor) da Focus NFe
  */
-export function mapSaleToNFCePayload(sale: Sale, items: (SaleItem & { product?: Product })[], customer?: Customer) {
+export function mapSaleToNFCePayload(
+  sale: Sale,
+  items: (SaleItem & { product?: Product })[],
+  customer?: Customer,
+  tenantState?: string
+) {
   const customerFields = customer ? mapCustomerToFocusV2(customer) : {};
 
   return {
@@ -55,7 +65,7 @@ export function mapSaleToNFCePayload(sale: Sale, items: (SaleItem & { product?: 
     modalidade_frete: '9', // 9 - Sem frete
     informacoes_adicionais_contribuinte: (sale.notes || (sale as any).observacoes || '').trim().substring(0, 5000) || undefined,
     ...customerFields,
-    items: items.map((item, index) => mapItemToFocus(item, index + 1)),
+    items: items.map((item, index) => mapItemToFocus(item, index + 1, tenantState, customer?.state)),
     formas_pagamento: [
       {
         forma_pagamento: mapPaymentMethod((sale as any).forma_pagamento || (sale as any).payment_method),
@@ -162,10 +172,24 @@ function mapCustomerToFocusV2(customer?: Customer) {
 /**
  * Auxiliar para mapear item
  */
-function mapItemToFocus(item: SaleItem & { product?: Product }, index: number) {
+function mapItemToFocus(
+  item: SaleItem & { product?: Product },
+  index: number,
+  tenantState?: string,
+  customerState?: string
+) {
   // Usar novos campos fiscais do produto se disponíveis
   const ncm = item.product?.ncm || '00000000';
-  const cfop = item.product?.cfop_default || '5102';
+  let cfop = item.product?.cfop_default || '5102';
+
+  // Se for venda interestadual (estados diferentes), converter CFOP 5xxx para 6xxx
+  if (tenantState && customerState) {
+    const tState = tenantState.trim().toUpperCase();
+    const cState = customerState.trim().toUpperCase();
+    if (tState !== cState && cfop.startsWith('5')) {
+      cfop = '6' + cfop.substring(1);
+    }
+  }
 
   const unit = String(item.product?.unit || 'UN').trim();
   const unitClean = unit.length > 0 ? unit.substring(0, 6) : 'UN';
