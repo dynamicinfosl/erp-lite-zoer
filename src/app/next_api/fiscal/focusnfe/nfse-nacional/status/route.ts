@@ -98,7 +98,6 @@ export async function GET(request: NextRequest) {
     const baseUrl = getBaseUrl(environment);
 
     const url = `${baseUrl}/v2/nfsen/${encodeURIComponent(fiscalDoc.ref)}${completa ? `?completa=${encodeURIComponent(completa)}` : ''}`;
-    const environment = (globalConfig.environment as Environment) || 'homologacao';
     const token = environment === 'producao'
       ? (integration.focus_token_producao || globalConfig.api_token)
       : (integration.focus_token_homologacao || globalConfig.api_token);
