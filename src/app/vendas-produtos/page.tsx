@@ -53,7 +53,11 @@ import {
   FileText,
   Truck,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
@@ -68,6 +72,14 @@ import {
   emitFiscalDocument 
 } from '@/lib/fiscal-utils';
 import { api } from '@/lib/api-client';
+
+const getFullFileUrl = (path: string | null | undefined) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return path.startsWith('/arquivos_development')
+    ? `https://homologacao.focusnfe.com.br${path}`
+    : `https://api.focusnfe.com.br${path}`;
+};
 
 interface Sale {
   id: string;
@@ -89,6 +101,14 @@ interface Sale {
   status: 'pendente' | 'paga' | 'cancelada';
   data_venda: string;
   observacoes?: string;
+  fiscal_doc?: {
+    id: string;
+    status: string;
+    numero: string | null;
+    chave: string | null;
+    pdf_url: string | null;
+    xml_url: string | null;
+  } | null;
 }
 
 interface ColumnVisibility {
@@ -117,6 +137,45 @@ export default function VendasProdutosPage() {
   const [showEditSaleDialog, setShowEditSaleDialog] = useState(false);
   const [selectedVendaId, setSelectedVendaId] = useState<string | undefined>(undefined);
   const [selectedVendas, setSelectedVendas] = useState<Set<string>>(new Set());
+
+  // Estados para Auditoria Fiscal
+  const [showAuditDialog, setShowAuditDialog] = useState(false);
+  const [auditResult, setAuditResult] = useState<{
+    venda: Sale;
+    type: 'nfe' | 'nfce';
+    customer?: any;
+    itemsWithProducts: any[];
+    errors: Array<{ field: string; message: string; type: 'error' | 'warning' }>;
+    warnings: Array<{ field: string; message: string; type: 'error' | 'warning' }>;
+  } | null>(null);
+  const [isAuditing, setIsAuditing] = useState(false);
+  const [editCustomerForm, setEditCustomerForm] = useState<{
+    name: string;
+    document: string;
+    zipcode: string;
+    address: string;
+    address_number: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+  } | null>(null);
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+
+  // Estados para Acompanhamento da Emissão
+  const [showEmissionDialog, setShowEmissionDialog] = useState(false);
+  const [emissionState, setEmissionState] = useState<{
+    status: 'enviando' | 'processando' | 'autorizado' | 'erro';
+    message: string;
+    pdfUrl: string | null;
+    xmlUrl: string | null;
+    errors: string[];
+  }>({
+    status: 'enviando',
+    message: 'Preparando dados e enviando para a Focus NFe...',
+    pdfUrl: null,
+    xmlUrl: null,
+    errors: []
+  });
 
   // Estados para modal de entrega
   const [showDeliveryDialog, setShowDeliveryDialog] = useState(false);
@@ -175,7 +234,7 @@ export default function VendasProdutosPage() {
 
       console.log('📦 Carregando vendas de produtos para o tenant:', tenant.id, { scope, branchId, shouldUseMatrix });
       
-      const res = await fetch(`/next_api/sales?${params.toString()}`);
+      const res = await fetch(`/next_api/sales?${params.toString()}`, { cache: 'no-store' });
       
       // Mapear customer_id da resposta bruta
       // ...
@@ -202,6 +261,32 @@ export default function VendasProdutosPage() {
       
       const data = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
       
+      // Carregar também os documentos fiscais do tenant para correlacionar com as vendas
+      let fiscalDocsMap = new Map<string, any>();
+      try {
+        const docsRes = await fetch(`/next_api/fiscal/documents?tenant_id=${tenant.id}&limit=1000`);
+        if (docsRes.ok) {
+          const docsJson = await docsRes.json();
+          if (docsJson.success && Array.isArray(docsJson.data)) {
+            // Ordenar por data de criação crescente para o mais recente sobrescrever anteriores
+            const sortedDocs = [...docsJson.data].sort((a: any, b: any) => 
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+            sortedDocs.forEach((doc: any) => {
+              if (doc.ref && doc.ref.startsWith('sale_')) {
+                const parts = doc.ref.split('_');
+                const saleId = parts[1];
+                if (saleId) {
+                  fiscalDocsMap.set(saleId, doc);
+                }
+              }
+            });
+          }
+        }
+      } catch (docsError) {
+        console.error('❌ Erro ao buscar documentos fiscais para mapeamento:', docsError);
+      }
+
       // Filtrar apenas vendas de produtos
       // NOTA: Vendas canceladas são carregadas mas filtradas na visualização padrão (filteredVendas)
       // Filtrar apenas vendas de produtos (considera source 'produtos' ou tipo 'produtos' se source for null)
@@ -214,9 +299,11 @@ export default function VendasProdutosPage() {
       
       const mapped: Sale[] = produtosData.map((s: any, i: number) => {
         const items = Array.isArray(s.items) ? s.items : [];
+        const saleId = String(s.id ?? i + 1);
+        const doc = fiscalDocsMap.get(saleId);
         
         return {
-          id: String(s.id ?? i + 1),
+          id: saleId,
           numero: s.sale_number ?? s.numero ?? `VND-${String(i + 1).padStart(6, '0')}`,
           cliente: s.customer?.name ?? s.customer_name ?? s.cliente ?? 'Cliente Avulso',
           customer_id: s.customer_id,
@@ -243,6 +330,14 @@ export default function VendasProdutosPage() {
           })(),
           data_venda: s.created_at ?? s.sold_at ?? s.data_venda ?? new Date().toISOString(),
           observacoes: s.notes ?? s.observacoes ?? '',
+          fiscal_doc: doc ? {
+            id: doc.id,
+            status: doc.status,
+            numero: doc.numero,
+            chave: doc.chave,
+            pdf_url: doc.caminho_pdf || doc.pdf_path,
+            xml_url: doc.caminho_xml || doc.xml_path,
+          } : null,
         };
       });
       
@@ -260,6 +355,24 @@ export default function VendasProdutosPage() {
   useEffect(() => {
     loadVendas();
   }, [loadVendas]);
+
+  useEffect(() => {
+    if (showAuditDialog && auditResult?.customer) {
+      const cust = auditResult.customer.data || auditResult.customer;
+      setEditCustomerForm({
+        name: cust.name || '',
+        document: cust.document || '',
+        zipcode: cust.zipcode || '',
+        address: cust.address || '',
+        address_number: cust.address_number || '',
+        neighborhood: cust.neighborhood || '',
+        city: cust.city || '',
+        state: cust.state || '',
+      });
+    } else {
+      setEditCustomerForm(null);
+    }
+  }, [showAuditDialog, auditResult]);
 
   // Filtrar vendas
   // Se não houver filtro de status ou filtro de status diferente de 'cancelada', excluir canceladas da visualização padrão
@@ -663,16 +776,35 @@ export default function VendasProdutosPage() {
   const handleEmitirNFe = async (venda: Sale, type: 'nfe' | 'nfce') => {
     if (!tenant?.id) return;
     
-    const toastId = toast.loading(`Preparando emissão de ${type.toUpperCase()}...`);
+    setIsAuditing(true);
+    const toastId = toast.loading(`Realizando auditoria fiscal prévia da venda...`);
     
     try {
-      // 1. Buscar dados completos do cliente
+      // 1. Buscar dados completos do cliente (com fallback por nome se customer_id estiver vazio/nulo)
       let customer = undefined;
-      if (venda.customer_id) {
+      let linkedCustomerId = venda.customer_id;
+
+      if (linkedCustomerId) {
         try {
-          customer = await api.get(`/customers/${venda.customer_id}?tenant_id=${tenant.id}`);
+          customer = await api.get(`/customers/${linkedCustomerId}?tenant_id=${tenant.id}`);
         } catch (e) {
           console.error("Erro ao carregar dados do cliente:", e);
+        }
+      }
+
+      // Se não encontrou o cliente ou não tem customer_id associado, mas tem nome do cliente válido
+      if (!customer && venda.cliente && venda.cliente.toLowerCase() !== 'cliente avulso') {
+        try {
+          // Obter dados completos da venda, que faz a busca do cliente por nome (fallback no backend)
+          const fullSale = await api.get(`/sales/${venda.id}`);
+          if (fullSale && fullSale.customer) {
+            customer = fullSale.customer;
+            linkedCustomerId = String(fullSale.customer.id);
+            // Atualizar o objeto venda na memória para passar nas validações do frontend
+            venda.customer_id = linkedCustomerId;
+          }
+        } catch (e) {
+          console.error("Erro no fallback de busca de cliente por nome:", e);
         }
       }
 
@@ -687,12 +819,303 @@ export default function VendasProdutosPage() {
         }
       }));
 
-      // 3. Mapear payload
+      // 3. Executar auditoria
+      const errors: Array<{ field: string; message: string; type: 'error' | 'warning' }> = [];
+      const warnings: Array<{ field: string; message: string; type: 'error' | 'warning' }> = [];
+
+      // Validação do Cliente
+      if (!venda.customer_id) {
+        if (type === 'nfe') {
+          errors.push({
+            field: 'Cliente',
+            message: 'Uma NF-e exige que o cliente seja identificado e tenha cadastro completo.',
+            type: 'error'
+          });
+        } else {
+          warnings.push({
+            field: 'Cliente',
+            message: 'Consumidor não identificado (NFC-e permite emissão sem CPF, sujeito a limites estaduais de valor).',
+            type: 'warning'
+          });
+        }
+      } else if (customer) {
+        if (!customer.name) {
+          errors.push({
+            field: 'Nome do Cliente',
+            message: 'O nome do cliente não está preenchido.',
+            type: 'error'
+          });
+        }
+        
+        const docClean = String(customer.document || '').replace(/\D/g, '');
+        if (!docClean) {
+          errors.push({
+            field: 'Documento do Cliente',
+            message: `Cliente "${customer.name}" não possui CPF/CNPJ cadastrado.`,
+            type: 'error'
+          });
+        } else if (docClean.length !== 11 && docClean.length !== 14) {
+          errors.push({
+            field: 'Documento do Cliente',
+            message: `O CPF/CNPJ do cliente "${customer.name}" é inválido: deve conter 11 ou 14 dígitos (encontrado: ${docClean.length}).`,
+            type: 'error'
+          });
+        }
+
+        // NF-e exige endereço completo. NFC-e exige apenas se identificado.
+        if (type === 'nfe' || (type === 'nfce' && customer.document)) {
+          if (!customer.zipcode) {
+            errors.push({
+              field: 'CEP do Cliente',
+              message: 'CEP do destinatário é obrigatório.',
+              type: 'error'
+            });
+          }
+          if (!customer.address) {
+            errors.push({
+              field: 'Logradouro do Cliente',
+              message: 'Endereço (rua/avenida) do destinatário é obrigatório.',
+              type: 'error'
+            });
+          }
+          if (!customer.address_number) {
+            warnings.push({
+              field: 'Número do Endereço',
+              message: 'Número do endereço não cadastrado. O sistema enviará "SN" (Sem Número).',
+              type: 'warning'
+            });
+          }
+          if (!customer.neighborhood) {
+            errors.push({
+              field: 'Bairro do Cliente',
+              message: 'Bairro do destinatário é obrigatório.',
+              type: 'error'
+            });
+          }
+          if (!customer.city) {
+            errors.push({
+              field: 'Cidade do Cliente',
+              message: 'Cidade do destinatário é obrigatória.',
+              type: 'error'
+            });
+          }
+          if (!customer.state) {
+            errors.push({
+              field: 'UF do Cliente',
+              message: 'UF (estado) do destinatário é obrigatório.',
+              type: 'error'
+            });
+          } else if (String(customer.state).trim().length !== 2) {
+            errors.push({
+              field: 'UF do Cliente',
+              message: `A UF do destinatário deve ter exatamente 2 letras (ex: RJ, SP). Encontrado: "${customer.state}".`,
+              type: 'error'
+            });
+          }
+        }
+      }
+
+      // Validação dos Itens / Produtos
+      if (!venda.itens || venda.itens.length === 0) {
+        errors.push({
+          field: 'Itens da Venda',
+          message: 'A venda deve conter pelo menos 1 produto cadastrado.',
+          type: 'error'
+        });
+      } else {
+        itemsWithProducts.forEach((item: any, idx) => {
+          const itemNum = idx + 1;
+          const pName = item.produto || `Item ${itemNum}`;
+          const prod = item.product;
+
+          if (!prod) {
+            errors.push({
+              field: `Item ${itemNum}`,
+              message: `Produto "${pName}" não foi encontrado no cadastro de produtos.`,
+              type: 'error'
+            });
+            return;
+          }
+
+          const ncmClean = String(prod.ncm || '').replace(/\D/g, '');
+          if (!ncmClean) {
+            errors.push({
+              field: `NCM - ${prod.name}`,
+              message: `O produto "${prod.name}" (Item ${itemNum}) está com NCM vazio.`,
+              type: 'error'
+            });
+          } else if (ncmClean === '00000000') {
+            errors.push({
+              field: `NCM - ${prod.name}`,
+              message: `O produto "${prod.name}" (Item ${itemNum}) está com NCM zerado (00000000). Cadastre um NCM de 8 dígitos válido.`,
+              type: 'error'
+            });
+          } else if (ncmClean.length !== 8) {
+            errors.push({
+              field: `NCM - ${prod.name}`,
+              message: `O produto "${prod.name}" (Item ${itemNum}) está com NCM incorreto: "${prod.ncm}". O NCM deve conter exatamente 8 dígitos.`,
+              type: 'error'
+            });
+          }
+
+          if (!prod.cfop_default) {
+            warnings.push({
+              field: `CFOP - ${prod.name}`,
+              message: `O produto "${prod.name}" (Item ${itemNum}) não possui CFOP padrão cadastrado. Será utilizado o CFOP 5102 (venda estadual).`,
+              type: 'warning'
+            });
+          }
+
+          if (!prod.unit) {
+            warnings.push({
+              field: `Unidade - ${prod.name}`,
+              message: `O produto "${prod.name}" (Item ${itemNum}) não possui unidade comercial. Será utilizado "UN".`,
+              type: 'warning'
+            });
+          }
+        });
+      }
+
+      toast.dismiss(toastId);
+
+      // Se houver erros ou alertas, abrir o modal de auditoria
+      if (errors.length > 0 || warnings.length > 0) {
+        setAuditResult({
+          venda,
+          type,
+          customer,
+          itemsWithProducts,
+          errors,
+          warnings
+        });
+        setShowAuditDialog(true);
+      } else {
+        // Se estiver 100% correto, prosseguir com a emissão direta
+        await proceedWithEmission(venda, type, itemsWithProducts, customer);
+      }
+
+    } catch (err: any) {
+      console.error("Erro na auditoria da nota:", err);
+      toast.error(`Falha ao auditar nota: ${err.message}`, { id: toastId });
+    } finally {
+      setIsAuditing(false);
+    }
+  };
+
+  const handleCepLookup = async (cep: string) => {
+    const cleanCep = cep.replace(/\D/g, '');
+    if (cleanCep.length !== 8) return;
+    
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await res.json();
+      if (!data.erro && editCustomerForm) {
+        setEditCustomerForm((prev: any) => ({
+          ...prev,
+          address: data.logradouro || prev.address,
+          neighborhood: data.bairro || prev.neighborhood,
+          city: data.localidade || prev.city,
+          state: data.uf || prev.state,
+        }));
+        toast.success('Endereço preenchido automaticamente via CEP!');
+      } else if (data.erro) {
+        toast.error('CEP não encontrado.');
+      }
+    } catch (e) {
+      console.warn('Erro ao consultar CEP:', e);
+    }
+  };
+
+  const handleSaveCustomer = async () => {
+    if (!auditResult?.customer?.id || !tenant?.id || !editCustomerForm) return;
+    setIsSavingCustomer(true);
+    const toastId = toast.loading('Atualizando cadastro do cliente...');
+    try {
+      // 1. Atualizar cadastro do cliente
+      const response = await fetch(`/next_api/customers?id=${auditResult.customer.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tenant_id: tenant.id,
+          name: editCustomerForm.name,
+          document: editCustomerForm.document,
+          zipcode: editCustomerForm.zipcode,
+          address: editCustomerForm.address,
+          address_number: editCustomerForm.address_number,
+          neighborhood: editCustomerForm.neighborhood,
+          city: editCustomerForm.city,
+          state: editCustomerForm.state,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao atualizar cliente');
+      }
+
+      // 2. Vincular o cliente à venda no banco de dados para consolidar o vínculo
+      try {
+        await api.put(`/sales/${auditResult.venda.id}`, {
+          customer_id: Number(auditResult.customer.id),
+          customer_name: editCustomerForm.name
+        });
+      } catch (saleErr) {
+        console.error("Erro ao vincular cliente à venda:", saleErr);
+      }
+
+      toast.success('Cadastro do cliente atualizado e vinculado à venda!', { id: toastId });
+      
+      // Atualizar a listagem de vendas em background
+      loadVendas();
+
+      // Fechar modal anterior e re-executar auditoria
+      setShowAuditDialog(false);
+      
+      // Re-auditar a mesma venda
+      const currentVenda = auditResult.venda;
+      const currentType = auditResult.type;
+      currentVenda.customer_id = String(auditResult.customer.id);
+      currentVenda.cliente = editCustomerForm.name; // Atualizar nome exibido na memória também
+
+      setTimeout(() => {
+        handleEmitirNFe(currentVenda, currentType);
+      }, 300);
+
+    } catch (error: any) {
+      console.error('Erro ao atualizar cliente:', error);
+      toast.error(`Falha ao atualizar cliente: ${error.message}`, { id: toastId });
+    } finally {
+      setIsSavingCustomer(false);
+    }
+  };
+
+  const proceedWithEmission = async (
+    venda: Sale, 
+    type: 'nfe' | 'nfce', 
+    itemsWithProducts: any[], 
+    customer: any
+  ) => {
+    if (!tenant?.id) return;
+
+    // Abrir modal de progresso
+    setShowEmissionDialog(true);
+    setEmissionState({
+      status: 'enviando',
+      message: 'Preparando dados e enviando lote para a Focus NFe...',
+      pdfUrl: null,
+      xmlUrl: null,
+      errors: []
+    });
+
+    try {
+      // 1. Mapear payload
       const payload = type === 'nfe' 
         ? mapSaleToNFePayload(venda as any, itemsWithProducts as any, customer)
         : mapSaleToNFCePayload(venda as any, itemsWithProducts as any, customer);
 
-      // 4. Emitir
+      // 2. Emitir
       const result = await emitFiscalDocument({
         tenant_id: tenant.id,
         doc_type: type,
@@ -700,16 +1123,160 @@ export default function VendasProdutosPage() {
         ref: `sale_${venda.id}_${Date.now()}`
       });
 
-      toast.success(`${type.toUpperCase()} enviada com sucesso!`, { id: toastId });
-      
-      // Opcional: abrir link se disponível
-      if (result.provider_response?.pdf_url) {
-        window.open(result.provider_response.pdf_url, '_blank');
+      const fiscalDocId = result.fiscal_document_id;
+      const initialStatus = result.provider_response?.status;
+
+      if (initialStatus === 'autorizado') {
+        const body = result.provider_response;
+        let pdfUrl = body.pdf_url || body.caminho_danfe || body.caminho_pdf;
+        if (pdfUrl && !pdfUrl.startsWith('http')) {
+          pdfUrl = `https://homologacao.focusnfe.com.br${pdfUrl}`;
+        }
+        let xmlUrl = body.caminho_xml_nota_fiscal || body.caminho_xml;
+        if (xmlUrl && !xmlUrl.startsWith('http') && pdfUrl) {
+          try {
+            const urlObj = new URL(pdfUrl);
+            xmlUrl = `${urlObj.origin}${xmlUrl}`;
+          } catch {
+            xmlUrl = `https://homologacao.focusnfe.com.br${xmlUrl}`;
+          }
+        }
+
+        setEmissionState({
+          status: 'autorizado',
+          message: 'Nota Fiscal emitida e autorizada com sucesso!',
+          pdfUrl,
+          xmlUrl,
+          errors: []
+        });
+        toast.success('Documento fiscal emitido com sucesso!');
+      } else if (initialStatus === 'erro_autorizacao' || initialStatus === 'rejeitado' || initialStatus === 'erro') {
+        const errorsList: string[] = [];
+        const body = result.provider_response || {};
+        if (body.erros && Array.isArray(body.erros)) {
+          body.erros.forEach((e: any) => errorsList.push(`${e.codigo || ''}: ${e.mensagem || ''}`));
+        } else if (body.errors && Array.isArray(body.errors)) {
+          body.errors.forEach((e: any) => errorsList.push(`${e.message || ''}`));
+        } else {
+          errorsList.push(body.mensagem || 'Erro retornado pela SEFAZ.');
+        }
+
+        setEmissionState({
+          status: 'erro',
+          message: 'Falha na emissão pela Focus NFe.',
+          pdfUrl: null,
+          xmlUrl: null,
+          errors: errorsList
+        });
+      } else {
+        // Status processando
+        setEmissionState({
+          status: 'processando',
+          message: 'Lote recebido! Aguardando autorização da SEFAZ...',
+          pdfUrl: null,
+          xmlUrl: null,
+          errors: []
+        });
+
+        // Iniciar polling de status
+        pollEmissionStatus(fiscalDocId);
       }
     } catch (error: any) {
       console.error(`Erro ao emitir ${type.toUpperCase()}:`, error);
-      toast.error(`Erro: ${error.message}`, { id: toastId });
+      
+      let errorMsg = error.message || 'Erro de comunicação desconhecido';
+      const errorsList: string[] = [errorMsg];
+
+      if (error.provider_error) {
+        const details = error.provider_error.erros || error.provider_error.errors;
+        if (Array.isArray(details)) {
+          details.forEach((d: any) => errorsList.push(`${d.campo || ''} - ${d.mensagem}`));
+        } else if (error.provider_error.mensagem) {
+          errorsList.push(error.provider_error.mensagem);
+        }
+      }
+
+      setEmissionState({
+        status: 'erro',
+        message: 'Erro ao processar emissão fiscal.',
+        pdfUrl: null,
+        xmlUrl: null,
+        errors: errorsList
+      });
     }
+  };
+
+  const pollEmissionStatus = async (fiscalDocId: string, iteration = 1) => {
+    if (iteration > 20) {
+      setEmissionState(prev => ({
+        ...prev,
+        status: 'erro',
+        message: 'Tempo limite atingido ao aguardar autorização da SEFAZ.',
+        errors: ['O processamento demorou muito. A nota poderá ser autorizada em instantes. Verifique a lista de notas posteriormente.']
+      }));
+      return;
+    }
+
+    try {
+      const res = await api.get(`/fiscal/focusnfe/status?fiscal_document_id=${fiscalDocId}`);
+      if (res) {
+        const body = res.provider_response || {};
+        const currentStatus = res.status || body?.status;
+
+        if (currentStatus === 'autorizado') {
+          let pdfUrl = body.pdf_url || body.caminho_danfe || body.caminho_pdf;
+          if (pdfUrl && !pdfUrl.startsWith('http')) {
+            pdfUrl = `https://homologacao.focusnfe.com.br${pdfUrl}`;
+          }
+          let xmlUrl = body.caminho_xml_nota_fiscal || body.caminho_xml;
+          if (xmlUrl && !xmlUrl.startsWith('http') && pdfUrl) {
+            try {
+              const urlObj = new URL(pdfUrl);
+              xmlUrl = `${urlObj.origin}${xmlUrl}`;
+            } catch {
+              xmlUrl = `https://homologacao.focusnfe.com.br${xmlUrl}`;
+            }
+          }
+
+          setEmissionState({
+            status: 'autorizado',
+            message: 'Nota Fiscal autorizada com sucesso pela SEFAZ!',
+            pdfUrl,
+            xmlUrl,
+            errors: []
+          });
+          toast.success('Nota Fiscal emitida e autorizada!');
+          return;
+        } else if (currentStatus === 'erro_autorizacao' || currentStatus === 'rejeitado' || currentStatus === 'erro') {
+          const errorsList: string[] = [];
+          if (body.erros && Array.isArray(body.erros)) {
+            body.erros.forEach((e: any) => errorsList.push(`${e.codigo || ''}: ${e.mensagem || ''}`));
+          } else if (body.errors && Array.isArray(body.errors)) {
+            body.errors.forEach((e: any) => errorsList.push(`${e.message || ''}`));
+          } else if (body.mensagem_sefaz) {
+            errorsList.push(body.mensagem_sefaz);
+          } else {
+            errorsList.push(body.mensagem || 'Rejeição desconhecida pela SEFAZ.');
+          }
+
+          setEmissionState({
+            status: 'erro',
+            message: 'A nota foi rejeitada pela SEFAZ ou apresentou erros.',
+            pdfUrl: null,
+            xmlUrl: null,
+            errors: errorsList
+          });
+          return;
+        }
+      }
+    } catch (err: any) {
+      console.error('Erro na consulta do status:', err);
+    }
+
+    // Polling contínuo
+    setTimeout(() => {
+      pollEmissionStatus(fiscalDocId, iteration + 1);
+    }, 2000);
   };
 
   return (
@@ -938,7 +1505,21 @@ export default function VendasProdutosPage() {
                   <TableRow key={venda.id}>
                     {columnVisibility.numero && (
                       <TableCell className="font-mono text-sm font-medium">
-                        {venda.numero}
+                        <div className="flex items-center gap-1.5">
+                          <span>{venda.numero}</span>
+                          {venda.fiscal_doc && venda.fiscal_doc.status === 'autorizado' && (
+                            <Badge className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50 text-[10px] font-bold px-1.5 py-0.5 flex items-center gap-1 rounded">
+                              <Receipt className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                              NF
+                            </Badge>
+                          )}
+                          {venda.fiscal_doc && (venda.fiscal_doc.status === 'processando' || venda.fiscal_doc.status === 'submitt') && (
+                            <Badge className="bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 text-[10px] font-bold px-1.5 py-0.5 flex items-center gap-1 rounded">
+                              <Loader2 className="h-3 w-3 animate-spin text-amber-500" />
+                              NF
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                     )}
                     {columnVisibility.cliente && (
@@ -1011,10 +1592,38 @@ export default function VendasProdutosPage() {
                             Imprimir Cupom
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleEmitirNFe(venda, 'nfe')}>
-                            <FileText className="h-4 w-4 mr-2" />
-                            Emitir NF-e
-                          </DropdownMenuItem>
+                          {venda.fiscal_doc && venda.fiscal_doc.status === 'autorizado' ? (
+                            <>
+                              <DropdownMenuItem disabled className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                                <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600 dark:text-emerald-400" />
+                                NF-e já Emitida {venda.fiscal_doc.numero ? `(Nº ${venda.fiscal_doc.numero})` : ''}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                const url = getFullFileUrl(venda.fiscal_doc?.pdf_url);
+                                if (url) window.open(url, '_blank');
+                              }}>
+                                <Printer className="h-4 w-4 mr-2 text-emerald-500" />
+                                Visualizar DANFE (PDF)
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                const url = getFullFileUrl(venda.fiscal_doc?.xml_url);
+                                if (url) window.open(url, '_blank');
+                              }}>
+                                <Download className="h-4 w-4 mr-2 text-indigo-500" />
+                                Baixar XML da NF-e
+                              </DropdownMenuItem>
+                            </>
+                          ) : venda.fiscal_doc && (venda.fiscal_doc.status === 'processando' || venda.fiscal_doc.status === 'submitt') ? (
+                            <DropdownMenuItem disabled className="text-amber-600 dark:text-amber-400 font-semibold">
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin text-amber-500" />
+                              Processando na SEFAZ...
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem onClick={() => handleEmitirNFe(venda, 'nfe')}>
+                              <FileText className="h-4 w-4 mr-2" />
+                              Emitir NF-e
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => handleMarcarEntrega(venda)}>
                             <Truck className="h-4 w-4 mr-2" />
@@ -1204,6 +1813,372 @@ export default function VendasProdutosPage() {
                 }} 
                 onCancel={() => setShowEditSaleDialog(false)} 
               />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Auditoria Fiscal */}
+      <Dialog open={showAuditDialog} onOpenChange={setShowAuditDialog}>
+        <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto rounded-2xl border-2 border-slate-200 dark:border-slate-800 shadow-2xl">
+          <DialogHeader className="pb-4 border-b">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-foreground">
+              <Receipt className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+              Auditoria Fiscal Prévia da Venda
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              Análise de dados cadastrais e fiscais da Venda {auditResult?.venda.numero} antes do envio para a Sefaz.
+            </DialogDescription>
+          </DialogHeader>
+
+          {auditResult && (
+            <div className="space-y-6 py-4">
+              {/* Resumo */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border">
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tipo de Emissão</p>
+                  <Badge className="mt-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1">
+                    {auditResult.type.toUpperCase()}
+                  </Badge>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Valor Total</p>
+                  <p className="text-lg font-bold text-slate-950 dark:text-slate-50 mt-0.5">
+                    {formatCurrency(auditResult.venda.total)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Erros Impeditivos */}
+              {auditResult.errors.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-bold text-red-600 dark:text-red-400 flex items-center gap-1.5 uppercase tracking-wider">
+                    <XCircle className="h-4.5 w-4.5 text-red-600" />
+                    Erros Impeditivos ({auditResult.errors.length})
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    Estes erros impedem a emissão da nota fiscal e devem ser corrigidos no cadastro correspondente.
+                  </p>
+                  <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                    {auditResult.errors.map((err, i) => (
+                      <div key={i} className="flex gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 text-red-800 dark:text-red-200 text-sm animate-in fade-in slide-in-from-top-1 duration-200">
+                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-red-600 dark:text-red-400" />
+                        <div>
+                          <strong className="font-semibold">{err.field}:</strong> {err.message}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Alertas / Avisos */}
+              {auditResult.warnings.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
+                    <AlertCircle className="h-4.5 w-4.5 text-amber-500" />
+                    Alertas e Avisos ({auditResult.warnings.length})
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    Avisos que não impedem a emissão diretamente, mas podem gerar reparações ou tributações incorretas.
+                  </p>
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                    {auditResult.warnings.map((warn, i) => (
+                      <div key={i} className="flex gap-3 p-3 rounded-lg bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200/60 dark:border-amber-900/30 text-amber-800 dark:text-amber-300 text-sm animate-in fade-in slide-in-from-top-1 duration-200">
+                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-500" />
+                        <div>
+                          <strong className="font-semibold">{warn.field}:</strong> {warn.message}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Status de Sucesso (Se sem erros nem avisos mas abriu por algum motivo) */}
+              {auditResult.errors.length === 0 && auditResult.warnings.length === 0 && (
+                <div className="flex flex-col items-center justify-center p-8 border border-dashed rounded-xl text-center space-y-3">
+                  <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+                  <div>
+                    <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">Tudo pronto para emissão!</h4>
+                    <p className="text-sm text-muted-foreground mt-1">Todos os dados cadastrais e fiscais estão corretos.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Correção Rápida de Cadastro */}
+              {editCustomerForm ? (
+                <div className="space-y-4 border-t pt-5 mt-4">
+                  <div className="flex items-center gap-2">
+                    <User className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                      Correção Rápida do Destinatário
+                    </h4>
+                  </div>
+                  
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="cust-name" className="text-xs font-semibold text-muted-foreground">Nome / Razão Social</Label>
+                        <Input 
+                          id="cust-name" 
+                          value={editCustomerForm.name} 
+                          onChange={(e) => setEditCustomerForm(prev => prev ? { ...prev, name: e.target.value } : null)}
+                          placeholder="Nome do cliente"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="cust-doc" className="text-xs font-semibold text-muted-foreground">CPF ou CNPJ</Label>
+                        <Input 
+                          id="cust-doc" 
+                          value={editCustomerForm.document} 
+                          onChange={(e) => setEditCustomerForm(prev => prev ? { ...prev, document: e.target.value } : null)}
+                          placeholder="Apenas números"
+                          className="h-9 text-sm font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1.5 col-span-1">
+                        <Label htmlFor="cust-zip" className="text-xs font-semibold text-muted-foreground">CEP</Label>
+                        <Input 
+                          id="cust-zip" 
+                          value={editCustomerForm.zipcode} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setEditCustomerForm(prev => prev ? { ...prev, zipcode: val } : null);
+                            if (val.replace(/\D/g, '').length === 8) {
+                              handleCepLookup(val);
+                            }
+                          }}
+                          onBlur={(e) => handleCepLookup(e.target.value)}
+                          placeholder="00000-000"
+                          className="h-9 text-sm font-mono"
+                        />
+                      </div>
+                      <div className="space-y-1.5 col-span-2">
+                        <Label htmlFor="cust-addr" className="text-xs font-semibold text-muted-foreground">Endereço (Rua/Av.)</Label>
+                        <Input 
+                          id="cust-addr" 
+                          value={editCustomerForm.address} 
+                          onChange={(e) => setEditCustomerForm(prev => prev ? { ...prev, address: e.target.value } : null)}
+                          placeholder="Ex: Av. Atlântica"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-3">
+                      <div className="space-y-1.5 col-span-1">
+                        <Label htmlFor="cust-num" className="text-xs font-semibold text-muted-foreground">Número</Label>
+                        <Input 
+                          id="cust-num" 
+                          value={editCustomerForm.address_number} 
+                          onChange={(e) => setEditCustomerForm(prev => prev ? { ...prev, address_number: e.target.value } : null)}
+                          placeholder="S/N"
+                          className="h-9 text-sm font-mono"
+                        />
+                      </div>
+                      <div className="space-y-1.5 col-span-3">
+                        <Label htmlFor="cust-neigh" className="text-xs font-semibold text-muted-foreground">Bairro</Label>
+                        <Input 
+                          id="cust-neigh" 
+                          value={editCustomerForm.neighborhood} 
+                          onChange={(e) => setEditCustomerForm(prev => prev ? { ...prev, neighborhood: e.target.value } : null)}
+                          placeholder="Ex: Copacabana"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-3">
+                      <div className="space-y-1.5 col-span-3">
+                        <Label htmlFor="cust-city" className="text-xs font-semibold text-muted-foreground">Cidade</Label>
+                        <Input 
+                          id="cust-city" 
+                          value={editCustomerForm.city} 
+                          onChange={(e) => setEditCustomerForm(prev => prev ? { ...prev, city: e.target.value } : null)}
+                          placeholder="Ex: Rio de Janeiro"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5 col-span-1">
+                        <Label htmlFor="cust-state" className="text-xs font-semibold text-muted-foreground">UF</Label>
+                        <Input 
+                          id="cust-state" 
+                          value={editCustomerForm.state} 
+                          onChange={(e) => setEditCustomerForm(prev => prev ? { ...prev, state: e.target.value.toUpperCase() } : null)}
+                          maxLength={2}
+                          placeholder="UF"
+                          className="h-9 text-sm font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                      <Button 
+                        type="button"
+                        onClick={handleSaveCustomer}
+                        disabled={isSavingCustomer}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold transition-all flex items-center gap-2"
+                      >
+                        {isSavingCustomer ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4" />
+                        )}
+                        Salvar e Re-auditar Cadastro
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                !auditResult.venda.customer_id && (
+                  <div className="space-y-3 border-t pt-5 mt-4">
+                    <div className="flex gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-200 text-sm shadow-sm">
+                      <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <strong className="font-semibold text-amber-900 dark:text-amber-100">Nenhum cliente associado:</strong> Esta venda não possui um cliente associado. Para poder emitir uma NF-e (Modelo 55), é obrigatório identificar o destinatário.
+                        <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">Por favor, feche este modal, edite a venda e associe um cliente cadastrado antes de prosseguir.</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="pt-4 border-t flex flex-row items-center justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowAuditDialog(false)}>
+              Fechar e Corrigir
+            </Button>
+            {auditResult && auditResult.errors.length === 0 && (
+              <Button 
+                onClick={async () => {
+                  setShowAuditDialog(false);
+                  await proceedWithEmission(
+                    auditResult.venda,
+                    auditResult.type,
+                    auditResult.itemsWithProducts,
+                    auditResult.customer
+                  );
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Emitir Mesmo Assim
+              </Button>
+            )}
+            {auditResult && auditResult.errors.length > 0 && (
+              <Button 
+                disabled
+                className="bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold cursor-not-allowed"
+              >
+                Emissão Bloqueada
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Acompanhamento da Emissão */}
+      <Dialog open={showEmissionDialog} onOpenChange={setShowEmissionDialog}>
+        <DialogContent className="sm:max-w-[500px] rounded-2xl border-2 border-slate-200 dark:border-slate-800 shadow-2xl p-6">
+          <DialogHeader className="pb-4 border-b flex flex-col items-center text-center">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-foreground">
+              <Receipt className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+              Acompanhamento da Emissão
+            </DialogTitle>
+            <DialogDescription className="text-sm mt-1">
+              Verifique o status da sua nota fiscal em tempo real com a Sefaz.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col items-center justify-center py-8 space-y-6 text-center">
+            {/* Ícones e Estados */}
+            {emissionState.status === 'enviando' && (
+              <div className="flex flex-col items-center space-y-4">
+                <div className="relative flex items-center justify-center">
+                  <div className="h-16 w-16 rounded-full border-4 border-indigo-100 dark:border-indigo-950 border-t-indigo-600 animate-spin" />
+                  <ShoppingCart className="h-6 w-6 text-indigo-600 absolute" />
+                </div>
+                <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">{emissionState.message}</h4>
+                <p className="text-xs text-muted-foreground max-w-xs">Mapeando dados cadastrais e fiscais da venda...</p>
+              </div>
+            )}
+
+            {emissionState.status === 'processando' && (
+              <div className="flex flex-col items-center space-y-4">
+                <div className="relative flex items-center justify-center">
+                  <div className="h-16 w-16 rounded-full border-4 border-amber-100 dark:border-amber-950 border-t-amber-500 animate-spin" />
+                  <Clock className="h-6 w-6 text-amber-500 absolute" />
+                </div>
+                <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">{emissionState.message}</h4>
+                <p className="text-xs text-muted-foreground max-w-xs">Aguardando processamento e resposta da SEFAZ estadual...</p>
+              </div>
+            )}
+
+            {emissionState.status === 'autorizado' && (
+              <div className="flex flex-col items-center space-y-4 w-full">
+                <div className="h-16 w-16 rounded-full bg-emerald-100 dark:bg-emerald-950/30 flex items-center justify-center border-2 border-emerald-500 animate-bounce">
+                  <CheckCircle2 className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">{emissionState.message}</h4>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 max-w-xs font-semibold">Tudo pronto! Você já pode visualizar ou baixar os documentos abaixo.</p>
+                
+                <div className="flex flex-col gap-2 w-full pt-4">
+                  {emissionState.pdfUrl && (
+                    <Button 
+                      onClick={() => window.open(emissionState.pdfUrl!, '_blank')}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center gap-2 h-11 rounded-xl shadow-md transition-all hover:scale-[1.02]"
+                    >
+                      <Printer className="h-5 w-5" />
+                      Visualizar DANFE (PDF)
+                    </Button>
+                  )}
+                  {emissionState.xmlUrl && (
+                    <Button 
+                      variant="outline"
+                      onClick={() => window.open(emissionState.xmlUrl!, '_blank')}
+                      className="border-2 border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700 font-bold flex items-center justify-center gap-2 h-11 rounded-xl shadow-sm transition-all hover:scale-[1.02]"
+                    >
+                      <Download className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                      Baixar XML da Nota
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {emissionState.status === 'erro' && (
+              <div className="flex flex-col items-center space-y-4 w-full">
+                <div className="h-16 w-16 rounded-full bg-red-100 dark:bg-red-950/30 flex items-center justify-center border-2 border-red-500">
+                  <XCircle className="h-10 w-10 text-red-600 dark:text-red-400" />
+                </div>
+                <h4 className="text-base font-bold text-red-600 dark:text-red-400">{emissionState.message}</h4>
+                
+                <div className="w-full bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 p-4 rounded-xl text-left max-h-[180px] overflow-y-auto space-y-1.5 shadow-inner">
+                  <p className="text-xs font-bold text-red-800 dark:text-red-300 uppercase tracking-wider">Erros Identificados:</p>
+                  {emissionState.errors.length > 0 ? (
+                    emissionState.errors.map((err, i) => (
+                      <p key={i} className="text-xs text-red-700 dark:text-red-300 leading-relaxed font-mono">
+                        • {err}
+                      </p>
+                    ))
+                  ) : (
+                    <p className="text-xs text-red-700 dark:text-red-300">Falha ao processar nota fiscal ou resposta nula do servidor.</p>
+                  )}
+                </div>
+
+                <Button 
+                  onClick={() => setShowEmissionDialog(false)}
+                  className="bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900 text-white font-semibold w-full mt-4 h-10 rounded-xl"
+                >
+                  Fechar e Corrigir Venda
+                </Button>
+              </div>
             )}
           </div>
         </DialogContent>

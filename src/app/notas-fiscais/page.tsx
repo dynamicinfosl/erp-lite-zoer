@@ -23,7 +23,11 @@ import {
   AlertCircle,
   XCircle,
   CheckCircle2,
-  FileJson
+  FileJson,
+  ShoppingCart,
+  Calendar,
+  DollarSign,
+  User
 } from 'lucide-react';
 import {
   Dialog,
@@ -32,6 +36,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+
+const getFullFileUrl = (path: string | null | undefined) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return path.startsWith('/arquivos_development')
+    ? `https://homologacao.focusnfe.com.br${path}`
+    : `https://api.focusnfe.com.br${path}`;
+};
 
 interface FiscalDocument {
   id: string;
@@ -69,6 +81,70 @@ export default function NotasFiscaisPage() {
   // Detail Modal
   const [selectedDoc, setSelectedDoc] = useState<FiscalDocument | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  // Cancellation Modal
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
+  const [cancelJustification, setCancelJustification] = useState('');
+  const [docToCancel, setDocToCancel] = useState<FiscalDocument | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+
+  // Mapa de Vendas para atrelar e facilitar a identificação
+  const [salesMap, setSalesMap] = useState<Map<string, { numero: string; cliente: string; total: number }>>(new Map());
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+  const [selectedSale, setSelectedSale] = useState<any | null>(null);
+  const [isSaleDetailOpen, setIsSaleDetailOpen] = useState(false);
+  const [loadingSale, setLoadingSale] = useState(false);
+
+  const loadSalesMap = useCallback(async () => {
+    if (!tenant?.id) return;
+    try {
+      const res = await fetch(`/next_api/sales?tenant_id=${tenant.id}&limit=2000`);
+      if (res.ok) {
+        const json = await res.json();
+        const data = Array.isArray(json?.data) ? json.data : (json?.rows || json || []);
+        const newMap = new Map<string, { numero: string; cliente: string; total: number }>();
+        data.forEach((s: any) => {
+          newMap.set(String(s.id), {
+            numero: s.sale_number || s.numero || '',
+            cliente: s.customer?.name || s.customer_name || s.cliente || 'Cliente Avulso',
+            total: Number(s.total_amount || s.final_amount || s.total || 0)
+          });
+        });
+        setSalesMap(newMap);
+      }
+    } catch (e) {
+      console.error('Erro ao carregar mapa de vendas:', e);
+    }
+  }, [tenant?.id]);
+
+  useEffect(() => {
+    loadSalesMap();
+  }, [loadSalesMap]);
+
+  const handleViewSaleDetails = async (saleId: string) => {
+    setSelectedSaleId(saleId);
+    setIsSaleDetailOpen(true);
+    setLoadingSale(true);
+    setSelectedSale(null);
+    try {
+      const res = await fetch(`/next_api/sales/${saleId}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setSelectedSale(json.data);
+        } else {
+          toast.error('Venda não encontrada ou erro ao carregar.');
+        }
+      } else {
+        toast.error('Erro ao carregar detalhes da venda.');
+      }
+    } catch (e) {
+      console.error('Erro ao buscar venda:', e);
+      toast.error('Erro ao conectar com a API de vendas.');
+    } finally {
+      setLoadingSale(false);
+    }
+  };
 
   const loadDocuments = useCallback(async () => {
     if (!tenant?.id) return;
@@ -117,14 +193,53 @@ export default function NotasFiscaisPage() {
   };
 
   const handleDownloadFile = (path: string, fileName: string) => {
-    // Se o path for absoluto ou relativo, inicia o download
+    // Se o path for absoluto ou relativo, inicia o download resolvendo caminhos relativos da FocusNFe
     const link = document.createElement('a');
-    link.href = path;
+    link.href = getFullFileUrl(path);
     link.setAttribute('download', fileName);
     link.target = '_blank';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleCancelDocument = async () => {
+    if (!docToCancel || !cancelJustification) return;
+    if (cancelJustification.trim().length < 15) {
+      toast.error('A justificativa de cancelamento deve ter pelo menos 15 caracteres.');
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      const res = await fetch('/next_api/fiscal/focusnfe/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fiscal_document_id: docToCancel.id,
+          justificativa: cancelJustification,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || 'Erro ao cancelar documento fiscal.');
+      }
+
+      toast.success('Documento fiscal cancelado com sucesso!');
+      setIsCancelOpen(false);
+      setCancelJustification('');
+      setDocToCancel(null);
+      loadDocuments();
+      if (selectedDoc?.id === docToCancel.id) {
+        setIsDetailOpen(false);
+      }
+    } catch (error: any) {
+      console.error('Erro ao cancelar nota:', error);
+      toast.error(`Falha ao cancelar: ${error.message}`);
+    } finally {
+      setCancelling(false);
+    }
   };
 
   // Client-side text and status filtering
@@ -194,14 +309,14 @@ export default function NotasFiscaisPage() {
       return (
         <Badge variant="outline" className="border-blue-500 text-blue-500 bg-blue-50/20 dark:bg-blue-950/20 flex items-center gap-1 w-fit">
           <Building2 className="h-3 w-3" />
-          Focus NFe
+          Faturamento ERP
         </Badge>
       );
     }
     return (
       <Badge variant="outline" className="border-purple-500 text-purple-500 bg-purple-50/20 dark:bg-purple-950/20 flex items-center gap-1 w-fit">
         <Database className="h-3 w-3" />
-        Gestão Click
+        Importada (Legado)
       </Badge>
     );
   };
@@ -273,9 +388,9 @@ export default function NotasFiscaisPage() {
                 onChange={(e) => setProviderFilter(e.target.value)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
               >
-                <option value="all">Todos os Provedores</option>
-                <option value="focusnfe">Focus NFe (Emitidas)</option>
-                <option value="gestaoclick">Gestão Click (Importadas)</option>
+                <option value="all">Todas as Origens</option>
+                <option value="focusnfe">Emitidas pelo ERP</option>
+                <option value="gestaoclick">Importadas (Legado)</option>
               </select>
             </div>
 
@@ -315,7 +430,7 @@ export default function NotasFiscaisPage() {
                   <thead className="bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-800">
                     <tr>
                       <th className="px-4 py-3 text-sm font-semibold">Tipo</th>
-                      <th className="px-4 py-3 text-sm font-semibold">Provedor</th>
+                      <th className="px-4 py-3 text-sm font-semibold">Venda / Cliente</th>
                       <th className="px-4 py-3 text-sm font-semibold">Série / Número</th>
                       <th className="px-4 py-3 text-sm font-semibold">Ref / Chave de Acesso</th>
                       <th className="px-4 py-3 text-sm font-semibold">Situação</th>
@@ -332,7 +447,35 @@ export default function NotasFiscaisPage() {
                           </Badge>
                         </td>
                         <td className="px-4 py-3">
-                          {getProviderBadge(doc.provider)}
+                          {doc.ref && doc.ref.startsWith('sale_') ? (() => {
+                            const saleId = doc.ref.split('_')[1];
+                            const saleInfo = salesMap.get(saleId);
+                            return (
+                              <div className="flex flex-col space-y-0.5">
+                                <Button
+                                  variant="link"
+                                  className="p-0 h-auto text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold flex items-center gap-1 w-fit"
+                                  onClick={() => handleViewSaleDetails(saleId)}
+                                  title="Clique para visualizar detalhes da venda"
+                                >
+                                  <ShoppingCart className="h-3 w-3" />
+                                  {saleInfo?.numero ? `Venda #${saleInfo.numero}` : `Venda #${saleId}`}
+                                </Button>
+                                {saleInfo?.cliente ? (
+                                  <span className="text-xs text-gray-900 dark:text-gray-100 font-medium truncate max-w-[180px]" title={saleInfo.cliente}>
+                                    {saleInfo.cliente}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">Carregando cliente...</span>
+                                )}
+                              </div>
+                            );
+                          })() : (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-xs text-muted-foreground italic">Sem venda atrelada</span>
+                              {getProviderBadge(doc.provider)}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                           {doc.numero ? (
@@ -388,6 +531,33 @@ export default function NotasFiscaisPage() {
                                 title="Download PDF"
                               >
                                 <Download className="h-4 w-4 text-emerald-500" />
+                              </Button>
+                            )}
+
+                            {(doc.xml_path || doc.caminho_xml) && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={() => handleDownloadFile((doc.xml_path || doc.caminho_xml)!, `XML_${doc.numero || doc.ref}.xml`)}
+                                title="Download XML"
+                              >
+                                <FileJson className="h-4 w-4 text-indigo-500" />
+                              </Button>
+                            )}
+
+                            {doc.provider === 'focusnfe' && (doc.status === 'autorizado' || doc.status === 'processado' || doc.status === 'success' || doc.status.includes('autoriz') || doc.status.includes('success')) && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={() => {
+                                  setDocToCancel(doc);
+                                  setIsCancelOpen(true);
+                                }}
+                                title="Cancelar Nota Fiscal"
+                              >
+                                <XCircle className="h-4 w-4 text-red-500 hover:text-red-700" />
                               </Button>
                             )}
                           </div>
@@ -479,7 +649,7 @@ export default function NotasFiscaisPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border">
                 <div>
                   <span className="text-xs text-muted-foreground block">Provedor</span>
-                  <span className="font-semibold text-sm">{selectedDoc.provider === 'focusnfe' ? 'Focus NFe' : 'Gestão Click'}</span>
+                  <span className="font-semibold text-sm">{selectedDoc.provider === 'focusnfe' ? 'Emitida pelo ERP' : 'Importada (Legado)'}</span>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground block">Tipo</span>
@@ -524,6 +694,19 @@ export default function NotasFiscaisPage() {
 
               {/* Ações adicionais */}
               <div className="flex justify-end gap-2 border-t pt-4">
+                {selectedDoc.provider === 'focusnfe' && (selectedDoc.status === 'autorizado' || selectedDoc.status === 'processado' || selectedDoc.status === 'success' || selectedDoc.status.includes('autoriz') || selectedDoc.status.includes('success')) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setDocToCancel(selectedDoc);
+                      setIsCancelOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 text-red-600 border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    Cancelar Nota
+                  </Button>
+                )}
                 {(selectedDoc.xml_path || selectedDoc.caminho_xml) && (
                   <Button
                     variant="outline"
@@ -548,6 +731,210 @@ export default function NotasFiscaisPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancellation Dialog */}
+      <Dialog open={isCancelOpen} onOpenChange={setIsCancelOpen}>
+        <DialogContent className="max-w-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2 text-red-600 font-bold">
+              <XCircle className="h-5 w-5" />
+              Cancelar Nota Fiscal
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground mt-1">
+              Tem certeza de que deseja cancelar esta nota fiscal? Esta ação enviará um pedido de homologação de cancelamento perante a SEFAZ.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium block text-gray-900 dark:text-gray-100">
+                Justificativa do Cancelamento <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-gray-900 dark:text-gray-100"
+                placeholder="Informe o motivo do cancelamento (mínimo de 15 caracteres)..."
+                value={cancelJustification}
+                onChange={(e) => setCancelJustification(e.target.value)}
+                maxLength={255}
+                disabled={cancelling}
+              />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>Mínimo: 15 caracteres</span>
+                <span className={cancelJustification.trim().length < 15 ? "text-amber-600 font-semibold" : "text-emerald-600 font-semibold"}>
+                  {cancelJustification.trim().length} / 255
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsCancelOpen(false);
+                  setCancelJustification('');
+                  setDocToCancel(null);
+                }}
+                disabled={cancelling}
+              >
+                Voltar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleCancelDocument}
+                disabled={cancelling || cancelJustification.trim().length < 15}
+                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white"
+              >
+                {cancelling ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Cancelando...
+                  </>
+                ) : (
+                  'Confirmar Cancelamento'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Dialog de Detalhes da Venda */}
+      <Dialog open={isSaleDetailOpen} onOpenChange={setIsSaleDetailOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl">
+          <DialogHeader className="border-b pb-4">
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5 text-indigo-600" />
+              Detalhes da Venda {selectedSale?.sale_number}
+            </DialogTitle>
+            <DialogDescription>
+              Informações consolidadas da venda de produtos vinculada a este documento fiscal.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {loadingSale ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-3">
+              <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+              <p className="text-sm text-muted-foreground">Carregando dados da venda...</p>
+            </div>
+          ) : selectedSale ? (
+            <div className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block uppercase tracking-wider">Número da Venda</label>
+                  <div className="font-mono text-sm mt-1 font-semibold">{selectedSale.sale_number}</div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block uppercase tracking-wider">Status</label>
+                  <div className="mt-1">
+                    <Badge variant={selectedSale.status === 'completed' || selectedSale.status === 'paga' ? 'default' : 'outline'}>
+                      {selectedSale.status === 'completed' || selectedSale.status === 'paga' ? 'Paga' : selectedSale.status === 'canceled' ? 'Cancelada' : 'Pendente'}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block uppercase tracking-wider">Cliente</label>
+                  <div className="mt-1 text-sm font-medium flex items-center gap-1">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
+                    {selectedSale.customer_name || 'Cliente Avulso'}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block uppercase tracking-wider">Vendedor</label>
+                  <div className="mt-1 text-sm">{selectedSale.seller_name || '-'}</div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block uppercase tracking-wider">Data da Venda</label>
+                  <div className="mt-1 text-sm flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                    {new Date(selectedSale.created_at).toLocaleDateString('pt-BR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block uppercase tracking-wider">Forma de Pagamento</label>
+                  <div className="mt-1">
+                    <Badge variant="secondary">
+                      {selectedSale.payment_method === 'dinheiro' ? 'Dinheiro' :
+                       selectedSale.payment_method === 'cartao_debito' ? 'Cartão Débito' :
+                       selectedSale.payment_method === 'cartao_credito' ? 'Cartão Crédito' :
+                       selectedSale.payment_method === 'pix' ? 'PIX' :
+                       selectedSale.payment_method === 'boleto' ? 'Boleto' : selectedSale.payment_method || 'Não Informada'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              
+              {selectedSale.items && selectedSale.items.length > 0 && (
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block uppercase tracking-wider mb-2">Itens Vendidos</label>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-slate-50 dark:bg-slate-900 border-b">
+                        <tr>
+                          <th className="px-3 py-2 font-semibold">Produto</th>
+                          <th className="px-3 py-2 font-semibold text-center">Qtd</th>
+                          <th className="px-3 py-2 font-semibold text-right">Preço Unit.</th>
+                          <th className="px-3 py-2 font-semibold text-right">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {selectedSale.items.map((item: any, index: number) => (
+                          <tr key={index} className="hover:bg-slate-50/50">
+                            <td className="px-3 py-2">{item.product_name}</td>
+                            <td className="px-3 py-2 text-center">{item.quantity}</td>
+                            <td className="px-3 py-2 text-right">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unit_price)}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.subtotal)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block uppercase tracking-wider">Subtotal</label>
+                  <div className="text-sm font-semibold mt-1">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(selectedSale.total_amount || 0))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block uppercase tracking-wider">Total Final</label>
+                  <div className="text-lg font-bold text-indigo-600 mt-0.5">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(selectedSale.final_amount || selectedSale.total_amount || 0))}
+                  </div>
+                </div>
+              </div>
+              
+              {selectedSale.notes && (
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block uppercase tracking-wider">Observações</label>
+                  <div className="text-xs text-muted-foreground mt-1 bg-slate-50 dark:bg-slate-900 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 italic leading-relaxed">
+                    {selectedSale.notes}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              Erro ao exibir detalhes da venda.
+            </div>
+          )}
+          
+          <div className="flex justify-end pt-4 border-t">
+            <Button onClick={() => setIsSaleDetailOpen(false)}>Fechar</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

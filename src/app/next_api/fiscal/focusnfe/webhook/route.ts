@@ -103,8 +103,8 @@ export async function POST(request: NextRequest) {
       if (body.numero) updateData.numero = String(body.numero);
       if (body.serie) updateData.serie = String(body.serie);
       if (finalChave) updateData.chave = String(finalChave);
-      if (body.caminho_xml_nota_fiscal || body.caminho_xml) updateData.xml_path = String(body.caminho_xml_nota_fiscal || body.caminho_xml);
-      if (body.caminho_danfe || body.caminho_pdf) updateData.pdf_path = String(body.caminho_danfe || body.caminho_pdf);
+      if (body.caminho_xml_nota_fiscal || body.caminho_xml) updateData.caminho_xml = String(body.caminho_xml_nota_fiscal || body.caminho_xml);
+      if (body.caminho_danfe || body.caminho_pdf) updateData.caminho_pdf = String(body.caminho_danfe || body.caminho_pdf);
 
       await supabaseAdmin
         .from('fiscal_documents')

