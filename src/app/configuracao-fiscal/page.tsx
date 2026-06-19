@@ -49,6 +49,8 @@ interface FiscalIntegration {
   cert_valid_from?: string;
   cert_valid_to?: string;
   cert_cnpj?: string;
+  nfe_serie?: string;
+  nfce_serie?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -119,6 +121,10 @@ export default function ConfiguracaoFiscalPage() {
     certificate_password: '',
   });
 
+  const [nfeSerie, setNfeSerie] = useState('1');
+  const [nfceSerie, setNfceSerie] = useState('1');
+  const [savingSeries, setSavingSeries] = useState(false);
+
   const loadFiscalData = useCallback(async () => {
     if (!authTenant && !user) {
       console.warn('Nenhum tenant ou usuário disponível');
@@ -175,6 +181,8 @@ export default function ConfiguracaoFiscalPage() {
         const integrationResult = await integrationResponse.json();
         if (integrationResult?.data) {
           setIntegration(integrationResult.data);
+          setNfeSerie(integrationResult.data.nfe_serie || '1');
+          setNfceSerie(integrationResult.data.nfce_serie || '1');
           setFormData({
             certificate_password: '',
           });
@@ -318,6 +326,39 @@ export default function ConfiguracaoFiscalPage() {
       toast.error('Erro: ' + errorMessage, { duration: 10000 });
     } finally {
       setProvisioning(false);
+    }
+  };
+
+  const handleSaveSeries = async () => {
+    if (!integration) return;
+    const fallbackTenantId = user?.id || '00000000-0000-0000-0000-000000000000';
+    const tenantId = authTenant?.id || fallbackTenantId;
+
+    try {
+      setSavingSeries(true);
+      const response = await fetch('/next_api/fiscal/focusnfe/integration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          api_token: integration.api_token,
+          nfe_serie: nfeSerie,
+          nfce_serie: nfceSerie,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao salvar séries');
+      }
+
+      toast.success('Séries de notas fiscais atualizadas com sucesso!');
+      await loadFiscalData();
+    } catch (error: any) {
+      console.error('Erro ao salvar séries:', error);
+      toast.error(`Erro ao salvar séries: ${error.message}`);
+    } finally {
+      setSavingSeries(false);
     }
   };
 
@@ -816,6 +857,72 @@ export default function ConfiguracaoFiscalPage() {
                       </div>
                     )}
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="juga-card-elevated overflow-hidden">
+              <div className="h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-foreground font-bold text-lg">
+                  <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md">
+                    <FileText className="h-5 w-5 text-white" />
+                  </div>
+                  Série dos Documentos Fiscais
+                </CardTitle>
+                <CardDescription>
+                  Configure as séries que serão utilizadas para a emissão em Produção / Homologação.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="nfe_serie" className="text-sm font-semibold text-foreground">
+                      Série da NF-e (Produto / Modelo 55)
+                    </Label>
+                    <Input
+                      id="nfe_serie"
+                      value={nfeSerie}
+                      onChange={(e) => setNfeSerie(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Ex: 1"
+                      className="h-12 text-base border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Se você configurou a série no painel da Focus NFe (Ex: série 50), informe-a aqui.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="nfce_serie" className="text-sm font-semibold text-foreground">
+                      Série da NFC-e (Consumidor / Modelo 65)
+                    </Label>
+                    <Input
+                      id="nfce_serie"
+                      value={nfceSerie}
+                      onChange={(e) => setNfceSerie(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Ex: 1"
+                      className="h-12 text-base border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Série configurada para cupons fiscais eletrônicos no painel da Focus NFe.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <Button
+                    type="button"
+                    onClick={handleSaveSeries}
+                    disabled={savingSeries || !integration}
+                    className="min-w-[180px] h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg shadow-blue-500/25 transition-all hover:shadow-xl hover:shadow-blue-500/30"
+                  >
+                    {savingSeries ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      'Salvar Séries'
+                    )}
+                  </Button>
                 </div>
               </CardContent>
             </Card>

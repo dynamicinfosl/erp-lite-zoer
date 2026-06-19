@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     const { data: integration, error: integrationError } = await supabaseAdmin
       .from('fiscal_integrations')
-      .select('enabled, focus_empresa_id, focus_token_homologacao, focus_token_producao, cnpj_emitente, cert_cnpj')
+      .select('enabled, focus_empresa_id, focus_token_homologacao, focus_token_producao, cnpj_emitente, cert_cnpj, nfe_serie, nfce_serie')
       .eq('tenant_id', tenant_id)
       .eq('provider', 'focusnfe')
       .maybeSingle();
@@ -114,6 +114,15 @@ export async function POST(request: NextRequest) {
     const issuerCnpj = (integration.cnpj_emitente || integration.cert_cnpj || '').replace(/\D/g, '');
     if (issuerCnpj && payload && typeof payload === 'object' && !payload.cnpj_emitente) {
       payload.cnpj_emitente = issuerCnpj;
+    }
+
+    // Injetar a série da nota se disponível e não preenchida no payload
+    if (payload && typeof payload === 'object' && !payload.serie) {
+      if (doc_type === 'nfe') {
+        payload.serie = integration.nfe_serie || '1';
+      } else if (doc_type === 'nfce') {
+        payload.serie = integration.nfce_serie || '1';
+      }
     }
 
     const { data: fiscalDoc, error: insertError } = await supabaseAdmin
