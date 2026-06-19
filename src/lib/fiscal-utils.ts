@@ -148,7 +148,7 @@ function mapItemToFocus(item: SaleItem & { product?: Product }, index: number) {
   const mapped: any = {
     numero_item: String(index),
     codigo_produto: String(item.product_id || `item_${index}`),
-    descricao: item.product?.name || item.product_name || item.produto || 'Produto sem nome',
+    descricao: item.product?.name || (item as any).product_name || (item as any).produto || 'Produto sem nome',
     codigo_ncm: ncm.replace(/\D/g, ''),
     cfop: cfop.replace(/\D/g, ''),
     unidade_comercial: unitClean,
