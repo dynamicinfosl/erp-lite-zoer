@@ -1112,8 +1112,8 @@ export default function VendasProdutosPage() {
     try {
       // 1. Mapear payload
       const payload = type === 'nfe' 
-        ? mapSaleToNFePayload(venda as any, itemsWithProducts as any, customer)
-        : mapSaleToNFCePayload(venda as any, itemsWithProducts as any, customer);
+        ? mapSaleToNFePayload(venda as any, itemsWithProducts as any, customer, tenant?.state)
+        : mapSaleToNFCePayload(venda as any, itemsWithProducts as any, customer, tenant?.state);
 
       // 2. Emitir
       const result = await emitFiscalDocument({

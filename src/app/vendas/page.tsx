@@ -877,7 +877,7 @@ export default function VendasPage() {
       }));
 
       // 3. Mapear payload
-      const payload = mapSaleToNFCePayload(venda as any, itemsWithProducts as any, customer);
+      const payload = mapSaleToNFCePayload(venda as any, itemsWithProducts as any, customer, tenant?.state);
 
       // 4. Emitir
       const result = await emitFiscalDocument({
