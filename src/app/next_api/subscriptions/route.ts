@@ -394,12 +394,12 @@ export async function POST(request: NextRequest) {
 
     // Criar subscription
     const trialEndsAt = status === 'trial' 
-      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dias
+      ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() // 3 dias
       : null;
 
     const currentPeriodStart = new Date().toISOString();
     const currentPeriodEnd = status === 'active' 
-      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dias
+      ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() // 3 dias
       : null;
 
     console.log('📝 [POST] Dados para inserção:', {

@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
         zip_code: data.address.zip_code,
         // Status e trial
         status: 'trial',
-        trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_ends_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
       };
 
       const result = await supabaseAdmin
@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
         zip_code: data.address.zip_code,
         // Status e trial
         status: 'trial',
-        trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_ends_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
       };
 
       console.log('📝 Tentando criar tenant com campos básicos...');
@@ -256,8 +256,7 @@ export async function POST(request: NextRequest) {
           tenant_id: tenant.id,
           plan_id: data.plan_id,
           status: 'trial',
-          trial_started_at: new Date().toISOString(),
-          trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          trial_end: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
         });
 
       if (subscriptionError) {
@@ -268,6 +267,25 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.warn('Erro ao criar subscription (tabela pode não existir):', error);
       // Não falhar aqui, pois o usuário já foi criado com sucesso
+    }
+
+    // 5.5 Disparar webhook para o n8n (Boas-vindas ao cadastrar)
+    try {
+      const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL || 'https://project1-n8n-editor.y7f9fe.easypanel.host/webhook/juga-boas-vindas';
+      fetch(n8nWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'signup',
+          tenant_id: tenant.id,
+          user_name: data.responsible.name,
+          user_email: data.responsible.email,
+          company_name: tenant.name,
+          phone: data.responsible.phone || '',
+        }),
+      }).catch(err => console.error('⚠️ Falha silenciosa no fetch do n8n cadastro:', err));
+    } catch (n8nErr) {
+      console.error('⚠️ Erro ao disparar n8n cadastro:', n8nErr);
     }
 
     // 6. Retornar sucesso

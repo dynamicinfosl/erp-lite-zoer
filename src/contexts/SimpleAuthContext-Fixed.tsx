@@ -360,7 +360,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
                             
                             const subscriptionData: SubscriptionData = {
                               id: subData.id,
-                              status: subData.status || 'trial',
+                              status: subData.status === 'trialing' ? 'trial' : (subData.status || 'trial'),
                               trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
                               current_period_end: subData.current_period_end || undefined,
                               plan: {
@@ -470,7 +470,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
                       
                       setSubscription({
                         id: subData.id,
-                        status: subData.status || 'trial',
+                        status: subData.status === 'trialing' ? 'trial' : (subData.status || 'trial'),
                         trial_ends_at: subData.trial_end || subData.trial_ends_at || undefined,
                         current_period_end: subData.current_period_end || undefined,
                         plan: {
@@ -745,7 +745,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
           
           // Se não conseguiu criar, usar subscription padrão com trial de 7 dias
           const trialEndDate = new Date();
-          trialEndDate.setDate(trialEndDate.getDate() + 7);
+          trialEndDate.setDate(trialEndDate.getDate() + 3);
           
           setSubscription({
             id: '00000000-0000-0000-0000-000000000000',

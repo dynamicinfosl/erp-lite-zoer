@@ -23,6 +23,14 @@ export default function AdminSettingsPage() {
   const [environment, setEnvironment] = useState<'homologacao' | 'producao'>('homologacao');
   const [enabled, setEnabled] = useState(true);
 
+  // Estados fiscais da plataforma (JUGA)
+  const [cnpj, setCnpj] = useState('');
+  const [razaoSocial, setRazaoSocial] = useState('');
+  const [im, setIm] = useState('');
+  const [codigoServico, setCodigoServico] = useState('1.03');
+  const [aliquotaIss, setAliquotaIss] = useState('2'); // em % (2%)
+  const [codigoMunicipio, setCodigoMunicipio] = useState('');
+
   const selectedTenantId = '00000000-0000-0000-0000-000000000000';
 
   const loadIntegration = useCallback(async () => {
@@ -34,12 +42,16 @@ export default function AdminSettingsPage() {
 
     try {
       setLoading(true);
+      
+      // 1. Buscar integração Focus NFe
       const res = await fetch(`/next_api/fiscal/focusnfe/integration?tenant_id=${selectedTenantId}`);
+      let integrationData = null;
       if (res.ok) {
         const json = await res.json();
         if (json?.data) {
+          integrationData = json.data;
           setIntegration(json.data);
-          setApiToken(''); // Deixar em branco por segurança, ou carregar mascarado
+          setApiToken(''); // Deixar em branco por segurança
           setEnvironment(json.data.environment || 'homologacao');
           setEnabled(json.data.enabled !== false);
         } else {
@@ -49,6 +61,23 @@ export default function AdminSettingsPage() {
           setEnabled(true);
         }
       }
+
+      // 2. Buscar dados fiscais do tenant global (JUGA)
+      const { data: tenantData } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('id', selectedTenantId)
+        .maybeSingle();
+
+      if (tenantData) {
+        setCnpj(tenantData.document || '');
+        setRazaoSocial(tenantData.razao_social || tenantData.name || '');
+        setIm(tenantData.inscricao_municipal || '');
+        setCodigoServico(tenantData.settings?.nfse_codigo_servico || '1.03');
+        setAliquotaIss(String((tenantData.settings?.nfse_aliquota || 0.02) * 100)); // em porcentagem
+        setCodigoMunicipio(tenantData.settings?.nfse_codigo_municipio || '');
+      }
+
     } catch (error) {
       console.error('Erro ao buscar integração Focus NFe:', error);
       toast.error('Erro ao buscar dados da integração Focus NFe');
@@ -64,32 +93,53 @@ export default function AdminSettingsPage() {
   const handleSave = async (e?: React.FormEvent | React.MouseEvent) => {
     try {
       if (e) e.preventDefault();
-      console.log('🔮 [handleSave] Iniciando salvamento...', {
-        tenantId: selectedTenantId,
-        apiTokenEmpty: !apiToken,
-        integrationTokenEmpty: !integration?.api_token,
-        environment,
-        enabled
-      });
-
+      
       if (!selectedTenantId) {
-        console.warn('🔮 [handleSave] Cancelado: selectedTenantId está ausente');
         toast.error('Por favor, selecione uma empresa (inquilino) primeiro');
         return;
       }
 
       const tokenToSave = apiToken.trim() || integration?.api_token;
-      console.log('🔮 [handleSave] Token determinado:', tokenToSave ? '•••• (preenchido)' : 'Vazio');
 
       if (!tokenToSave) {
-        console.warn('🔮 [handleSave] Cancelado: Token está vazio');
         toast.error('Token da API Focus NFe é obrigatório');
         return;
       }
 
       setSaving(true);
-      console.log('🔮 [handleSave] Enviando requisição POST...');
 
+      // 1. Salvar dados fiscais do prestador global (JUGA)
+      const aliquotaDecimal = parseFloat(aliquotaIss) / 100;
+      
+      // Buscar dados atuais para mesclar settings
+      const { data: currentTenant } = await supabase
+        .from('tenants')
+        .select('settings')
+        .eq('id', selectedTenantId)
+        .maybeSingle();
+
+      const newSettings = {
+        ...(currentTenant?.settings || {}),
+        nfse_codigo_servico: codigoServico,
+        nfse_aliquota: aliquotaDecimal,
+        nfse_codigo_municipio: codigoMunicipio,
+      };
+
+      const { error: tenantUpdateError } = await supabase
+        .from('tenants')
+        .update({
+          document: cnpj.replace(/\D/g, ''),
+          razao_social: razaoSocial,
+          inscricao_municipal: im.replace(/\D/g, ''),
+          settings: newSettings
+        })
+        .eq('id', selectedTenantId);
+
+      if (tenantUpdateError) {
+        throw new Error(`Erro ao salvar dados do prestador: ${tenantUpdateError.message}`);
+      }
+
+      // 2. Salvar credenciais Focus NFe
       const res = await fetch('/next_api/fiscal/focusnfe/integration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -101,22 +151,20 @@ export default function AdminSettingsPage() {
         }),
       });
 
-      console.log('🔮 [handleSave] Resposta recebida, status:', res.status);
       const json = await res.json();
       
       if (!res.ok) {
         throw new Error(json.error || 'Erro ao salvar integração');
       }
 
-      toast.success('Configurações Focus NFe salvas com sucesso!');
+      toast.success('Configurações fiscais e Focus NFe salvas com sucesso!');
       setApiToken('');
       await loadIntegration();
     } catch (error: any) {
-      console.error('🔮 [handleSave] Erro ao salvar integração:', error);
+      console.error('Erro ao salvar configurações fiscais:', error);
       toast.error(`Erro ao salvar: ${error.message}`);
     } finally {
       setSaving(false);
-      console.log('🔮 [handleSave] Salvamento concluído.');
     }
   };
 
@@ -174,7 +222,7 @@ export default function AdminSettingsPage() {
                 <form onSubmit={handleSave} className="space-y-6">
                   {/* API Token Input */}
                   <div className="space-y-2">
-                    <Label htmlFor="api_token" className="font-semibold">
+                    <Label htmlFor="api_token" className="font-semibold text-slate-800">
                       Token da API Focus NFe
                     </Label>
                     <div className="relative">
@@ -184,7 +232,7 @@ export default function AdminSettingsPage() {
                         placeholder={integration?.api_token ? "••••••••••••••••••••••••••••••••" : "Insira o token fornecido pela Focus NFe"}
                         value={apiToken}
                         onChange={(e) => setApiToken(e.target.value)}
-                        className="pr-10"
+                        className="pr-10 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
                       />
                     </div>
                     {integration?.api_token && (
@@ -194,16 +242,105 @@ export default function AdminSettingsPage() {
                     )}
                   </div>
 
+                  {/* Dados Fiscais do Emitente (JUGA) */}
+                  <div className="border-t border-slate-100 pt-5 space-y-4">
+                    <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                      <Settings className="h-4 w-4 text-blue-500" />
+                      Dados do Prestador (JUGA Sistemas)
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="cnpj" className="font-semibold text-slate-700">CNPJ</Label>
+                        <Input
+                          id="cnpj"
+                          placeholder="00.000.000/0000-00"
+                          value={cnpj}
+                          onChange={(e) => setCnpj(e.target.value)}
+                          className="border-slate-200 focus:border-blue-500 rounded-xl"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="im" className="font-semibold text-slate-700">Inscrição Municipal</Label>
+                        <Input
+                          id="im"
+                          placeholder="Inscrição Municipal"
+                          value={im}
+                          onChange={(e) => setIm(e.target.value)}
+                          className="border-slate-200 focus:border-blue-500 rounded-xl"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="razao_social" className="font-semibold text-slate-700">Razão Social</Label>
+                      <Input
+                        id="razao_social"
+                        placeholder="JUGA SISTEMAS LTDA"
+                        value={razaoSocial}
+                        onChange={(e) => setRazaoSocial(e.target.value)}
+                        className="border-slate-200 focus:border-blue-500 rounded-xl"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Parâmetros de NFS-e */}
+                  <div className="border-t border-slate-100 pt-5 space-y-4">
+                    <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                      <Database className="h-4 w-4 text-blue-500" />
+                      Parâmetros para NFS-e Municipal
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="codigo_servico" className="font-semibold text-slate-700">Código de Serviço</Label>
+                        <Input
+                          id="codigo_servico"
+                          placeholder="1.03"
+                          value={codigoServico}
+                          onChange={(e) => setCodigoServico(e.target.value)}
+                          className="border-slate-200 focus:border-blue-500 rounded-xl"
+                        />
+                        <p className="text-[10px] text-slate-400">1.03 - Licenciamento de software (SaaS)</p>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="aliquota" className="font-semibold text-slate-700">Alíquota de ISS (%)</Label>
+                        <Input
+                          id="aliquota"
+                          placeholder="2"
+                          value={aliquotaIss}
+                          onChange={(e) => setAliquotaIss(e.target.value)}
+                          className="border-slate-200 focus:border-blue-500 rounded-xl"
+                        />
+                        <p className="text-[10px] text-slate-400">Porcentagem (ex: 2 para 2%)</p>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="codigo_municipio" className="font-semibold text-slate-700">Código IBGE Município</Label>
+                        <Input
+                          id="codigo_municipio"
+                          placeholder="3550308"
+                          value={codigoMunicipio}
+                          onChange={(e) => setCodigoMunicipio(e.target.value)}
+                          className="border-slate-200 focus:border-blue-500 rounded-xl"
+                        />
+                        <p className="text-[10px] text-slate-400">Código IBGE (ex: São Paulo = 3550308)</p>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Environment Selector */}
-                  <div className="space-y-2">
-                    <Label htmlFor="environment" className="font-semibold">
+                  <div className="space-y-2 border-t border-slate-100 pt-5">
+                    <Label htmlFor="environment" className="font-semibold text-slate-800">
                       Ambiente de Emissão
                     </Label>
                     <Select
                       value={environment}
                       onValueChange={(val: 'homologacao' | 'producao') => setEnvironment(val)}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="w-full rounded-xl">
                         <SelectValue placeholder="Selecione o ambiente" />
                       </SelectTrigger>
                       <SelectContent>

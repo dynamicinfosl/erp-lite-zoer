@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
+import Aurora from '@/components/ui/Aurora';
 import {
   DollarSign,
   Users,
@@ -16,7 +17,10 @@ import {
   ArrowRight,
   FileText,
   Download,
-  Calendar
+  Calendar,
+  Clock,
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -66,7 +70,6 @@ interface MonthlyData {
   orders: number;
 }
 
-
 export default function JugaDashboard() {
   const { tenant } = useSimpleAuth();
   const { branchId, scope } = useBranch();
@@ -83,14 +86,6 @@ export default function JugaDashboard() {
 
   const handleNavigateToReports = () => {
     router.push('/relatorios');
-  };
-
-  const handleNavigateToProducts = () => {
-    router.push('/produtos');
-  };
-
-  const handleNavigateToSales = () => {
-    router.push('/vendas');
   };
 
   const [stats, setStats] = useState<DashboardStats>({
@@ -117,36 +112,19 @@ export default function JugaDashboard() {
   const [initialLoad, setInitialLoad] = useState(true);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
 
-  // Cores para gráficos
-  const COLORS = {
-    primary: '#3b82f6',
-    secondary: '#8b5cf6',
-    success: '#10b981',
-    warning: '#f59e0b',
-    error: '#ef4444',
-    info: '#06b6d4',
-    purple: '#8b5cf6',
-    pink: '#ec4899',
-    indigo: '#6366f1',
-    teal: '#14b8a6',
-    orange: '#f97316',
-    red: '#ef4444',
-    green: '#22c55e',
-    blue: '#3b82f6',
-    yellow: '#eab308',
-    gray: '#6b7280',
-    slate: '#64748b',
-    zinc: '#71717a',
-    neutral: '#737373',
-    stone: '#78716c',
-    amber: '#f59e0b',
-    lime: '#84cc16',
-    emerald: '#10b981',
-    cyan: '#06b6d4',
-    sky: '#0ea5e9',
-    violet: '#8b5cf6',
-    fuchsia: '#d946ef',
-    rose: '#f43f5e'
+  // Formatar tempo relativo
+  const formatTimeAgo = (dateString: string) => {
+    if (!dateString) return 'Data não disponível';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Data inválida';
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    if (diffInMinutes < 1) return 'Agora';
+    if (diffInMinutes < 60) return `${diffInMinutes} min atrás`;
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}h atrás`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `${diffInDays} dia${diffInDays > 1 ? 's' : ''} atrás`;
   };
 
   // Gerar atividades recentes
@@ -172,26 +150,74 @@ export default function JugaDashboard() {
         id: `customer-${customer.id}`,
         type: 'customer',
         title: 'Novo cliente cadastrado',
-        description: `${customer.name} - ${customer.email}`,
+        description: `${customer.name} - ${customer.email || 'Sem email'}`,
         time: formatTimeAgo(customer.created_at),
         status: 'success'
       });
     });
 
-    return activities.slice(0, 5);
+    return activities.sort((a, b) => b.id.localeCompare(a.id)).slice(0, 5);
+  }, []);
+
+  // Gerar dados mensais
+  const generateMonthlyData = useCallback((sales: any[]) => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const isFirstHalf = currentMonth < 6;
+    
+    let monthsData;
+    if (isFirstHalf) {
+      monthsData = [
+        { month: 'Jan', monthIndex: 0, year: currentYear },
+        { month: 'Fev', monthIndex: 1, year: currentYear },
+        { month: 'Mar', monthIndex: 2, year: currentYear },
+        { month: 'Abr', monthIndex: 3, year: currentYear },
+        { month: 'Mai', monthIndex: 4, year: currentYear },
+        { month: 'Jun', monthIndex: 5, year: currentYear }
+      ];
+    } else {
+      monthsData = [
+        { month: 'Jul', monthIndex: 6, year: currentYear },
+        { month: 'Ago', monthIndex: 7, year: currentYear },
+        { month: 'Set', monthIndex: 8, year: currentYear },
+        { month: 'Out', monthIndex: 9, year: currentYear },
+        { month: 'Nov', monthIndex: 10, year: currentYear },
+        { month: 'Dez', monthIndex: 11, year: currentYear }
+      ];
+    }
+    
+    return monthsData.map(({ month, monthIndex, year }) => {
+      const monthSales = sales.filter(sale => {
+        if (!sale?.created_at) return false;
+        const saleDate = new Date(sale.created_at);
+        if (isNaN(saleDate.getTime())) return false;
+        return saleDate.getMonth() === monthIndex && saleDate.getFullYear() === year;
+      });
+      
+      const total = monthSales.reduce((sum, sale) => {
+        const amount = parseFloat(sale.total_amount || sale.final_amount || 0);
+        return sum + (isNaN(amount) ? 0 : amount);
+      }, 0);
+      
+      return {
+        month,
+        sales: total,
+        customers: Math.floor(Math.random() * 20) + 5,
+        products: Math.floor(Math.random() * 10) + 2,
+        orders: monthSales.length
+      };
+    });
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    // Declarar variáveis no escopo do useEffect para acesso no cleanup
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let controller: AbortController | null = null;
     
     const loadDashboardData = async (retryCount = 0) => {
       try {
         setLoading(true);
-        
-        // Aguardar tenant estar disponível (máximo 3 segundos)
         let attempts = 0;
         while (!tenant?.id && attempts < 30 && !cancelled) {
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -199,7 +225,6 @@ export default function JugaDashboard() {
         }
         
         if (cancelled) return;
-        
         if (!tenant?.id) {
           if (retryCount < 2) {
             setTimeout(() => loadDashboardData(retryCount + 1), 500);
@@ -209,16 +234,14 @@ export default function JugaDashboard() {
           return;
         }
 
-        // Cache de 30 segundos para evitar requisições desnecessárias
         const now = Date.now();
-        const cacheTime = 30 * 1000; // 30 segundos
+        const cacheTime = 30 * 1000;
         
         if (now - lastFetchTime < cacheTime && !initialLoad && !cancelled) {
           setLoading(false);
           return;
         }
 
-        // Mostrar dados iniciais primeiro para melhor UX
         if (initialLoad) {
           setStats({
             totalSales: 0,
@@ -243,38 +266,32 @@ export default function JugaDashboard() {
         }
 
         controller = new AbortController();
-        const currentController = controller; // Guardar referência para uso seguro
+        const currentController = controller;
         
         timeoutId = setTimeout(() => {
           if (currentController && !currentController.signal.aborted) {
             try {
               currentController.abort('Request timeout after 10 seconds');
-            } catch (e) {
-              // Ignorar erros ao abortar
-            }
+            } catch (e) {}
           }
-        }, 10000); // 10 segundos timeout
+        }, 10000);
 
         try {
-          // Carregar dados em paralelo com cache desabilitado para garantir dados atualizados
           const tz = -new Date().getTimezoneOffset();
           const fetchOptions = { 
             signal: controller!.signal,
             cache: 'no-store' as RequestCache,
           };
           
-          // Montar URLs com parâmetros de branch
           let salesUrl = `/next_api/sales?tenant_id=${encodeURIComponent(tenant.id)}&tz=${tz}`;
           let productsUrl = `/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`;
           let customersUrl = `/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}`;
           
-          // Adicionar branch_id se disponível, caso contrário usar branch_scope=all
           if (branchId) {
             salesUrl += `&branch_id=${branchId}`;
             productsUrl += `&branch_id=${branchId}`;
             customersUrl += `&branch_id=${branchId}`;
           } else {
-            // Se não tem branchId, buscar todos os dados da matriz usando branch_scope=all
             salesUrl += `&branch_scope=all`;
             productsUrl += `&branch_scope=all`;
             customersUrl += `&branch_scope=all`;
@@ -287,11 +304,10 @@ export default function JugaDashboard() {
           ]);
 
           clearTimeout(timeoutId);
-          controller = null; // Limpar referência após sucesso
+          controller = null;
           
           if (cancelled) return;
 
-          // Processar respostas de forma mais robusta
           let salesData: any = { data: [] };
           let productsData: any = { data: [] };
           let customersData: any = { data: [] };
@@ -326,7 +342,6 @@ export default function JugaDashboard() {
           const products = Array.isArray(productsData?.data) ? productsData.data : (Array.isArray(productsData?.rows) ? productsData.rows : (Array.isArray(productsData) ? productsData : []));
           const customers = Array.isArray(customersData?.data) ? customersData.data : (Array.isArray(customersData?.rows) ? customersData.rows : (Array.isArray(customersData) ? customersData : []));
 
-          // Calcular estatísticas
           const totalSales = sales.reduce((sum: number, sale: any) => 
             sum + parseFloat(sale.total_amount || sale.final_amount || 0), 0
           );
@@ -349,8 +364,8 @@ export default function JugaDashboard() {
           const endOfMonth = new Date(nowLocal.getFullYear(), nowLocal.getMonth() + 1, 0, 23, 59, 59, 999);
           const getMondayStart = (date: Date) => {
             const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
-            const day = d.getDay(); // 0=Domingo, 1=Segunda...
-            const diff = day === 0 ? -6 : 1 - day; // voltar para segunda
+            const day = d.getDay();
+            const diff = day === 0 ? -6 : 1 - day;
             d.setDate(d.getDate() + diff);
             return d;
           };
@@ -382,10 +397,7 @@ export default function JugaDashboard() {
             return sum + (isNaN(amount) ? 0 : amount);
           }, 0);
 
-          // Gerar dados mensais
           const monthlyData = generateMonthlyData(sales);
-          
-          // Gerar atividades recentes
           const recentActivity = generateRecentActivity(sales, customers, products);
 
           if (cancelled) return;
@@ -415,17 +427,13 @@ export default function JugaDashboard() {
 
         } catch (fetchError: any) {
           if (cancelled) return;
-          
-          // Verificar se é um erro de abort (timeout ou cancelamento)
           if (fetchError.name === 'AbortError' || fetchError.message?.includes('aborted')) {
-            // Timeout do fetch: não tratar como erro para evitar ruído no console
             if (retryCount < 2) {
               setTimeout(() => loadDashboardData(retryCount + 1), 1000);
             }
             setLoading(false);
             return;
           }
-          
           if (retryCount < 2 && !fetchError.message?.includes('404')) {
             setTimeout(() => loadDashboardData(retryCount + 1), 1000);
             return;
@@ -461,13 +469,10 @@ export default function JugaDashboard() {
           clearTimeout(timeoutId);
           timeoutId = null;
         }
-        // Garantir que o controller seja abortado se ainda não foi
         if (controller && !controller.signal.aborted) {
           try {
             controller.abort('Request completed or cancelled');
-          } catch (e) {
-            // Ignorar erros ao abortar no cleanup
-          }
+          } catch (e) {}
         }
         controller = null;
       }
@@ -484,341 +489,227 @@ export default function JugaDashboard() {
       if (controller && !controller.signal.aborted) {
         try {
           controller.abort('Component unmounted or cancelled');
-        } catch (e) {
-          // Ignorar erros ao abortar
-        }
+        } catch (e) {}
         controller = null;
       }
     };
-  }, [tenant?.id, branchId, scope, generateRecentActivity, initialLoad, lastFetchTime]);
+  }, [tenant?.id, branchId, scope, generateRecentActivity, generateMonthlyData, initialLoad, lastFetchTime]);
 
-  // Gerar dados mensais (semestre atual)
-  const generateMonthlyData = (sales: any[]) => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth(); // 0-11
-    
-    // Determinar se estamos no 1º semestre (Jan-Jun) ou 2º semestre (Jul-Dez)
-    const isFirstHalf = currentMonth < 6; // Jan (0) a Jun (5)
-    
-    let monthsData;
-    if (isFirstHalf) {
-      // 1º semestre: Janeiro a Junho
-      monthsData = [
-        { month: 'Jan', monthIndex: 0, year: currentYear },
-        { month: 'Fev', monthIndex: 1, year: currentYear },
-        { month: 'Mar', monthIndex: 2, year: currentYear },
-        { month: 'Abr', monthIndex: 3, year: currentYear },
-        { month: 'Mai', monthIndex: 4, year: currentYear },
-        { month: 'Jun', monthIndex: 5, year: currentYear }
-      ];
-    } else {
-      // 2º semestre: Julho a Dezembro
-      monthsData = [
-        { month: 'Jul', monthIndex: 6, year: currentYear },
-        { month: 'Ago', monthIndex: 7, year: currentYear },
-        { month: 'Set', monthIndex: 8, year: currentYear },
-        { month: 'Out', monthIndex: 9, year: currentYear },
-        { month: 'Nov', monthIndex: 10, year: currentYear },
-        { month: 'Dez', monthIndex: 11, year: currentYear }
-      ];
-    }
-    
-    console.log(`📅 JugaDashboard - ${isFirstHalf ? '1º' : '2º'} Semestre:`, monthsData.map(m => `${m.month}/${m.year}`));
-    
-    return monthsData.map(({ month, monthIndex, year }) => {
-      const monthSales = sales.filter(sale => {
-        if (!sale?.created_at) return false;
-        const saleDate = new Date(sale.created_at);
-        if (isNaN(saleDate.getTime())) return false;
-        
-        // Comparar mês e ano
-        return saleDate.getMonth() === monthIndex && saleDate.getFullYear() === year;
-      });
-      
-      const total = monthSales.reduce((sum, sale) => {
-        const amount = parseFloat(sale.total_amount || sale.final_amount || 0);
-        return sum + (isNaN(amount) ? 0 : amount);
-      }, 0);
-      
-      return {
-        month,
-        sales: total,
-        customers: Math.floor(Math.random() * 20) + 5,
-        products: Math.floor(Math.random() * 10) + 2,
-        orders: monthSales.length
-      };
-    });
-  };
-
-
-
-  // Formatar tempo relativo
-  const formatTimeAgo = (dateString: string) => {
-    if (!dateString) return 'Data não disponível';
-    
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return 'Data inválida';
-    
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'Agora';
-    if (diffInMinutes < 60) return `${diffInMinutes} min atrás`;
-    
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours}h atrás`;
-    
-    const diffInDays = Math.floor(diffInHours / 24);
-    return `${diffInDays} dia${diffInDays > 1 ? 's' : ''} atrás`;
-  };
-
-  // Loading otimizado - só mostra na primeira carga
   if (loading && initialLoad) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 dark:border-indigo-400 mx-auto"></div>
-          <p className="text-slate-600 dark:text-slate-400 text-sm">
-            Carregando dashboard...
-          </p>
+      <div className="flex items-center justify-center min-h-[500px] relative overflow-hidden bg-slate-50/50">
+        <div className="absolute inset-0 z-0 opacity-10 pointer-events-none">
+          <Aurora colorStops={['#0ea5e9', '#3b82f6', '#93c5fd']} blend={0.8} amplitude={1.0} speed={0.3} />
+        </div>
+        <div className="text-center relative z-10">
+          <Loader2 className="h-10 w-10 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-slate-600 font-medium">Carregando painel principal...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-xl shadow-lg">
-        {loading && !initialLoad && (
-          <div className="absolute top-4 right-4">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-          </div>
-        )}
-        <div>
-          <h1 className="text-3xl font-bold text-white">
-            Dashboard
-          </h1>
-          <p className="text-blue-100 mt-1 font-medium">
-            Visão geral do seu negócio
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/30"
-            onClick={handleNavigateToReports}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Exportar
-          </Button>
-          <Button 
-            size="sm" 
-            className="bg-white text-blue-600 hover:bg-blue-50 font-semibold"
-            onClick={handleNavigateToPDV}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Venda
-          </Button>
-        </div>
+    <div className="relative overflow-hidden bg-slate-50/70 min-h-screen w-full">
+      {/* Aurora Background - Mais visível para contraste */}
+      <div className="absolute inset-0 z-0 opacity-[0.06] pointer-events-none">
+        <Aurora colorStops={['#0ea5e9', '#2563eb', '#818cf8']} blend={0.8} amplitude={1.1} speed={0.4} />
       </div>
 
-      {/* KPIs Principais */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-emerald-100">
-                {salesCardView === 'day' ? 'Vendas (Hoje)' : salesCardView === 'week' ? `Vendas (${stats.weekLabel})` : 'Vendas (Mês)'}
-              </CardTitle>
+      <div className="relative z-10 space-y-6 sm:space-y-8 w-full max-w-[1920px] mx-auto p-4 sm:p-6 md:p-8">
+        
+        {/* HEADER SECTION */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b-2 border-slate-200 pb-6">
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 bg-blue-600/10 border border-blue-600/20 text-blue-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+              <Sparkles className="h-3.5 w-3.5 text-blue-600 animate-pulse" />
+              Visão Geral do Negócio
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">Dashboard</h1>
+            <p className="text-slate-600 text-sm sm:text-base font-medium">Gerencie vendas, produtos, clientes e acompanhe estatísticas reais</p>
+          </div>
+          <div className="flex items-center gap-2.5 self-start sm:self-auto">
+            {loading && !initialLoad && (
+              <Loader2 className="h-4 w-4 animate-spin text-blue-600 mr-2" />
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNavigateToReports}
+              className="border-slate-300 hover:bg-slate-50 text-slate-700 font-bold rounded-xl shadow-sm h-10 px-4"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleNavigateToPDV}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-600/25 h-10 px-4 transition-all duration-300 hover:shadow-lg"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Venda
+            </Button>
+          </div>
+        </div>
+
+        {/* 4 KPIs CARDS - GLASSMORPHISM COM BORDAS AZUIS/INDIGO DE CONTRASTE */}
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          
+          {/* SALES CARD */}
+          <div className="bg-white border-2 border-slate-200 hover:border-emerald-500/50 shadow-md shadow-slate-100 rounded-2xl p-6 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group flex flex-col justify-between min-h-[140px]">
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500" />
+            <div className="flex items-start justify-between">
+              <div className="space-y-1 pl-1">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  {salesCardView === 'day' ? 'Vendas (Hoje)' : salesCardView === 'week' ? `Vendas (${stats.weekLabel})` : 'Vendas (Mês)'}
+                </span>
+                <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
+                  R$ {(salesCardView === 'day'
+                    ? stats.todaySalesAmount
+                    : salesCardView === 'week'
+                      ? stats.weekSalesAmount
+                      : stats.monthSalesAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setSalesCardView((prev) => (prev === 'day' ? 'week' : prev === 'week' ? 'month' : 'day'))}
-                title={salesCardView === 'day' ? 'Ver vendas da semana' : salesCardView === 'week' ? 'Ver vendas do mês' : 'Ver vendas do dia'}
-                className="p-2 bg-emerald-500/20 rounded-lg backdrop-blur-sm hover:bg-emerald-500/30 transition-colors"
+                className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 transition-colors border border-emerald-200 shadow-sm"
               >
-                <Calendar className="h-5 w-5 text-emerald-100" />
+                <Calendar className="h-5 w-5" />
               </button>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              R$ {(salesCardView === 'day'
-                ? stats.todaySalesAmount
-                : salesCardView === 'week'
-                  ? stats.weekSalesAmount
-                  : stats.monthSalesAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </div>
-            <div className="flex items-center mt-2">
-              <span className="text-sm text-emerald-200">
+            <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between text-xs font-bold text-slate-600 pl-1">
+              <span>
                 {salesCardView === 'day'
                   ? `${stats.todaySalesCount} venda${stats.todaySalesCount === 1 ? '' : 's'} hoje`
                   : salesCardView === 'week'
                     ? `${stats.weekSalesCount} venda${stats.weekSalesCount === 1 ? '' : 's'} na semana`
                     : `${stats.monthSalesCount} venda${stats.monthSalesCount === 1 ? '' : 's'} no mês`}
               </span>
-            </div>
-            <div className="flex items-center mt-2">
-              <DollarSign className="h-4 w-4 text-emerald-200 mr-1" />
-              <span className="text-sm text-emerald-200">
-                Total: R$ {stats.totalSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              <span className="flex items-center text-emerald-700 font-extrabold">
+                Total: R$ {stats.totalSales.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
               </span>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 transition-all duration-300">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-slate-100">
-                Clientes
-              </CardTitle>
-              <div className="p-2 bg-slate-500/20 rounded-lg backdrop-blur-sm">
-                <Users className="h-5 w-5 text-slate-100" />
+          </div>
+          
+          {/* CLIENTS CARD */}
+          <div className="bg-white border-2 border-slate-200 hover:border-blue-500/50 shadow-md shadow-slate-100 rounded-2xl p-6 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group flex flex-col justify-between min-h-[140px]">
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600" />
+            <div className="flex items-start justify-between">
+              <div className="space-y-1 pl-1">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Clientes</span>
+                <div className="text-3xl font-black text-slate-900 mt-1">{stats.totalCustomers}</div>
+              </div>
+              <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl border border-blue-200 shadow-sm">
+                <Users className="h-5 w-5" />
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {stats.totalCustomers}
+            <div className="mt-4 pt-4 border-t border-slate-200 flex items-center text-xs font-bold text-emerald-700 pl-1">
+              <TrendingUp className="h-4 w-4 mr-1 text-emerald-600" />
+              <span>+{stats.customerGrowth}% este mês</span>
             </div>
-            <div className="flex items-center mt-2">
-              <TrendingUp className="h-4 w-4 text-green-300 mr-1" />
-              <span className="text-sm text-green-200">
-                +{stats.customerGrowth}% este mês
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 transition-all duration-300">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-indigo-100">
-                Produtos
-              </CardTitle>
-              <div className="p-2 bg-indigo-500/20 rounded-lg backdrop-blur-sm">
-                <Package className="h-5 w-5 text-indigo-100" />
+          {/* PRODUCTS CARD */}
+          <div className="bg-white border-2 border-slate-200 hover:border-indigo-500/50 shadow-md shadow-slate-100 rounded-2xl p-6 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group flex flex-col justify-between min-h-[140px]">
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-600" />
+            <div className="flex items-start justify-between">
+              <div className="space-y-1 pl-1">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Produtos</span>
+                <div className="text-3xl font-black text-slate-900 mt-1">{stats.totalProducts}</div>
+              </div>
+              <div className="p-2.5 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-200 shadow-sm">
+                <Package className="h-5 w-5" />
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {stats.totalProducts}
+            <div className="mt-4 pt-4 border-t border-slate-200 flex items-center text-xs font-bold text-emerald-700 pl-1">
+              <TrendingUp className="h-4 w-4 mr-1 text-emerald-600" />
+              <span>+{stats.productGrowth}% este mês</span>
             </div>
-            <div className="flex items-center mt-2">
-              <TrendingUp className="h-4 w-4 text-green-300 mr-1" />
-              <span className="text-sm text-green-200">
-                +{stats.productGrowth}% este mês
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 transition-all duration-300">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-cyan-100">
-                Pedidos
-              </CardTitle>
-              <div className="p-2 bg-cyan-500/20 rounded-lg backdrop-blur-sm">
-                <ShoppingCart className="h-5 w-5 text-cyan-100" />
+          {/* ORDERS CARD */}
+          <div className="bg-white border-2 border-slate-200 hover:border-violet-500/50 shadow-md shadow-slate-100 rounded-2xl p-6 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group flex flex-col justify-between min-h-[140px]">
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-violet-600" />
+            <div className="flex items-start justify-between">
+              <div className="space-y-1 pl-1">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pedidos</span>
+                <div className="text-3xl font-black text-slate-900 mt-1">{stats.totalOrders}</div>
+              </div>
+              <div className="p-2.5 bg-violet-50 text-violet-700 rounded-xl border border-violet-200 shadow-sm">
+                <ShoppingCart className="h-5 w-5" />
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {stats.totalOrders}
+            <div className="mt-4 pt-4 border-t border-slate-200 flex items-center text-xs font-bold text-emerald-700 pl-1">
+              <TrendingUp className="h-4 w-4 mr-1 text-emerald-600" />
+              <span>+{stats.orderGrowth}% este mês</span>
             </div>
-            <div className="flex items-center mt-2">
-              <TrendingUp className="h-4 w-4 text-green-300 mr-1" />
-              <span className="text-sm text-green-200">
-                +{stats.orderGrowth}% este mês
-              </span>
+          </div>
+
+        </div>
+
+        {/* GRÁFICOS & ATIVIDADES - 2 COLUNAS RESPONSIVAS (MONITORES LARGOS/PEQUENOS) */}
+        <div className="grid gap-6 grid-cols-1 xl:grid-cols-3">
+          
+          {/* CHART CARD - TOMA 2 COLUNAS EM TELAS LARGAS */}
+          <div className="bg-white border-2 border-slate-200 shadow-md rounded-2xl p-4 sm:p-6 space-y-4 xl:col-span-2">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-blue-600" />
+                Vendas dos Últimos 6 Meses
+              </h3>
+              <p className="text-slate-500 text-xs sm:text-sm">Comparativo de vendas mensais do semestre atual</p>
             </div>
-          </CardContent>
-        </Card>
+            <div className="pt-4 w-full">
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart data={monthlyData} margin={{ left: -10, right: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="month" stroke="#64748b" fontSize={11} fontWeight={700} />
+                  <YAxis stroke="#64748b" fontSize={11} fontWeight={700} tickFormatter={(value) => `R$ ${value.toLocaleString()}`} />
+                  <Tooltip 
+                    formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Vendas']}
+                    labelStyle={{ color: '#1e293b', fontWeight: 'bold' }}
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                      border: '2px solid #3b82f6',
+                      borderRadius: '12px',
+                      boxShadow: '0 8px 30px rgba(0,0,0,0.08)',
+                      backdropFilter: 'blur(8px)',
+                      fontSize: '12px',
+                      color: '#0f172a'
+                    }}
+                  />
+                  <Bar dataKey="sales" fill="url(#salesGradient)" radius={[4, 4, 0, 0]} />
+                  <defs>
+                    <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#2563eb" />
+                      <stop offset="100%" stopColor="#4f46e5" />
+                    </linearGradient>
+                  </defs>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
 
-        
-      </div>
-
-      {/* Gráficos */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Vendas Mensais */}
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-white dark:from-slate-800 to-blue-50/30 dark:to-slate-900/50 hover:shadow-xl transition-all duration-300">
-          <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <BarChart3 className="h-5 w-5" />
-              Vendas dos Últimos 6 Meses
-            </CardTitle>
-            <CardDescription className="text-blue-100">
-              Comparativo de vendas mensais
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-6">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" className="dark:stroke-slate-700" />
-                <XAxis 
-                  dataKey="month" 
-                  stroke="#475569"
-                  className="dark:stroke-slate-400"
-                  fontSize={12}
-                  fontWeight={500}
-                />
-                <YAxis 
-                  stroke="#475569"
-                  className="dark:stroke-slate-400"
-                  fontSize={12}
-                  fontWeight={500}
-                  tickFormatter={(value) => `R$ ${value.toLocaleString()}`}
-                />
-                <Tooltip 
-                  formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Vendas']}
-                  labelStyle={{ color: '#1e293b', fontWeight: '600' }}
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--background))', 
-                    border: '1px solid #3b82f6',
-                    borderRadius: '12px',
-                    boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.2)',
-                    fontWeight: '500',
-                    color: 'hsl(var(--foreground))'
-                  }}
-                  itemStyle={{ color: 'hsl(var(--foreground))' }}
-                />
-                <Bar 
-                  dataKey="sales" 
-                  fill="#3b82f6"
-                  radius={[6, 6, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Atividades Recentes */}
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-white dark:from-slate-800 to-slate-50/30 dark:to-slate-900/50 hover:shadow-xl transition-all duration-300">
-          <CardHeader className="bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-t-lg">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <Activity className="h-5 w-5" />
-              Atividades Recentes
-            </CardTitle>
-            <CardDescription className="text-slate-100">
-              Últimas atividades do sistema
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="space-y-4">
+          {/* ACTIVITIES CARD - TOMA 1 COLUNA EM TELAS LARGAS */}
+          <div className="bg-white border-2 border-slate-200 shadow-md rounded-2xl p-4 sm:p-6 space-y-4">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <Activity className="h-5 w-5 text-blue-600" />
+                Atividades Recentes
+              </h3>
+              <p className="text-slate-500 text-xs sm:text-sm">Últimas movimentações de vendas e clientes no sistema</p>
+            </div>
+            <div className="space-y-3.5 max-h-[320px] overflow-y-auto pr-1">
               {recentActivity.length > 0 ? (
-                recentActivity.map((activity, index) => (
-                  <div key={activity.id} className="flex items-start gap-3 p-4 rounded-lg bg-gradient-to-r from-slate-50 dark:from-slate-700/50 to-slate-100 dark:to-slate-800/50 hover:from-slate-100 dark:hover:from-slate-700 hover:to-slate-200 dark:hover:to-slate-800 transition-all duration-200 border border-slate-200 dark:border-slate-700">
-                    <div className={`p-2 rounded-full ${
-                      activity.status === 'success' ? 'bg-green-500 text-white' :
-                      activity.status === 'warning' ? 'bg-yellow-500 text-white' :
-                      activity.status === 'error' ? 'bg-red-500 text-white' :
-                      'bg-blue-500 text-white'
+                recentActivity.map((activity) => (
+                  <div key={activity.id} className="border border-slate-200 hover:border-blue-200 rounded-xl p-3.5 bg-slate-50/50 flex items-start gap-3 hover:bg-blue-50/20 transition-all duration-200">
+                    <div className={`p-2 rounded-lg shrink-0 ${
+                      activity.type === 'sale' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
+                      activity.type === 'customer' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                      activity.type === 'product' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' :
+                      'bg-violet-100 text-violet-700 border border-violet-200'
                     }`}>
                       {activity.type === 'sale' ? <ShoppingCart className="h-4 w-4" /> :
                        activity.type === 'customer' ? <Users className="h-4 w-4" /> :
@@ -826,104 +717,90 @@ export default function JugaDashboard() {
                        <Activity className="h-4 w-4" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm">
-                        {activity.title}
-                      </p>
-                      <p className="text-slate-600 dark:text-slate-400 text-xs mt-1">
-                        {activity.description}
-                      </p>
-                      <p className="text-slate-500 dark:text-slate-500 text-xs mt-1 font-medium">
+                      <p className="font-bold text-slate-800 text-sm leading-snug">{activity.title}</p>
+                      <p className="text-slate-600 text-xs mt-0.5 leading-snug font-medium">{activity.description}</p>
+                      <p className="text-[10px] text-slate-500 mt-1 font-bold flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-slate-400" />
                         {activity.time}
                       </p>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-                  <Activity className="h-12 w-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
-                  <p className="font-medium">Nenhuma atividade recente</p>
+                <div className="bg-slate-50 border border-slate-200 p-8 rounded-xl text-center">
+                  <Activity className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs text-slate-500 font-bold">Nenhuma atividade recente encontrada.</p>
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
 
-      {/* Cards de Ação Rápida */}
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card 
-          className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white dark:from-slate-800 to-blue-50/30 dark:to-slate-900/50 hover:from-blue-50 dark:hover:from-slate-700 hover:to-blue-100 dark:hover:to-slate-800"
-          onClick={handleNavigateToPDV}
-        >
-          <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <Plus className="h-5 w-5" />
-              Nova Venda
-            </CardTitle>
-            <CardDescription className="text-blue-100">
-              Iniciar uma nova venda no PDV
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-6">
+        </div>
+
+        {/* BOTTOM CARDS - QUICK ACTIONS - 3 COLUNAS RESPONSIVAS */}
+        <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          
+          {/* ACTION 1 */}
+          <div className="bg-white border-2 border-slate-200 hover:border-blue-500/40 shadow-md rounded-2xl p-6 flex flex-col justify-between gap-4 group transition-all duration-300 hover:shadow-lg">
+            <div>
+              <div className="inline-flex items-center gap-1.5 bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                <ShoppingCart className="h-3.5 w-3.5" />
+                Frente de Caixa (PDV)
+              </div>
+              <h4 className="text-lg font-black text-slate-900 mt-3">Ponto de Vendas</h4>
+              <p className="text-slate-600 text-xs sm:text-sm mt-1 font-medium">Abra o terminal do caixa para registrar vendas e receber pagamentos rápidos de forma simples.</p>
+            </div>
             <Button 
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
               onClick={handleNavigateToPDV}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow-sm transition-all duration-300 hover:shadow-md"
             >
-              <ShoppingCart className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4 mr-2" />
               Abrir PDV
             </Button>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card 
-          className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white dark:from-slate-800 to-slate-50/30 dark:to-slate-900/50 hover:from-slate-50 dark:hover:from-slate-700 hover:to-slate-100 dark:hover:to-slate-800"
-          onClick={handleNavigateToCustomers}
-        >
-          <CardHeader className="bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-t-lg">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <Users className="h-5 w-5" />
-              Gerenciar Clientes
-            </CardTitle>
-            <CardDescription className="text-slate-100">
-              Visualizar e gerenciar clientes
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-6">
+          {/* ACTION 2 */}
+          <div className="bg-white border-2 border-slate-200 hover:border-blue-500/40 shadow-md rounded-2xl p-6 flex flex-col justify-between gap-4 group transition-all duration-300 hover:shadow-lg">
+            <div>
+              <div className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                <Users className="h-3.5 w-3.5" />
+                Clientes da Base
+              </div>
+              <h4 className="text-lg font-black text-slate-900 mt-3">Gerenciar Clientes</h4>
+              <p className="text-slate-600 text-xs sm:text-sm mt-1 font-medium">Acesse a lista completa de clientes cadastrados, histórico de compras, contatos e perfis de crédito.</p>
+            </div>
             <Button 
               variant="outline" 
-              className="w-full border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:border-slate-400 dark:hover:border-slate-500 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold py-3 rounded-lg transition-all duration-200"
               onClick={handleNavigateToCustomers}
+              className="w-full border-slate-300 text-slate-700 hover:bg-slate-50 font-bold py-2.5 rounded-xl transition-all duration-300 hover:border-slate-400"
             >
-              <ArrowRight className="h-4 w-4 mr-2" />
               Ver Clientes
+              <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card 
-          className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white dark:from-slate-800 to-indigo-50/30 dark:to-slate-900/50 hover:from-indigo-50 dark:hover:from-slate-700 hover:to-indigo-100 dark:hover:to-slate-800"
-          onClick={handleNavigateToReports}
-        >
-          <CardHeader className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-t-lg">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <FileText className="h-5 w-5" />
-              Relatórios
-            </CardTitle>
-            <CardDescription className="text-indigo-100">
-              Acessar relatórios e análises
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-6">
+          {/* ACTION 3 */}
+          <div className="bg-white border-2 border-slate-200 hover:border-indigo-500/40 shadow-md rounded-2xl p-6 flex flex-col justify-between gap-4 group transition-all duration-300 hover:shadow-lg sm:col-span-2 lg:col-span-1">
+            <div>
+              <div className="inline-flex items-center gap-1.5 bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                <BarChart3 className="h-3.5 w-3.5" />
+                Análise & Métricas
+              </div>
+              <h4 className="text-lg font-black text-slate-900 mt-3">Relatórios do Sistema</h4>
+              <p className="text-slate-600 text-xs sm:text-sm mt-1 font-medium">Visualize faturamentos, margens de lucros, produtos mais vendidos, fluxo de caixa e relatórios fiscais.</p>
+            </div>
             <Button 
               variant="outline" 
-              className="w-full border-indigo-300 dark:border-indigo-600 text-indigo-700 dark:text-indigo-200 hover:border-indigo-400 dark:hover:border-indigo-500 hover:text-indigo-800 dark:hover:text-indigo-100 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 font-semibold py-3 rounded-lg transition-all duration-200"
               onClick={handleNavigateToReports}
+              className="w-full border-slate-300 text-slate-700 hover:bg-slate-50 font-bold py-2.5 rounded-xl transition-all duration-300 hover:border-slate-400"
             >
-              <ArrowRight className="h-4 w-4 mr-2" />
               Ver Relatórios
+              <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+
+        </div>
+
       </div>
     </div>
   );

@@ -1,16 +1,14 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { JugaKPICard, JugaProgressCard } from '@/components/dashboard/JugaComponents';
 import { usePlanLimits } from '@/hooks/usePlanLimits';
-import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
-import { PaymentModal } from '@/components/payment/PaymentModal';
-import { formatPrice, calculateYearlyDiscount } from '@/lib/plan-utils';
+import { formatPrice } from '@/lib/plan-utils';
+import Aurora from '@/components/ui/Aurora';
 import { 
   CreditCard, 
   Calendar, 
@@ -19,14 +17,19 @@ import {
   CheckCircle, 
   Crown, 
   Zap, 
-  Shield,
-  Download,
-  AlertCircle,
-  TrendingUp,
-  Clock,
-  User,
-  Loader2,
-  RefreshCw
+  Shield, 
+  Download, 
+  AlertCircle, 
+  TrendingUp, 
+  Clock, 
+  User, 
+  Loader2, 
+  RefreshCw,
+  Sparkles,
+  Receipt,
+  ArrowUpRight,
+  ChevronRight,
+  TrendingDown
 } from 'lucide-react';
 
 type PlanId = 'trial' | 'basic' | 'pro' | 'enterprise';
@@ -44,7 +47,8 @@ type SubscriptionInfo = {
 type Plan = {
   id: Exclude<PlanId, 'trial'>;
   name: string;
-  price: number;
+  priceMonthly: number;
+  priceYearly: number;
   description: string;
   features: string[];
   popular?: boolean;
@@ -54,16 +58,16 @@ const subscriptionInfo: Record<PlanId, SubscriptionInfo> = {
   trial: {
     name: 'Trial Gratuito',
     icon: Zap,
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-100',
-    daysLeft: 7,
-    totalDays: 7,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-100',
+    daysLeft: 3,
+    totalDays: 3,
   },
   basic: {
     name: 'Plano Básico',
     icon: CheckCircle,
-    color: 'text-green-600',
-    bgColor: 'bg-green-100',
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-100',
     price: 'R$ 79,90/mês',
   },
   pro: {
@@ -76,8 +80,8 @@ const subscriptionInfo: Record<PlanId, SubscriptionInfo> = {
   enterprise: {
     name: 'Enterprise',
     icon: Shield,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-100',
+    color: 'text-violet-600',
+    bgColor: 'bg-violet-100',
     price: 'R$ 299,90/mês',
   },
 };
@@ -86,14 +90,16 @@ const plans: Plan[] = [
   {
     id: 'basic',
     name: 'Básico',
-    price: 79.9,
+    priceMonthly: 79.9,
+    priceYearly: 767.04,
     description: 'Ideal para pequenas empresas',
     features: ['Até 500 clientes', 'Até 1.000 produtos', 'Vendas ilimitadas', 'Relatórios básicos', 'Suporte por email'],
   },
   {
     id: 'pro',
     name: 'Profissional',
-    price: 139.9,
+    priceMonthly: 139.9,
+    priceYearly: 1343.04,
     description: 'Para empresas em crescimento',
     popular: true,
     features: [
@@ -109,7 +115,8 @@ const plans: Plan[] = [
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: 299.9,
+    priceMonthly: 299.9,
+    priceYearly: 2879.04,
     description: 'Para grandes empresas',
     features: [
       'Clientes ilimitados',
@@ -129,206 +136,212 @@ export default function AssinaturaPage() {
     subscription,
     usage,
     limits,
-    loading,
-    error,
+    loading: loadingLimits,
+    error: errorLimits,
     isTrialExpired,
     daysLeftInTrial,
-    canCreate,
     getUsagePercentage,
     refreshData
   } = usePlanLimits();
   
-  const { refreshSubscription } = useSimpleAuth();
+  const { refreshSubscription, tenant } = useSimpleAuth();
   
-  const { tenant } = useSimpleAuth();
-  
-  // Forçar refresh da subscription ao carregar a página
-  useEffect(() => {
-    const refresh = async () => {
-      if (!tenant?.id) {
-        console.log('⚠️ Sem tenant, aguardando...');
-        return;
+  const hasRefreshed = useRef(false);
+
+  // Estados locais para dados reais do banco
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
+  const [isYearly, setIsYearly] = useState(false);
+
+  // Buscar faturas reais do banco
+  const loadInvoices = async () => {
+    if (!tenant?.id) return;
+    try {
+      setLoadingInvoices(true);
+      const res = await fetch(`/next_api/admin/payment-records?tenant_id=${encodeURIComponent(tenant.id)}`);
+      if (res.ok) {
+        const result = await res.json();
+        if (result.success && result.data) {
+          setInvoices(result.data);
+        }
       }
+    } catch (err) {
+      console.error('❌ Erro ao carregar faturas:', err);
+    } finally {
+      setLoadingInvoices(false);
+    }
+  };
+
+  // Forçar refresh inicial da subscription e carregar faturas
+  useEffect(() => {
+    const init = async () => {
+      if (!tenant?.id) return;
+      if (hasRefreshed.current) return;
+      hasRefreshed.current = true;
       
-      console.log('🔄 Forçando refresh da subscription na página de assinatura...');
       try {
         await refreshSubscription();
         await refreshData();
+        await loadInvoices();
       } catch (error) {
-        console.error('❌ Erro ao atualizar subscription:', error);
+        console.error('❌ Erro na sincronização inicial:', error);
       }
     };
     
-    // Aguardar um pouco para garantir que o tenant esteja carregado
-    const timer = setTimeout(refresh, 500);
+    const timer = setTimeout(init, 500);
     return () => clearTimeout(timer);
-  }, [tenant?.id, refreshSubscription, refreshData]);
+  }, [tenant?.id]);
 
-  // Estados para modal de pagamento
-  const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  // Determinar plano atual baseado nos dados reais
-  const getCurrentPlan = (): PlanId => {
-    if (!subscription) {
-      console.log('⚠️ Sem subscription, retornando trial');
-      return 'trial';
+  // Recarregar faturas quando o tenant id estiver disponível
+  useEffect(() => {
+    if (tenant?.id) {
+      loadInvoices();
     }
+  }, [tenant?.id]);
+
+  // Mapear status e slug para PlanId
+  const getCurrentPlan = (): PlanId => {
+    if (!subscription) return 'trial';
     
-    console.log('🔍 getCurrentPlan - subscription:', {
-      status: subscription.status,
-      plan_slug: subscription.plan?.slug,
-      plan_name: subscription.plan?.name,
-      current_period_end: subscription.current_period_end,
-      trial_ends_at: subscription.trial_ends_at
-    });
-    
-    // Se status é active e tem plano, usar o slug do plano
     if (subscription.status === 'active' && subscription.plan?.slug) {
       const slug = subscription.plan.slug.toLowerCase().trim();
-      // Mapear slugs para PlanId
       const slugMap: Record<string, PlanId> = {
         'free': 'trial',
         'trial': 'trial',
         'basic': 'basic',
         'basico': 'basic',
         'pro': 'pro',
-        'professional': 'pro', // Mapear professional para pro
+        'professional': 'pro',
         'profissional': 'pro',
         'enterprise': 'enterprise',
         'empresarial': 'enterprise'
       };
-      
-      const mappedPlan = slugMap[slug] || 'trial';
-      console.log('✅ Plano mapeado:', slug, '->', mappedPlan);
-      return mappedPlan;
+      return slugMap[slug] || 'trial';
     }
     
-    // Se status é active mas não tem slug, tentar pelo nome do plano
-    if (subscription.status === 'active' && subscription.plan?.name) {
-      const planName = subscription.plan.name.toLowerCase();
-      if (planName.includes('básico') || planName.includes('basic')) return 'basic';
-      if (planName.includes('profissional') || planName.includes('professional') || planName.includes('pro')) return 'pro';
-      if (planName.includes('enterprise') || planName.includes('empresarial')) return 'enterprise';
-    }
+    if (subscription.status === 'trial') return 'trial';
     
-    // Se status é trial, retornar trial
-    if (subscription.status === 'trial') {
-      console.log('⚠️ Status é trial');
-      return 'trial';
-    }
-    
-    // Verificar se tem current_period_end válido (plano ativo)
-    if (subscription.current_period_end) {
-      const periodEnd = new Date(subscription.current_period_end);
-      const now = new Date();
-      if (periodEnd > now) {
-        // Plano ativo mas sem slug claro, tentar inferir
-        console.log('⚠️ Plano ativo mas sem slug claro, retornando pro como padrão');
-        return 'pro'; // Assumir pro como padrão para planos ativos
-      }
-    }
-    
-    console.log('⚠️ Retornando trial como padrão');
     return 'trial';
   };
   
   const currentPlan: PlanId = getCurrentPlan();
-  
-  // Log para debug
-  useEffect(() => {
-    console.log('📋 Página de Assinatura - Estado atual:', {
-      subscription_status: subscription?.status,
-      subscription_plan_slug: subscription?.plan?.slug,
-      subscription_plan_name: subscription?.plan?.name,
-      currentPlan,
-      subscription
-    });
-  }, [subscription, currentPlan]);
-  
   const currentInfo = subscriptionInfo[currentPlan];
   const CurrentIcon = currentInfo.icon;
 
-  // Função para selecionar plano
+  // Processar Checkout Stripe
   const handleSelectPlan = async (planId: PlanId) => {
     if (planId === currentPlan) return;
-    
-    console.log('🎯 Plano selecionado:', planId);
-    
-    const planData = plans.find(plan => plan.id === planId);
-    if (!planData) {
-      console.error('❌ Plano não encontrado:', planId);
+    if (!tenant?.id) {
+      alert('Erro: Conta de usuário ou tenant não carregado.');
       return;
     }
 
-    setSelectedPlan(planId);
-    setShowPaymentModal(true);
-  };
-
-  // Função para sucesso do pagamento
-  const handlePaymentSuccess = async (paymentData: any) => {
     try {
       setIsProcessing(true);
-      console.log('💳 Dados do pagamento:', paymentData);
-      
-      // Simular criação de assinatura
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      console.log('✅ Assinatura criada:', paymentData);
-      
-      setShowPaymentModal(false);
+      setSelectedPlan(planId);
+
+      const planUuidMap: Record<string, string> = {
+        basic: '880509a7-0b5c-4f9c-a8f6-e95fda14808b',
+        pro: 'bcdfed13-c598-4551-b388-89bb1af328f0',
+        enterprise: 'fe073523-6a3a-4a82-953b-86b0fca84231',
+      };
+
+      const planUUID = planUuidMap[planId];
+      if (!planUUID) throw new Error('UUID do plano não mapeado.');
+
+      const response = await fetch('/next_api/payments/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant_id: tenant.id,
+          plan_slug: planId,
+          plan_id: planUUID,
+          billing_period: isYearly ? 'yearly' : 'monthly',
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success || !data.url) {
+        throw new Error(data.error || 'Erro ao criar sessão de checkout no Stripe');
+      }
+
+      window.location.href = data.url;
+    } catch (err: any) {
+      console.error('❌ Erro no checkout:', err);
+      alert(err.message || 'Erro ao processar redirecionamento de pagamento.');
       setSelectedPlan(null);
-      refreshData();
-      
-    } catch (error) {
-      console.error('❌ Erro ao criar assinatura:', error);
-      alert('Erro ao processar assinatura. Tente novamente.');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Usar dados reais do hook
-  const usageLimits = useMemo(
-    () => [
-      { 
-        label: 'Clientes', 
-        current: usage.customers, 
-        total: limits?.max_customers === -1 ? 'Ilimitado' : limits?.max_customers || 0 
-      },
-      { 
-        label: 'Produtos', 
-        current: usage.products, 
-        total: limits?.max_products === -1 ? 'Ilimitado' : limits?.max_products || 0 
-      },
-      { 
-        label: 'Usuários', 
-        current: usage.users, 
-        total: limits?.max_users === -1 ? 'Ilimitado' : limits?.max_users || 0 
-      },
-    ],
-    [usage, limits],
-  );
+  // Gerenciar Assinatura via Stripe Portal
+  const handleManageBilling = async () => {
+    if (!tenant?.id) return;
+    try {
+      setIsProcessing(true);
+      const res = await fetch('/next_api/payments/stripe/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant_id: tenant.id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success || !data.url) {
+        throw new Error(data.error || 'Não foi possível acessar o portal de pagamentos.');
+      }
+      window.location.href = data.url;
+    } catch (err: any) {
+      alert(err.message || 'Erro ao abrir portal do Stripe.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
-  if (loading) {
+  const usageLimits = useMemo(() => [
+    { 
+      label: 'Clientes', 
+      current: usage.customers, 
+      total: limits?.max_customers === -1 ? 'Ilimitado' : limits?.max_customers || 0,
+      percent: getUsagePercentage('customer')
+    },
+    { 
+      label: 'Produtos', 
+      current: usage.products, 
+      total: limits?.max_products === -1 ? 'Ilimitado' : limits?.max_products || 0,
+      percent: getUsagePercentage('product')
+    },
+    { 
+      label: 'Usuários', 
+      current: usage.users, 
+      total: limits?.max_users === -1 ? 'Ilimitado' : limits?.max_users || 0,
+      percent: getUsagePercentage('user')
+    },
+  ], [usage, limits]);
+
+  if (loadingLimits || loadingInvoices) {
     return (
-      <div className="flex items-center justify-center min-h-[400px] bg-juga-surface">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-juga-primary mx-auto mb-4" />
-          <p className="text-body">Carregando informações do plano...</p>
+      <div className="flex items-center justify-center min-h-[500px] relative overflow-hidden bg-slate-50/50">
+        <div className="absolute inset-0 z-0 opacity-10 pointer-events-none">
+          <Aurora colorStops={['#0ea5e9', '#3b82f6', '#93c5fd']} blend={0.8} amplitude={1.0} speed={0.3} />
+        </div>
+        <div className="text-center relative z-10">
+          <Loader2 className="h-10 w-10 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-slate-600 font-medium">Carregando dados financeiros...</p>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (errorLimits) {
     return (
-      <div className="flex items-center justify-center min-h-[400px] bg-juga-surface">
-        <div className="text-center">
-          <AlertCircle className="h-8 w-8 text-juga-error mx-auto mb-4" />
-          <p className="text-juga-error mb-4">Erro ao carregar dados do plano</p>
-          <Button onClick={refreshData} variant="outline" className="px-4 py-2 sm:px-5 sm:py-2.5 bg-juga-surface-elevated border-juga-border text-heading hover:bg-juga-surface-card">
+      <div className="flex items-center justify-center min-h-[500px] relative overflow-hidden bg-slate-50/50 p-6">
+        <div className="text-center bg-white border border-slate-200 p-8 rounded-2xl shadow-lg max-w-md w-full">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-slate-900 mb-2">Erro de Carregamento</h3>
+          <p className="text-slate-600 text-sm mb-6">{errorLimits}</p>
+          <Button onClick={refreshData} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl">
             Tentar Novamente
           </Button>
         </div>
@@ -337,540 +350,404 @@ export default function AssinaturaPage() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6 bg-juga-surface min-h-screen">
-      {/* Header - Responsivo */}
-      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold text-heading">Assinatura</h1>
-          <p className="text-sm sm:text-base text-body">Gerencie seu plano e faturamento</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-fit">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              console.log('🔄 Refresh manual da subscription...');
-              await refreshSubscription();
-              await refreshData();
-            }}
-            className="text-xs bg-juga-surface-elevated border-juga-border text-heading hover:bg-juga-surface-card"
-          >
-            <RefreshCw className="h-3 w-3 mr-1" />
-            Atualizar
-          </Button>
-          <Badge variant="secondary" className="px-3 py-1 bg-juga-surface-elevated border-juga-border text-heading">
-            <CurrentIcon className="h-3 w-3" />
-            {currentInfo.name}
-          </Badge>
-          {currentPlan === 'trial' && daysLeftInTrial > 0 && (
-            <Badge 
-              variant={daysLeftInTrial <= 3 ? "destructive" : daysLeftInTrial <= 7 ? "default" : "outline"} 
-              className="px-3 py-1 animate-pulse"
+    <div className="relative overflow-hidden bg-slate-50/50 min-h-screen w-full">
+      {/* Aurora Background */}
+      <div className="absolute inset-0 z-0 opacity-[0.08] pointer-events-none">
+        <Aurora colorStops={['#0ea5e9', '#3b82f6', '#93c5fd']} blend={0.8} amplitude={1.0} speed={0.3} />
+      </div>
+
+      <div className="relative z-10 max-w-[1920px] mx-auto p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8 w-full">
+        
+        {/* HEADER SECTION */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200/80 pb-6">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200/50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-1">
+              <Sparkles className="h-3.5 w-3.5" />
+              Faturamento & Assinatura
+            </div>
+            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Faturamento</h1>
+            <p className="text-slate-500 text-sm">Gerencie seu plano, faturas de cobrança e portal financeiro</p>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                await refreshSubscription();
+                await refreshData();
+                await loadInvoices();
+              }}
+              className="border-slate-200 hover:bg-slate-50 hover:text-slate-900 rounded-xl"
             >
-              <Clock className="h-3 w-3" />
-              {daysLeftInTrial} {daysLeftInTrial === 1 ? 'dia restante' : 'dias restantes'}
+              <RefreshCw className="h-3.5 w-3.5 mr-2" />
+              Sincronizar
+            </Button>
+            <Badge className="bg-slate-900 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+              <CurrentIcon className="h-4 w-4" />
+              {currentInfo.name}
             </Badge>
-          )}
-          {isTrialExpired && (
-            <Badge variant="destructive" className="px-3 py-1">
-              <AlertCircle className="h-3 w-3" />
-              Trial Expirado
-            </Badge>
-          )}
+          </div>
         </div>
-      </div>
 
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-          <JugaKPICard
-          title="Plano Atual"
-          value={
-            currentPlan === 'trial' 
-              ? currentInfo.name
-              : subscription?.plan?.name || currentInfo.name
-          }
-          description={
-            currentPlan === 'trial' 
-              ? `Período de teste${daysLeftInTrial > 0 ? ` - ${daysLeftInTrial} ${daysLeftInTrial === 1 ? 'dia' : 'dias'} restantes` : ' - Expirado'}`
-              : (() => {
-                  // Para planos não-trial, mostrar preço ou nome
-                  if (subscription?.plan?.price_monthly && subscription.plan.price_monthly > 0) {
-                    return `${formatPrice(subscription.plan.price_monthly)}/mês`;
-                  }
-                  if (subscription?.plan?.name) {
-                    return subscription.plan.name;
-                  }
-                  return currentInfo.price || 'Plano ativo';
-                })()
-          }
-          color="primary"
-          icon={<CurrentIcon className="h-5 w-5" />}
-          trend="neutral"
-          trendValue={
-            currentPlan === 'trial' 
-              ? daysLeftInTrial > 0 
-                ? `${daysLeftInTrial} ${daysLeftInTrial === 1 ? 'dia' : 'dias'} restantes`
-                : 'Expirado'
-              : subscription?.current_period_end
-                ? `Expira em ${new Date(subscription.current_period_end).toLocaleDateString('pt-BR')}`
-                : 'Ativo'
-          }
-          className={`min-h-[120px] sm:min-h-[140px] ${
-            currentPlan === 'trial' && daysLeftInTrial <= 3 ? 'ring-2 ring-red-200' : ''
-          }`}
-        />
-        <JugaKPICard
-          title="Clientes"
-          value={`${usageLimits[0].current} / ${usageLimits[0].total}`}
-          description={`${getUsagePercentage('customer').toFixed(0)}% utilizado`}
-          color="success"
-          icon={<Users className="h-4 w-4 sm:h-5 sm:w-5" />}
-          trend="up"
-          trendValue="Do limite"
-          className="min-h-[120px] sm:min-h-[140px]"
-        />
-        <JugaKPICard
-          title="Produtos"
-          value={`${usageLimits[1].current} / ${usageLimits[1].total}`}
-          description={`${getUsagePercentage('product').toFixed(0)}% utilizado`}
-          color="primary"
-          icon={<Package className="h-4 w-4 sm:h-5 sm:w-5" />}
-          trend="neutral"
-          trendValue="Do limite"
-          className="min-h-[120px] sm:min-h-[140px]"
-        />
-        <JugaKPICard
-          title="Usuários"
-          value={`${usageLimits[2].current} / ${usageLimits[2].total}`}
-          description="Usuários ativos"
-          color="accent"
-          icon={<User className="h-4 w-4 sm:h-5 sm:w-5" />}
-          trend="neutral"
-          trendValue="Do limite"
-          className="min-h-[120px] sm:min-h-[140px]"
-        />
-      </div>
-
-      {/* Status da Assinatura */}
-      <Card className="juga-card">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2 text-heading">
-            <CurrentIcon className={`h-5 w-5 ${currentInfo.color}`} />
-            Sua Assinatura Atual
-          </CardTitle>
-          <CardDescription className="text-sm">
-            {currentPlan === 'trial' ? 'Você está no período de teste gratuito' : 'Detalhes do seu plano atual'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {currentPlan === 'trial' ? (
-            <>
-              {/* Contagem de Dias - Layout Dashboard */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-6">
-                {/* Card Principal - Dias Restantes */}
-                <JugaKPICard
-                  title={isTrialExpired ? 'Trial Expirado' : 'Dias Restantes'}
-                  value={isTrialExpired ? '0' : daysLeftInTrial.toString()}
-                  description={isTrialExpired ? 'Período finalizado' : 
-                             daysLeftInTrial === 1 ? 'dia restante' : 'dias restantes'}
-                  trend={isTrialExpired ? 'down' : 
-                         daysLeftInTrial <= 3 ? 'down' : 
-                         daysLeftInTrial <= 7 ? 'neutral' : 'up'}
-                  trendValue={isTrialExpired ? 'Expirado' :
-                             daysLeftInTrial <= 3 ? 'Crítico' :
-                             daysLeftInTrial <= 7 ? 'Atenção' : 'Ativo'}
-                  icon={<Clock className="h-4 w-4 sm:h-5 sm:w-5" />}
-                  color={isTrialExpired ? 'error' : 
-                         daysLeftInTrial <= 3 ? 'error' : 
-                         daysLeftInTrial <= 7 ? 'warning' : 'success'}
-                  className="min-h-[120px] sm:min-h-[140px]"
-                />
-
-                {/* Card de Progresso */}
-                <JugaKPICard
-                  title="Progresso do Teste"
-                  value={(() => {
-                    if (isTrialExpired) return '100%';
-                    // Calcular dias totais do trial (7 dias padrão)
-                    const totalTrialDays = 7;
-                    const daysUsed = Math.max(0, totalTrialDays - daysLeftInTrial);
-                    const progress = Math.min(100, Math.max(0, Math.round((daysUsed / totalTrialDays) * 100)));
-                    return `${progress}%`;
-                  })()}
-                  description={(() => {
-                    if (isTrialExpired) return '7 de 7 dias utilizados';
-                    const totalTrialDays = 7;
-                    const daysUsed = Math.max(0, Math.min(totalTrialDays, totalTrialDays - daysLeftInTrial));
-                    return `${daysUsed} de ${totalTrialDays} dias utilizados`;
-                  })()}
-                  trend="neutral"
-                  trendValue={isTrialExpired ? 'Completo' : 'Em andamento'}
-                  icon={<TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />}
-                  color="primary"
-                  className="min-h-[120px] sm:min-h-[140px]"
-                />
-
-                {/* Card de Status */}
-                <JugaKPICard
-                  title="Status do Trial"
-                  value={isTrialExpired ? 'Expirado' :
-                         daysLeftInTrial <= 3 ? 'Crítico' :
-                         daysLeftInTrial <= 7 ? 'Atenção' : 'Ativo'}
-                  description="Estado atual"
-                  trend={isTrialExpired ? 'down' : 
-                         daysLeftInTrial <= 3 ? 'down' : 
-                         daysLeftInTrial <= 7 ? 'neutral' : 'up'}
-                  trendValue={isTrialExpired ? 'Finalizado' :
-                             daysLeftInTrial <= 3 ? 'Urgente' :
-                             daysLeftInTrial <= 7 ? 'Próximo' : 'Normal'}
-                  icon={isTrialExpired ? 
-                        <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" /> :
-                        daysLeftInTrial <= 3 ? 
-                        <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" /> :
-                        daysLeftInTrial <= 7 ? 
-                        <Clock className="h-4 w-4 sm:h-5 sm:w-5" /> :
-                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />}
-                  color={isTrialExpired ? 'error' : 
-                         daysLeftInTrial <= 3 ? 'error' : 
-                         daysLeftInTrial <= 7 ? 'warning' : 'success'}
-                  className="min-h-[120px] sm:min-h-[140px]"
-                />
-              </div>
-
-              {/* Alerta de Urgência - Estilo Dashboard */}
-              {(isTrialExpired || daysLeftInTrial <= 7) && (
-                <div className={`juga-card border ${
-                  isTrialExpired
-                    ? 'border-juga-error/20 bg-juga-error/5'
-                    : daysLeftInTrial <= 3 
-                    ? 'border-juga-error/20 bg-juga-error/5' 
-                    : 'border-juga-warning/20 bg-juga-warning/5'
-                }`}>
-                  <div className="flex items-start gap-3 p-4">
-                    <div className={`p-2 rounded-lg ${
-                      isTrialExpired ? 'bg-juga-error/10' :
-                      daysLeftInTrial <= 3 ? 'bg-juga-error/10' : 'bg-juga-warning/10'
-                    }`}>
-                      <AlertCircle className={`h-5 w-5 ${
-                        isTrialExpired ? 'text-juga-error' :
-                        daysLeftInTrial <= 3 ? 'text-juga-error' : 'text-juga-warning'
-                      }`} />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className={`font-semibold text-heading ${
-                        isTrialExpired ? 'text-juga-error' :
-                        daysLeftInTrial <= 3 ? 'text-juga-error' : 'text-juga-warning'
-                      }`}>
-                        {isTrialExpired 
-                          ? 'Período de teste expirado' 
-                          : daysLeftInTrial <= 3 
-                          ? 'Seu período de teste está quase acabando!' 
-                          : 'Seu período de teste está chegando ao fim'
-                        }
-                      </h4>
-                      <p className={`text-sm mt-1 text-body ${
-                        isTrialExpired ? 'text-juga-error/80' :
-                        daysLeftInTrial <= 3 ? 'text-juga-error/80' : 'text-juga-warning/80'
-                      }`}>
-                        {isTrialExpired 
-                          ? 'Escolha um plano para continuar usando o sistema.'
-                          : daysLeftInTrial <= 3 
-                          ? 'Escolha um plano agora para não perder acesso ao sistema.'
-                          : 'Escolha um plano abaixo para continuar usando o sistema após o período gratuito.'
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          ) : isTrialExpired ? (
-            <div className="bg-juga-error/5 border border-juga-error/20 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-juga-error mt-0.5" />
-                <div>
-                  <p className="font-medium text-heading">Período de teste expirado</p>
-                  <p className="text-sm text-body mt-1">
-                    Seu período de teste expirou. Escolha um plano para continuar usando o sistema.
+        {/* DASHBOARD GRID - 2 COLUNAS */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+          
+          {/* COLUNA ESQUERDA (PLAN DETAILS & RESOURCE LIMITS) */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* PLAN CARD */}
+            <div className="bg-white/70 backdrop-blur-md border border-slate-200/80 shadow-[0_8px_30px_rgba(0,0,0,0.02)] rounded-2xl p-6 relative overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div className="space-y-3">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${currentInfo.bgColor} ${currentInfo.color}`}>
+                    <CurrentIcon className="h-3.5 w-3.5" />
+                    {currentPlan === 'trial' ? 'Período de Teste' : 'Assinatura Ativa'}
+                  </span>
+                  
+                  <h2 className="text-2xl font-bold text-slate-900">
+                    {currentPlan === 'trial' ? 'Trial Gratuito' : subscription?.plan?.name || currentInfo.name}
+                  </h2>
+                  
+                  <p className="text-slate-600 text-sm max-w-md">
+                    {currentPlan === 'trial' 
+                      ? 'Você está no período inicial de teste. Aproveite todas as funcionalidades liberadas antes de escolher um plano definitivo.' 
+                      : 'Sua assinatura está ativa e sendo renovada automaticamente direto pelo seu método de pagamento Stripe.'
+                    }
                   </p>
                 </div>
+                
+                <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-xl text-center sm:text-right min-w-[160px] self-stretch sm:self-auto flex flex-col justify-center">
+                  <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Período atual</span>
+                  <span className="text-lg font-bold text-slate-950 mt-1">
+                    {currentPlan === 'trial'
+                      ? `${daysLeftInTrial} ${daysLeftInTrial === 1 ? 'dia restante' : 'dias restantes'}`
+                      : subscription?.current_period_end
+                        ? new Date(subscription.current_period_end).toLocaleDateString('pt-BR')
+                        : 'Ativo'
+                    }
+                  </span>
+                  <span className="text-[10px] text-slate-400 mt-1">
+                    {currentPlan === 'trial' ? 'Sem compromisso' : 'Renovação Stripe'}
+                  </span>
+                </div>
               </div>
-            </div>
-          ) : (currentPlan as string) !== 'trial' && subscription?.plan ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-center gap-3 p-4 bg-juga-surface-elevated border border-juga-border rounded-lg">
-                  <div className={`p-2 rounded-lg ${currentInfo.bgColor}`}>
-                    <CreditCard className={`h-5 w-5 ${currentInfo.color}`} />
-                  </div>
+
+              {/* Alertas de Vencimento do Trial */}
+              {currentPlan === 'trial' && (
+                <div className={`mt-6 border p-4 rounded-xl flex items-start gap-3 ${
+                  isTrialExpired 
+                    ? 'border-red-200 bg-red-50/50' 
+                    : daysLeftInTrial <= 1 
+                      ? 'border-red-200 bg-red-50/50 animate-pulse' 
+                      : 'border-amber-200 bg-amber-50/30'
+                }`}>
+                  <AlertCircle className={`h-5 w-5 mt-0.5 shrink-0 ${isTrialExpired || daysLeftInTrial <= 1 ? 'text-red-500' : 'text-amber-500'}`} />
                   <div>
-                    <p className="text-sm font-medium text-caption">Plano</p>
-                    <p className="text-lg font-bold text-heading">{subscription.plan.name}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-4 bg-juga-surface-elevated border border-juga-border rounded-lg">
-                  <div className={`p-2 rounded-lg ${currentInfo.bgColor}`}>
-                    <CreditCard className={`h-5 w-5 ${currentInfo.color}`} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-caption">Valor Mensal</p>
-                    <p className="text-lg font-bold text-heading">{formatPrice(subscription.plan.price_monthly)}/mês</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-4 bg-juga-surface-elevated border border-juga-border rounded-lg">
-                  <div className="p-2 rounded-lg bg-juga-primary/10">
-                    <Calendar className="h-5 w-5 text-juga-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-caption">Data de Expiração</p>
-                    <p className="text-lg font-bold text-heading">
-                      {subscription.current_period_end 
-                        ? new Date(subscription.current_period_end).toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric'
-                          })
-                        : 'N/A'
+                    <h4 className={`font-bold text-sm ${isTrialExpired || daysLeftInTrial <= 1 ? 'text-red-900' : 'text-amber-900'}`}>
+                      {isTrialExpired ? 'Seu período de teste expirou' : 'Seu trial está quase acabando!'}
+                    </h4>
+                    <p className={`text-xs mt-0.5 ${isTrialExpired || daysLeftInTrial <= 1 ? 'text-red-700' : 'text-amber-700'}`}>
+                      {isTrialExpired 
+                        ? 'Selecione e contrate um dos planos abaixo para reativar as funções e continuar utilizando a plataforma.' 
+                        : `Resta apenas ${daysLeftInTrial} ${daysLeftInTrial === 1 ? 'dia' : 'dias'}. Salve seus dados escolhendo seu plano.`
                       }
                     </p>
                   </div>
                 </div>
-              </div>
-              {subscription.current_period_end && (
-                <div className="p-4 bg-juga-primary/10 border border-juga-primary/20 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <Calendar className="h-5 w-5 text-juga-primary mt-0.5" />
-                    <div>
-                      <p className="font-medium text-heading">
-                        Seu plano está ativo até {new Date(subscription.current_period_end).toLocaleDateString('pt-BR', {
-                          day: '2-digit',
-                          month: 'long',
-                          year: 'numeric'
-                        })}
-                      </p>
-                      <p className="text-sm text-body mt-1">
-                        A renovação será automática na data de expiração.
-                      </p>
-                    </div>
-                  </div>
-                </div>
               )}
             </div>
-          ) : null}
 
-          <div className="border-t pt-4">
-            <h4 className="font-semibold mb-4 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Uso dos Recursos
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {usageLimits.map(({ label, current, total }) => (
-                <JugaProgressCard
-                  key={label}
-                  title={label}
-                  description={`${current} de ${total}`}
-                  progress={label === 'Clientes' ? getUsagePercentage('customer') : 
-                           label === 'Produtos' ? getUsagePercentage('product') : 
-                           getUsagePercentage('user')}
-                  current={current}
-                  total={typeof total === 'number' ? total : undefined}
-                  color="primary"
-                />
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Planos Disponíveis */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-heading">Escolha seu Plano</h2>
-          <Badge variant="outline" className="bg-juga-surface-elevated border-juga-border text-heading">3 planos disponíveis</Badge>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {plans.map((plan) => (
-            <Card 
-              key={plan.id} 
-              className={`relative transition-all juga-card hover:shadow-lg flex flex-col ${
-                plan.popular 
-                  ? 'border-juga-primary shadow-lg scale-105 ring-2 ring-juga-primary/20' 
-                  : 'hover:border-juga-primary/50'
-              }`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <Badge className="juga-gradient text-white">Mais Popular</Badge>
-                </div>
-              )}
-
-              <CardHeader className="text-center pb-4">
-                <div className="mx-auto mb-4">
-                  {plan.id === 'basic' && (
-                    <div className="w-12 h-12 rounded-full bg-juga-success/20 flex items-center justify-center">
-                      <CheckCircle className="h-6 w-6 text-juga-success" />
-                    </div>
-                  )}
-                  {plan.id === 'pro' && (
-                    <div className="w-12 h-12 rounded-full bg-juga-primary/20 flex items-center justify-center">
-                      <Crown className="h-6 w-6 text-juga-primary" />
-                    </div>
-                  )}
-                  {plan.id === 'enterprise' && (
-                    <div className="w-12 h-12 rounded-full bg-juga-accent/20 flex items-center justify-center">
-                      <Shield className="h-6 w-6 text-juga-accent" />
-                    </div>
-                  )}
-                </div>
-                <CardTitle className="text-xl text-heading">{plan.name}</CardTitle>
-                <CardDescription className="mt-2 text-body">{plan.description}</CardDescription>
-                <div className="py-4">
-                  <span className="text-4xl font-bold text-heading">R$ {plan.price.toFixed(2)}</span>
-                  <span className="text-caption text-sm">/mês</span>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-4 flex-1 flex flex-col">
-                <ul className="space-y-3 flex-1">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-juga-success mt-0.5 flex-shrink-0" />
-                      <span className="text-body">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="mt-auto">
-                  <Button 
-                    className={`w-full px-4 py-2.5 sm:px-5 sm:py-3 transition-all duration-200 ${
-                      currentPlan === plan.id 
-                        ? 'bg-juga-surface-elevated text-body border-juga-border cursor-not-allowed' 
-                        : plan.popular 
-                        ? 'juga-gradient text-white hover:shadow-lg hover:scale-105' 
-                        : 'bg-juga-surface-elevated text-juga-primary border-juga-primary hover:bg-juga-primary/10 hover:border-juga-primary'
-                    }`}
-                    variant={currentPlan === plan.id ? 'outline' : plan.popular ? 'default' : 'outline'} 
-                    disabled={currentPlan === plan.id || isProcessing}
-                    onClick={() => handleSelectPlan(plan.id as PlanId)}
-                  >
-                    {currentPlan === plan.id ? (
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4" />
-                        Plano Atual
-                      </div>
-                    ) : selectedPlan === plan.id && isProcessing ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Processando...
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Crown className="h-4 w-4" />
-                        Escolher Plano
-                      </div>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* Método de Pagamento */}
-      <Card className="juga-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-heading">
-            <CreditCard className="h-5 w-5" />
-            Método de Pagamento
-          </CardTitle>
-          <CardDescription>Configure seu método de pagamento preferido</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between p-4 border border-juga-border rounded-lg bg-juga-surface-elevated hover:bg-juga-surface-card transition-colors">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-8 juga-gradient rounded text-white text-xs font-bold flex items-center justify-center">
-                VISA
-              </div>
+            {/* RESOURCE LIMITS */}
+            <div className="bg-white/70 backdrop-blur-md border border-slate-200/80 shadow-[0_8px_30px_rgba(0,0,0,0.02)] rounded-2xl p-6 space-y-6">
               <div>
-                <p className="font-medium text-heading">**** **** **** 4242</p>
-                <p className="text-sm text-caption">Expira 12/2025</p>
+                <h3 className="text-lg font-bold text-slate-900">Uso do Plano</h3>
+                <p className="text-slate-500 text-xs">Acompanhe o consumo de recursos permitidos em seu pacote</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {usageLimits.map((lim) => (
+                  <div key={lim.label} className="border border-slate-200/60 rounded-xl p-4 bg-white/40 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{lim.label}</span>
+                      <span className="text-xs font-bold text-slate-900">{lim.current} / {lim.total}</span>
+                    </div>
+                    <Progress value={lim.percent} className="h-2 bg-slate-100" />
+                    <div className="flex items-center justify-between text-[11px] text-slate-500">
+                      <span>{lim.percent.toFixed(0)}% utilizado</span>
+                      {lim.percent >= 95 && <Badge variant="destructive" className="text-[9px] px-1 py-0 scale-90">Crítico</Badge>}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-            <Button variant="outline" size="sm" className="px-3 py-2 bg-juga-surface-elevated border-juga-border text-heading hover:bg-juga-surface-card">
-              Atualizar
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Histórico de Faturas */}
-      <Card className="juga-card">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-heading">Histórico de Faturas</CardTitle>
-              <CardDescription className="text-sm">Suas faturas mais recentes</CardDescription>
-            </div>
-            <Badge variant="outline" className="bg-juga-surface-elevated border-juga-border text-heading">3 faturas</Badge>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {[
-              { date: '24 Set 2025', amount: 'R$ 59,90', status: 'Paga', invoice: 'INV-001' },
-              { date: '24 Ago 2025', amount: 'R$ 59,90', status: 'Paga', invoice: 'INV-002' },
-              { date: '24 Jul 2025', amount: 'R$ 59,90', status: 'Paga', invoice: 'INV-003' },
-            ].map((invoice) => (
-              <div 
-                key={invoice.invoice} 
-                className="flex items-center justify-between p-4 border border-juga-border rounded-lg bg-juga-surface-elevated hover:bg-juga-surface-card transition-colors"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="text-center">
-                    <div className="w-12 h-12 rounded-full bg-juga-success/20 flex items-center justify-center">
-                      <CheckCircle className="h-6 w-6 text-juga-success" />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="font-medium text-heading">{invoice.invoice}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Calendar className="h-3 w-3 text-caption" />
-                      <p className="text-sm text-caption">{invoice.date}</p>
-                    </div>
-                  </div>
+
+          {/* COLUNA DIREITA (METHOD & HISTORY) */}
+          <div className="space-y-6">
+            
+            {/* PAYMENT METHOD */}
+            <div className="bg-white/70 backdrop-blur-md border border-slate-200/80 shadow-[0_8px_30px_rgba(0,0,0,0.02)] rounded-2xl p-6 space-y-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-slate-700" />
+                  Pagamento Recorrente
+                </h3>
+                <p className="text-slate-500 text-xs">Formas de faturamento e cartões salvos</p>
+              </div>
+
+              {currentPlan === 'trial' ? (
+                <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-xl text-center">
+                  <p className="text-xs text-slate-600 font-medium">Nenhum cartão cadastrado ainda.</p>
+                  <p className="text-[10px] text-slate-400 mt-1">O cadastro do cartão é feito no Checkout ao escolher seu plano.</p>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <Badge variant="outline" className="text-juga-success border-juga-success/30 bg-juga-success/10 mb-1">
-                      {invoice.status}
-                    </Badge>
-                    <p className="font-semibold text-lg text-heading">{invoice.amount}</p>
+              ) : (
+                <div className="border border-slate-200/60 rounded-xl p-4 bg-white/40 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-7 bg-gradient-to-br from-slate-900 to-slate-800 rounded flex items-center justify-center text-white text-[10px] font-black uppercase tracking-wider shrink-0 shadow-sm">
+                      Stripe
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Cobrança Recorrente</p>
+                      <p className="text-[10px] text-slate-500">Cartão seguro via gateway</p>
+                    </div>
                   </div>
-                  <Button variant="ghost" size="sm" className="gap-2 px-2.5 py-1.5 text-body hover:bg-juga-surface-card">
-                    <Download className="h-4 w-4" />
-                    Download
+                  <Button 
+                    size="sm"
+                    variant="outline"
+                    onClick={handleManageBilling}
+                    disabled={isProcessing}
+                    className="h-8 text-xs border-slate-200 hover:bg-slate-50 rounded-lg shrink-0"
+                  >
+                    Gerenciar
+                    <ArrowUpRight className="h-3 w-3 ml-1" />
                   </Button>
                 </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              )}
+            </div>
 
-      {/* Modal de Pagamento */}
-      {showPaymentModal && selectedPlan && (
-        <PaymentModal
-          isOpen={showPaymentModal}
-          onClose={() => {
-            setShowPaymentModal(false);
-            setSelectedPlan(null);
-          }}
-          plan={plans.find(plan => plan.id === selectedPlan)!}
-          onPaymentSuccess={handlePaymentSuccess}
-        />
-      )}
+            {/* REAL INVOICES HISTORY */}
+            <div className="bg-white/70 backdrop-blur-md border border-slate-200/80 shadow-[0_8px_30px_rgba(0,0,0,0.02)] rounded-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <Receipt className="h-5 w-5 text-slate-700" />
+                    Histórico Financeiro
+                  </h3>
+                  <p className="text-slate-500 text-xs">Faturas e pagamentos realizados</p>
+                </div>
+                <Badge variant="outline" className="border-slate-200 text-slate-700 bg-white">{invoices.length}</Badge>
+              </div>
+
+              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                {invoices.length === 0 ? (
+                  <div className="bg-slate-50 border border-slate-200/60 p-6 rounded-xl text-center">
+                    <AlertCircle className="h-7 w-7 text-slate-400 mx-auto mb-2" />
+                    <p className="text-xs text-slate-600 font-semibold">Nenhuma fatura registrada.</p>
+                    <p className="text-[10px] text-slate-400 mt-1">O histórico aparecerá quando uma assinatura Stripe for confirmada.</p>
+                  </div>
+                ) : (
+                  invoices.map((inv) => {
+                    const isPaid = inv.status === 'confirmed' || inv.status === 'paid';
+                    const isPending = inv.status === 'pending';
+                    const formattedDate = new Date(inv.payment_date).toLocaleDateString('pt-BR', {
+                      day: '2-digit',
+                      month: 'short',
+                    });
+                    const invoiceRef = inv.invoice_number || `FAT-${inv.id.slice(0, 8).toUpperCase()}`;
+
+                    return (
+                      <div 
+                        key={inv.id} 
+                        className="border border-slate-200/50 rounded-xl p-3.5 bg-white/40 flex items-center justify-between gap-3 hover:border-slate-300 transition-colors"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-900">{invoiceRef}</span>
+                            <Badge 
+                              className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                                isPaid 
+                                  ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' 
+                                  : isPending 
+                                    ? 'bg-amber-500/10 text-amber-700 border border-amber-500/20' 
+                                    : 'bg-red-500/10 text-red-700 border border-red-500/20'
+                              }`}
+                            >
+                              {isPaid ? 'Paga' : isPending ? 'Pendente' : 'Vencida'}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                            <Calendar className="h-3 w-3" />
+                            <span>{formattedDate}</span>
+                            <span>•</span>
+                            <span className="capitalize">{inv.payment_method?.replace('_', ' ')}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-sm font-extrabold text-slate-950">
+                            {formatPrice(Number(inv.amount))}
+                          </span>
+                          {inv.receipt_url && (
+                            <a 
+                              href={inv.receipt_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors shadow-sm bg-white"
+                              title="Baixar Recibo PDF"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* SECTION TABELA DE PLANOS */}
+        <div className="space-y-6 pt-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Altere seu Plano</h2>
+              <p className="text-slate-500 text-sm">Contrate ou faça upgrade da sua licença a qualquer momento</p>
+            </div>
+            
+            {/* SWITCH MENSAL / ANUAL */}
+            <div className="flex items-center gap-3 bg-white border border-slate-200 px-4 py-2 rounded-full w-fit shadow-sm">
+              <span className={`text-sm font-semibold ${!isYearly ? 'text-blue-600' : 'text-slate-500'}`}>Mensal</span>
+              <button
+                type="button"
+                onClick={() => setIsYearly(!isYearly)}
+                className="w-12 h-6 rounded-full bg-blue-100 border border-blue-200 p-0.5 transition-colors relative cursor-pointer"
+              >
+                <div
+                  className={`w-4.5 h-4.5 rounded-full bg-blue-600 transition-transform ${
+                    isYearly ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                  style={{ width: '1.125rem', height: '1.125rem' }}
+                />
+              </button>
+              <span className={`text-sm font-semibold flex items-center gap-1.5 ${isYearly ? 'text-blue-600' : 'text-slate-500'}`}>
+                Anual
+                <span className="bg-emerald-500/10 text-emerald-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  Economize 20%
+                </span>
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {plans.map((plan) => {
+              const isPopular = plan.popular;
+              return (
+                <div
+                  key={plan.id}
+                  className={`relative rounded-2xl border-2 flex flex-col transition-all duration-300 hover:-translate-y-1 ${
+                    isPopular
+                      ? 'border-blue-500 shadow-xl shadow-blue-600/10 bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 text-white'
+                      : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-xl hover:shadow-blue-600/5'
+                  }`}
+                >
+                  {isPopular && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                      <span className="bg-white text-blue-700 text-[11px] font-bold px-4 py-1 rounded-full shadow-md border border-blue-100">
+                        Mais Popular
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="p-7 text-center flex-1 flex flex-col">
+                    <div
+                      className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${
+                        plan.id === 'basic' 
+                          ? 'from-emerald-400 to-emerald-600' 
+                          : plan.id === 'pro' 
+                            ? 'from-blue-400 to-blue-600' 
+                            : 'from-violet-400 to-violet-600'
+                      } mx-auto mb-4 flex items-center justify-center shadow-lg ${
+                        isPopular ? 'bg-white/20' : ''
+                      }`}
+                    >
+                      {plan.id === 'basic' && <CheckCircle className="h-7 w-7 text-white" />}
+                      {plan.id === 'pro' && <Crown className="h-7 w-7 text-white" />}
+                      {plan.id === 'enterprise' && <Shield className="h-7 w-7 text-white" />}
+                    </div>
+                    
+                    <h3 className={`text-xl font-bold mb-1 ${isPopular ? 'text-white' : 'text-slate-900'}`}>
+                      {plan.name}
+                    </h3>
+                    <p className={`text-xs mb-5 ${isPopular ? 'text-blue-100' : 'text-slate-500'}`}>
+                      {plan.description}
+                    </p>
+
+                    <div className="mb-6">
+                      <span className={`text-4xl font-extrabold ${isPopular ? 'text-white' : 'text-slate-900'}`}>
+                        R$ {(isYearly ? plan.priceYearly : plan.priceMonthly).toFixed(2).replace('.', ',')}
+                      </span>
+                      <span className={`text-sm ml-1 ${isPopular ? 'text-blue-100' : 'text-slate-500'}`}>
+                        {isYearly ? '/ano' : '/mês'}
+                      </span>
+                      {isYearly && (
+                        <div className={`text-[10px] mt-1 font-semibold ${isPopular ? 'text-blue-200' : 'text-emerald-600 bg-emerald-500/10 border border-emerald-500/20'} px-2 py-0.5 rounded-md w-fit mx-auto`}>
+                          Equivalente a R$ {(plan.priceYearly / 12).toFixed(2).replace('.', ',')}/mês
+                        </div>
+                      )}
+                    </div>
+
+                    <ul className="space-y-2.5 text-left flex-1 mb-6">
+                      {plan.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-2.5 text-[13px]">
+                          <CheckCircle
+                            className={`h-4 w-4 mt-0.5 shrink-0 ${isPopular ? 'text-blue-200' : 'text-emerald-500'}`}
+                          />
+                          <span className={isPopular ? 'text-blue-50' : 'text-slate-700'}>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Button
+                      className={`w-full rounded-xl py-3 font-semibold transition-all ${
+                        currentPlan === plan.id
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                          : isPopular
+                            ? 'bg-white text-blue-700 hover:bg-blue-50 shadow-md'
+                            : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500 shadow-md shadow-blue-600/10'
+                      }`}
+                      disabled={currentPlan === plan.id || isProcessing}
+                      onClick={() => handleSelectPlan(plan.id as PlanId)}
+                    >
+                      {currentPlan === plan.id ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-emerald-500" />
+                          Plano Atual
+                        </div>
+                      ) : selectedPlan === plan.id && isProcessing ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Processando...
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-1.5">
+                          Escolher Plano
+                          <ChevronRight className="h-4 w-4" />
+                        </div>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }

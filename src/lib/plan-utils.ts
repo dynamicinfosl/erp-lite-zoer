@@ -235,7 +235,7 @@ export async function createSubscription(
   try {
 
     const trialEndsAt = status === 'trial' 
-      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dias
+      ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() // 3 dias
       : null;
 
     const { error } = await supabase
@@ -247,7 +247,7 @@ export async function createSubscription(
         trial_ends_at: trialEndsAt,
         current_period_start: new Date().toISOString(),
         current_period_end: status === 'active' 
-          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dias
+          ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() // 3 dias
           : null,
       });
 

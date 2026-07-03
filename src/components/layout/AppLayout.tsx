@@ -107,7 +107,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <AppSidebar />
         <SidebarInset>
           <main className="flex-1 overflow-auto min-h-screen">
-            <div className="w-full h-full p-4 sm:p-6">
+            <div className={`w-full h-full ${pathname === '/dashboard' || pathname === '/assinatura' ? '' : 'p-4 sm:p-6'}`}>
               {needsTrialProtection ? (
                 <TrialProtection>{children}</TrialProtection>
               ) : (
@@ -156,7 +156,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <AppSidebar />
       <SidebarInset>
         <main className="flex-1 overflow-auto min-h-screen">
-          <div className="w-full h-full p-6">
+          <div className={`w-full h-full ${pathname === '/dashboard' || pathname === '/assinatura' ? '' : 'p-6'}`}>
             {needsTrialProtection ? (
               <TrialProtection>{children}</TrialProtection>
             ) : (

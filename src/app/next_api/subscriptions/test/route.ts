@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
             tenant_id: testTenantId,
             plan_id: trialPlan.id,
             status: 'trial',
-            trial_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            trial_end: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
             current_period_start: new Date().toISOString(),
           })
           .select('id')

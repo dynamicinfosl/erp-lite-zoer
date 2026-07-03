@@ -1,14 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
 import { 
   User, 
   Building2, 
@@ -20,7 +18,14 @@ import {
   Mail,
   Phone,
   FileText,
-  MapPinIcon
+  MapPinIcon,
+  Lock,
+  Home,
+  Briefcase,
+  Info,
+  Check,
+  Building,
+  Sparkles
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -80,7 +85,7 @@ const PLANS: Plan[] = [
   {
     id: 'basic',
     name: 'Básico',
-    description: 'Ideal para pequenas empresas',
+    description: 'Ideal para pequenas empresas e MEI',
     price: 79.90,
     features: ['Gestão de produtos', 'Gestão de clientes', 'Relatórios básicos', 'Suporte por email'],
     max_users: 1,
@@ -90,9 +95,9 @@ const PLANS: Plan[] = [
   {
     id: 'professional',
     name: 'Profissional',
-    description: 'Para empresas em crescimento',
+    description: 'Para empresas em crescimento acelerado',
     price: 139.90,
-    features: ['Tudo do Básico', 'Múltiplos usuários', 'Relatórios avançados', 'Integração com APIs', 'Suporte prioritário'],
+    features: ['Tudo do Básico', 'Múltiplos usuários (até 5)', 'Relatórios avançados', 'Integração com APIs', 'Suporte prioritário'],
     max_users: 5,
     max_products: 1000,
     max_customers: 10000,
@@ -100,9 +105,9 @@ const PLANS: Plan[] = [
   {
     id: 'enterprise',
     name: 'Enterprise',
-    description: 'Solução completa para grandes empresas',
-    price: 99.90,
-    features: ['Tudo do Profissional', 'Usuários ilimitados', 'Produtos ilimitados', 'Clientes ilimitados', 'Suporte 24/7', 'Customizações'],
+    description: 'Solução completa sob medida',
+    price: 199.90,
+    features: ['Tudo do Profissional', 'Usuários ilimitados', 'Produtos ilimitados', 'Clientes ilimitados', 'Suporte 24/7 dedicado', 'Customizações exclusivas'],
     max_users: -1,
     max_products: -1,
     max_customers: -1,
@@ -142,13 +147,13 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
       city: '',
       state: '',
     });
-    setSelectedPlan(null);
+    setSelectedPlan(PLANS[1]); // Seleciona o Profissional como padrão
     setError(null);
     setAcceptedTerms(false);
     setCurrentStep(1);
   };
 
-  // Dados do formulário - garantindo que sempre iniciem vazios
+  // Dados do formulário
   const [responsibleData, setResponsibleData] = useState<ResponsibleData>({
     name: '',
     email: '',
@@ -177,11 +182,38 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
     state: '',
   });
 
-  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(PLANS[1]);
 
   const progress = (currentStep / STEPS.length) * 100;
 
-  // Validação sem efeitos colaterais (não altera estado de erro)
+  // Busca de CEP por ViaCEP
+  useEffect(() => {
+    const cleanCep = addressData.zip_code.replace(/\D/g, '');
+    if (cleanCep.length === 8) {
+      const fetchCepData = async () => {
+        try {
+          const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+          const data = await res.json();
+          if (data.erro) {
+            toast.error('CEP não localizado. Insira os dados manualmente.');
+            return;
+          }
+          setAddressData(prev => ({
+            ...prev,
+            address: data.logradouro || '',
+            neighborhood: data.bairro || '',
+            city: data.localidade || '',
+            state: data.uf || '',
+          }));
+          toast.success('Endereço autocompletado com sucesso!');
+        } catch (err) {
+          console.error('Erro de rede ao buscar CEP:', err);
+        }
+      };
+      fetchCepData();
+    }
+  }, [addressData.zip_code]);
+
   const isStepValid = (step: number): boolean => {
     switch (step) {
       case 1:
@@ -212,39 +244,39 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
     switch (step) {
       case 1:
         if (!responsibleData.name || !responsibleData.email || !responsibleData.password) {
-          setError('Preencha todos os campos obrigatórios');
+          setError('Preencha os campos obrigatórios.');
           return false;
         }
         if (responsibleData.password !== responsibleData.confirmPassword) {
-          setError('As senhas não coincidem');
+          setError('As senhas digitadas não coincidem.');
           return false;
         }
         if (responsibleData.password.length < 6) {
-          setError('A senha deve ter pelo menos 6 caracteres');
+          setError('A senha deve conter no mínimo 6 caracteres.');
           return false;
         }
         break;
       case 2:
         if (!companyData.name || !companyData.document) {
-          setError('Preencha todos os campos obrigatórios');
+          setError('Razão Social e Documento da Empresa são obrigatórios.');
           return false;
         }
         break;
       case 3:
         if (!addressData.zip_code || !addressData.address || !addressData.number || !addressData.city || !addressData.state) {
-          setError('Preencha todos os campos obrigatórios');
+          setError('Campos obrigatórios de endereço estão pendentes.');
           return false;
         }
         break;
       case 4:
         if (!selectedPlan) {
-          setError('Selecione um plano');
+          setError('Selecione um plano para continuar.');
           return false;
         }
         break;
       case 5:
         if (!acceptedTerms) {
-          setError('Você deve aceitar os termos de uso');
+          setError('É necessário aceitar os termos de uso.');
           return false;
         }
         break;
@@ -253,14 +285,10 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
     return true;
   };
 
-  // Limpa o formulário quando o componente for montado
   useEffect(() => {
-    // Limpeza simples e eficaz
     clearForm();
   }, []);
 
-
-  // Limpa o erro automaticamente quando os campos da etapa atual ficarem válidos
   useEffect(() => {
     if (error && isStepValid(currentStep)) {
       setError(null);
@@ -325,54 +353,26 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
       const result = await response.json();
 
       if (!response.ok) {
-        // Tratamento específico de erros
         let errorMessage = 'Erro ao realizar cadastro';
-        
         if (result.error) {
-          if (result.error.includes('Invalid login credentials')) {
-            errorMessage = 'Erro de configuração do servidor. Tente novamente em alguns minutos.';
-          } else if (result.error.includes('User already registered') || result.error.includes('already exists')) {
-            errorMessage = 'Este e-mail já está cadastrado. Tente fazer login ou use outro e-mail.';
-          } else if (result.error.includes('Invalid verification code')) {
-            errorMessage = 'Código de verificação inválido. Tente novamente.';
-          } else if (result.error.includes('Dados do responsável são obrigatórios')) {
-            errorMessage = 'Preencha todos os dados do responsável.';
-          } else if (result.error.includes('Dados da empresa são obrigatórios')) {
-            errorMessage = 'Preencha todos os dados da empresa.';
-          } else if (result.error.includes('Endereço completo é obrigatório')) {
-            errorMessage = 'Preencha todos os dados de endereço.';
+          if (result.error.includes('User already registered') || result.error.includes('already exists')) {
+            errorMessage = 'Este endereço de e-mail já está em uso.';
           } else {
             errorMessage = result.error;
           }
         }
-        
         throw new Error(errorMessage);
       }
 
-      toast.success('Cadastro realizado com sucesso!');
-      
-      // Limpar dados do formulário após sucesso
+      toast.success('Empresa registrada com sucesso!');
       clearForm();
       
-      // Pequeno delay para garantir que o toast seja exibido
       setTimeout(() => {
         onSuccess?.();
-      }, 1000);
+      }, 1200);
     } catch (err: any) {
       console.error('Erro no cadastro:', err);
-      
-      // Detectar erros de conexão
-      let errorMessage = err.message || 'Erro ao realizar cadastro';
-      
-      if (err.message?.includes('Failed to fetch') || 
-          err.message?.includes('ERR_INTERNET_DISCONNECTED') ||
-          err.message?.includes('network error')) {
-        errorMessage = 'Sem conexão com a internet. Verifique sua conexão e tente novamente.';
-      } else if (err.message?.includes('timeout') || err.name === 'AbortError') {
-        errorMessage = 'A requisição demorou muito. Verifique sua conexão e tente novamente.';
-      }
-      
-      setError(errorMessage);
+      setError(err.message || 'Houve um erro no servidor de rede.');
     } finally {
       setIsLoading(false);
     }
@@ -381,14 +381,12 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
   const formatDocument = (value: string, type: 'CNPJ' | 'CPF') => {
     const numbers = value.replace(/\D/g, '');
     if (type === 'CNPJ') {
-      // CNPJ: 14 dígitos - 00.000.000/0000-00
       if (numbers.length <= 2) return numbers;
       if (numbers.length <= 5) return `${numbers.slice(0, 2)}.${numbers.slice(2)}`;
       if (numbers.length <= 8) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5)}`;
       if (numbers.length <= 12) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8)}`;
       return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8, 12)}-${numbers.slice(12, 14)}`;
     } else {
-      // CPF: 11 dígitos - 000.000.000-00
       if (numbers.length <= 3) return numbers;
       if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
       if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
@@ -398,484 +396,549 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
 
   const formatPhone = (value: string) => {
     const numbers = value.replace(/\D/g, '');
-    
-    // Telefone fixo: 10 dígitos - (00) 0000-0000
     if (numbers.length <= 2) return numbers;
     if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
     if (numbers.length <= 10) {
       return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
     }
-    
-    // Celular: 11 dígitos - (00) 00000-0000
-    if (numbers.length === 11) {
-      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
-    }
-    
-    // Limita a 11 dígitos
     const limitedNumbers = numbers.slice(0, 11);
-    if (limitedNumbers.length <= 2) return limitedNumbers;
-    if (limitedNumbers.length <= 6) return `(${limitedNumbers.slice(0, 2)}) ${limitedNumbers.slice(2)}`;
-    if (limitedNumbers.length <= 10) {
-      return `(${limitedNumbers.slice(0, 2)}) ${limitedNumbers.slice(2, 6)}-${limitedNumbers.slice(6)}`;
-    }
     return `(${limitedNumbers.slice(0, 2)}) ${limitedNumbers.slice(2, 7)}-${limitedNumbers.slice(7)}`;
   };
 
   const formatZipCode = (value: string) => {
     const numbers = value.replace(/\D/g, '');
-    return numbers.replace(/(\d{5})(\d{3})/, '$1-$2');
+    if (numbers.length <= 5) return numbers;
+    return `${numbers.slice(0, 5)}-${numbers.slice(5, 8)}`;
   };
 
-  // Funções de validação
-  const validateCPF = (cpf: string): boolean => {
-    const numbers = cpf.replace(/\D/g, '');
-    return numbers.length === 11;
+  const validateCPF = (cpf: string) => cpf.replace(/\D/g, '').length === 11;
+  const validateCNPJ = (cnpj: string) => cnpj.replace(/\D/g, '').length === 14;
+  const validatePhoneLength = (phone: string) => {
+    const len = phone.replace(/\D/g, '').length;
+    return len === 10 || len === 11;
   };
 
-  const validatePhone = (phone: string): boolean => {
-    const numbers = phone.replace(/\D/g, '');
-    return numbers.length === 10 || numbers.length === 11;
-  };
-
-  const validateCNPJ = (cnpj: string): boolean => {
-    const numbers = cnpj.replace(/\D/g, '');
-    return numbers.length === 14;
-  };
-
+  // Render Step 1
   const renderStep1 = () => (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="name" className="font-semibold">Nome Completo *</Label>
-        <Input
-          id="name"
-          value={responsibleData.name}
-          onChange={(e) => setResponsibleData({ ...responsibleData, name: e.target.value })}
-          placeholder="Seu nome completo"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="email" className="font-semibold">E-mail *</Label>
-        <Input
-          id="email"
-          type="email"
-          value={responsibleData.email}
-          onChange={(e) => setResponsibleData({ ...responsibleData, email: e.target.value })}
-          placeholder="seu@email.com"
-          autoComplete="off"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <Label htmlFor="phone" className="font-semibold">Telefone</Label>
+    <div className="space-y-4 animate-fadeIn text-slate-800">
+      <div className="space-y-1.5">
+        <Label htmlFor="name" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nome Completo *</Label>
+        <div className="relative group">
+          <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
           <Input
-            id="phone"
-            value={responsibleData.phone}
-            onChange={(e) => {
-              const newValue = e.target.value;
-              setResponsibleData({ 
-                ...responsibleData, 
-                phone: formatPhone(newValue) 
-              });
-            }}
-            placeholder="(00) 00000-0000"
-            maxLength={15}
-            autoComplete="off"
-            className={responsibleData.phone && !validatePhone(responsibleData.phone) ? 'border-red-400 focus:border-red-400' : ''}
+            id="name"
+            value={responsibleData.name}
+            onChange={(e) => setResponsibleData({ ...responsibleData, name: e.target.value })}
+            placeholder="Digite seu nome completo"
+            className="pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm"
           />
-          {responsibleData.phone && !validatePhone(responsibleData.phone) && (
-            <p className="text-sm text-red-400">Telefone deve ter 10 ou 11 dígitos</p>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="email" className="text-xs font-bold text-slate-500 uppercase tracking-wider">E-mail *</Label>
+        <div className="relative group">
+          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+          <Input
+            id="email"
+            type="email"
+            value={responsibleData.email}
+            onChange={(e) => setResponsibleData({ ...responsibleData, email: e.target.value })}
+            placeholder="nome@exemplo.com"
+            autoComplete="off"
+            className="pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="phone" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Telefone</Label>
+          <div className="relative group">
+            <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+            <Input
+              id="phone"
+              value={responsibleData.phone}
+              onChange={(e) => setResponsibleData({ ...responsibleData, phone: formatPhone(e.target.value) })}
+              placeholder="(00) 00000-0000"
+              maxLength={15}
+              className={`pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm ${
+                responsibleData.phone && !validatePhoneLength(responsibleData.phone) ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/50' : ''
+              }`}
+            />
+          </div>
+          {responsibleData.phone && !validatePhoneLength(responsibleData.phone) && (
+            <p className="text-[11px] text-red-500 font-medium">Formato inválido. Deve ter 10 ou 11 dígitos.</p>
           )}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="cpf" className="font-semibold">CPF (opcional)</Label>
-          <Input
-            id="cpf"
-            value={responsibleData.cpf}
-            onChange={(e) => setResponsibleData({ 
-              ...responsibleData, 
-              cpf: formatDocument(e.target.value, 'CPF') 
-            })}
-            placeholder="000.000.000-00"
-            maxLength={14}
-            autoComplete="off"
-            className={responsibleData.cpf && !validateCPF(responsibleData.cpf) ? 'border-red-400 focus:border-red-400' : ''}
-          />
+        <div className="space-y-1.5">
+          <Label htmlFor="cpf" className="text-xs font-bold text-slate-500 uppercase tracking-wider">CPF (Opcional)</Label>
+          <div className="relative group">
+            <FileText className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+            <Input
+              id="cpf"
+              value={responsibleData.cpf}
+              onChange={(e) => setResponsibleData({ ...responsibleData, cpf: formatDocument(e.target.value, 'CPF') })}
+              placeholder="000.000.000-00"
+              maxLength={14}
+              className={`pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm ${
+                responsibleData.cpf && !validateCPF(responsibleData.cpf) ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/50' : ''
+              }`}
+            />
+          </div>
           {responsibleData.cpf && !validateCPF(responsibleData.cpf) && (
-            <p className="text-sm text-red-400">CPF deve ter 11 dígitos</p>
+            <p className="text-[11px] text-red-500 font-medium">CPF inválido. Deve conter 11 dígitos.</p>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <Label htmlFor="password" className="font-semibold">Senha *</Label>
-          <Input
-            id="password"
-            type="password"
-            value={responsibleData.password}
-            onChange={(e) => setResponsibleData({ ...responsibleData, password: e.target.value })}
-            placeholder="Mínimo 6 caracteres"
-            autoComplete="new-password"
-          />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="password" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Senha *</Label>
+          <div className="relative group">
+            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+            <Input
+              id="password"
+              type="password"
+              value={responsibleData.password}
+              onChange={(e) => setResponsibleData({ ...responsibleData, password: e.target.value })}
+              placeholder="Mínimo 6 caracteres"
+              className="pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm"
+            />
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="confirmPassword" className="font-semibold">Confirmar Senha *</Label>
-          <Input
-            id="confirmPassword"
-            type="password"
-            value={responsibleData.confirmPassword}
-            onChange={(e) => setResponsibleData({ ...responsibleData, confirmPassword: e.target.value })}
-            placeholder="Digite a senha novamente"
-            autoComplete="new-password"
-          />
+        <div className="space-y-1.5">
+          <Label htmlFor="confirmPassword" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Confirmar Senha *</Label>
+          <div className="relative group">
+            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+            <Input
+              id="confirmPassword"
+              type="password"
+              value={responsibleData.confirmPassword}
+              onChange={(e) => setResponsibleData({ ...responsibleData, confirmPassword: e.target.value })}
+              placeholder="Repita sua senha"
+              className="pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm"
+            />
+          </div>
         </div>
       </div>
     </div>
   );
 
+  // Render Step 2
   const renderStep2 = () => (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="companyName">Razão Social / Nome da Empresa *</Label>
-        <Input
-          id="companyName"
-          value={companyData.name}
-          onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
-          placeholder="Nome oficial da empresa"
-        />
+    <div className="space-y-4 animate-fadeIn text-slate-800">
+      <div className="space-y-1.5">
+        <Label htmlFor="companyName" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Razão Social / Nome da Empresa *</Label>
+        <div className="relative group">
+          <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+          <Input
+            id="companyName"
+            value={companyData.name}
+            onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
+            placeholder="Razão social oficial"
+            className="pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm"
+          />
+        </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="fantasyName">Nome Fantasia</Label>
-        <Input
-          id="fantasyName"
-          value={companyData.fantasy_name}
-          onChange={(e) => setCompanyData({ ...companyData, fantasy_name: e.target.value })}
-          placeholder="Nome comercial da empresa"
-        />
+      <div className="space-y-1.5">
+        <Label htmlFor="fantasyName" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nome Fantasia (Opcional)</Label>
+        <div className="relative group">
+          <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+          <Input
+            id="fantasyName"
+            value={companyData.fantasy_name}
+            onChange={(e) => setCompanyData({ ...companyData, fantasy_name: e.target.value })}
+            placeholder="Nome fantasia comercial"
+            className="pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm"
+          />
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="documentType">Tipo de Documento</Label>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tipo de Documento</Label>
           <Select
             value={companyData.document_type}
-            onValueChange={(value: 'CNPJ' | 'CPF') => setCompanyData({ ...companyData, document_type: value })}
+            onValueChange={(value: 'CNPJ' | 'CPF') => setCompanyData({ ...companyData, document_type: value, document: '' })}
           >
-            <SelectTrigger>
+            <SelectTrigger className="bg-white border-slate-200 text-slate-900 h-12 rounded-xl focus:ring-1 focus:ring-blue-500">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="z-50 bg-white text-slate-900 border border-slate-200 shadow-xl dark:bg-slate-900 dark:text-white dark:border-slate-700">
-              <SelectItem value="CNPJ" className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">CNPJ</SelectItem>
-              <SelectItem value="CPF" className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">CPF (MEI)</SelectItem>
+            <SelectContent className="z-50 bg-white border-slate-200 text-slate-900 shadow-2xl">
+              <SelectItem value="CNPJ" className="cursor-pointer hover:bg-slate-100">CNPJ</SelectItem>
+              <SelectItem value="CPF" className="cursor-pointer hover:bg-slate-100">CPF (Autônomo/MEI)</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="document">
+        <div className="space-y-1.5">
+          <Label htmlFor="document" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
             {companyData.document_type} *
           </Label>
-          <Input
-            id="document"
-            value={companyData.document}
-            onChange={(e) => setCompanyData({ 
-              ...companyData, 
-              document: formatDocument(e.target.value, companyData.document_type) 
-            })}
-            placeholder={companyData.document_type === 'CNPJ' ? '00.000.000/0000-00' : '000.000.000-00'}
-            maxLength={companyData.document_type === 'CNPJ' ? 18 : 14}
-            className={companyData.document && (
-              (companyData.document_type === 'CNPJ' && !validateCNPJ(companyData.document)) ||
-              (companyData.document_type === 'CPF' && !validateCPF(companyData.document))
-            ) ? 'border-red-400 focus:border-red-400' : ''}
-          />
+          <div className="relative group">
+            <FileText className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+            <Input
+              id="document"
+              value={companyData.document}
+              onChange={(e) => setCompanyData({ 
+                ...companyData, 
+                document: formatDocument(e.target.value, companyData.document_type) 
+              })}
+              placeholder={companyData.document_type === 'CNPJ' ? '00.000.000/0000-00' : '000.000.000-00'}
+              maxLength={companyData.document_type === 'CNPJ' ? 18 : 14}
+              className={`pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm ${
+                companyData.document && (
+                  (companyData.document_type === 'CNPJ' && !validateCNPJ(companyData.document)) ||
+                  (companyData.document_type === 'CPF' && !validateCPF(companyData.document))
+                ) ? 'border-red-500/50 focus:border-red-500' : ''
+              }`}
+            />
+          </div>
           {companyData.document && (
             (companyData.document_type === 'CNPJ' && !validateCNPJ(companyData.document)) ||
             (companyData.document_type === 'CPF' && !validateCPF(companyData.document))
           ) && (
-            <p className="text-sm text-red-400">
-              {companyData.document_type === 'CNPJ' ? 'CNPJ deve ter 14 dígitos' : 'CPF deve ter 11 dígitos'}
+            <p className="text-[11px] text-red-500 font-medium">
+              {companyData.document_type === 'CNPJ' ? 'CNPJ deve conter 14 dígitos.' : 'CPF deve conter 11 dígitos.'}
             </p>
           )}
         </div>
       </div>
 
-      {/* Contato Corporativo lado a lado */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="corporateEmail" className="text-sm font-semibold">E-mail Corporativo</Label>
-          <Input
-            id="corporateEmail"
-            type="email"
-            value={companyData.corporate_email}
-            onChange={(e) => setCompanyData({ ...companyData, corporate_email: e.target.value })}
-            placeholder="contato@empresa.com"
-            className="h-11"
-          />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="corporateEmail" className="text-xs font-bold text-slate-500 uppercase tracking-wider">E-mail Corporativo</Label>
+          <div className="relative group">
+            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+            <Input
+              id="corporateEmail"
+              type="email"
+              value={companyData.corporate_email}
+              onChange={(e) => setCompanyData({ ...companyData, corporate_email: e.target.value })}
+              placeholder="financeiro@empresa.com"
+              className="pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm"
+            />
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="corporatePhone" className="text-sm font-semibold">Telefone Corporativo</Label>
-          <Input
-            id="corporatePhone"
-            value={companyData.corporate_phone}
-            onChange={(e) => setCompanyData({ 
-              ...companyData, 
-              corporate_phone: formatPhone(e.target.value) 
-            })}
-            placeholder="(00) 00000-0000"
-            maxLength={15}
-            className="h-11"
-          />
+        <div className="space-y-1.5">
+          <Label htmlFor="corporatePhone" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Telefone Corporativo</Label>
+          <div className="relative group">
+            <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+            <Input
+              id="corporatePhone"
+              value={companyData.corporate_phone}
+              onChange={(e) => setCompanyData({ ...companyData, corporate_phone: formatPhone(e.target.value) })}
+              placeholder="(00) 0000-0000"
+              maxLength={15}
+              className="pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm"
+            />
+          </div>
         </div>
       </div>
     </div>
   );
 
+  // Render Step 3
   const renderStep3 = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="zipCode">CEP *</Label>
-          <Input
-            id="zipCode"
-            value={addressData.zip_code}
-            onChange={(e) => setAddressData({ 
-              ...addressData, 
-              zip_code: formatZipCode(e.target.value) 
-            })}
-            placeholder="00000-000"
-            maxLength={9}
-          />
+    <div className="space-y-4 animate-fadeIn text-slate-800">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="zipCode" className="text-xs font-bold text-slate-500 uppercase tracking-wider">CEP *</Label>
+          <div className="relative group">
+            <MapPinIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+            <Input
+              id="zipCode"
+              value={addressData.zip_code}
+              onChange={(e) => setAddressData({ ...addressData, zip_code: formatZipCode(e.target.value) })}
+              placeholder="00000-000"
+              maxLength={9}
+              className="pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm"
+            />
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="number">Número *</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="number" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Número *</Label>
+          <div className="relative group">
+            <Home className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+            <Input
+              id="number"
+              value={addressData.number}
+              onChange={(e) => setAddressData({ ...addressData, number: e.target.value })}
+              placeholder="Nº ou S/N"
+              className="pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="address" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Endereço (Rua/Avenida) *</Label>
+        <div className="relative group">
+          <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
           <Input
-            id="number"
-            value={addressData.number}
-            onChange={(e) => setAddressData({ ...addressData, number: e.target.value })}
-            placeholder="123"
+            id="address"
+            value={addressData.address}
+            onChange={(e) => setAddressData({ ...addressData, address: e.target.value })}
+            placeholder="Nome do logradouro"
+            className="pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm"
           />
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="address">Rua *</Label>
-        <Input
-          id="address"
-          value={addressData.address}
-          onChange={(e) => setAddressData({ ...addressData, address: e.target.value })}
-          placeholder="Nome da rua"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="complement">Complemento</Label>
-          <Input
-            id="complement"
-            value={addressData.complement}
-            onChange={(e) => setAddressData({ ...addressData, complement: e.target.value })}
-            placeholder="Apto, sala, etc."
-          />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="complement" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Complemento (Opcional)</Label>
+          <div className="relative group">
+            <Info className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+            <Input
+              id="complement"
+              value={addressData.complement}
+              onChange={(e) => setAddressData({ ...addressData, complement: e.target.value })}
+              placeholder="Ex: Apto 101, Bloco B"
+              className="pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm"
+            />
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="neighborhood">Bairro</Label>
-          <Input
-            id="neighborhood"
-            value={addressData.neighborhood}
-            onChange={(e) => setAddressData({ ...addressData, neighborhood: e.target.value })}
-            placeholder="Nome do bairro"
-          />
+        <div className="space-y-1.5">
+          <Label htmlFor="neighborhood" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Bairro</Label>
+          <div className="relative group">
+            <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+            <Input
+              id="neighborhood"
+              value={addressData.neighborhood}
+              onChange={(e) => setAddressData({ ...addressData, neighborhood: e.target.value })}
+              placeholder="Nome do bairro"
+              className="pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="city">Cidade *</Label>
-          <Input
-            id="city"
-            value={addressData.city}
-            onChange={(e) => setAddressData({ ...addressData, city: e.target.value })}
-            placeholder="Rio de Janeiro"
-          />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="city" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cidade *</Label>
+          <div className="relative group">
+            <Building className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+            <Input
+              id="city"
+              value={addressData.city}
+              onChange={(e) => setAddressData({ ...addressData, city: e.target.value })}
+              placeholder="Cidade"
+              className="pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm"
+            />
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="state">Estado *</Label>
-          <Input
-            id="state"
-            value={addressData.state}
-            onChange={(e) => setAddressData({ ...addressData, state: e.target.value.toUpperCase() })}
-            placeholder="RJ"
-            maxLength={2}
-          />
+        <div className="space-y-1.5">
+          <Label htmlFor="state" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Estado *</Label>
+          <div className="relative group">
+            <MapPinIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+            <Input
+              id="state"
+              value={addressData.state}
+              onChange={(e) => setAddressData({ ...addressData, state: e.target.value.toUpperCase() })}
+              placeholder="Ex: SP"
+              maxLength={2}
+              className="pl-11 bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12 transition-all rounded-xl shadow-sm"
+            />
+          </div>
         </div>
       </div>
     </div>
   );
 
+  // Render Step 4
   const renderStep4 = () => (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-lg font-semibold mb-2 text-foreground">Escolha seu plano</h3>
-        <p className="text-muted-foreground font-medium">Todos os planos incluem 7 dias de teste gratuito</p>
+    <div className="space-y-5 animate-fadeIn text-slate-800">
+      <div className="text-center pb-2">
+        <p className="text-xs text-blue-600 font-bold tracking-wider uppercase">Faturamento Flexível</p>
+        <h4 className="text-lg font-extrabold text-slate-900 mt-1">Selecione o plano ideal</h4>
+        <p className="text-slate-500 text-xs mt-1">Todos os planos iniciam com 3 dias grátis, cancele quando quiser</p>
       </div>
 
-      <div className="space-y-4">
-        {PLANS.map((plan) => (
-          <Card 
-            key={plan.id} 
-            className={`cursor-pointer transition-all border-2 ${
-              selectedPlan?.id === plan.id 
-                ? 'ring-2 ring-primary border-primary bg-primary/10 dark:bg-primary/20 shadow-lg' 
-                : 'border-border hover:border-primary/50 hover:shadow-md'
-            }`}
-            onClick={() => setSelectedPlan(plan)}
-          >
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-base text-card-foreground font-bold">
-                  <CreditCard className="h-4 w-4" />
-                  {plan.name}
-                </CardTitle>
-                {selectedPlan?.id === plan.id && (
-                  <Badge className="bg-primary text-primary-foreground font-semibold">Selecionado</Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-card-foreground mb-1 font-medium">{plan.description}</p>
-                  <div className="text-2xl font-bold text-primary">
-                    R$ {plan.price.toFixed(2).replace('.', ',')}
-                    <span className="text-sm font-normal text-muted-foreground">/mês</span>
+      <div className="space-y-3.5">
+        {PLANS.map((plan) => {
+          const isSelected = selectedPlan?.id === plan.id;
+          return (
+            <div 
+              key={plan.id}
+              onClick={() => setSelectedPlan(plan)}
+              className={`relative overflow-hidden cursor-pointer rounded-2xl p-5 border-2 transition-all duration-300 ${
+                isSelected 
+                  ? 'bg-blue-50/50 border-blue-500 shadow-lg shadow-slate-200/50' 
+                  : 'bg-white border-slate-200 hover:bg-slate-50/50 hover:border-slate-350'
+              }`}
+            >
+              {plan.id === 'professional' && (
+                <div className="absolute top-0 right-0">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-white bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-1 rounded-bl-xl shadow-md flex items-center gap-1">
+                    <Sparkles className="h-2.5 w-2.5" />
+                    Recomendado
+                  </span>
+                </div>
+              )}
+              
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-sm text-slate-900 tracking-tight">{plan.name}</span>
+                    {isSelected && (
+                      <span className="h-4.5 w-4.5 rounded-full bg-blue-600 flex items-center justify-center">
+                        <Check className="h-3 w-3 text-white stroke-[3px]" />
+                      </span>
+                    )}
                   </div>
+                  <p className="text-xs text-slate-500 max-w-sm">{plan.description}</p>
+                </div>
+                
+                <div className="text-right">
+                  <div className="text-lg font-black text-slate-900">
+                    R$ {plan.price.toFixed(2).replace('.', ',')}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">/mês</span>
                 </div>
               </div>
-              
-              <div className="border-t border-border pt-3">
-                <h4 className="text-sm font-semibold text-card-foreground mb-2">Recursos incluídos:</h4>
-                <ul className="space-y-1 text-sm">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-center gap-2">
-                      <CheckCircle className="h-3 w-3 text-green-500 dark:text-green-400 flex-shrink-0" />
-                      <span className="text-card-foreground font-medium">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+
+              {/* Limites em badges */}
+              <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-100">
+                <span className="text-[10px] font-semibold text-slate-600 bg-slate-100/70 border border-slate-200/40 px-2 py-0.5 rounded-md">
+                  Usuários: {plan.max_users === -1 ? 'Ilimitado' : plan.max_users}
+                </span>
+                <span className="text-[10px] font-semibold text-slate-600 bg-slate-100/70 border border-slate-200/40 px-2 py-0.5 rounded-md">
+                  Produtos: {plan.max_products === -1 ? 'Ilimitado' : plan.max_products}
+                </span>
+                <span className="text-[10px] font-semibold text-slate-600 bg-slate-100/70 border border-slate-200/40 px-2 py-0.5 rounded-md">
+                  Clientes: {plan.max_customers === -1 ? 'Ilimitado' : plan.max_customers}
+                </span>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+
+              {/* Recursos */}
+              <div className="mt-3.5 grid grid-cols-1 md:grid-cols-2 gap-y-1.5 gap-x-4">
+                {plan.features.map((feature, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-[11px] text-slate-600 font-medium">
+                    <CheckCircle className="h-3 w-3 text-emerald-600 flex-shrink-0" />
+                    <span>{feature}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 
+  // Render Step 5
   const renderStep5 = () => (
-    <div className="space-y-6">
+    <div className="space-y-5 animate-fadeIn text-slate-800">
       <div className="text-center">
-        <h3 className="text-lg font-semibold mb-2 text-foreground">Confirmação dos Dados</h3>
-        <p className="text-muted-foreground">Revise os dados antes de finalizar o cadastro</p>
+        <h4 className="text-lg font-bold text-slate-900">Revisão de Informações</h4>
+        <p className="text-xs text-slate-500 mt-0.5">Confirme seus dados antes de concluir</p>
       </div>
 
-      <div className="space-y-4">
-        <Card className="border-2 border-border shadow-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-card-foreground font-bold">
-              <User className="h-4 w-4" />
-              Dados do Responsável
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p className="text-card-foreground"><strong className="font-semibold">Nome:</strong> <span className="text-muted-foreground">{responsibleData.name}</span></p>
-            <p className="text-card-foreground"><strong className="font-semibold">E-mail:</strong> <span className="text-muted-foreground">{responsibleData.email}</span></p>
-            <p className="text-card-foreground"><strong className="font-semibold">Telefone:</strong> <span className="text-muted-foreground">{responsibleData.phone || 'Não informado'}</span></p>
-            <p className="text-card-foreground"><strong className="font-semibold">CPF:</strong> <span className="text-muted-foreground">{responsibleData.cpf || 'Não informado'}</span></p>
-          </CardContent>
-        </Card>
+      <div className="space-y-3.5 bg-slate-50/50 border border-slate-200 rounded-2xl p-5 md:p-6 divide-y divide-slate-200">
+        {/* Responsável */}
+        <div className="pb-3 space-y-2">
+          <h5 className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1.5">
+            <User className="h-3 w-3" />
+            Dados do Responsável
+          </h5>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+            <p className="text-slate-500 font-medium">Nome: <span className="text-slate-900 font-semibold">{responsibleData.name}</span></p>
+            <p className="text-slate-500 font-medium">E-mail: <span className="text-slate-900 font-semibold">{responsibleData.email}</span></p>
+            <p className="text-slate-500 font-medium">Fone: <span className="text-slate-900 font-semibold">{responsibleData.phone || 'Não informado'}</span></p>
+            <p className="text-slate-500 font-medium">CPF: <span className="text-slate-900 font-semibold">{responsibleData.cpf || 'Não informado'}</span></p>
+          </div>
+        </div>
 
-        <Card className="border-2 border-border shadow-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-card-foreground font-bold">
-              <Building2 className="h-4 w-4" />
-              Dados da Empresa
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p className="text-card-foreground"><strong className="font-semibold">Razão Social:</strong> <span className="text-muted-foreground">{companyData.name}</span></p>
-            <p className="text-card-foreground"><strong className="font-semibold">Nome Fantasia:</strong> <span className="text-muted-foreground">{companyData.fantasy_name || 'Não informado'}</span></p>
-            <p className="text-card-foreground"><strong className="font-semibold">Documento:</strong> <span className="text-muted-foreground">{companyData.document} ({companyData.document_type})</span></p>
-            <p className="text-card-foreground"><strong className="font-semibold">E-mail Corporativo:</strong> <span className="text-muted-foreground">{companyData.corporate_email || 'Não informado'}</span></p>
-            <p className="text-card-foreground"><strong className="font-semibold">Telefone Corporativo:</strong> <span className="text-muted-foreground">{companyData.corporate_phone || 'Não informado'}</span></p>
-          </CardContent>
-        </Card>
+        {/* Empresa */}
+        <div className="py-3.5 space-y-2">
+          <h5 className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1.5">
+            <Building2 className="h-3 w-3" />
+            Empresa
+          </h5>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+            <p className="text-slate-500 font-medium">Razão Social: <span className="text-slate-900 font-semibold">{companyData.name}</span></p>
+            <p className="text-slate-500 font-medium">Nome Fantasia: <span className="text-slate-900 font-semibold">{companyData.fantasy_name || 'Não informado'}</span></p>
+            <p className="text-slate-500 font-medium">Doc: <span className="text-slate-900 font-semibold">{companyData.document} ({companyData.document_type})</span></p>
+            <p className="text-slate-500 font-medium">E-mail Corp: <span className="text-slate-900 font-semibold">{companyData.corporate_email || 'Não informado'}</span></p>
+          </div>
+        </div>
 
-        <Card className="border-2 border-border shadow-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-card-foreground font-bold">
-              <MapPinIcon className="h-4 w-4" />
-              Endereço
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p className="text-card-foreground"><strong className="font-semibold">CEP:</strong> <span className="text-muted-foreground">{addressData.zip_code}</span></p>
-            <p className="text-card-foreground"><strong className="font-semibold">Endereço:</strong> <span className="text-muted-foreground">{addressData.address}, {addressData.number}</span></p>
-            <p className="text-card-foreground"><strong className="font-semibold">Complemento:</strong> <span className="text-muted-foreground">{addressData.complement || 'Não informado'}</span></p>
-            <p className="text-card-foreground"><strong className="font-semibold">Bairro:</strong> <span className="text-muted-foreground">{addressData.neighborhood || 'Não informado'}</span></p>
-            <p className="text-card-foreground"><strong className="font-semibold">Cidade/Estado:</strong> <span className="text-muted-foreground">{addressData.city}/{addressData.state}</span></p>
-          </CardContent>
-        </Card>
+        {/* Endereço */}
+        <div className="py-3.5 space-y-2">
+          <h5 className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1.5">
+            <MapPinIcon className="h-3 w-3" />
+            Endereço Principal
+          </h5>
+          <div className="text-xs space-y-1">
+            <p className="text-slate-500 font-medium">
+              Logradouro:{' '}
+              <span className="text-slate-900 font-semibold">
+                {addressData.address}, Nº {addressData.number}
+                {addressData.complement ? ` - ${addressData.complement}` : ''}
+              </span>
+            </p>
+            <p className="text-slate-500 font-medium">
+              Bairro/Cidade:{' '}
+              <span className="text-slate-900 font-semibold">
+                {addressData.neighborhood ? `${addressData.neighborhood}, ` : ''}
+                {addressData.city} - {addressData.state}
+              </span>
+            </p>
+            <p className="text-slate-500 font-medium">CEP: <span className="text-slate-900 font-semibold">{addressData.zip_code}</span></p>
+          </div>
+        </div>
 
-        <Card className="border-2 border-border shadow-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-card-foreground font-bold">
-              <CreditCard className="h-4 w-4" />
-              Plano Selecionado
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p className="text-card-foreground"><strong className="font-semibold">Plano:</strong> <span className="text-muted-foreground">{selectedPlan?.name}</span></p>
-            <p className="text-card-foreground"><strong className="font-semibold">Preço:</strong> <span className="text-muted-foreground">R$ {selectedPlan?.price.toFixed(2).replace('.', ',')}/mês</span></p>
-            <p className="text-card-foreground"><strong className="font-semibold">Período de Teste:</strong> <span className="text-muted-foreground">7 dias gratuitos</span></p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="space-y-4">
-        <Card className="border-2 border-border shadow-md bg-muted/50">
-          <CardContent className="pt-4">
-            <div className="flex items-start space-x-3">
-              <Checkbox
-                id="terms"
-                checked={acceptedTerms}
-                onCheckedChange={(checked) => setAcceptedTerms(checked as boolean)}
-                className="mt-1"
-              />
-              <div className="grid gap-1.5 leading-none">
-                <label
-                  htmlFor="terms"
-                  className="text-sm font-semibold leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-card-foreground cursor-pointer"
-                >
-                  Aceito os termos de uso e política de privacidade
-                </label>
-                <p className="text-sm text-muted-foreground">
-                  Ao continuar, você concorda com nossos{' '}
-                  <a href="#" className="text-primary hover:underline font-medium">Termos de Uso</a> e{' '}
-                  <a href="#" className="text-primary hover:underline font-medium">Política de Privacidade</a>.
-                </p>
-              </div>
+        {/* Plano */}
+        <div className="pt-3.5 space-y-2">
+          <h5 className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1.5">
+            <CreditCard className="h-3 w-3" />
+            Plano Escolhido
+          </h5>
+          <div className="flex justify-between items-center bg-white border border-slate-200 rounded-xl p-3.5">
+            <div>
+              <p className="text-xs font-bold text-slate-900">{selectedPlan?.name}</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">{selectedPlan?.description}</p>
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-right">
+              <span className="text-sm font-extrabold text-blue-600">R$ {selectedPlan?.price.toFixed(2).replace('.', ',')}/mês</span>
+              <p className="text-[9px] text-emerald-600 font-semibold mt-0.5">3 dias de teste grátis</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Termos de uso */}
+      <div className="bg-slate-50/50 border border-slate-200 rounded-2xl p-4 md:p-5">
+        <div className="flex items-start gap-3">
+          <Checkbox
+            id="terms"
+            checked={acceptedTerms}
+            onCheckedChange={(checked) => setAcceptedTerms(checked as boolean)}
+            className="mt-0.5 border-slate-300 bg-white data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+          />
+          <div className="grid gap-1">
+            <label
+              htmlFor="terms"
+              className="text-xs font-semibold leading-none text-slate-800 cursor-pointer select-none"
+            >
+              Declaro que li e concordo com os Termos de Uso
+            </label>
+            <p className="text-[11px] text-slate-500 leading-normal">
+              Ao concluir o cadastro, você concorda com nossos{' '}
+              <a href="#" className="text-blue-600 hover:underline font-bold transition-all">Termos de Serviço</a> e{' '}
+              <a href="#" className="text-blue-600 hover:underline font-bold transition-all">Políticas de Privacidade</a>.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -893,116 +956,138 @@ export function CompleteRegisterForm({ onSuccess, onSwitchToLogin }: CompleteReg
 
   return (
     <div className="w-full">
-      <div className="space-y-8">
-        {/* Progress Section */}
-        <div className="space-y-4">
-          <div className="text-center space-y-2">
-            <h2 className="text-xl font-semibold text-foreground">Cadastro da Empresa</h2>
-            <p className="text-sm text-muted-foreground">Complete seu cadastro em poucos passos</p>
+      <div className="space-y-6">
+        {/* Stepper info */}
+        <div className="space-y-3">
+          <div className="flex items-end justify-between">
+            <div>
+              <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Cadastro Empresarial</span>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight mt-0.5">Criar Nova Conta</h2>
+            </div>
+            <div className="text-right">
+              <span className="text-[11px] font-semibold text-slate-500">Passo {currentStep} de {STEPS.length}</span>
+              <p className="text-[10px] text-slate-400 font-medium">{Math.round(progress)}% completo</p>
+            </div>
           </div>
           
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>Etapa {currentStep} de {STEPS.length}</span>
-              <span>{Math.round(progress)}% concluído</span>
-            </div>
-            <Progress value={progress} className="h-2" />
+          {/* Progress bar */}
+          <div className="relative w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+            <div 
+              className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 transition-all duration-500 ease-out"
+              style={{ width: `${progress}%` }}
+            />
           </div>
 
-          <div className="flex justify-between px-2">
+          {/* Stepper Dots (Tema claro) */}
+          <div className="flex justify-between items-center gap-1.5 pt-1.5">
             {STEPS.map((step) => {
               const Icon = step.icon;
+              const isActive = currentStep === step.id;
+              const isCompleted = currentStep > step.id;
+              
               return (
-                <div
-                  key={step.id}
-                  className={`flex flex-col items-center space-y-2 ${
-                    currentStep >= step.id ? 'text-primary' : 'text-muted-foreground'
+                <div 
+                  key={step.id} 
+                  className={`flex flex-col items-center flex-1 transition-all ${
+                    isActive ? 'scale-105' : ''
                   }`}
                 >
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                      currentStep >= step.id
-                        ? 'bg-primary text-primary-foreground shadow-lg'
-                        : 'bg-muted text-muted-foreground'
+                  <div 
+                    className={`h-7 w-7 rounded-lg flex items-center justify-center transition-all border ${
+                      isActive 
+                        ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/10' 
+                        : isCompleted
+                        ? 'bg-indigo-50 border-indigo-200/50 text-indigo-600'
+                        : 'bg-slate-100 border-slate-200 text-slate-400'
                     }`}
                   >
-                    <Icon className="h-5 w-5" />
+                    <Icon className="h-3.5 w-3.5" />
                   </div>
-                  <span className="text-xs font-medium text-center leading-tight max-w-[80px]">{step.title}</span>
+                  <span className={`hidden md:block text-[9px] font-bold uppercase tracking-wider mt-1 text-center truncate w-full ${
+                    isActive ? 'text-blue-600' : isCompleted ? 'text-indigo-600/80' : 'text-slate-400'
+                  }`}>
+                    {step.title.split(' ')[0]}
+                  </span>
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* Form Content */}
-        <Card className="border-2 border-border shadow-lg">
-          <CardContent className="pt-6 space-y-6">
-          {error && (
-            <div className="bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 rounded-md p-4">
-              <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
-            </div>
-          )}
-
-          {renderCurrentStep()}
-
-          <div className="flex justify-between pt-6">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={prevStep}
-              disabled={currentStep === 1}
-              className="flex items-center gap-2 px-6 py-3"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Anterior
-            </Button>
-
-            {currentStep < STEPS.length ? (
-              <Button
-                type="button"
-                onClick={nextStep}
-                className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md"
-              >
-                Próximo
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isLoading}
-                className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium shadow-md disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <>
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Finalizando...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-4 w-4" />
-                    Finalizar Cadastro
-                  </>
-                )}
-              </Button>
+        {/* Form Container Card */}
+        <Card className="bg-white border border-slate-200/85 rounded-2xl shadow-xl shadow-slate-100 relative overflow-hidden">
+          <CardContent className="p-6 md:p-8 space-y-6">
+            
+            {/* Erros */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-xs font-semibold text-red-600 flex items-start gap-2.5">
+                <Info className="h-4.5 w-4.5 shrink-0" />
+                <span>{error}</span>
+              </div>
             )}
-          </div>
 
-            <div className="text-center pt-4 border-t border-border">
-              <p className="text-sm text-muted-foreground">
-                Já tem uma conta?{' '}
-                <button
+            {/* Passo ativo */}
+            {renderCurrentStep()}
+
+            {/* Ações */}
+            <div className="flex items-center justify-between gap-4 pt-4 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={prevStep}
+                disabled={currentStep === 1}
+                className="flex items-center gap-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 h-11 px-5 rounded-xl transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Anterior
+              </Button>
+
+              {currentStep < STEPS.length ? (
+                <Button
                   type="button"
-                  onClick={onSwitchToLogin}
-                  className="text-primary hover:underline font-medium"
+                  onClick={nextStep}
+                  className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold shadow-lg shadow-indigo-500/10 h-11 px-6 rounded-xl transition-all active:scale-95 shrink-0"
                 >
-                  Faça login
-                </button>
-              </p>
+                  Continuar
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isLoading}
+                  className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold shadow-lg shadow-green-500/10 h-11 px-6 rounded-xl transition-all active:scale-95 disabled:opacity-50 shrink-0"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Criando conta...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4" />
+                      Concluir Registro
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
+
+        {/* Link para login */}
+        <div className="text-center pt-2">
+          <p className="text-xs text-slate-500">
+            Já possui uma conta ativa?{' '}
+            <button
+              type="button"
+              onClick={onSwitchToLogin}
+              className="text-blue-600 hover:text-blue-700 font-bold hover:underline transition-colors ml-0.5"
+            >
+              Fazer Login
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );
