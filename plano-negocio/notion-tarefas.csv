@@ -1,0 +1,74 @@
+Dia,Semana,Bloco,Categoria,Prioridade,Tarefa,Status
+Dia 1,Semana 1,Manha,Produto,Alta,"CRITICO: Revogar EXECUTE de anon nas RPCs link_user_to_tenant e is_superadmin (testar em staging antes)",A Fazer
+Dia 1,Semana 1,Manha,Produto,Alta,"Rodar Security Advisors do Supabase e listar todos os itens vermelhos/laranja",A Fazer
+Dia 1,Semana 1,Tarde,Juridico,Alta,"Definir nome comercial + checar dominio disponivel + registrar dominio",A Fazer
+Dia 1,Semana 1,Tarde,Marketing,Media,"Reservar @ do Instagram e nome no Google Perfil da Empresa",A Fazer
+Dia 1,Semana 1,Fim do dia,Gestao,Media,"Montar quadro de metricas (MRR, trials, leads, churn)",A Fazer
+Dia 2,Semana 1,Manha,Produto,Alta,"CRITICO: Recriar view cash_sessions_audit_view sem SECURITY DEFINER + filtro por tenant",A Fazer
+Dia 2,Semana 1,Manha,Produto,Alta,"Testar isolamento entre 2 tenants (um nao pode ver dados do outro)",A Fazer
+Dia 2,Semana 1,Tarde,Juridico,Alta,"Iniciar abertura de CNPJ (MEI ou ME conforme faturamento previsto)",A Fazer
+Dia 2,Semana 1,Tarde,Marketing,Media,"Criar logo simples (Canva/Looka) e paleta de cores da marca",A Fazer
+Dia 2,Semana 1,Fim do dia,Gestao,Baixa,"Definir tarefa nº1 de amanha",A Fazer
+Dia 3,Semana 1,Manha,Produto,Alta,"CRITICO: Validar sessao no servidor (Supabase getUser) no middleware, nao so cookie",A Fazer
+Dia 3,Semana 1,Manha,Produto,Alta,"Garantir NEXT_PUBLIC_ENABLE_AUTH=true em producao e remover bypass no build de prod",A Fazer
+Dia 3,Semana 1,Tarde,Vendas,Alta,"Listar os 9 clientes active + 3 trialing e agendar conversa de feedback",A Fazer
+Dia 3,Semana 1,Tarde,Marketing,Media,"Definir os 5 pilares de conteudo e 10 ideias de Reels",A Fazer
+Dia 4,Semana 1,Manha,Produto,Alta,"CRITICO: Impor billing no servidor - bloquear acesso a dados quando past_due/canceled/trial expirado",A Fazer
+Dia 4,Semana 1,Tarde,Juridico,Media,"Abrir conta bancaria PJ",A Fazer
+Dia 4,Semana 1,Tarde,Vendas,Media,"Fazer 5 contatos de prospeccao no nicho conhecido",A Fazer
+Dia 5,Semana 1,Manha,Produto,Alta,"Testar fluxo completo: criar conta trial de fora -> usar -> expirar -> confirmar bloqueio",A Fazer
+Dia 5,Semana 1,Tarde,Marketing,Media,"Definir precos oficiais dos 3 planos (Essencial/Profissional/Multi-filial)",A Fazer
+Dia 5,Semana 1,Fim do dia,Gestao,Media,"Revisao da semana 1: o que ficou pronto x pendente",A Fazer
+Dia 6,Semana 1,Manha,Produto,Media,"Ativar Leaked Password Protection no Supabase Auth",A Fazer
+Dia 6,Semana 1,Tarde,Marketing,Baixa,"Gravar 1 video de tela: 'como fechar o caixa em 30s'",A Fazer
+Dia 8,Semana 2,Manha,Produto,Alta,"Definir policy RLS para cash_sessions_log (por tenant)",A Fazer
+Dia 8,Semana 2,Manha,Produto,Media,"Padronizar schema da tabela plans (remover colunas duplicadas name/nome, price/preco)",A Fazer
+Dia 8,Semana 2,Tarde,Vendas,Alta,"Campanha de reativacao dos 49 past_due (WhatsApp/email com oferta de retorno)",A Fazer
+Dia 8,Semana 2,Tarde,Marketing,Media,"Publicar 1º post de apresentacao da empresa no Instagram",A Fazer
+Dia 9,Semana 2,Manha,Produto,Media,"Adicionar SET search_path nas funcoes apontadas pelo advisor",A Fazer
+Dia 9,Semana 2,Tarde,Juridico,Alta,"Redigir Termos de Uso + Politica de Privacidade (LGPD) e publicar",A Fazer
+Dia 9,Semana 2,Tarde,Vendas,Media,"Follow-up dos past_due que responderam",A Fazer
+Dia 10,Semana 2,Manha,Produto,Media,"Limpeza da base: marcar tenants de teste/mortos vs reais",A Fazer
+Dia 10,Semana 2,Tarde,Marketing,Media,"Configurar WhatsApp Business com mensagem automatica e catalogo",A Fazer
+Dia 11,Semana 2,Manha,Produto,Media,"Agendar/validar job de expiracao de trial (check_expired_subscriptions via cron)",A Fazer
+Dia 11,Semana 2,Tarde,Vendas,Media,"5 contatos de prospeccao + registrar no CRM/planilha",A Fazer
+Dia 12,Semana 2,Manha,Produto,Baixa,"Confirmar que certs/ e chaves fiscais NAO estao no Git; limpar arquivos soltos da raiz",A Fazer
+Dia 12,Semana 2,Tarde,Marketing,Media,"Preencher Google Perfil da Empresa (fotos, descricao, contato)",A Fazer
+Dia 12,Semana 2,Fim do dia,Gestao,Media,"Revisao da semana 2 + metricas",A Fazer
+Dia 13,Semana 2,Manha,Produto,Media,"Agendar upgrade do Postgres (backup antes) em janela de manutencao",A Fazer
+Dia 13,Semana 2,Tarde,Marketing,Baixa,"Gravar 2 Reels (dor do cliente + prova social)",A Fazer
+Dia 15,Semana 3,Manha,Produto,Alta,"Onboarding self-service: fluxo cadastro -> tenant -> primeiros passos guiados",A Fazer
+Dia 15,Semana 3,Tarde,Vendas,Alta,"Coletar depoimento em video/texto de 1 cliente satisfeito",A Fazer
+Dia 15,Semana 3,Tarde,Marketing,Media,"Publicar conteudo do dia",A Fazer
+Dia 16,Semana 3,Manha,Produto,Alta,"Polir UI da tela de Login/Register",A Fazer
+Dia 16,Semana 3,Tarde,Vendas,Media,"5 contatos de prospeccao ativa",A Fazer
+Dia 17,Semana 3,Manha,Produto,Alta,"Polir UI do Dashboard (primeira impressao)",A Fazer
+Dia 17,Semana 3,Tarde,Marketing,Media,"Coletar 2º depoimento + montar 1 estudo de caso",A Fazer
+Dia 18,Semana 3,Manha,Produto,Alta,"Polir UI do PDV (tela de maior uso)",A Fazer
+Dia 18,Semana 3,Tarde,Marketing,Media,"Publicar estudo de caso no Instagram/landing",A Fazer
+Dia 19,Semana 3,Manha,Produto,Media,"Criar central de ajuda/FAQ basica",A Fazer
+Dia 19,Semana 3,Tarde,Vendas,Media,"Follow-up de trials ativos",A Fazer
+Dia 19,Semana 3,Fim do dia,Gestao,Media,"Revisao da semana 3 + metricas",A Fazer
+Dia 20,Semana 3,Manha,Produto,Baixa,"Adicionar monitor de uptime + logs de erro (ex.: Sentry)",A Fazer
+Dia 20,Semana 3,Tarde,Marketing,Baixa,"Gravar tutorial em video (vira suporte + SEO)",A Fazer
+Dia 22,Semana 4,Manha,Produto,Alta,"Landing page de conversao: proposta de valor + prova social + CTA de trial",A Fazer
+Dia 22,Semana 4,Tarde,Marketing,Alta,"Estruturar 1ª campanha Google Search (palavras de intencao alta)",A Fazer
+Dia 23,Semana 4,Manha,Produto,Alta,"Landing: secao de precos ligada aos 3 planos + botao de assinar",A Fazer
+Dia 23,Semana 4,Tarde,Marketing,Media,"Instalar pixel/conversao (Google Ads + Meta) na landing",A Fazer
+Dia 24,Semana 4,Manha,Produto,Media,"Testar jornada completa: anuncio -> landing -> cadastro -> trial",A Fazer
+Dia 24,Semana 4,Tarde,Vendas,Alta,"Criar programa de indicacao para clientes atuais",A Fazer
+Dia 25,Semana 4,Manha,Marketing,Alta,"Publicar campanha Google Search com orcamento pequeno (ex.: R$30-50/dia)",A Fazer
+Dia 25,Semana 4,Tarde,Vendas,Media,"5 contatos de prospeccao + convidar para trial",A Fazer
+Dia 26,Semana 4,Manha,Marketing,Media,"Configurar remarketing Meta Ads (topo de funil + retorno)",A Fazer
+Dia 26,Semana 4,Tarde,Marketing,Media,"Calendario de conteudo do proximo mes (12 posts)",A Fazer
+Dia 26,Semana 4,Fim do dia,Gestao,Alta,"Revisao do mes: MRR, CAC, conversao de trial, churn",A Fazer
+Dia 27,Semana 4,Manha,Produto,Media,"Corrigir bugs/atritos reportados pelos primeiros trials",A Fazer
+Dia 27,Semana 4,Tarde,Gestao,Media,"Documentar processo de onboarding de cliente e de suporte (prep contratacao)",A Fazer
+Dia 29,Semana 4,Manha,Gestao,Media,"Escrever descricao da 1ª vaga (Suporte/CS part-time ou PJ)",A Fazer
+Dia 29,Semana 4,Tarde,Marketing,Media,"Analisar campanhas: pausar o que nao converte, dobrar no que funciona",A Fazer
+Dia 30,Semana 4,Fim do dia,Gestao,Alta,"Planejar Sprint 2 (dias 31-60) com base nos resultados",A Fazer
+Recorrente,Todos os dias,Manha,Produto,Media,"Revisar logs/alertas e clientes travados antes de comecar",A Fazer
+Recorrente,Todos os dias,Tarde,Marketing,Media,"Publicar/agendar 1 conteudo e responder DMs/leads",A Fazer
+Recorrente,Todos os dias,Tarde,Vendas,Media,"3-5 contatos de prospeccao + follow-up de trials",A Fazer
+Recorrente,Todos os dias,Fim do dia,Gestao,Baixa,"Atualizar metricas e definir tarefa nº1 de amanha",A Fazer
+Recorrente,Toda sexta,Fim do dia,Gestao,Media,"Revisao semanal de MRR/churn + gravar 1 conteudo ancora",A Fazer
