@@ -72,7 +72,7 @@ interface MonthlyData {
 
 export default function JugaDashboard() {
   const { tenant } = useSimpleAuth();
-  const { branchId, scope } = useBranch();
+  const { branchId, scope, isMatrixAdmin } = useBranch();
   const router = useRouter();
 
   // Funções de navegação
@@ -287,7 +287,8 @@ export default function JugaDashboard() {
           let productsUrl = `/next_api/products?tenant_id=${encodeURIComponent(tenant.id)}`;
           let customersUrl = `/next_api/customers?tenant_id=${encodeURIComponent(tenant.id)}`;
           
-          if (branchId) {
+          // Admin matriz/owner vê dados de todas as filiais no dashboard; admin de filial vê apenas a sua
+          if (branchId && !isMatrixAdmin) {
             salesUrl += `&branch_id=${branchId}`;
             productsUrl += `&branch_id=${branchId}`;
             customersUrl += `&branch_id=${branchId}`;
@@ -493,7 +494,7 @@ export default function JugaDashboard() {
         controller = null;
       }
     };
-  }, [tenant?.id, branchId, scope, generateRecentActivity, generateMonthlyData, initialLoad, lastFetchTime]);
+  }, [tenant?.id, branchId, scope, isMatrixAdmin, generateRecentActivity, generateMonthlyData, initialLoad, lastFetchTime]);
 
   if (loading && initialLoad) {
     return (

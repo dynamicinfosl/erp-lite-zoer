@@ -7,6 +7,36 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJ
 
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+// O Supabase/PostgREST limita cada requisição a no máximo 1000 linhas por padrão.
+// Para tenants com mais de 1000 clientes, é necessário paginar internamente (via .range())
+// e concatenar todos os lotes antes de retornar ao frontend.
+const PAGE_SIZE = 1000;
+
+async function fetchAllRows(buildQuery: (from: number, to: number) => any): Promise<{ data: any[]; error: any }> {
+  const allRows: any[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await buildQuery(from, to);
+
+    if (error) {
+      return { data: allRows, error };
+    }
+
+    const rows = data || [];
+    allRows.push(...rows);
+
+    if (rows.length < PAGE_SIZE) {
+      break;
+    }
+
+    from += PAGE_SIZE;
+  }
+
+  return { data: allRows, error: null };
+}
+
 // Handler original para criar cliente
 async function createCustomerHandler(request: NextRequest) {
   try {
@@ -139,27 +169,38 @@ async function listCustomersHandler(request: NextRequest) {
     // ✅ Lógica de compartilhamento:
     // - Se branch_scope='all' (matriz): retorna apenas clientes cadastrados na matriz
     // - Se branch_id fornecido (filial ou matriz visitando filial): retorna clientes daquela filial
-    let query;
+    let data: any[] = [];
+    let error: any = null;
 
     // Select de clientes (usando * para compatibilidade com schema variável)
     if (branch_scope === 'all') {
       // Matriz vê todos os clientes cadastrados (matriz e filiais)
-      query = supabaseAdmin
-        .from('customers')
-        .select('*')
-        .eq('tenant_id', tenant_id);
       console.log(`🔍 [Matriz] Buscando todos os clientes do tenant`);
+      const result = await fetchAllRows((from, to) =>
+        supabaseAdmin
+          .from('customers')
+          .select('*')
+          .eq('tenant_id', tenant_id)
+          .order('is_active', { ascending: false })
+          .order('created_at', { ascending: false })
+          .range(from, to)
+      );
+      data = result.data;
+      error = result.error;
     } else if (branch_id) {
       // Filial: buscar apenas clientes compartilhados
       const bid = Number(branch_id);
       if (Number.isFinite(bid) && bid > 0) {
-        // Primeiro: buscar IDs dos clientes compartilhados
-        const { data: sharedCustomers } = await supabaseAdmin
-          .from('branch_customers')
-          .select('customer_id')
-          .eq('tenant_id', tenant_id)
-          .eq('branch_id', bid)
-          .eq('is_active', true);
+        // Primeiro: buscar IDs dos clientes compartilhados (também paginado)
+        const { data: sharedCustomers } = await fetchAllRows((from, to) =>
+          supabaseAdmin
+            .from('branch_customers')
+            .select('customer_id')
+            .eq('tenant_id', tenant_id)
+            .eq('branch_id', bid)
+            .eq('is_active', true)
+            .range(from, to)
+        );
 
         const customerIds = (sharedCustomers || [])
           .map((c: any) => Number(c.customer_id))
@@ -169,22 +210,28 @@ async function listCustomersHandler(request: NextRequest) {
         const allCustomers: any[] = [];
         const seenIds = new Set<number>();
 
-        // Fazer as duas queries em paralelo
+        // Fazer as duas queries em paralelo (cada uma já paginada internamente)
         const [sharedResult, branchResult] = await Promise.all([
           // Query 1: Clientes compartilhados
           customerIds.length > 0
-            ? supabaseAdmin
+            ? fetchAllRows((from, to) =>
+                supabaseAdmin
+                  .from('customers')
+                  .select('*')
+                  .eq('tenant_id', tenant_id)
+                  .in('id', customerIds)
+                  .range(from, to)
+              )
+            : Promise.resolve({ data: [], error: null }),
+          // Query 2: Clientes cadastrados nesta filial
+          fetchAllRows((from, to) =>
+            supabaseAdmin
               .from('customers')
               .select('*')
               .eq('tenant_id', tenant_id)
-              .in('id', customerIds)
-            : Promise.resolve({ data: null, error: null }),
-          // Query 2: Clientes cadastrados nesta filial
-          supabaseAdmin
-            .from('customers')
-            .select('*')
-            .eq('tenant_id', tenant_id)
-            .eq('created_at_branch_id', bid)
+              .eq('created_at_branch_id', bid)
+              .range(from, to)
+          )
         ]);
 
         // Processar clientes compartilhados
@@ -217,14 +264,19 @@ async function listCustomersHandler(request: NextRequest) {
       }
     } else {
       // Fallback: retornar todos (compatibilidade com código antigo)
-      query = supabaseAdmin
-        .from('customers')
-        .select('*')
-        .eq('tenant_id', tenant_id);
       console.log(`🔍 [Fallback] Buscando todos os clientes do tenant`);
+      const result = await fetchAllRows((from, to) =>
+        supabaseAdmin
+          .from('customers')
+          .select('*')
+          .eq('tenant_id', tenant_id)
+          .order('is_active', { ascending: false })
+          .order('created_at', { ascending: false })
+          .range(from, to)
+      );
+      data = result.data;
+      error = result.error;
     }
-
-    const { data, error } = await query.order('is_active', { ascending: false }).order('created_at', { ascending: false });
 
     if (error) {
       console.error('❌ Erro ao listar clientes:', error);

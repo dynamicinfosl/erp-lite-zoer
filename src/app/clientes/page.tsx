@@ -2,10 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { 
   Dialog, 
   DialogContent, 
@@ -96,6 +94,10 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  
+  // Estados de paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -420,6 +422,55 @@ export default function ClientesPage() {
     return matchesSearch && matchesAdvanced;
   }) : [];
 
+  // Paginação
+  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex);
+
+  // Resetar página quando mudar busca ou filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, advancedFilters]);
+
+  // Funções de paginação
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
+
+  // Gerar números de página
+  const getVisiblePages = () => {
+    const delta = 2;
+    const range: number[] = [];
+    const rangeWithDots: (number | string)[] = [];
+    let l: number | undefined;
+
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
+        range.push(i);
+      }
+    }
+
+    range.forEach((i) => {
+      if (l !== undefined) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l !== 1) {
+          rangeWithDots.push('...');
+        }
+      }
+      rangeWithDots.push(i);
+      l = i;
+    });
+
+    return rangeWithDots;
+  };
+
   // Diálogo de adição agora é gerenciado pelo componente externo
   const handleAddSuccess = async () => {
     await loadCustomers();
@@ -737,48 +788,54 @@ export default function ClientesPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-full space-y-3 pb-8 lg:pb-0">
+    <div className="flex flex-col min-h-full space-y-4 pb-8 lg:pb-0 bg-[#f8f9fb]">
       {/* Header */}
-      <Card className="border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-white flex-shrink-0">
-        <CardContent className="pt-4 pb-3">
-          <div className="flex items-center justify-between">
+      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex-shrink-0 overflow-hidden">
+        <div className="px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl bg-gradient-to-tr from-[#2e539e] to-blue-500 flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
+              <Users className="h-5 w-5 text-white" />
+            </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-blue-900">Gerenciar Clientes</h1>
-              <p className="text-xs text-blue-900/70">
+              <h1 className="text-xl font-bold tracking-tight text-[#353535]">Gerenciar Clientes</h1>
+              <p className="text-xs text-slate-500 font-medium">
                 Gerencie seus clientes e informações de contato
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge className="px-2 py-1 bg-blue-600 text-white text-xs">
-                <Users className="h-3 w-3 mr-1" />
-                {customers.length} clientes
-              </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="px-4 py-2 rounded-xl bg-slate-50 border border-slate-200/80 text-center min-w-[90px]">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total</p>
+              <p className="text-base font-black text-[#353535]">{customers.length}</p>
+            </div>
+            <div className="px-4 py-2 rounded-xl bg-blue-50 border border-blue-100 text-center min-w-[90px]">
+              <p className="text-[10px] text-[#2e539e] font-bold uppercase tracking-wider">Filtrados</p>
+              <p className="text-base font-black text-[#2e539e]">{filteredCustomers.length}</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Toolbar */}
-      <Card className="border-blue-100 flex-shrink-0">
-        <CardContent className="pt-3 pb-3">
+      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex-shrink-0 px-6 py-4">
           <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
             {/* Lado esquerdo - Botões de ação */}
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
               <Button 
-                className="juga-gradient text-white"
+                className="h-10 rounded-xl bg-gradient-to-r from-[#2e539e] to-blue-600 hover:from-[#264884] hover:to-blue-700 text-white font-semibold shadow-md shadow-blue-500/15"
                 onClick={() => setShowAddDialog(true)}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Adicionar Cliente
               </Button>
 
-              <Button variant="outline" onClick={testCreateCustomer} title="Diagnóstico: testar POST /next_api/customers">
+              <Button variant="outline" className="h-10 rounded-xl border-slate-200 text-slate-500 hover:bg-slate-50" onClick={testCreateCustomer} title="Diagnóstico: testar POST /next_api/customers">
                 Teste API
               </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="border-blue-200 hover:bg-blue-50">
+                  <Button variant="outline" className="h-10 rounded-xl border-slate-200 hover:bg-slate-50">
                     <MoreHorizontal className="h-4 w-4 mr-2" />
                     Mais Ações
                   </Button>
@@ -808,7 +865,7 @@ export default function ClientesPage() {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="border-blue-200 hover:bg-blue-50">
+                  <Button variant="outline" className="h-10 rounded-xl border-slate-200 hover:bg-slate-50">
                     <Settings2 className="h-4 w-4 mr-2" />
                     Colunas
                   </Button>
@@ -870,19 +927,20 @@ export default function ClientesPage() {
 
             {/* Lado direito - Busca */}
             <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <div className="relative group">
+                <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400 group-focus-within:text-[#2e539e] transition-colors h-4 w-4" />
                 <Input
                   placeholder="Buscar clientes..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-full md:w-64 lg:w-80"
+                  className="pl-10 h-10 w-full md:w-64 lg:w-80 rounded-xl border-slate-200 focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                 />
               </div>
               <Button
                 variant="outline"
                 onClick={() => loadCustomers()}
                 disabled={loading}
+                className="h-10 rounded-xl border-slate-200 hover:bg-slate-50"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Atualizar
@@ -890,7 +948,7 @@ export default function ClientesPage() {
               <Button 
                 variant="outline" 
                 onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-                className="w-full sm:w-auto"
+                className="h-10 rounded-xl border-slate-200 hover:bg-slate-50 w-full sm:w-auto"
               >
                 <Filter className="h-4 w-4 mr-2" />
                 Busca Avançada
@@ -900,25 +958,28 @@ export default function ClientesPage() {
 
           {/* Busca Avançada */}
           {showAdvancedSearch && (
-            <div className="mt-4 p-4 bg-blue-50/40 rounded-lg border border-blue-100">
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200/80">
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 <Input
                   placeholder="Telefone..."
                   value={advancedFilters.phone}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, phone: e.target.value }))}
+                  className="h-10 rounded-xl border-slate-200 bg-white focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                 />
                 <Input
                   placeholder="E-mail..."
                   value={advancedFilters.email}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, email: e.target.value }))}
+                  className="h-10 rounded-xl border-slate-200 bg-white focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                 />
                 <Input
                   placeholder="Cidade..."
                   value={advancedFilters.city}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, city: e.target.value }))}
+                  className="h-10 rounded-xl border-slate-200 bg-white focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                 />
                 <select 
-                  className="px-3 py-2 border rounded-md"
+                  className="h-10 px-3 border border-slate-200 bg-white rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#2e539e] focus:border-[#2e539e]"
                   value={advancedFilters.type}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, type: e.target.value }))}
                 >
@@ -927,7 +988,7 @@ export default function ClientesPage() {
                   <option value="PJ">Pessoa Jurídica</option>
                 </select>
                 <select 
-                  className="px-3 py-2 border rounded-md"
+                  className="h-10 px-3 border border-slate-200 bg-white rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#2e539e] focus:border-[#2e539e]"
                   value={advancedFilters.status}
                   onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))}
                 >
@@ -938,78 +999,95 @@ export default function ClientesPage() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       {/* Tabela */}
-      <Card className="border-blue-100 flex-1 flex flex-col min-h-[400px] lg:min-h-0 overflow-hidden">
-        <CardHeader className="flex-shrink-0 pb-2 pt-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Users className="h-4 w-4" />
-            Lista de Clientes ({filteredCustomers.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-hidden p-0">
+      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex-1 flex flex-col min-h-[400px] lg:min-h-0 overflow-hidden">
+        <div className="flex-shrink-0 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-[#353535]">
+            <Users className="h-4 w-4 text-[#2e539e]" />
+            Lista de Clientes
+          </h2>
+          <span className="text-xs font-medium text-slate-400">
+            {filteredCustomers.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, filteredCustomers.length)} de ${filteredCustomers.length}` : '0 resultados'}
+          </span>
+        </div>
+        <div className="flex-1 overflow-hidden p-0">
           {loading ? (
-            <div className="text-center py-8">Carregando clientes...</div>
+            <div className="text-center py-16 text-slate-400 text-sm font-medium">Carregando clientes...</div>
           ) : (
             <div className="h-full overflow-auto">
               <Table>
-                <TableHeader className="sticky top-0 bg-white dark:bg-gray-950 z-10">
-                  <TableRow>
-                    <TableHead className="font-semibold">Nome</TableHead>
-                    {columnVisibility.type && <TableHead className="font-semibold">Tipo</TableHead>}
-                    {columnVisibility.document && <TableHead className="font-semibold">CPF/CNPJ</TableHead>}
-                    {columnVisibility.phone && <TableHead className="font-semibold">Telefone</TableHead>}
-                    {columnVisibility.email && <TableHead className="font-semibold">E-mail</TableHead>}
-                    {columnVisibility.city && <TableHead className="font-semibold">Cidade</TableHead>}
-                    {columnVisibility.status && <TableHead className="font-semibold">Status</TableHead>}
-                    <TableHead className="font-semibold">Ações</TableHead>
+                <TableHeader className="sticky top-0 bg-slate-50 z-10">
+                  <TableRow className="hover:bg-transparent border-slate-100">
+                    <TableHead className="font-bold text-[11px] uppercase tracking-wider text-slate-500">Nome</TableHead>
+                    {columnVisibility.type && <TableHead className="font-bold text-[11px] uppercase tracking-wider text-slate-500">Tipo</TableHead>}
+                    {columnVisibility.document && <TableHead className="font-bold text-[11px] uppercase tracking-wider text-slate-500">CPF/CNPJ</TableHead>}
+                    {columnVisibility.phone && <TableHead className="font-bold text-[11px] uppercase tracking-wider text-slate-500">Telefone</TableHead>}
+                    {columnVisibility.email && <TableHead className="font-bold text-[11px] uppercase tracking-wider text-slate-500">E-mail</TableHead>}
+                    {columnVisibility.city && <TableHead className="font-bold text-[11px] uppercase tracking-wider text-slate-500">Cidade</TableHead>}
+                    {columnVisibility.status && <TableHead className="font-bold text-[11px] uppercase tracking-wider text-slate-500">Status</TableHead>}
+                    <TableHead className="font-bold text-[11px] uppercase tracking-wider text-slate-500 text-right pr-6">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCustomers.map((customer) => (
-                    <TableRow key={customer.id}>
-                      <TableCell className="font-medium">{customer.name}</TableCell>
+                  {paginatedCustomers.map((customer) => {
+                    const initials = (customer.name || '?')
+                      .trim()
+                      .split(/\s+/)
+                      .slice(0, 2)
+                      .map((p) => p[0]?.toUpperCase())
+                      .join('') || '?';
+                    return (
+                    <TableRow key={customer.id} className="border-slate-100 hover:bg-blue-50/30 transition-colors">
+                      <TableCell className="font-medium text-[#353535]">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-[#2e539e] to-blue-400 flex items-center justify-center text-white text-[11px] font-bold shrink-0">
+                            {initials}
+                          </div>
+                          <span className="truncate max-w-[220px]">{customer.name}</span>
+                        </div>
+                      </TableCell>
                       {columnVisibility.type && (
                         <TableCell>
-                          <Badge variant={customer.type === 'PF' ? 'default' : 'secondary'}>
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold ${customer.type === 'PF' ? 'bg-blue-50 text-[#2e539e]' : 'bg-slate-100 text-slate-600'}`}>
                             {customer.type === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica'}
-                          </Badge>
+                          </span>
                         </TableCell>
                       )}
                       {columnVisibility.document && (
-                        <TableCell>{formatDocument(customer.document, customer.type)}</TableCell>
+                        <TableCell className="text-slate-600 text-sm">{formatDocument(customer.document, customer.type)}</TableCell>
                       )}
                       {columnVisibility.phone && (
                         <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Phone className="h-3 w-3 text-gray-400" />
+                          <div className="flex items-center gap-1.5 text-sm text-slate-600">
+                            <Phone className="h-3.5 w-3.5 text-slate-400" />
                             {formatPhone(customer.phone)}
                           </div>
                         </TableCell>
                       )}
                       {columnVisibility.email && (
                         <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Mail className="h-3 w-3 text-gray-400" />
-                            {customer.email}
+                          <div className="flex items-center gap-1.5 text-sm text-slate-600">
+                            <Mail className="h-3.5 w-3.5 text-slate-400" />
+                            <span className="truncate max-w-[180px]">{customer.email || '-'}</span>
                           </div>
                         </TableCell>
                       )}
-                      {columnVisibility.city && <TableCell>{customer.city}</TableCell>}
+                      {columnVisibility.city && <TableCell className="text-slate-600 text-sm">{customer.city || '-'}</TableCell>}
                       {columnVisibility.status && (
                         <TableCell>
-                          <Badge variant={customer.status === 'active' ? 'default' : 'secondary'}>
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${customer.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${customer.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                             {customer.status === 'active' ? 'Ativo' : 'Inativo'}
-                          </Badge>
+                          </span>
                         </TableCell>
                       )}
-                      <TableCell>
+                      <TableCell className="text-right pr-4">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
+                            <Button variant="ghost" className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100">
+                              <MoreHorizontal className="h-4 w-4 text-slate-500" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
@@ -1033,19 +1111,104 @@ export default function ClientesPage() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
           )}
 
-          {filteredCustomers.length === 0 && !loading && (
-            <div className="text-center py-8 text-muted-foreground">
-              Nenhum cliente encontrado
+          {paginatedCustomers.length === 0 && !loading && (
+            <div className="text-center py-16">
+              <Users className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm font-medium text-slate-400">
+                {filteredCustomers.length === 0 ? 'Nenhum cliente encontrado' : 'Nenhum cliente nesta página'}
+              </p>
             </div>
           )}
-        </CardContent>
-      </Card>
+
+          {/* Paginação */}
+          {!loading && filteredCustomers.length > 0 && (
+            <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/60">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-slate-500">Itens por página:</span>
+                  <select 
+                    value={itemsPerPage}
+                    onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                    className="h-8 border border-slate-200 bg-white rounded-lg px-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#2e539e] focus:border-[#2e539e]"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={200}>200</option>
+                  </select>
+                </div>
+
+                {totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8 p-0 rounded-lg border-slate-200"
+                  >
+                    «
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8 p-0 rounded-lg border-slate-200"
+                  >
+                    ‹
+                  </Button>
+                  
+                  {getVisiblePages().map((page, index) => (
+                    <React.Fragment key={index}>
+                      {page === '...' ? (
+                        <span className="px-2 text-gray-500">...</span>
+                      ) : (
+                        <Button
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(Number(page))}
+                          className={`h-8 w-8 p-0 rounded-lg ${currentPage === page ? 'bg-[#2e539e] hover:bg-[#264884] text-white' : 'border-slate-200 hover:bg-slate-50 text-slate-600'}`}
+                        >
+                          {page}
+                        </Button>
+                      )}
+                    </React.Fragment>
+                  ))}
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="h-8 w-8 p-0 rounded-lg border-slate-200"
+                  >
+                    ›
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="h-8 w-8 p-0 rounded-lg border-slate-200"
+                  >
+                    »
+                  </Button>
+                </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Dialog Adicionar Cliente */}
       {/* Modal Adicionar Cliente */}
@@ -1057,10 +1220,10 @@ export default function ClientesPage() {
 
       {/* Dialog Editar Cliente */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl bg-white rounded-2xl">
           <div className="relative">
             {/* Header com gradiente */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-t-lg">
+            <div className="bg-gradient-to-r from-[#2e539e] to-blue-500 p-6 rounded-t-2xl">
               <div className="flex items-center gap-3">
                 <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
                   <Pencil className="h-6 w-6 text-white" />
@@ -1074,60 +1237,60 @@ export default function ClientesPage() {
               </div>
             </div>
 
-            <div className="p-6 bg-slate-800/50 backdrop-blur-sm space-y-8">
+            <div className="p-6 bg-white space-y-8">
               {/* Informações Básicas */}
               <div className="space-y-4">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-2 flex items-center gap-2">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center gap-2">
                   <User className="h-3.5 w-3.5" />
                   Informações Básicas
                 </h3>
                 <div className="grid gap-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="edit-name" className="text-sm font-medium text-slate-200">Nome *</Label>
+                    <Label htmlFor="edit-name" className="text-sm font-medium text-slate-600">Nome *</Label>
                     <Input
                       id="edit-name"
                       value={editCustomer.name}
                       onChange={(e) => setEditCustomer(prev => ({ ...prev, name: e.target.value }))}
                       placeholder="Nome completo"
-                      className="h-11 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
+                      className="h-11 bg-white border-slate-200 text-[#353535] placeholder:text-slate-400 rounded-xl focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label htmlFor="edit-type" className="text-sm font-medium text-slate-200">Tipo</Label>
+                      <Label htmlFor="edit-type" className="text-sm font-medium text-slate-600">Tipo</Label>
                       <select 
-                        className="h-11 w-full bg-slate-700/50 border border-slate-600 rounded-md text-white px-3"
+                        className="h-11 w-full bg-white border border-slate-200 rounded-xl text-[#353535] px-3 focus:outline-none focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                         value={editCustomer.type}
                         onChange={(e) => setEditCustomer(prev => ({ ...prev, type: e.target.value as 'PF' | 'PJ' }))}
                       >
-                        <option value="PF" className="bg-slate-800">Pessoa Física</option>
-                        <option value="PJ" className="bg-slate-800">Pessoa Jurídica</option>
+                        <option value="PF">Pessoa Física</option>
+                        <option value="PJ">Pessoa Jurídica</option>
                       </select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="edit-status" className="text-sm font-medium text-slate-200">Status</Label>
+                      <Label htmlFor="edit-status" className="text-sm font-medium text-slate-600">Status</Label>
                       <select 
-                        className="h-11 w-full bg-slate-700/50 border border-slate-600 rounded-md text-white px-3"
+                        className="h-11 w-full bg-white border border-slate-200 rounded-xl text-[#353535] px-3 focus:outline-none focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                         value={editCustomer.status}
                         onChange={(e) => setEditCustomer(prev => ({ ...prev, status: e.target.value as 'active' | 'inactive' }))}
                       >
-                        <option value="active" className="bg-slate-800">Ativo</option>
-                        <option value="inactive" className="bg-slate-800">Inativo</option>
+                        <option value="active">Ativo</option>
+                        <option value="inactive">Inativo</option>
                       </select>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label htmlFor="edit-document" className="text-sm font-medium text-slate-200">CPF/CNPJ</Label>
+                      <Label htmlFor="edit-document" className="text-sm font-medium text-slate-600">CPF/CNPJ</Label>
                       <Input
                         id="edit-document"
                         value={editCustomer.document}
                         onChange={(e) => setEditCustomer(prev => ({ ...prev, document: e.target.value.replace(/\D/g, '') }))}
-                        className="h-11 bg-slate-700/50 border-slate-600 text-white font-mono"
+                        className="h-11 bg-white border-slate-200 text-[#353535] font-mono rounded-xl focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="edit-state_registration" className="text-sm font-medium text-slate-200">Inscrição Estadual</Label>
+                      <Label htmlFor="edit-state_registration" className="text-sm font-medium text-slate-600">Inscrição Estadual</Label>
                       <Input
                         id="edit-state_registration"
                         value={editCustomer.state_registration}
@@ -1135,7 +1298,7 @@ export default function ClientesPage() {
                           const val = e.target.value.toUpperCase();
                           setEditCustomer(prev => ({ ...prev, state_registration: val === 'ISENTO' ? 'ISENTO' : val.replace(/\D/g, '') }));
                         }}
-                        className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                        className="h-11 bg-white border-slate-200 text-[#353535] rounded-xl focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                       />
                     </div>
                   </div>
@@ -1144,28 +1307,28 @@ export default function ClientesPage() {
 
               {/* Contato */}
               <div className="space-y-4">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-2 flex items-center gap-2">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center gap-2">
                   <Mail className="h-3.5 w-3.5" />
                   Contato
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="edit-email" className="text-sm font-medium text-slate-200">E-mail</Label>
+                    <Label htmlFor="edit-email" className="text-sm font-medium text-slate-600">E-mail</Label>
                     <Input
                       id="edit-email"
                       type="email"
                       value={editCustomer.email}
                       onChange={(e) => setEditCustomer(prev => ({ ...prev, email: e.target.value }))}
-                      className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                      className="h-11 bg-white border-slate-200 text-[#353535] rounded-xl focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="edit-phone" className="text-sm font-medium text-slate-200">Telefone</Label>
+                    <Label htmlFor="edit-phone" className="text-sm font-medium text-slate-600">Telefone</Label>
                     <Input
                       id="edit-phone"
                       value={editCustomer.phone}
                       onChange={(e) => setEditCustomer(prev => ({ ...prev, phone: e.target.value }))}
-                      className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                      className="h-11 bg-white border-slate-200 text-[#353535] rounded-xl focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                     />
                   </div>
                 </div>
@@ -1173,75 +1336,75 @@ export default function ClientesPage() {
 
               {/* Endereço */}
               <div className="space-y-4">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700/50 pb-2 flex items-center gap-2">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center gap-2">
                   <MapPin className="h-3.5 w-3.5" />
                   Endereço
                 </h3>
                 <div className="grid gap-4">
                     <div className="space-y-1.5">
-                      <Label htmlFor="edit-zipcode" className="text-sm font-medium text-slate-200">CEP</Label>
+                      <Label htmlFor="edit-zipcode" className="text-sm font-medium text-slate-600">CEP</Label>
                       <Input
                         id="edit-zipcode"
                         value={editCustomer.zipcode}
                         onChange={(e) => setEditCustomer(prev => ({ ...prev, zipcode: e.target.value.replace(/\D/g, '') }))}
-                        className="h-11 bg-slate-700/50 border-slate-600 text-white font-mono"
+                        className="h-11 bg-white border-slate-200 text-[#353535] font-mono rounded-xl focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                       />
                     </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="sm:col-span-2 space-y-1.5">
-                      <Label htmlFor="edit-address" className="text-sm font-medium text-slate-200">Logradouro</Label>
+                      <Label htmlFor="edit-address" className="text-sm font-medium text-slate-600">Logradouro</Label>
                       <Input
                         id="edit-address"
                         value={editCustomer.address}
                         onChange={(e) => setEditCustomer(prev => ({ ...prev, address: e.target.value }))}
-                        className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                        className="h-11 bg-white border-slate-200 text-[#353535] rounded-xl focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="edit-address_number" className="text-sm font-medium text-slate-200">Número</Label>
+                      <Label htmlFor="edit-address_number" className="text-sm font-medium text-slate-600">Número</Label>
                       <Input
                         id="edit-address_number"
                         value={editCustomer.address_number}
                         onChange={(e) => setEditCustomer(prev => ({ ...prev, address_number: e.target.value }))}
-                        className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                        className="h-11 bg-white border-slate-200 text-[#353535] rounded-xl focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                       />
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="edit-address_complement" className="text-sm font-medium text-slate-200">Complemento</Label>
+                    <Label htmlFor="edit-address_complement" className="text-sm font-medium text-slate-600">Complemento</Label>
                     <Input
                       id="edit-address_complement"
                       value={editCustomer.address_complement}
                       onChange={(e) => setEditCustomer(prev => ({ ...prev, address_complement: e.target.value }))}
-                      className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                      className="h-11 bg-white border-slate-200 text-[#353535] rounded-xl focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <div className="space-y-1.5">
-                      <Label htmlFor="edit-neighborhood" className="text-sm font-medium text-slate-200">Bairro</Label>
+                      <Label htmlFor="edit-neighborhood" className="text-sm font-medium text-slate-600">Bairro</Label>
                       <Input
                         id="edit-neighborhood"
                         value={editCustomer.neighborhood}
                         onChange={(e) => setEditCustomer(prev => ({ ...prev, neighborhood: e.target.value }))}
-                        className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                        className="h-11 bg-white border-slate-200 text-[#353535] rounded-xl focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="edit-city" className="text-sm font-medium text-slate-200">Cidade</Label>
+                      <Label htmlFor="edit-city" className="text-sm font-medium text-slate-600">Cidade</Label>
                       <Input
                         id="edit-city"
                         value={editCustomer.city}
                         onChange={(e) => setEditCustomer(prev => ({ ...prev, city: e.target.value }))}
-                        className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                        className="h-11 bg-white border-slate-200 text-[#353535] rounded-xl focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="edit-state" className="text-sm font-medium text-slate-200">UF</Label>
+                      <Label htmlFor="edit-state" className="text-sm font-medium text-slate-600">UF</Label>
                       <Input
                         id="edit-state"
                         value={editCustomer.state}
                         onChange={(e) => setEditCustomer(prev => ({ ...prev, state: e.target.value.toUpperCase() }))}
-                        className="h-11 bg-slate-700/50 border-slate-600 text-white"
+                        className="h-11 bg-white border-slate-200 text-[#353535] rounded-xl focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
                       />
                     </div>
                   </div>
@@ -1249,15 +1412,15 @@ export default function ClientesPage() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-r from-slate-800 to-slate-700 p-6 rounded-b-lg border-t border-slate-600/50">
+            <div className="bg-slate-50 p-6 rounded-b-2xl border-t border-slate-100">
               <div className="flex flex-col sm:flex-row gap-3 justify-end">
                 <Button variant="ghost" onClick={() => {
                   setShowEditDialog(false);
                   setEditingCustomer(null);
-                }} className="text-slate-300 hover:text-white hover:bg-slate-700">
+                }} className="text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl">
                   Cancelar
                 </Button>
-                <Button onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-700 text-white px-8 font-bold uppercase tracking-wider shadow-lg shadow-blue-500/20">
+                <Button onClick={handleSaveEdit} className="bg-gradient-to-r from-[#2e539e] to-blue-600 hover:from-[#264884] hover:to-blue-700 text-white px-8 font-bold rounded-xl shadow-lg shadow-blue-500/20">
                   Salvar Alterações
                 </Button>
               </div>
@@ -1268,15 +1431,15 @@ export default function ClientesPage() {
 
       {/* Dialog Importar */}
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-        <DialogContent className="p-0 border-0 shadow-2xl bg-slate-900">
-          <div className="bg-gradient-to-r from-emerald-600 to-teal-700 p-6 rounded-t-lg">
+        <DialogContent className="p-0 border-0 shadow-2xl bg-white rounded-2xl">
+          <div className="bg-gradient-to-r from-[#2e539e] to-blue-500 p-6 rounded-t-2xl">
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
                 <Upload className="h-6 w-6 text-white" />
               </div>
               <div>
                 <DialogTitle className="text-xl font-bold text-white">Importar Clientes</DialogTitle>
-                <DialogDescription className="text-emerald-100 mt-1">
+                <DialogDescription className="text-blue-100 mt-1">
                   Selecione um arquivo CSV ou Excel com os dados dos clientes.
                 </DialogDescription>
               </div>
@@ -1285,16 +1448,16 @@ export default function ClientesPage() {
           
           <div className="p-6 space-y-4">
             <div className="grid gap-2">
-              <Label htmlFor="file" className="text-slate-200">Selecione o Arquivo</Label>
+              <Label htmlFor="file" className="text-sm font-medium text-slate-600">Selecione o Arquivo</Label>
               <Input
                 id="file"
                 type="file"
                 accept=".csv,.xlsx,.xls"
                 onChange={handleFileUpload}
-                className="bg-slate-800 border-slate-700 text-white"
+                className="bg-white border-slate-200 text-[#353535] rounded-xl focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
               />
             </div>
-            <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm text-blue-200">
+            <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 text-sm text-[#2e539e]">
               <p className="font-bold mb-2">Colunas esperadas:</p>
               <ul className="list-disc pl-4 space-y-1">
                 <li>nome (obrigatório)</li>
@@ -1307,11 +1470,11 @@ export default function ClientesPage() {
             </div>
           </div>
           
-          <div className="p-6 bg-slate-800/50 flex justify-end gap-3 rounded-b-lg">
-            <Button variant="ghost" onClick={() => setShowImportDialog(false)} className="text-slate-400 hover:text-white hover:bg-slate-700">
+          <div className="p-6 bg-slate-50 flex justify-end gap-3 rounded-b-2xl border-t border-slate-100">
+            <Button variant="ghost" onClick={() => setShowImportDialog(false)} className="text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl">
               Cancelar
             </Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 font-bold" onClick={() => document.getElementById('file')?.click()}>
+            <Button className="bg-gradient-to-r from-[#2e539e] to-blue-600 hover:from-[#264884] hover:to-blue-700 text-white font-bold rounded-xl" onClick={() => document.getElementById('file')?.click()}>
               Selecionar Arquivo
             </Button>
           </div>
@@ -1420,15 +1583,15 @@ export default function ClientesPage() {
 
       {/* Dialog Importar Endereços */}
       <Dialog open={showImportAddressDialog} onOpenChange={setShowImportAddressDialog}>
-        <DialogContent className="p-0 border-0 shadow-2xl bg-slate-900">
-          <div className="bg-gradient-to-r from-emerald-600 to-teal-700 p-6 rounded-t-lg">
+        <DialogContent className="p-0 border-0 shadow-2xl bg-white rounded-2xl">
+          <div className="bg-gradient-to-r from-[#2e539e] to-blue-500 p-6 rounded-t-2xl">
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
                 <MapPin className="h-6 w-6 text-white" />
               </div>
               <div>
                 <DialogTitle className="text-xl font-bold text-white">Importar Endereços</DialogTitle>
-                <DialogDescription className="text-emerald-100 mt-1">
+                <DialogDescription className="text-blue-100 mt-1">
                   Vincule endereços aos seus clientes via arquivo.
                 </DialogDescription>
               </div>
@@ -1437,16 +1600,16 @@ export default function ClientesPage() {
           
           <div className="p-6 space-y-4">
             <div className="grid gap-2">
-              <Label htmlFor="address-file" className="text-slate-200">Arquivo de Endereços</Label>
+              <Label htmlFor="address-file" className="text-sm font-medium text-slate-600">Arquivo de Endereços</Label>
               <Input
                 id="address-file"
                 type="file"
                 accept=".csv,.xlsx,.xls"
                 onChange={handleAddressFileUpload}
-                className="bg-slate-800 border-slate-700 text-white"
+                className="bg-white border-slate-200 text-[#353535] rounded-xl focus:border-[#2e539e] focus:ring-1 focus:ring-[#2e539e]"
               />
             </div>
-            <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm text-blue-200">
+            <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 text-sm text-[#2e539e]">
               <p className="font-bold mb-2">Colunas esperadas:</p>
               <ul className="list-disc pl-4 space-y-1">
                 <li><strong>Código</strong> (obrigatório) - código do cliente para vincular</li>
@@ -1455,11 +1618,11 @@ export default function ClientesPage() {
             </div>
           </div>
           
-          <div className="p-6 bg-slate-800/50 flex justify-end gap-3 rounded-b-lg">
-            <Button variant="ghost" onClick={() => setShowImportAddressDialog(false)} className="text-slate-400 hover:text-white hover:bg-slate-700">
+          <div className="p-6 bg-slate-50 flex justify-end gap-3 rounded-b-2xl border-t border-slate-100">
+            <Button variant="ghost" onClick={() => setShowImportAddressDialog(false)} className="text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl">
               Cancelar
             </Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 font-bold" onClick={() => document.getElementById('address-file')?.click()}>
+            <Button className="bg-gradient-to-r from-[#2e539e] to-blue-600 hover:from-[#264884] hover:to-blue-700 text-white font-bold rounded-xl" onClick={() => document.getElementById('address-file')?.click()}>
               Selecionar Arquivo
             </Button>
           </div>

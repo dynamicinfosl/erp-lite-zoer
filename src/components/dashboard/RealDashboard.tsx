@@ -145,6 +145,9 @@ export default function RealDashboard() {
           const sales = Array.isArray(salesData?.data) ? salesData.data : (Array.isArray(salesData?.sales) ? salesData.sales : (Array.isArray(salesData) ? salesData : []));
           const products = Array.isArray(productsData?.data) ? productsData.data : (Array.isArray(productsData?.rows) ? productsData.rows : (Array.isArray(productsData) ? productsData : []));
           const customers = Array.isArray(customersData?.data) ? customersData.data : (Array.isArray(customersData?.rows) ? customersData.rows : (Array.isArray(customersData) ? customersData : []));
+          
+          // Garantir que todos os clientes sejam carregados (sem limite)
+          console.log(`📊 Dashboard - Clientes carregados: ${customers.length}`);
 
           // Calcular totais
           const totalSales = sales.reduce((sum: number, sale: any) => sum + parseFloat(sale.total_amount || sale.final_amount || 0), 0);
