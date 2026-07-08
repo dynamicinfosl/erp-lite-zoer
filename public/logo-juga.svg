@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 48" width="160" height="48">
+  <!-- Emblem -->
+  <rect x="4" y="8" width="32" height="32" rx="8" ry="8" fill="#1e40af"/>
+  <path d="M13 27c0-5 4-9 9-9h5v3h-5c-3.3 0-6 2.7-6 6v3h-3v-3z" fill="#ffffff"/>
+  <circle cx="27" cy="17" r="3" fill="#0ea5e9"/>
+  <!-- Text -->
+  <text x="46" y="30" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="800" fill="#ffffff">JUGA</text>
+  <text x="100" y="30" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="500" fill="#cbd5e1">Sistemas</text>
+</svg>

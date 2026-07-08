@@ -365,4 +365,48 @@ html { font-size: var(--font-size); scroll-behavior: smooth; }
     right: auto !important;
     transform: none !important;
   }
+
+  /* Exibição do print-container de relatórios na impressão */
+  .print-container {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    z-index: 9999 !important;
+    background: white !important;
+    color: black !important;
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* Reset e exibição de todos os ancestrais do print-container */
+  html, body, 
+  main:has(.print-container), 
+  div:has(.print-container) {
+    display: block !important;
+    visibility: visible !important;
+    position: relative !important;
+    opacity: 1 !important;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Forçar que a sidebar e outros elementos no-print fiquem ocultos mesmo se forem filhos de ancestrais visíveis */
+  [class*="Sidebar"],
+  [class*="sidebar"],
+  aside,
+  nav,
+  header:not(.print-container header),
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
 }
