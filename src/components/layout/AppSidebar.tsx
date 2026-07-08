@@ -44,6 +44,10 @@ import {
   UsersRound,
   Wallet,
   Database,
+  ClipboardList,
+  ShoppingBag,
+  Scroll,
+  Activity,
 } from 'lucide-react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { ENABLE_AUTH } from '@/constants/auth';
@@ -122,7 +126,6 @@ const menuGroups = [
     title: 'Gestão',
     items: [
       { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin', 'vendedor', 'financeiro'] },
-      { title: 'Relatórios', url: '/relatorios', icon: BarChart3, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Filiais', url: '/filiais', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Perfil da Empresa', url: '/perfil-empresa', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Notas Fiscais', url: '/notas-fiscais', icon: Receipt, roles: ['admin', 'vendedor', 'financeiro'] },
@@ -132,8 +135,27 @@ const menuGroups = [
       { title: 'Assinatura', url: '/assinatura', icon: CreditCard, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Configurações', url: '/configuracoes', icon: Settings, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Migrar Dados', url: '/migrar', icon: Database, roles: ['admin'] },
-      // Botão Administração oculto - acesso restrito apenas para usuário "julga"
-      // { title: 'Administração', url: '/admin', icon: Shield, roles: ['admin'] },
+    ],
+  },
+  {
+    title: 'Relatórios',
+    items: [
+      { 
+        title: 'Relatórios', 
+        url: '/relatorios', 
+        icon: BarChart3, 
+        roles: ['admin', 'vendedor', 'financeiro'],
+        subItems: [
+          { title: 'Cadastros', url: '/relatorios/cadastros', icon: ClipboardList },
+          { title: 'Vendas', url: '/relatorios/vendas', icon: ShoppingBag },
+          { title: 'Ordens de serviços', url: '/relatorios/ordem-servicos', icon: Wrench },
+          { title: 'Estoque', url: '/relatorios/estoque', icon: Package },
+          { title: 'Financeiro', url: '/relatorios/financeiro', icon: DollarSign },
+          { title: 'Contratos', url: '/relatorios/contratos', icon: Scroll },
+          { title: 'Fiscal', url: '/relatorios/fiscal', icon: Receipt },
+          { title: 'Logs do sistema', url: '/relatorios/logs', icon: Activity },
+        ]
+      },
     ],
   },
 ];
@@ -371,27 +393,36 @@ function SidebarContentInternal() {
 
 
   return (
-    <Sidebar className="hidden lg:flex w-60 flex-col juga-sidebar-gradient text-white">
-      <SidebarHeader className="px-4 py-5 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
+    <Sidebar className="hidden lg:flex w-60 flex-col juga-sidebar-gradient text-white border-r border-white/10">
+      <SidebarHeader className="px-4 py-6 border-b border-white/10 flex items-center justify-center">
+        <div className="w-full flex items-center justify-center h-16">
+          <img 
+            src="/logo-juga.png" 
+            alt="JUGA Logo" 
+            className="max-h-12 w-auto object-contain" 
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              const fallback = document.getElementById('sidebar-logo-fallback');
+              if (fallback) fallback.style.display = 'flex';
+            }} 
+          />
+          <div id="sidebar-logo-fallback" className="hidden h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white gap-2">
             <Store className="h-5 w-5" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-semibold tracking-wide text-white">JUGA</span>
-            <span className="text-xs text-white/60 dark:text-white font-medium">ERP v1.0.0</span>
+            <span className="text-sm font-semibold text-white">JUGA</span>
           </div>
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="flex-1 px-3 py-5">
-        {filteredGroups.map(group => (
-          <SidebarGroup key={group.title} className="space-y-3">
-            <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-[0.25em] text-white/60 dark:text-white px-3">
-              {group.title}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
+      <SidebarContent className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
+        {filteredGroups.map((group, groupIdx) => (
+          <React.Fragment key={group.title}>
+            {groupIdx > 0 && <div className="border-t border-white/15 my-2 mx-1" />}
+            <SidebarGroup className="space-y-2">
+              <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50 dark:text-white/60 px-3">
+                {group.title}
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="space-y-1">
                 {group.items.map((item: any) => {
                   // Se o item tem subitens, renderizar como collapsible
                   if (item.subItems && item.subItems.length > 0) {
@@ -404,7 +435,7 @@ function SidebarContentInternal() {
                           <CollapsibleTrigger asChild>
                             <SidebarMenuButton
                               isActive={isActive}
-                              className="group h-9 rounded-xl px-3 text-sm text-white/80 dark:text-white transition data-[active=true]:bg-white/20 data-[active=true]:text-white hover:bg-white/15 w-full"
+                              className="group h-9 rounded-xl px-3 text-sm text-white/85 dark:text-white transition data-[active=true]:bg-white/20 dark:data-[active=true]:bg-[#2e539e] data-[active=true]:text-white hover:bg-white/15 w-full"
                             >
                               <item.icon className="h-4 w-4 text-white/60 dark:text-white/90 transition group-data-[active=true]:text-white group-hover:text-white" />
                               <span className="truncate font-semibold dark:font-semibold flex-1 text-left">{item.title}</span>
@@ -418,7 +449,7 @@ function SidebarContentInternal() {
                                   <SidebarMenuButton
                                     asChild
                                     isActive={pathname === subItem.url}
-                                    className="group h-8 rounded-lg px-3 text-sm text-white/70 dark:text-white/80 transition data-[active=true]:bg-white/20 data-[active=true]:text-white hover:bg-white/10"
+                                    className="group h-8 rounded-lg px-3 text-sm text-white/75 dark:text-white/80 transition data-[active=true]:bg-white/20 dark:data-[active=true]:bg-[#2e539e]/70 data-[active=true]:text-white hover:bg-white/10"
                                   >
                                     <Link href={subItem.url}>
                                       <subItem.icon className="h-3.5 w-3.5 text-white/50 dark:text-white/70 transition group-data-[active=true]:text-white group-hover:text-white" />
@@ -440,7 +471,7 @@ function SidebarContentInternal() {
                       <SidebarMenuButton
                         asChild
                         isActive={pathname === item.url}
-                        className="group h-9 rounded-xl px-3 text-sm text-white/80 dark:text-white transition data-[active=true]:bg-white/20 data-[active=true]:text-white hover:bg-white/15"
+                        className="group h-9 rounded-xl px-3 text-sm text-white/85 dark:text-white transition data-[active=true]:bg-white/20 dark:data-[active=true]:bg-[#2e539e] data-[active=true]:text-white hover:bg-white/15"
                       >
                         <Link href={item.url}>
                           <item.icon className="h-4 w-4 text-white/60 dark:text-white/90 transition group-data-[active=true]:text-white group-hover:text-white" />
@@ -453,8 +484,9 @@ function SidebarContentInternal() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-        ))}
-      </SidebarContent>
+        </React.Fragment>
+      ))}
+    </SidebarContent>
 
       <SidebarFooter className="px-4 py-5 border-t border-white/10">
         <div className="flex flex-col gap-4">

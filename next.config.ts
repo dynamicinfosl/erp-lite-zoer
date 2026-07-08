@@ -1,4 +1,24 @@
 import type { NextConfig } from "next";
+import fs from 'fs';
+import path from 'path';
+
+try {
+  const src = "C:\\Users\\Administrator\\Documents\\Juga sistemas\\6x\\logo SF 2 juga@6x.png";
+  const dest = path.join(process.cwd(), 'public', 'logo-juga.png');
+  // Ensure public folder exists
+  const publicDir = path.join(process.cwd(), 'public');
+  if (!fs.existsSync(publicDir)) {
+    fs.mkdirSync(publicDir, { recursive: true });
+  }
+  if (fs.existsSync(src)) {
+    fs.copyFileSync(src, dest);
+    console.log("✅ [Next.config] Logo copied successfully to", dest);
+  } else {
+    console.warn("⚠️ [Next.config] Source logo not found at:", src);
+  }
+} catch (e) {
+  console.error("❌ [Next.config] Error copying logo:", e);
+}
 
 const nextConfig: NextConfig = {
   /* config options here */

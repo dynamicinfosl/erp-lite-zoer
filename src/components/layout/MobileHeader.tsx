@@ -28,6 +28,12 @@ import {
   Building2,
   UsersRound,
   Database,
+  ClipboardList,
+  ShoppingBag,
+  Scroll,
+  Activity,
+  Layers,
+  Wallet,
 } from 'lucide-react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { ENABLE_AUTH } from '@/constants/auth';
@@ -40,41 +46,87 @@ const menuGroups = [
     title: 'Principal',
     items: [
       { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'vendedor', 'financeiro'] },
-      { title: 'PDV', url: '/pdv', icon: ShoppingCart, roles: ['admin', 'vendedor'] },
+    ],
+  },
+  {
+    title: 'Vendas',
+    items: [
+      { title: 'Clientes', url: '/clientes', icon: Users, roles: ['admin', 'vendedor'] },
+      { 
+        title: 'Produtos', 
+        url: '/produtos', 
+        icon: Package, 
+        roles: ['admin', 'vendedor'],
+        subItems: [
+          { title: 'Lista de Produtos', url: '/produtos', icon: Package },
+          { title: 'Valores de Venda', url: '/produtos/valores-venda', icon: Tag },
+          { title: 'Variações', url: '/produtos/variacoes', icon: Layers },
+        ]
+      },
+      { 
+        title: 'Vendas', 
+        url: '/vendas', 
+        icon: Receipt, 
+        roles: ['admin', 'vendedor'],
+        subItems: [
+          { title: 'Vendas de Balcão', url: '/vendas', icon: ShoppingCart },
+          { title: 'Vendas de Produtos', url: '/vendas-produtos', icon: Package },
+        ]
+      },
+      {
+        title: 'PDV',
+        url: '/pdv',
+        icon: ShoppingCart,
+        roles: ['admin', 'vendedor'],
+        subItems: [
+          { title: 'Ponto de Venda', url: '/pdv', icon: ShoppingCart },
+          { title: 'Caixas', url: '/pdv/caixas', icon: Wallet },
+        ],
+      },
+      { title: 'Entregas', url: '/entregas', icon: Truck, roles: ['admin', 'vendedor'] },
+      { title: 'Entregadores', url: '/entregadores', icon: UsersRound, roles: ['admin', 'vendedor'] },
+    ],
+  },
+  {
+    title: 'Operações',
+    items: [
+      { title: 'Estoque', url: '/estoque', icon: Warehouse, roles: ['admin', 'vendedor'] },
+      { title: 'Ordem de Serviços', url: '/ordem-servicos', icon: Wrench, roles: ['admin', 'vendedor'] },
     ],
   },
   {
     title: 'Gestão',
     items: [
       { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin', 'vendedor', 'financeiro'] },
-      { title: 'Relatórios', url: '/relatorios', icon: BarChart3, roles: ['admin', 'vendedor', 'financeiro'] },
-      { title: 'Estoque', url: '/estoque', icon: Warehouse, roles: ['admin', 'vendedor'] },
       { title: 'Filiais', url: '/filiais', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
-      { title: 'Notas Fiscais', url: '/notas-fiscais', icon: Receipt, roles: ['admin', 'vendedor', 'financeiro'] },
-    ],
-  },
-  {
-    title: 'Vendas',
-    items: [
-      { title: 'Vendas', url: '/vendas', icon: Receipt, roles: ['admin', 'vendedor'] },
-      { title: 'Clientes', url: '/clientes', icon: Users, roles: ['admin', 'vendedor'] },
-      { title: 'Produtos', url: '/produtos', icon: Package, roles: ['admin', 'vendedor'] },
-      { title: 'Entregas', url: '/entregas', icon: Truck, roles: ['admin', 'vendedor'] },
-      { title: 'Entregadores', url: '/entregadores', icon: UsersRound, roles: ['admin', 'vendedor'] },
-      { title: 'Entregador', url: '/entregador', icon: Truck, roles: ['admin', 'vendedor'] },
-    ],
-  },
-  {
-    title: 'Configurações',
-    items: [
-      { title: 'Fornecedores', url: '/fornecedores', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
-      { title: 'Ordem de Serviços', url: '/ordem-servicos', icon: Wrench, roles: ['admin', 'vendedor'] },
-      { title: 'Assinatura', url: '/assinatura', icon: CreditCard, roles: ['admin', 'vendedor', 'financeiro'] },
-      { title: 'Usuários', url: '/configuracoes/usuarios', icon: Users, roles: ['admin'] },
-      { title: 'Configurações', url: '/configuracoes', icon: Settings, roles: ['admin', 'vendedor', 'financeiro'] },
-      { title: 'Migrar Dados', url: '/migrar', icon: Database, roles: ['admin'] },
       { title: 'Perfil Empresa', url: '/perfil-empresa', icon: Store, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Notas Fiscais', url: '/notas-fiscais', icon: Receipt, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Configurações', url: '/configuracoes', icon: Settings, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Usuários', url: '/configuracoes/usuarios', icon: Users, roles: ['admin'] },
+      { title: 'Assinatura', url: '/assinatura', icon: CreditCard, roles: ['admin', 'vendedor', 'financeiro'] },
+      { title: 'Migrar Dados', url: '/migrar', icon: Database, roles: ['admin'] },
       { title: 'Perfil Usuário', url: '/perfil-usuario', icon: UserCog, roles: ['admin', 'vendedor', 'financeiro'] },
+    ],
+  },
+  {
+    title: 'Relatórios',
+    items: [
+      { 
+        title: 'Relatórios', 
+        url: '/relatorios', 
+        icon: BarChart3, 
+        roles: ['admin', 'vendedor', 'financeiro'],
+        subItems: [
+          { title: 'Cadastros', url: '/relatorios/cadastros', icon: ClipboardList },
+          { title: 'Vendas', url: '/relatorios/vendas', icon: ShoppingBag },
+          { title: 'Ordens de serviços', url: '/relatorios/ordem-servicos', icon: Wrench },
+          { title: 'Estoque', url: '/relatorios/estoque', icon: Package },
+          { title: 'Financeiro', url: '/relatorios/financeiro', icon: DollarSign },
+          { title: 'Contratos', url: '/relatorios/contratos', icon: Scroll },
+          { title: 'Fiscal', url: '/relatorios/fiscal', icon: Receipt },
+          { title: 'Logs do sistema', url: '/relatorios/logs', icon: Activity },
+        ]
+      },
     ],
   },
 ];
@@ -219,38 +271,46 @@ export function MobileHeader() {
             <span className="sr-only">Abrir menu</span>
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-80 p-0">
+        <SheetContent side="left" className="w-80 p-0 juga-sidebar-gradient text-white border-r border-white/10">
           <div className="flex flex-col h-full">
             {/* Header */}
-            <div className="px-4 py-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-600 to-blue-700 dark:from-slate-800 dark:to-slate-900 text-white">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
+            <div className="px-4 py-6 border-b border-white/10 bg-white/5 text-white flex items-center justify-center">
+              <div className="w-full flex items-center justify-center h-16">
+                <img 
+                  src="/logo-juga.png" 
+                  alt="JUGA Logo" 
+                  className="max-h-12 w-auto object-contain" 
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = document.getElementById('mobile-logo-fallback');
+                    if (fallback) fallback.style.display = 'flex';
+                  }} 
+                />
+                <div id="mobile-logo-fallback" className="hidden h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white gap-2">
                   <Store className="h-5 w-5" />
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-semibold tracking-wide text-white">JUGA</span>
-                  <span className="text-xs text-white/70 dark:text-white font-medium">ERP v1.0.0</span>
+                  <span className="text-sm font-semibold text-white">JUGA</span>
                 </div>
               </div>
             </div>
 
-            <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+            <div className="px-4 py-4 border-b border-white/10 bg-white/5">
               <BranchSelector />
             </div>
 
             {/* Navigation */}
-            <div className="flex-1 overflow-y-auto px-3 py-5">
-              {menuGroups.map(group => (
-                <Collapsible
-                  key={group.title}
-                  open={openGroups.includes(group.title)}
-                  onOpenChange={() => toggleGroup(group.title)}
-                  className="space-y-3"
-                >
+            <div className="flex-1 overflow-y-auto px-3 py-5 space-y-4">
+              {menuGroups.map((group, groupIdx) => (
+                <React.Fragment key={group.title}>
+                  {groupIdx > 0 && <div className="border-t border-white/10 my-2 mx-1" />}
+                  <Collapsible
+                    open={openGroups.includes(group.title)}
+                    onOpenChange={() => toggleGroup(group.title)}
+                    className="space-y-3"
+                  >
                   <CollapsibleTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="w-full justify-between text-left font-bold text-gray-700 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="w-full justify-between text-left font-bold text-white/60 dark:text-white/60 hover:bg-white/10 hover:text-white"
                     >
                       <span className="text-sm uppercase tracking-wide">{group.title}</span>
                       <ChevronDown className={`h-4 w-4 transition-transform ${
@@ -267,32 +327,64 @@ export function MobileHeader() {
                         const shouldShowFiliais = isFiliaisItem ? isBranchesEnabled : true;
                         return hasRole && shouldShowFiliais;
                       })
-                      .map((item: any) => (
-                      <Link
-                        key={item.title}
-                        href={item.url}
-                        onClick={() => setIsOpen(false)}
-                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                          pathname === item.url
-                            ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-100 font-semibold'
-                            : 'text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
-                        }`}
-                      >
-                        <item.icon className="h-4 w-4" />
-                        {item.title}
-                      </Link>
-                    ))}
+                      .map((item: any) => {
+                        const hasSubItems = item.subItems && item.subItems.length > 0;
+                        if (hasSubItems) {
+                          return (
+                            <div key={item.title} className="space-y-1">
+                              <div className="flex items-center gap-3 px-3 py-2 text-sm font-semibold text-white/50 dark:text-white/50">
+                                <item.icon className="h-4 w-4" />
+                                <span>{item.title}</span>
+                              </div>
+                              <div className="pl-4 space-y-1 border-l border-white/10 ml-5">
+                                {item.subItems.map((subItem: any) => (
+                                  <Link
+                                    key={subItem.title}
+                                    href={subItem.url}
+                                    onClick={() => setIsOpen(false)}
+                                    className={`flex items-center gap-3 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                                      pathname === subItem.url
+                                        ? 'bg-white/20 dark:bg-[#2e539e] text-white font-semibold'
+                                        : 'text-white/70 dark:text-white/80 hover:bg-white/10 hover:text-white'
+                                    }`}
+                                  >
+                                    <subItem.icon className="h-3.5 w-3.5" />
+                                    {subItem.title}
+                                  </Link>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <Link
+                            key={item.title}
+                            href={item.url}
+                            onClick={() => setIsOpen(false)}
+                            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                              pathname === item.url
+                                ? 'bg-white/20 dark:bg-[#2e539e] text-white font-semibold'
+                                : 'text-white/70 dark:text-white/80 hover:bg-white/10 hover:text-white'
+                            }`}
+                          >
+                            <item.icon className="h-4 w-4" />
+                            {item.title}
+                          </Link>
+                        );
+                      })}
                   </CollapsibleContent>
                 </Collapsible>
-              ))}
+              </React.Fragment>
+            ))}
             </div>
 
             {/* Footer */}
-            <div className="px-3 py-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="px-3 py-4 border-t border-white/10 bg-white/5">
               <Button
                 onClick={handleLogout}
                 variant="outline"
-                className="w-full justify-center gap-2 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20"
+                className="w-full justify-center gap-2 text-white border-white/30 hover:bg-white/10"
               >
                 <LogOut className="h-4 w-4" />
                 Finalizar sessão
