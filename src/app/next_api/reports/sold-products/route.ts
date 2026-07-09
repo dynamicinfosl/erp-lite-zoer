@@ -90,7 +90,7 @@ async function handler(request: NextRequest): Promise<Response> {
     // 2. Buscar os itens das vendas
     let itemsQuery = supabase
       .from('sale_items')
-      .select('sale_id, product_id, quantity, unit_price')
+      .select('sale_id, product_id, quantity, unit_price, subtotal, total_price')
       .in('sale_id', saleIds);
 
     if (product_id && product_id.trim() !== '') {
@@ -107,7 +107,7 @@ async function handler(request: NextRequest): Promise<Response> {
     const items = itemsData || [];
     if (items.length === 0) {
       return NextResponse.json({
-        totals: { quantity: 0, cost: 0, value: 0, profit: 0 },
+        totals: { quantity: 0, cost: 0, value: 0, discount: 0, profit: 0 },
         products: []
       });
     }
@@ -149,7 +149,8 @@ async function handler(request: NextRequest): Promise<Response> {
       quantity: number;
       costPrice: number; // preço de custo unitário do produto
       totalCost: number; // quantidade * costPrice
-      totalValue: number; // quantidade * unit_price
+      totalValue: number; // valor efetivo de venda (com desconto)
+      totalDiscount: number; // valor do desconto acumulado
       profit: number; // totalValue - totalCost
     }> = {};
 
@@ -166,6 +167,10 @@ async function handler(request: NextRequest): Promise<Response> {
       const unitPrice = Number(item.unit_price) || 0;
       const costPrice = prodInfo.cost_price;
 
+      const originalValue = quantity * unitPrice;
+      const actualValue = Number(item.subtotal ?? item.total_price ?? originalValue);
+      const discount = Math.max(0, originalValue - actualValue);
+
       if (!aggregation[prodId]) {
         aggregation[prodId] = {
           productId: prodId,
@@ -174,6 +179,7 @@ async function handler(request: NextRequest): Promise<Response> {
           costPrice: costPrice,
           totalCost: 0,
           totalValue: 0,
+          totalDiscount: 0,
           profit: 0
         };
       }
@@ -181,7 +187,8 @@ async function handler(request: NextRequest): Promise<Response> {
       const agg = aggregation[prodId];
       agg.quantity += quantity;
       agg.totalCost += quantity * costPrice;
-      agg.totalValue += quantity * unitPrice;
+      agg.totalValue += actualValue;
+      agg.totalDiscount += discount;
       agg.profit = agg.totalValue - agg.totalCost;
     });
 
@@ -192,12 +199,14 @@ async function handler(request: NextRequest): Promise<Response> {
     let grandQuantity = 0;
     let grandCost = 0;
     let grandValue = 0;
+    let grandDiscount = 0;
     let grandProfit = 0;
 
     aggregatedList.forEach((item) => {
       grandQuantity += item.quantity;
       grandCost += item.totalCost;
       grandValue += item.totalValue;
+      grandDiscount += item.totalDiscount;
       grandProfit += item.profit;
     });
 
@@ -206,6 +215,7 @@ async function handler(request: NextRequest): Promise<Response> {
         quantity: grandQuantity,
         cost: grandCost,
         value: grandValue,
+        discount: grandDiscount,
         profit: grandProfit
       },
       products: aggregatedList

@@ -455,7 +455,7 @@ async function listSalesHandler(request: NextRequest) {
     // Usamos count: 'exact' para obter o total de registros que satisfazem os filtros
     let query = supabaseAdmin
       .from('sales')
-      .select('id, sale_number, customer_id, customer_name, total_amount, final_amount, discount_amount, payment_method, sale_type, sale_source, status, notes, created_at, updated_at, user_id, cash_session_id', { count: 'exact' });
+      .select('id, sale_number, customer_id, customer_name, total_amount, final_amount, discount_amount, payment_method, sale_type, sale_source, status, notes, created_at, updated_at, user_id, cash_session_id, seller_name', { count: 'exact' });
 
     // Filtrar por tenant_id se fornecido
     if (tenant_id && tenant_id !== '00000000-0000-0000-0000-000000000000') {
@@ -560,6 +560,40 @@ async function listSalesHandler(request: NextRequest) {
 
     // Buscar itens de venda para cada venda
     if (data && data.length > 0) {
+      // Mapear nomes dos vendedores (users/profiles) se seller_name estiver nulo
+      try {
+        const { data: memberships } = await supabaseAdmin
+          .from('user_memberships')
+          .select('user_id')
+          .eq('tenant_id', tenant_id);
+          
+        if (memberships && memberships.length > 0) {
+          const userIds = memberships.map((m: any) => m.user_id).filter(Boolean);
+          const { data: profiles } = await supabaseAdmin
+            .from('user_profiles')
+            .select('user_id, name')
+            .in('user_id', userIds);
+            
+          if (profiles && profiles.length > 0) {
+            const userNamesMap: Record<string, string> = {};
+            profiles.forEach((p: any) => {
+              if (p.user_id && p.name) {
+                userNamesMap[p.user_id] = p.name;
+              }
+            });
+            
+            data = data.map((sale: any) => {
+              if (!sale.seller_name && sale.user_id && userNamesMap[sale.user_id]) {
+                sale.seller_name = userNamesMap[sale.user_id];
+              }
+              return sale;
+            });
+          }
+        }
+      } catch (err) {
+        console.error('⚠️ [SALES API] Erro ao buscar perfis para seller_name:', err);
+      }
+
       const saleIds = (data || [])
         .map((sale: any) => sale?.id)
         .filter((id: any) => id !== null && id !== undefined && String(id).trim() !== '');

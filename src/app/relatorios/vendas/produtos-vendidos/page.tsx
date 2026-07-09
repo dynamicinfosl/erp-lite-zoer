@@ -17,7 +17,8 @@ import {
   FileDown,
   X,
   SlidersHorizontal,
-  ChevronDown
+  ChevronDown,
+  Percent
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,7 @@ interface SoldProduct {
   costPrice: number;
   totalCost: number;
   totalValue: number;
+  totalDiscount: number;
   profit: number;
 }
 
@@ -68,6 +70,7 @@ interface ReportData {
     quantity: number;
     cost: number;
     value: number;
+    discount: number;
     profit: number;
   };
   products: SoldProduct[];
@@ -108,7 +111,7 @@ export default function RelatorioProdutosVendidosPage() {
   // Estados da tabela e controle
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ReportData>({
-    totals: { quantity: 0, cost: 0, value: 0, profit: 0 },
+    totals: { quantity: 0, cost: 0, value: 0, discount: 0, profit: 0 },
     products: []
   });
   
@@ -123,6 +126,7 @@ export default function RelatorioProdutosVendidosPage() {
     custoMedio: true,
     custoTotal: true,
     valorTotal: true,
+    desconto: true,
     lucro: true,
   });
 
@@ -263,13 +267,14 @@ export default function RelatorioProdutosVendidosPage() {
   // Exportar Excel (CSV compatível com delimitador ;)
   const handleExportExcel = () => {
     try {
-      const headers = ['Produto', 'Quantidade', 'Custo Médio', 'Custo Total', 'Valor Total', 'Lucro'];
+      const headers = ['Produto', 'Quantidade', 'Custo Médio', 'Custo Total', 'Valor Total', 'Desconto', 'Lucro'];
       const rows = filteredProducts.map(p => [
         p.name,
         p.quantity.toString().replace('.', ','),
         p.costPrice.toFixed(2).replace('.', ','),
         p.totalCost.toFixed(2).replace('.', ','),
         p.totalValue.toFixed(2).replace('.', ','),
+        (p.totalDiscount || 0).toFixed(2).replace('.', ','),
         p.profit.toFixed(2).replace('.', ','),
       ]);
 
@@ -279,6 +284,7 @@ export default function RelatorioProdutosVendidosPage() {
         '-',
         data.totals.cost.toFixed(2).replace('.', ','),
         data.totals.value.toFixed(2).replace('.', ','),
+        (data.totals.discount || 0).toFixed(2).replace('.', ','),
         data.totals.profit.toFixed(2).replace('.', ','),
       ];
 
@@ -360,11 +366,11 @@ export default function RelatorioProdutosVendidosPage() {
       pdf.setLineWidth(0.3);
       pdf.line(margin, y, pageWidth - margin, y);
 
-      // 2. Renderizar os 4 Cards de KPI
+      // 2. Renderizar os 5 Cards de KPI
       y += 8;
-      const cardWidth = 42;
+      const cardWidth = 33.2;
       const cardHeight = 22;
-      const cardGap = 4;
+      const cardGap = 3.5;
       const rx = 2.5;
       const ry = 2.5;
 
@@ -416,21 +422,37 @@ export default function RelatorioProdutosVendidosPage() {
       pdf.setTextColor(5, 150, 105);
       pdf.text('Faturamento bruto', c3X + 4, y + 17.5);
 
-      // Card 4: Lucro (Dourado/Âmbar)
+      // Card 4: Desconto (Azul/Blue)
       const c4X = c3X + cardWidth + cardGap;
-      pdf.setFillColor(255, 251, 235); // #fffbeb
+      pdf.setFillColor(239, 246, 255); // #eff6ff
       pdf.roundedRect(c4X, y, cardWidth, cardHeight, rx, ry, 'F');
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(7.5);
+      pdf.setTextColor(59, 130, 246); // #3b82f6
+      pdf.text('DESCONTO', c4X + 4, y + 5.5);
+      pdf.setFontSize(11.5);
+      pdf.setTextColor(29, 78, 216);
+      pdf.text(formatNumber(data.totals.discount || 0), c4X + 4, y + 12);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(59, 130, 246);
+      pdf.text('Descontos aplicados', c4X + 4, y + 17.5);
+
+      // Card 5: Lucro (Dourado/Âmbar)
+      const c5X = c4X + cardWidth + cardGap;
+      pdf.setFillColor(255, 251, 235); // #fffbeb
+      pdf.roundedRect(c5X, y, cardWidth, cardHeight, rx, ry, 'F');
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(7.5);
       pdf.setTextColor(245, 158, 11); // #f59e0b
-      pdf.text('LUCRO LÍQUIDO', c4X + 4, y + 5.5);
+      pdf.text('LUCRO LÍQUIDO', c5X + 4, y + 5.5);
       pdf.setFontSize(11.5);
       pdf.setTextColor(217, 119, 6);
-      pdf.text(formatNumber(data.totals.profit), c4X + 4, y + 12);
+      pdf.text(formatNumber(data.totals.profit), c5X + 4, y + 12);
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(6.5);
       pdf.setTextColor(217, 119, 6);
-      pdf.text('Lucro das vendas', c4X + 4, y + 17.5);
+      pdf.text('Lucro das vendas', c5X + 4, y + 17.5);
 
       y += cardHeight + 8;
 
@@ -454,10 +476,11 @@ export default function RelatorioProdutosVendidosPage() {
       pdf.setFontSize(8.5);
       pdf.setTextColor(71, 85, 105);
       pdf.text('Produto', margin + 3, y);
-      pdf.text('Quantidade', margin + 74, y, { align: 'right' });
-      pdf.text('Custo Médio', margin + 102, y, { align: 'right' });
-      pdf.text('Custo Total', margin + 130, y, { align: 'right' });
-      pdf.text('Valor Total', margin + 158, y, { align: 'right' });
+      pdf.text('Quantidade', margin + 65, y, { align: 'right' });
+      pdf.text('Custo Médio', margin + 90, y, { align: 'right' });
+      pdf.text('Custo Total', margin + 115, y, { align: 'right' });
+      pdf.text('Valor Total', margin + 140, y, { align: 'right' });
+      pdf.text('Desconto', margin + 160, y, { align: 'right' });
       pdf.text('Lucro', margin + 177, y, { align: 'right' });
 
       y += 2.5;
@@ -503,10 +526,11 @@ export default function RelatorioProdutosVendidosPage() {
           pdf.setFontSize(8.5);
           pdf.setTextColor(71, 85, 105);
           pdf.text('Produto', margin + 3, y);
-          pdf.text('Quantidade', margin + 74, y, { align: 'right' });
-          pdf.text('Custo Médio', margin + 102, y, { align: 'right' });
-          pdf.text('Custo Total', margin + 130, y, { align: 'right' });
-          pdf.text('Valor Total', margin + 158, y, { align: 'right' });
+          pdf.text('Quantidade', margin + 65, y, { align: 'right' });
+          pdf.text('Custo Médio', margin + 90, y, { align: 'right' });
+          pdf.text('Custo Total', margin + 115, y, { align: 'right' });
+          pdf.text('Valor Total', margin + 140, y, { align: 'right' });
+          pdf.text('Desconto', margin + 160, y, { align: 'right' });
           pdf.text('Lucro', margin + 177, y, { align: 'right' });
           
           y += 8;
@@ -521,12 +545,13 @@ export default function RelatorioProdutosVendidosPage() {
           pdf.rect(margin, y - 4, pageWidth - 2 * margin, 5.5, 'F');
         }
 
-        const truncatedName = p.name.length > 35 ? p.name.slice(0, 32) + '...' : p.name;
+        const truncatedName = p.name.length > 30 ? p.name.slice(0, 27) + '...' : p.name;
         pdf.text(truncatedName, margin + 3, y);
-        pdf.text(formatNumber(p.quantity), margin + 74, y, { align: 'right' });
-        pdf.text(formatCurrency(p.costPrice), margin + 102, y, { align: 'right' });
-        pdf.text(formatCurrency(p.totalCost), margin + 130, y, { align: 'right' });
-        pdf.text(formatCurrency(p.totalValue), margin + 158, y, { align: 'right' });
+        pdf.text(formatNumber(p.quantity), margin + 65, y, { align: 'right' });
+        pdf.text(formatCurrency(p.costPrice), margin + 90, y, { align: 'right' });
+        pdf.text(formatCurrency(p.totalCost), margin + 115, y, { align: 'right' });
+        pdf.text(formatCurrency(p.totalValue), margin + 140, y, { align: 'right' });
+        pdf.text(formatCurrency(p.totalDiscount || 0), margin + 160, y, { align: 'right' });
         
         // Lucro em verde ou vermelho
         if (p.profit >= 0) {
@@ -556,10 +581,11 @@ export default function RelatorioProdutosVendidosPage() {
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(15, 23, 42);
       pdf.text('TOTAL', margin + 3, y);
-      pdf.text(formatNumber(data.totals.quantity), margin + 74, y, { align: 'right' });
-      pdf.text('-', margin + 102, y, { align: 'right' });
-      pdf.text(formatCurrency(data.totals.cost), margin + 130, y, { align: 'right' });
-      pdf.text(formatCurrency(data.totals.value), margin + 158, y, { align: 'right' });
+      pdf.text(formatNumber(data.totals.quantity), margin + 65, y, { align: 'right' });
+      pdf.text('-', margin + 90, y, { align: 'right' });
+      pdf.text(formatCurrency(data.totals.cost), margin + 115, y, { align: 'right' });
+      pdf.text(formatCurrency(data.totals.value), margin + 140, y, { align: 'right' });
+      pdf.text(formatCurrency(data.totals.discount || 0), margin + 160, y, { align: 'right' });
       
       if (data.totals.profit >= 0) {
         pdf.setTextColor(5, 150, 105);
@@ -713,6 +739,12 @@ export default function RelatorioProdutosVendidosPage() {
                 Valor total
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem 
+                checked={visibleColumns.desconto}
+                onCheckedChange={(checked) => setVisibleColumns(v => ({ ...v, desconto: checked }))}
+              >
+                Desconto
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem 
                 checked={visibleColumns.lucro}
                 onCheckedChange={(checked) => setVisibleColumns(v => ({ ...v, lucro: checked }))}
               >
@@ -765,7 +797,7 @@ export default function RelatorioProdutosVendidosPage() {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         {/* KPI 1 - Quantidade */}
         <Card className="print-card border border-slate-100 dark:border-slate-800 shadow-sm rounded-xl">
           <CardContent className="p-6 flex items-center justify-between">
@@ -814,6 +846,22 @@ export default function RelatorioProdutosVendidosPage() {
           </CardContent>
         </Card>
 
+        {/* KPI: Desconto */}
+        <Card className="print-card border border-slate-100 dark:border-slate-800 shadow-sm rounded-xl">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Desconto</span>
+              <h2 className="text-3xl font-extrabold text-blue-600 dark:text-blue-500 tracking-tight print-card-value">
+                {loading ? '...' : formatNumber(data.totals.discount || 0)}
+              </h2>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Descontos dados no período</p>
+            </div>
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/40 rounded-full text-blue-500 shrink-0">
+              <Percent className="h-6 w-6" />
+            </div>
+          </CardContent>
+        </Card>
+
         {/* KPI 4 - Lucro */}
         <Card className="print-card border border-slate-100 dark:border-slate-800 shadow-sm rounded-xl">
           <CardContent className="p-6 flex items-center justify-between">
@@ -843,13 +891,14 @@ export default function RelatorioProdutosVendidosPage() {
                   {visibleColumns.custoMedio && <TableHead className="font-semibold text-slate-700 dark:text-slate-300 text-right py-3.5 px-5">Custo médio</TableHead>}
                   {visibleColumns.custoTotal && <TableHead className="font-semibold text-slate-700 dark:text-slate-300 text-right py-3.5 px-5">Custo total</TableHead>}
                   {visibleColumns.valorTotal && <TableHead className="font-semibold text-slate-700 dark:text-slate-300 text-right py-3.5 px-5">Valor total</TableHead>}
+                  {visibleColumns.desconto && <TableHead className="font-semibold text-slate-700 dark:text-slate-300 text-right py-3.5 px-5">Desconto</TableHead>}
                   {visibleColumns.lucro && <TableHead className="font-semibold text-slate-700 dark:text-slate-300 text-right py-3.5 px-5">Lucro</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12 text-slate-500">
+                    <TableCell colSpan={7} className="text-center py-12 text-slate-500">
                       <div className="flex flex-col items-center gap-2">
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-slate-400"></div>
                         <span>Carregando relatório...</span>
@@ -858,7 +907,7 @@ export default function RelatorioProdutosVendidosPage() {
                   </TableRow>
                 ) : filteredProducts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12 text-slate-500">
+                    <TableCell colSpan={7} className="text-center py-12 text-slate-500">
                       Nenhum produto vendido encontrado para os filtros selecionados.
                     </TableCell>
                   </TableRow>
@@ -888,6 +937,11 @@ export default function RelatorioProdutosVendidosPage() {
                       {visibleColumns.valorTotal && (
                         <TableCell className="py-3.5 px-5 text-right font-semibold text-emerald-600 dark:text-emerald-500 print:text-black">
                           {formatCurrency(p.totalValue)}
+                        </TableCell>
+                      )}
+                      {visibleColumns.desconto && (
+                        <TableCell className="py-3.5 px-5 text-right font-medium text-blue-600 dark:text-blue-400 print:text-black">
+                          {formatCurrency(p.totalDiscount || 0)}
                         </TableCell>
                       )}
                       {visibleColumns.lucro && (

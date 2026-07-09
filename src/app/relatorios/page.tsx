@@ -1526,6 +1526,33 @@ export default function RelatoriosPage() {
             </CardContent>
           </Card>
 
+          {/* Filtro por Vendedor (Apenas para Admins) */}
+          {isAdmin && tenantUsers.length > 0 && (
+            <Card className="juga-card">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base sm:text-lg text-heading">Filtrar por Vendedor</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 sm:space-y-3">
+                <Select
+                  value={operatorUserId || 'all'}
+                  onValueChange={(val) => setOperatorUserId(val === 'all' ? '' : val)}
+                >
+                  <SelectTrigger className="w-full bg-background border-border">
+                    <SelectValue placeholder="Todos os Vendedores" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-56">
+                    <SelectItem value="all">Todos os Vendedores</SelectItem>
+                    {tenantUsers.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name || u.email || 'Vendedor Sem Nome'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Exportações - Responsivo */}
           <Card className="juga-card">
             <CardHeader className="pb-4">
