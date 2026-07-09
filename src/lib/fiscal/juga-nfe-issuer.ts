@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Buffer } from 'buffer';
+import { getFormattedDateForState } from '../fiscal-utils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10';
@@ -122,7 +123,7 @@ export async function issueJugaSubscriptionInvoice(params: {
     const codigoServico = prestadorTenant.settings?.nfse_codigo_servico || '1.03'; // SaaS
 
     const payload: NFSePayload = {
-      data_emissao: new Date().toISOString().replace(/\.\d+Z$/, ''), // Formato esperado yyyy-MM-ddTHH:mm:ss
+      data_emissao: getFormattedDateForState(prestadorTenant.state).replace(/[-+]\d{2}:\d{2}$/, ''), // Formato esperado yyyy-MM-ddTHH:mm:ss
       prestador: {
         cnpj: prestadorCNPJ,
         inscricao_municipal: prestadorIM,

@@ -3,6 +3,48 @@ import { Sale, SaleItem, Customer, Product } from '@/types';
 export type FocusNFEDocType = 'nfe' | 'nfce' | 'nfse' | 'nfse_nacional';
 
 /**
+ * Retorna o offset de fuso horário brasileiro para um determinado estado
+ */
+export function getTimezoneOffsetForState(state?: string): string {
+  if (!state) return '-03:00'; // Padrão: Horário de Brasília
+  const cleanState = state.trim().toUpperCase();
+  switch (cleanState) {
+    case 'AC':
+      return '-05:00';
+    case 'AM':
+    case 'RO':
+    case 'RR':
+    case 'MS':
+    case 'MT':
+      return '-04:00';
+    default:
+      return '-03:00';
+  }
+}
+
+/**
+ * Retorna a data e hora formatadas no padrão ISO 8601 com timezone correto do estado
+ * e atrasada em X minutos para evitar rejeição de data posterior por diferença de relógio com a SEFAZ.
+ */
+export function getFormattedDateForState(state?: string, dateDelayMinutes: number = 5): string {
+  const now = new Date();
+  
+  if (dateDelayMinutes > 0) {
+    now.setMinutes(now.getMinutes() - dateDelayMinutes);
+  }
+
+  const offsetStr = getTimezoneOffsetForState(state);
+  const offsetHours = parseInt(offsetStr.split(':')[0], 10);
+  
+  const localTimeMs = now.getTime() + (offsetHours * 60 * 60 * 1000);
+  const localDate = new Date(localTimeMs);
+  
+  const isoLocal = localDate.toISOString().replace(/\.\d+Z$/, '');
+  
+  return `${isoLocal}${offsetStr}`;
+}
+
+/**
  * Mapeia uma venda para o payload de NF-e (Produto) da Focus NFe
  */
 export function mapSaleToNFePayload(
@@ -15,7 +57,7 @@ export function mapSaleToNFePayload(
 
   return {
     natureza_operacao: 'Venda de mercadoria',
-    data_emissao: new Date().toISOString(),
+    data_emissao: getFormattedDateForState(tenantState),
     tipo_documento: 1, // 1 - Saída
     finalidade_emissao: 1, // 1 - Normal
     consumidor_final: (() => {
@@ -60,7 +102,7 @@ export function mapSaleToNFCePayload(
 
   return {
     natureza_operacao: 'Venda ao consumidor',
-    data_emissao: new Date().toISOString(),
+    data_emissao: getFormattedDateForState(tenantState),
     presenca_comprador: 1,
     modalidade_frete: '9', // 9 - Sem frete
     informacoes_adicionais_contribuinte: (sale.notes || (sale as any).observacoes || '').trim().substring(0, 5000) || undefined,
@@ -78,11 +120,11 @@ export function mapSaleToNFCePayload(
 /**
  * Mapeia uma ordem de serviço para o payload de NFSe Nacional da Focus NFe
  */
-export function mapOSToNFSeNacionalPayload(os: any, customer?: Customer) {
+export function mapOSToNFSeNacionalPayload(os: any, customer?: Customer, tenantState?: string) {
   // Nota: OS simplificada conforme src/app/ordem-servicos/page.tsx
   const customerFields = customer ? mapCustomerToFocusV2(customer) : {};
   return {
-    data_emissao: new Date().toISOString(),
+    data_emissao: getFormattedDateForState(tenantState),
     valor_servico: os.valor_final || os.valor_estimado,
     descricao_servico: os.descricao,
     codigo_tributacao_nacional_iss: '01.01', // Valor padrão, idealmente viria da OS ou Configuração

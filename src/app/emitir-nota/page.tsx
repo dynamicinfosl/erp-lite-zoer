@@ -29,6 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { getFormattedDateForState } from '@/lib/fiscal-utils';
 
 interface EmissionResult {
   fiscal_document_id: string;
@@ -235,7 +236,7 @@ export default function EmitirNotaPage() {
       // Montar payload para FocusNFe
       const payload: any = {
         natureza_operacao: notaData.natureza_operacao,
-        data_emissao: new Date().toISOString(),
+        data_emissao: getFormattedDateForState(tenant?.state),
         tipo_documento: notaData.tipo_documento,
         finalidade_emissao: notaData.finalidade_emissao,
         consumidor_final: notaData.consumidor_final,

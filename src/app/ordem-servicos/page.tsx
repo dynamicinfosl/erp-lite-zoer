@@ -469,7 +469,7 @@ export default function OrdemServicosPage() {
       }
 
       // 2. Mapear payload
-      const payload = mapOSToNFSeNacionalPayload(ordem, customer);
+      const payload = mapOSToNFSeNacionalPayload(ordem, customer, tenant?.state);
 
       // 3. Emitir
       const result = await emitFiscalDocument({
