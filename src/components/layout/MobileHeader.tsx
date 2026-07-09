@@ -277,7 +277,7 @@ export function MobileHeader() {
             <div className="px-4 py-6 border-b border-white/10 bg-white/5 text-white flex items-center justify-center">
               <div className="w-full flex items-center justify-center h-16">
                 <img 
-                  src="/logo-juga.png" 
+                  src="/logo-juga.svg" 
                   alt="JUGA Logo" 
                   className="max-h-12 w-auto object-contain" 
                   onError={(e) => {
