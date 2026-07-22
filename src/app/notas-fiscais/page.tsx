@@ -27,7 +27,8 @@ import {
   ShoppingCart,
   Calendar,
   DollarSign,
-  User
+  User,
+  Archive
 } from 'lucide-react';
 import {
   Dialog,
@@ -36,14 +37,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { getFullFileUrl } from '@/lib/fiscal/focusnfe-urls';
 
-const getFullFileUrl = (path: string | null | undefined) => {
-  if (!path) return '';
-  if (path.startsWith('http')) return path;
-  return path.startsWith('/arquivos_development')
-    ? `https://homologacao.focusnfe.com.br${path}`
-    : `https://api.focusnfe.com.br${path}`;
-};
+function getPreviousMonthValue(): string {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
 
 interface FiscalDocument {
   id: string;
@@ -87,6 +89,11 @@ export default function NotasFiscaisPage() {
   const [cancelJustification, setCancelJustification] = useState('');
   const [docToCancel, setDocToCancel] = useState<FiscalDocument | null>(null);
   const [cancelling, setCancelling] = useState(false);
+
+  // Export XMLs do mês (contador)
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [exportMonth, setExportMonth] = useState(getPreviousMonthValue);
+  const [exporting, setExporting] = useState(false);
 
   // Mapa de Vendas para atrelar e facilitar a identificação
   const [salesMap, setSalesMap] = useState<Map<string, { numero: string; cliente: string; total: number }>>(new Map());
@@ -201,6 +208,61 @@ export default function NotasFiscaisPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleExportMonthXmls = async () => {
+    if (!tenant?.id) {
+      toast.error('Tenant não identificado.');
+      return;
+    }
+    if (!/^\d{4}-\d{2}$/.test(exportMonth)) {
+      toast.error('Selecione um mês válido.');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({
+        tenant_id: tenant.id,
+        month: exportMonth,
+        type: 'xmls',
+      });
+      const res = await fetch(`/next_api/fiscal/focusnfe/backups/download?${params.toString()}`);
+
+      if (!res.ok) {
+        let message = 'Não foi possível baixar o ZIP deste mês.';
+        try {
+          const errJson = await res.json();
+          if (errJson?.error) message = String(errJson.error);
+        } catch {
+          // ignore
+        }
+        toast.error(message);
+        return;
+      }
+
+      const blob = await res.blob();
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/i);
+      const fileName = match?.[1] || `xmls-${exportMonth}.zip`;
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success('ZIP de XMLs baixado com sucesso.');
+      setIsExportOpen(false);
+    } catch (error: any) {
+      console.error('Erro ao exportar XMLs do mês:', error);
+      toast.error('Erro ao exportar XMLs. Tente novamente.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleCancelDocument = async () => {
@@ -338,6 +400,16 @@ export default function NotasFiscaisPage() {
           </p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
+          <Button
+            onClick={() => {
+              setExportMonth(getPreviousMonthValue());
+              setIsExportOpen(true);
+            }}
+            className="w-full md:w-auto h-10 rounded-xl bg-gradient-to-r from-[#2e539e] to-blue-600 hover:from-[#264884] hover:to-blue-700 text-white font-semibold shadow-md shadow-blue-500/15 flex items-center gap-2"
+          >
+            <Archive className="h-4 w-4" />
+            Exportar XMLs do mês
+          </Button>
           <Button onClick={loadDocuments} disabled={loading} variant="outline" className="w-full md:w-auto flex items-center gap-2 shadow-sm">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Atualizar
@@ -731,6 +803,80 @@ export default function NotasFiscaisPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Export XMLs do mês (contador) */}
+      <Dialog open={isExportOpen} onOpenChange={(open) => !exporting && setIsExportOpen(open)}>
+        <DialogContent className="sm:max-w-[420px] p-0 border-0 shadow-2xl bg-white rounded-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-[#2e539e] to-blue-500 p-6 rounded-t-2xl">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
+                <Archive className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-bold text-white tracking-tight">
+                  Exportar XMLs do mês
+                </DialogTitle>
+                <DialogDescription className="text-blue-100 mt-1">
+                  Baixe as notas do período em um arquivo ZIP.
+                </DialogDescription>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-5 bg-white">
+            <div className="space-y-2">
+              <label
+                htmlFor="export-month"
+                className="text-xs font-bold text-slate-400 uppercase tracking-widest"
+              >
+                Mês de referência
+              </label>
+              <div className="relative flex items-center rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-1 shadow-sm focus-within:border-[#2e539e] focus-within:ring-1 focus-within:ring-[#2e539e] transition-colors">
+                <Calendar className="h-4 w-4 text-[#2e539e] shrink-0 mr-3" />
+                <Input
+                  id="export-month"
+                  type="month"
+                  value={exportMonth}
+                  onChange={(e) => setExportMonth(e.target.value)}
+                  disabled={exporting}
+                  className="h-11 border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-0 text-[#353535] font-medium"
+                />
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Selecione o mês e baixe o ZIP com os XMLs das notas emitidas.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 px-6 py-4 rounded-b-2xl border-t border-slate-100 flex justify-end gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => setIsExportOpen(false)}
+              disabled={exporting}
+              className="rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleExportMonthXmls}
+              disabled={exporting || !exportMonth}
+              className="h-11 rounded-xl bg-gradient-to-r from-[#2e539e] to-blue-600 hover:from-[#264884] hover:to-blue-700 text-white font-bold shadow-lg shadow-blue-500/20 px-6"
+            >
+              {exporting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Gerando ZIP...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Baixar ZIP
+                </>
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
