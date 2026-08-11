@@ -297,7 +297,7 @@ export default function CaixasPage() {
     // Mapeia uma linha de venda da API para o formato usado no fechamento
     const mapSaleRow = (sale: any) => ({
       id: sale.id,
-      total: parseFloat(sale.total_amount || sale.final_amount || sale.total || 0),
+      total: parseFloat(sale.final_amount || sale.total_amount || sale.total || 0),
       forma_pagamento: sale.payment_method || sale.forma_pagamento || 'dinheiro',
       status: sale.status === 'completed' || sale.status === 'paid' ? 'paga' : (sale.status || 'paga'),
       created_at: sale.created_at,
@@ -454,7 +454,7 @@ export default function CaixasPage() {
 
         return filteredSales.map((sale: any) => ({
           id: sale.id,
-          total: parseFloat(sale.total_amount || sale.final_amount || sale.total || 0),
+          total: parseFloat(sale.final_amount || sale.total_amount || sale.total || 0),
           forma_pagamento: sale.payment_method || sale.forma_pagamento || 'dinheiro',
           status: sale.status === 'completed' || sale.status === 'paid' ? 'paga' : (sale.status || 'paga'),
           created_at: sale.created_at, // Incluir created_at para debug

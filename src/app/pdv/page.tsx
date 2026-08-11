@@ -600,7 +600,7 @@ export default function PDVPage() {
             id: sale.id,
             numero: sale.sale_number || sale.numero || `#${sale.id}`,
             cliente: sale.customer_name || sale.cliente || 'Cliente não informado',
-            total: parseFloat(sale.total_amount || sale.final_amount || sale.total || 0),
+            total: parseFloat(sale.final_amount || sale.total_amount || sale.total || 0),
             forma_pagamento: sale.payment_method || sale.forma_pagamento || 'dinheiro',
             data_venda: sale.created_at || sale.sold_at || sale.data_venda,
             status: sale.status === 'completed' ? 'paga' : (sale.status || 'paga'),
@@ -753,6 +753,7 @@ export default function PDVPage() {
         name: String(product.name || 'Produto sem nome').trim(),
         price: Number(product.sale_price || product.cost_price || 0),
         code: String(product.sku || product.barcode || product.id || index + 1).trim(),
+        cost_price: Number(product.cost_price || 0),
       }));
     }
 
@@ -779,6 +780,7 @@ export default function PDVPage() {
           name,
           price: Number(product.sale_price || product.cost_price || 0),
           code,
+          cost_price: Number(product.cost_price || 0),
           _score: score,
           _codeStarts: codeStarts,
           _codeIncludes: codeIncludes,
@@ -1119,7 +1121,9 @@ export default function PDVPage() {
         price: item.price,
         quantity: item.quantity,
         discount: item.discount || 0,
+        discount_type: 'percent',
         subtotal: calculateItemTotal(item),
+        cost_price: Number(item.cost_price || 0),
         variant_id: (item as any).variant_id || null,
         price_type_id: (item as any).price_type_id || null,
       }));

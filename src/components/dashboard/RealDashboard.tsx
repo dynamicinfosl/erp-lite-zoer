@@ -150,7 +150,7 @@ export default function RealDashboard() {
           console.log(`📊 Dashboard - Clientes carregados: ${customers.length}`);
 
           // Calcular totais
-          const totalSales = sales.reduce((sum: number, sale: any) => sum + parseFloat(sale.total_amount || sale.final_amount || 0), 0);
+          const totalSales = sales.reduce((sum: number, sale: any) => sum + parseFloat(sale.final_amount || sale.total_amount || 0), 0);
           
           // Preparar dados mensais (últimos 6 meses)
           const monthlySales = generateMonthlyData(sales);
@@ -159,7 +159,7 @@ export default function RealDashboard() {
           const recentSales = sales.slice(0, 5).map((sale: any) => ({
             id: sale.id || `sale-${Math.random()}`,
             title: 'Venda realizada',
-            description: `Pedido #${sale.sale_number || 'N/A'} - R$ ${parseFloat(sale.total_amount || sale.final_amount || 0).toFixed(2)}`,
+            description: `Pedido #${sale.sale_number || 'N/A'} - R$ ${parseFloat(sale.final_amount || sale.total_amount || 0).toFixed(2)}`,
             time: formatTimeAgo(sale.created_at || new Date().toISOString()),
             type: 'success' as const,
             user: sale.customer_name || 'Cliente Avulso',
@@ -277,7 +277,7 @@ export default function RealDashboard() {
       });
       
       const total = monthSales.reduce((sum, sale) => {
-        const amount = parseFloat(sale.total_amount || sale.final_amount || 0);
+        const amount = parseFloat(sale.final_amount || sale.total_amount || 0);
         return sum + (isNaN(amount) ? 0 : amount);
       }, 0);
       

@@ -36,6 +36,7 @@ const reportOptions: ReportOption[] = [
     gradientClass: 'from-emerald-500 to-emerald-700',
     hoverShadow: 'hover:shadow-emerald-500/20',
     icon: ShoppingBag,
+    href: '/relatorios/vendas/relatorio',
   },
   {
     title: 'Produtos vendidos',

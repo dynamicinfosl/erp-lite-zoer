@@ -51,6 +51,7 @@ interface Product {
   id: number;
   name: string;
   sale_price: number;
+  cost_price?: number;
   stock_quantity: number;
   sku?: string;
 }
@@ -75,6 +76,7 @@ interface SaleItem {
   unit_price: number;
   discount: number;
   subtotal: number;
+  cost_price?: number;
 }
 
 interface ServiceItem {
@@ -286,6 +288,7 @@ export function NewSaleForm({ onSuccess, onCancel, saleId }: NewSaleFormProps) {
               unit_price: Number(item.unit_price) || 0,
               discount: Number(item.discount) || 0,
               subtotal: Number(item.subtotal) || (Number(item.unit_price) * Number(item.quantity)),
+              cost_price: Number(item.cost_price || 0),
             })));
           }
 
@@ -384,6 +387,7 @@ export function NewSaleForm({ onSuccess, onCancel, saleId }: NewSaleFormProps) {
       unit_price: currentItem.unit_price,
       discount: currentItem.discount,
       subtotal: subtotal,
+      cost_price: Number(selectedProduct.cost_price || 0),
     };
 
     setItems([...items, newItem]);
@@ -545,7 +549,9 @@ export function NewSaleForm({ onSuccess, onCancel, saleId }: NewSaleFormProps) {
           price: item.unit_price,
           quantity: item.quantity,
           discount: item.discount,
+          discount_type: 'amount',
           subtotal: item.subtotal,
+          cost_price: Number(item.cost_price || 0),
         })),
         services: services.map(service => ({
           name: service.service_name,

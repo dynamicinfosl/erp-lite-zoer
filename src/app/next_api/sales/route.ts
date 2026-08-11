@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { withPlanValidation } from '@/lib/plan-middleware';
+import { resolveSaleItem, toSaleItemInsert } from '@/lib/sale-calculations';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -24,6 +25,8 @@ async function createSaleHandler(request: NextRequest) {
       products,
       total,
       total_amount,
+      final_amount,
+      discount_amount,
       payment_method,
       tenant_id,
       user_id,
@@ -43,6 +46,14 @@ async function createSaleHandler(request: NextRequest) {
 
     // Usar total_amount se fornecido, senão usar total
     const finalTotal = total_amount || total;
+    const resolvedFinalAmount =
+      final_amount !== undefined && final_amount !== null && final_amount !== ''
+        ? parseFloat(final_amount)
+        : parseFloat(finalTotal);
+    const resolvedDiscountAmount =
+      discount_amount !== undefined && discount_amount !== null && discount_amount !== ''
+        ? parseFloat(discount_amount)
+        : 0;
 
     console.log('📝 Dados recebidos na venda:', {
       tenant_id,
@@ -211,7 +222,8 @@ async function createSaleHandler(request: NextRequest) {
       customer_id: finalCustomerId,
       customer_name: customer_name || body.customer_name || 'Cliente Avulso',
       total_amount: parseFloat(finalTotal),
-      final_amount: parseFloat(finalTotal),
+      final_amount: Number.isFinite(resolvedFinalAmount) ? resolvedFinalAmount : parseFloat(finalTotal),
+      discount_amount: Number.isFinite(resolvedDiscountAmount) ? resolvedDiscountAmount : 0,
       payment_method,
       status: null, // ✅ Usar NULL para evitar constraint
       notes: notes || body.notes || null,
@@ -259,41 +271,48 @@ async function createSaleHandler(request: NextRequest) {
       );
     }
 
-    // Criar itens da venda (versão simplificada sem discount_percentage)
+    // Buscar custo atual dos produtos para congelar no item (custo histórico)
+    const productIdsForCost = [
+      ...new Set(
+        products
+          .map((p: any) => p.id ?? p.product_id)
+          .filter((id: any) => id !== null && id !== undefined && String(id).trim() !== '')
+          .map((id: any) => Number(id))
+          .filter((id: number) => Number.isFinite(id) && id > 0)
+      ),
+    ] as number[];
+
+    const costByProduct: Record<string, number> = {};
+    if (productIdsForCost.length > 0) {
+      const { data: productsCostData } = await supabaseAdmin
+        .from('products')
+        .select('id, cost_price')
+        .in('id', productIdsForCost)
+        .eq('tenant_id', tenant_id);
+
+      (productsCostData || []).forEach((p: any) => {
+        costByProduct[String(p.id)] = Number(p.cost_price) || 0;
+      });
+    }
+
+    // Criar itens com subtotal correto (% no PDV / R$ em vendas-produtos) + custo histórico
+    const saleUserId = user_id || '00000000-0000-0000-0000-000000000000';
     const saleItems = products.map((product: any) => {
-      const discountAmount = (product.price * product.quantity * (product.discount || 0)) / 100;
-      const subtotal = (product.price * product.quantity) - discountAmount;
-
-      // Permitir product_id como null para vendas importadas ou sem produto específico
-      const itemData: any = {
-        sale_id: sale.id,
-        tenant_id: tenant_id, // ✅ REATIVADO - coluna agora existe na tabela
-        user_id: user_id || '00000000-0000-0000-0000-000000000000', // ✅ Adicionar user_id
-        product_name: product.name || 'Produto',
-        // product_code: product.code, // ✅ Removido temporariamente
-        unit_price: product.price,
-        quantity: product.quantity,
-        // discount_percentage: product.discount || 0, // ✅ Removido temporariamente
-        subtotal: subtotal,
-        total_price: subtotal, // ✅ Adicionar total_price (mesmo valor do subtotal)
-      };
-
-      // Adicionar product_id apenas se fornecido (pode ser null para vendas importadas)
-      if (product.id !== null && product.id !== undefined) {
-        itemData.product_id = product.id;
+      const pid = product.id ?? product.product_id;
+      const fallbackCost = pid != null ? costByProduct[String(pid)] ?? 0 : 0;
+      const resolved = resolveSaleItem(product, {
+        saleSource: sale_source,
+        fallbackCost,
+      });
+      // Se o cliente não enviou cost_price, usa o do cadastro no momento da venda
+      if (!(product.cost_price != null || product.unit_cost != null)) {
+        resolved.costPrice = fallbackCost;
       }
-
-      // Adicionar variant_id se fornecido (variação do produto)
-      if (product.variant_id !== null && product.variant_id !== undefined) {
-        itemData.variant_id = product.variant_id;
-      }
-
-      // Adicionar price_type_id se fornecido (tipo de preço usado)
-      if (product.price_type_id !== null && product.price_type_id !== undefined) {
-        itemData.price_type_id = product.price_type_id;
-      }
-
-      return itemData;
+      return toSaleItemInsert(resolved, {
+        saleId: sale.id,
+        tenantId: tenant_id,
+        userId: saleUserId,
+      });
     });
 
     // ✅ DEBUG: Log dos itens antes da inserção

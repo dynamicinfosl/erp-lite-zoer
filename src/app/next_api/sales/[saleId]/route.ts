@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { resolveSaleItem, toSaleItemInsert } from '@/lib/sale-calculations';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -187,7 +188,8 @@ export async function GET(
           quantity: itemQuantity,
           unit_price: itemUnitPrice,
           discount: itemDiscount,
-          subtotal: itemSubtotal
+          subtotal: itemSubtotal,
+          cost_price: Number(item.cost_price) || 0,
         };
       }) || []
     };
@@ -314,11 +316,16 @@ export async function PUT(
       const products = body.products as any[];
       const cleaned = products
         .map((p) => ({
-          id: p?.id === null || p?.id === undefined ? null : Number(p.id),
+          id: p?.id === null || p?.id === undefined ? null : Number(p.id ?? p.product_id),
           name: String(p?.name || p?.product_name || '').trim(),
           price: Number(p?.price ?? p?.unit_price),
           quantity: Number(p?.quantity),
           discount: Number(p?.discount || 0),
+          discount_type: p?.discount_type,
+          subtotal: p?.subtotal,
+          cost_price: p?.cost_price ?? p?.unit_cost,
+          variant_id: p?.variant_id,
+          price_type_id: p?.price_type_id,
         }))
         .filter((p) => p.name && Number.isFinite(p.price) && Number.isFinite(p.quantity) && p.quantity > 0);
 
@@ -329,26 +336,44 @@ export async function PUT(
       const tenantId = sale.tenant_id || body.tenant_id;
       const userId = sale.user_id || body.user_id || '00000000-0000-0000-0000-000000000000';
       const now = new Date().toISOString();
+      const saleSource = sale.sale_source || body.sale_source || 'produtos';
+
+      // Custo histórico: congelar cost_price atual do produto no momento da edição
+      const productIdsForCost = [
+        ...new Set(
+          cleaned
+            .map((p) => p.id)
+            .filter((id): id is number => id !== null && Number.isFinite(id) && id > 0)
+        ),
+      ];
+      const costByProduct: Record<string, number> = {};
+      if (productIdsForCost.length > 0 && tenantId) {
+        const { data: productsCostData } = await supabaseAdmin
+          .from('products')
+          .select('id, cost_price')
+          .in('id', productIdsForCost)
+          .eq('tenant_id', tenantId);
+        (productsCostData || []).forEach((p: any) => {
+          costByProduct[String(p.id)] = Number(p.cost_price) || 0;
+        });
+      }
 
       const saleItems = cleaned.map((p) => {
-        // p.discount is treated as an absolute monetary value (R$), matching frontend
-        const subtotal = (p.price * p.quantity) - p.discount;
-        const itemData: any = {
-          sale_id: saleIdNum,
-          tenant_id: tenantId,
-          user_id: userId,
-          product_name: p.name,
-          unit_price: p.price,
-          quantity: p.quantity,
-          subtotal: subtotal,
-          total_price: subtotal,
-          created_at: now,
-        };
-        // Se p.id for um número válido (> 0), salvar como product_id
-        if (p.id !== null && Number.isFinite(p.id) && p.id > 0) {
-          itemData.product_id = p.id;
+        const fallbackCost = p.id != null ? costByProduct[String(p.id)] ?? 0 : 0;
+        const resolved = resolveSaleItem(p, {
+          saleSource,
+          discountMode: 'amount', // edição de vendas-produtos usa R$
+          fallbackCost,
+        });
+        if (p.cost_price === undefined || p.cost_price === null) {
+          resolved.costPrice = fallbackCost;
         }
-        return itemData;
+        return toSaleItemInsert(resolved, {
+          saleId: saleIdNum,
+          tenantId,
+          userId,
+          createdAt: now,
+        });
       });
 
       if (saleItems.length > 0) {

@@ -273,6 +273,7 @@ export interface PDVItem {
   code: string
   quantity: number
   discount: number
+  cost_price?: number
   variant_id?: number | null
   variant_label?: string | null
 }

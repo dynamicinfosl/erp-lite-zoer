@@ -196,7 +196,7 @@ export default function JugaDashboard() {
       });
       
       const total = monthSales.reduce((sum, sale) => {
-        const amount = parseFloat(sale.total_amount || sale.final_amount || 0);
+        const amount = parseFloat(sale.final_amount || sale.total_amount || 0);
         return sum + (isNaN(amount) ? 0 : amount);
       }, 0);
       
@@ -344,7 +344,7 @@ export default function JugaDashboard() {
           const customers = Array.isArray(customersData?.data) ? customersData.data : (Array.isArray(customersData?.rows) ? customersData.rows : (Array.isArray(customersData) ? customersData : []));
 
           const totalSales = sales.reduce((sum: number, sale: any) => 
-            sum + parseFloat(sale.total_amount || sale.final_amount || 0), 0
+            sum + parseFloat(sale.final_amount || sale.total_amount || 0), 0
           );
 
           const nowLocal = new Date();
@@ -357,7 +357,7 @@ export default function JugaDashboard() {
             return saleDate >= startOfDay && saleDate <= endOfDay;
           });
           const todaySalesAmount = todaySales.reduce((sum: number, sale: any) => {
-            const amount = parseFloat(sale.total_amount || sale.final_amount || 0);
+            const amount = parseFloat(sale.final_amount || sale.total_amount || 0);
             return sum + (isNaN(amount) ? 0 : amount);
           }, 0);
 
@@ -383,7 +383,7 @@ export default function JugaDashboard() {
             return saleDate >= weekStart && saleDate <= weekEnd;
           });
           const weekSalesAmount = weekSales.reduce((sum: number, sale: any) => {
-            const amount = parseFloat(sale.total_amount || sale.final_amount || 0);
+            const amount = parseFloat(sale.final_amount || sale.total_amount || 0);
             return sum + (isNaN(amount) ? 0 : amount);
           }, 0);
 
@@ -394,7 +394,7 @@ export default function JugaDashboard() {
             return saleDate >= startOfMonth && saleDate <= endOfMonth;
           });
           const monthSalesAmount = monthSales.reduce((sum: number, sale: any) => {
-            const amount = parseFloat(sale.total_amount || sale.final_amount || 0);
+            const amount = parseFloat(sale.final_amount || sale.total_amount || 0);
             return sum + (isNaN(amount) ? 0 : amount);
           }, 0);
 

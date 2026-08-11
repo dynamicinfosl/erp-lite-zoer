@@ -252,12 +252,14 @@ async function importSales(tenantId: string, userId: string, data: any): Promise
 
   const { data: products } = await supabaseAdmin
     .from('products')
-    .select('id, name')
+    .select('id, name, cost_price')
     .eq('tenant_id', tenantId);
   const productByName = new Map<string, number>();
+  const productCostById = new Map<number, number>();
   for (const p of products || []) {
     const key = normalizeText((p as any).name);
     if (key && !productByName.has(key)) productByName.set(key, (p as any).id);
+    productCostById.set(Number((p as any).id), Number((p as any).cost_price) || 0);
   }
 
   // Vendas já existentes (por sale_number) neste tenant
@@ -382,6 +384,7 @@ async function importSales(tenantId: string, userId: string, data: any): Promise
         unit_price: unitPrice,
         subtotal: total,
         total_price: total,
+        cost_price: productId ? (productCostById.get(productId) || 0) : 0,
         created_at: new Date().toISOString(),
       };
       if (productId) item.product_id = productId;

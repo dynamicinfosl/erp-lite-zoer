@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { withApiKeyAuth } from '@/lib/api-key-middleware';
+import { resolveSaleItem, toSaleItemInsert } from '@/lib/sale-calculations';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lfxietcasaooenffdodr.supabase.co';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTc3NDMsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10';
@@ -292,37 +293,54 @@ async function createSaleHandler(
       );
     }
 
-    // Criar itens da venda
+    // Criar itens da venda com custo histórico congelado
+    const productIdsForCost = [
+      ...new Set(
+        products
+          .map((p: any) => p.product_id ?? p.id)
+          .filter((id: any) => id !== null && id !== undefined)
+          .map((id: any) => Number(id))
+          .filter((id: number) => Number.isFinite(id) && id > 0)
+      ),
+    ] as number[];
+
+    const costByProduct: Record<string, number> = {};
+    if (productIdsForCost.length > 0) {
+      const { data: productsCostData } = await supabaseAdmin
+        .from('products')
+        .select('id, cost_price')
+        .in('id', productIdsForCost)
+        .eq('tenant_id', tenant_id);
+      (productsCostData || []).forEach((p: any) => {
+        costByProduct[String(p.id)] = Number(p.cost_price) || 0;
+      });
+    }
+
     const saleItems = products.map((product: any) => {
-      const subtotal = (Number(product.price) || 0) * (Number(product.quantity) || 0);
-
-      const itemData: any = {
-        sale_id: sale.id,
-        tenant_id,
-        user_id: '00000000-0000-0000-0000-000000000000',
-        product_name: product.name || 'Produto',
-        unit_price: Number(product.price) || 0,
-        quantity: Number(product.quantity) || 0,
-        subtotal,
-        total_price: subtotal,
-      };
-
-      // Adicionar product_id se fornecido
-      if (product.product_id !== null && product.product_id !== undefined) {
-        itemData.product_id = Number(product.product_id);
+      const pid = product.product_id ?? product.id;
+      const fallbackCost = pid != null ? costByProduct[String(pid)] ?? 0 : 0;
+      const resolved = resolveSaleItem(
+        {
+          ...product,
+          id: pid,
+          price: product.price,
+          quantity: product.quantity,
+          name: product.name,
+          cost_price: product.cost_price ?? fallbackCost,
+          subtotal:
+            product.subtotal ??
+            (Number(product.price) || 0) * (Number(product.quantity) || 0),
+        },
+        { saleSource: 'api', discountMode: 'amount', fallbackCost }
+      );
+      if (!(product.cost_price != null)) {
+        resolved.costPrice = fallbackCost;
       }
-
-      // Adicionar variant_id se fornecido (variação do produto)
-      if (product.variant_id !== null && product.variant_id !== undefined) {
-        itemData.variant_id = Number(product.variant_id);
-      }
-
-      // Adicionar price_type_id se fornecido (tipo de preço usado)
-      if (product.price_type_id !== null && product.price_type_id !== undefined) {
-        itemData.price_type_id = Number(product.price_type_id);
-      }
-
-      return itemData;
+      return toSaleItemInsert(resolved, {
+        saleId: sale.id,
+        tenantId: tenant_id,
+        userId: '00000000-0000-0000-0000-000000000000',
+      });
     });
 
     const { error: itemsError } = await supabaseAdmin.from('sale_items').insert(saleItems);
