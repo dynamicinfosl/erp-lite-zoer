@@ -269,7 +269,8 @@ export async function PUT(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    let { tenant_id, plan_id, status = 'trial' } = body as { tenant_id?: string; plan_id?: string | null; status?: 'trial' | 'active' };
+    let { tenant_id, plan_id, status = 'trialing' } = body as { tenant_id?: string; plan_id?: string | null; status?: string };
+    if (status === 'trial') status = 'trialing';
 
     if (!tenant_id) {
       console.error('❌ [POST] Tenant ID é obrigatório');
@@ -393,7 +394,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Criar subscription
-    const trialEndsAt = status === 'trial' 
+    const trialEndsAt = (status === 'trial' || status === 'trialing')
       ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() // 3 dias
       : null;
 

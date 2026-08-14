@@ -248,25 +248,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Criar subscription (empresa → plano) - opcional
+    // 5. Criar/Atualizar subscription (empresa → plano)
     try {
-      const { error: subscriptionError } = await supabaseAdmin
+      const { data: existingSub } = await supabaseAdmin
         .from('subscriptions')
-        .insert({
-          tenant_id: tenant.id,
-          plan_id: data.plan_id,
-          status: 'trial',
-          trial_end: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-        });
+        .select('id')
+        .eq('tenant_id', tenant.id)
+        .maybeSingle();
 
-      if (subscriptionError) {
-        console.warn('Subscription não criada (tabela pode não existir):', subscriptionError.message);
+      if (existingSub) {
+        if (data.plan_id) {
+          await supabaseAdmin
+            .from('subscriptions')
+            .update({
+              plan_id: data.plan_id,
+              status: 'trialing',
+              trial_end: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+            })
+            .eq('id', existingSub.id);
+        }
       } else {
-        console.log('Subscription criada com sucesso');
+        const { error: subscriptionError } = await supabaseAdmin
+          .from('subscriptions')
+          .insert({
+            tenant_id: tenant.id,
+            plan_id: data.plan_id,
+            status: 'trialing',
+            trial_end: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          });
+
+        if (subscriptionError) {
+          console.warn('Subscription não criada:', subscriptionError.message);
+        } else {
+          console.log('Subscription criada com sucesso');
+        }
       }
     } catch (error) {
-      console.warn('Erro ao criar subscription (tabela pode não existir):', error);
-      // Não falhar aqui, pois o usuário já foi criado com sucesso
+      console.warn('Erro ao configurar subscription:', error);
+      // Não falhar aqui, pois o usuário e tenant já foram criados com sucesso
     }
 
     // 5.5 Disparar webhook para o n8n (Boas-vindas ao cadastrar)
