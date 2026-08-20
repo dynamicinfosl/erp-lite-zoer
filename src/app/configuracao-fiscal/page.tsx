@@ -289,7 +289,8 @@ export default function ConfiguracaoFiscalPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Erro ao fazer upload do certificado');
+        const errMsg = result.details ? `${result.error || 'Erro'}: ${result.details}` : result.error || 'Erro ao fazer upload do certificado';
+        throw new Error(errMsg);
       }
 
       toast.success('Certificado enviado com sucesso!');
