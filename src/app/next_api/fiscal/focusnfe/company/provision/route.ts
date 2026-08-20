@@ -155,6 +155,8 @@ export async function POST(request: NextRequest) {
       regimeTributario = 4; // 4 - MEI
     }
 
+    const isMei = regimeTributario === 4;
+
     const payload: any = {
       nome: tenant.razao_social || tenant.nome_fantasia || tenant.name || 'Empresa',
       nome_fantasia: tenant.nome_fantasia || tenant.name || 'Empresa',
@@ -169,8 +171,8 @@ export async function POST(request: NextRequest) {
       uf: tenant.state || '',
       telefone: tenant.phone ? String(tenant.phone).replace(/\D/g, '') : '',
 
-      inscricao_estadual: tenant.inscricao_estadual || null,
-      inscricao_municipal: tenant.inscricao_municipal || null,
+      inscricao_estadual: tenant.inscricao_estadual ? String(tenant.inscricao_estadual).trim() : null,
+      inscricao_municipal: tenant.inscricao_municipal ? String(tenant.inscricao_municipal).trim() : null,
       regime_tributario: regimeTributario,
 
       arquivo_certificado_base64: certBase64,
@@ -178,9 +180,9 @@ export async function POST(request: NextRequest) {
 
       habilita_nfe: true,
       habilita_nfce: true,
-      habilita_nfse: true,
-      habilita_nfsen_homologacao: true,
-      habilita_nfsen_producao: environment === 'producao',
+      habilita_nfse: !isMei,
+      habilita_nfsen_homologacao: isMei,
+      habilita_nfsen_producao: isMei && environment === 'producao',
     };
 
     const masterToken = globalConfig.api_token;
