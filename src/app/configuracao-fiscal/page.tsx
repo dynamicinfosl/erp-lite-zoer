@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -109,6 +109,7 @@ export default function ConfiguracaoFiscalPage() {
   const [integration, setIntegration] = useState<FiscalIntegration | null>(null);
   const [certificate, setCertificate] = useState<FiscalCertificate | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const [documents, setDocuments] = useState<FiscalDocument[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
@@ -232,12 +233,29 @@ export default function ConfiguracaoFiscalPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const ext = file.name.split('.').pop()?.toLowerCase();
-      if (!ext || !['pfx', 'p12'].includes(ext)) {
-        toast.error('Por favor, selecione um arquivo .pfx ou .p12');
+      const fileName = file.name.toLowerCase();
+      if (!fileName.endsWith('.pfx') && !fileName.endsWith('.p12')) {
+        toast.error('Por favor, selecione um arquivo de certificado com extensão .pfx ou .p12');
+        if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
       setSelectedFile(file);
+      toast.success(`Certificado selecionado: ${file.name}`);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      const fileName = file.name.toLowerCase();
+      if (!fileName.endsWith('.pfx') && !fileName.endsWith('.p12')) {
+        toast.error('Por favor, selecione um arquivo de certificado com extensão .pfx ou .p12');
+        return;
+      }
+      setSelectedFile(file);
+      toast.success(`Certificado selecionado: ${file.name}`);
     }
   };
 
@@ -276,6 +294,7 @@ export default function ConfiguracaoFiscalPage() {
 
       toast.success('Certificado enviado com sucesso!');
       setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       setFormData({ ...formData, certificate_password: '' });
       await loadFiscalData();
     } catch (error) {
@@ -310,6 +329,7 @@ export default function ConfiguracaoFiscalPage() {
       toast.success('Certificado excluído com sucesso!');
       setCertificate(null);
       setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       setFormData({ ...formData, certificate_password: '' });
       await loadFiscalData();
     } catch (error) {
@@ -655,29 +675,42 @@ export default function ConfiguracaoFiscalPage() {
                   <Label htmlFor="certificate_file" className="text-sm font-semibold text-foreground">
                     Arquivo do Certificado (.pfx ou .p12)<span className="text-red-500 ml-0.5">*</span>
                   </Label>
+                  
+                  {/* Input de arquivo invisível controlado por ref */}
+                  <input
+                    ref={fileInputRef}
+                    id="certificate_file"
+                    type="file"
+                    accept=".pfx,.p12,application/x-pkcs12"
+                    onChange={handleFileSelect}
+                    style={{ display: 'none' }}
+                  />
+
                   <div 
-                    onClick={() => document.getElementById('certificate_file')?.click()}
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onDrop={handleDrop}
                     className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-8 text-center hover:border-blue-500 dark:hover:border-blue-400 transition-colors bg-slate-50/50 dark:bg-slate-900/10 cursor-pointer group"
                   >
                     <Upload className="h-10 w-10 mx-auto mb-3 text-slate-400 group-hover:text-blue-500 transition-colors" />
-                    <Input
-                      id="certificate_file"
-                      type="file"
-                      accept=".pfx,.p12"
-                      onChange={handleFileSelect}
-                      onClick={(e) => e.stopPropagation()}
-                      className="hidden"
-                    />
-                    <div className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white dark:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 shadow-sm group-hover:border-blue-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all mb-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fileInputRef.current?.click();
+                      }}
+                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white dark:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 shadow-sm group-hover:border-blue-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all mb-2"
+                    >
                       Escolher arquivo
-                    </div>
+                    </button>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {selectedFile ? `Selecionado: ${selectedFile.name}` : 'Nenhum arquivo escolhido'}
+                      {selectedFile ? `Selecionado: ${selectedFile.name}` : 'Nenhum arquivo escolhido (clique ou arraste o arquivo aqui)'}
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
                       Formatos aceitos: .pfx, .p12
                     </p>
                   </div>
+
                   {selectedFile && (
                     <div className="flex items-center gap-2 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-2.5">
                       <CheckCircle2 className="h-4 w-4 text-blue-600 flex-shrink-0" />
@@ -686,7 +719,10 @@ export default function ConfiguracaoFiscalPage() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => setSelectedFile(null)}
+                        onClick={() => {
+                          setSelectedFile(null);
+                          if (fileInputRef.current) fileInputRef.current.value = '';
+                        }}
                         className="h-6 px-2 text-xs ml-auto text-blue-600 hover:text-blue-800 hover:bg-blue-100"
                       >
                         Remover
