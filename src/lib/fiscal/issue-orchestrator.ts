@@ -65,7 +65,7 @@ export async function emitFiscalDocument(options: IssueOptions): Promise<IssueRe
   const notaasGlobal = globalIntegrations?.find((i) => i.provider === 'notaas');
 
   // Verificar provedor primário global e flag de fallback
-  const primaryProvider: FiscalProvider = focusGlobal?.primary_provider || (notaasGlobal?.enabled && !focusGlobal?.enabled ? 'notaas' : 'focusnfe');
+  const primaryProvider: FiscalProvider = focusGlobal?.primary_provider || notaasGlobal?.primary_provider || (notaasGlobal?.enabled && !focusGlobal?.enabled ? 'notaas' : 'focusnfe');
   const fallbackEnabled: boolean = focusGlobal?.fallback_enabled ?? notaasGlobal?.fallback_enabled ?? true;
 
   const secondaryProvider: FiscalProvider = primaryProvider === 'focusnfe' ? 'notaas' : 'focusnfe';

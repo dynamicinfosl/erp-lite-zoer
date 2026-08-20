@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requestMiddleware } from '@/lib/api-utils'
 import { effectiveUnitCost } from '@/lib/sale-calculations'
+import { fetchAllPaged, fetchAllByIds } from '@/lib/report-queries'
 
 interface SalesSummary {
   totalRevenue: number
@@ -61,14 +62,15 @@ async function handler(request: NextRequest): Promise<Response> {
       query = query.lte('created_at', endISO)
     }
 
-    const { data: salesData, error } = await query.order('created_at', { ascending: true })
-
-    if (error) {
+    let salesRows: any[]
+    try {
+      salesRows = await fetchAllPaged(
+        query.order('created_at', { ascending: true }).order('id', { ascending: true })
+      )
+    } catch (error: any) {
       console.error('❌ Erro ao buscar vendas:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
-
-    const salesRows = salesData || []
     const totalRevenue = salesRows.reduce(
       (s, row) => s + Number(row.final_amount ?? row.total_amount ?? 0),
       0
@@ -79,22 +81,30 @@ async function handler(request: NextRequest): Promise<Response> {
 
     if (salesRows.length > 0) {
       const saleIds = salesRows.map((r: any) => r.id)
-      const { data: itemsData } = await supabase
-        .from('sale_items')
-        .select('sale_id, product_id, quantity, cost_price')
-        .in('sale_id', saleIds)
-
-      const items = itemsData || []
+      const items = await fetchAllByIds(
+        (ids) =>
+          supabase
+            .from('sale_items')
+            .select('sale_id, product_id, quantity, cost_price')
+            .in('sale_id', ids)
+            .order('id', { ascending: true }),
+        saleIds
+      )
       const productIds = [...new Set(items.map((i: any) => i.product_id).filter(Boolean))] as string[]
       const costByProduct: Record<string, number> = {}
 
       if (productIds.length > 0) {
-        const { data: productsData } = await supabase
-          .from('products')
-          .select('id, cost_price')
-          .in('id', productIds)
-          .eq('tenant_id', tenantId)
-        ;(productsData || []).forEach((p: any) => {
+        const productsData = await fetchAllByIds(
+          (ids) =>
+            supabase
+              .from('products')
+              .select('id, cost_price')
+              .in('id', ids)
+              .eq('tenant_id', tenantId)
+              .order('id', { ascending: true }),
+          productIds
+        )
+        productsData.forEach((p: any) => {
           costByProduct[String(p.id)] = Number(p.cost_price) || 0
         })
       }

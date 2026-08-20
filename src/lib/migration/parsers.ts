@@ -69,6 +69,25 @@ export function onlyDigits(value: unknown): string {
   return String(value).replace(/\D/g, '');
 }
 
+/**
+ * Ajusta um texto ao tamanho de uma coluna varchar(n).
+ * Corta na última palavra que couber (e remove conectivo solto no fim), porque
+ * várias colunas do ERP são curtas — financial_transactions.payment_method tem
+ * apenas 20 caracteres e rótulos como "Devolução de Mercadorias" estouravam o
+ * INSERT, derrubando o lote inteiro.
+ */
+export function fitVarchar(value: unknown, max: number): string | null {
+  const s = cleanString(value);
+  if (s === null) return null;
+  if (s.length <= max) return s;
+
+  const cut = s.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  let out = lastSpace > 0 ? cut.slice(0, lastSpace) : cut;
+  out = out.replace(/[\s,;.-]+$/, '').replace(/\s+(de|da|do|das|dos|e|em|para)$/i, '');
+  return (out || cut).trim();
+}
+
 /** Normaliza texto para comparação (sem acento, minúsculo, espaços colapsados). */
 export function normalizeText(value: unknown): string {
   return String(value ?? '')
@@ -122,11 +141,13 @@ export function parseState(value: unknown): string | null {
 /**
  * Mapeia a forma de pagamento legada para os valores aceitos pela constraint
  * de sales.payment_method: dinheiro | pix | cartao_debito | cartao_credito | fiado.
+ * O rótulo original continua sendo gravado em sales.payment_condition.
  */
 export function mapPaymentMethod(value: unknown): 'dinheiro' | 'pix' | 'cartao_debito' | 'cartao_credito' | 'fiado' {
   const s = normalizeText(value);
   if (!s) return 'dinheiro';
   if (s.includes('pix')) return 'pix';
+  if (s.includes('transferencia') || s.includes('ted') || s.includes('doc bancario')) return 'pix';
   if (s.includes('debito')) return 'cartao_debito';
   if (s.includes('credito')) return 'cartao_credito';
   if (s.includes('cartao') || s.includes('card')) return 'cartao_credito';
@@ -135,8 +156,11 @@ export function mapPaymentMethod(value: unknown): 'dinheiro' | 'pix' | 'cartao_d
     s.includes('prazo') ||
     s.includes('boleto') ||
     s.includes('crediario') ||
+    s.includes('carne') ||
+    s.includes('cheque') ||
     s.includes('duplicata') ||
-    s.includes('promissoria')
+    s.includes('promissoria') ||
+    s.includes('a combinar')
   ) {
     return 'fiado';
   }
@@ -144,4 +168,34 @@ export function mapPaymentMethod(value: unknown): 'dinheiro' | 'pix' | 'cartao_d
     return 'dinheiro';
   }
   return 'dinheiro';
+}
+
+/**
+ * Situação da venda no Gestão Click -> status de `sales`.
+ * "Concretizada" = venda fechada; "Em aberto"/"Em andamento" = pedido ainda não fechado.
+ * Os relatórios tratam qualquer status diferente de canceled/cancelada como concluída.
+ */
+export function mapSaleStatus(value: unknown): 'completed' | 'canceled' | 'pendente' {
+  const s = normalizeText(value);
+  if (!s) return 'completed';
+  if (s.includes('cancel')) return 'canceled';
+  if (s.includes('aberto') || s.includes('andamento') || s.includes('orcamento') || s.includes('pendente')) {
+    return 'pendente';
+  }
+  return 'completed';
+}
+
+/**
+ * Situação da conta (a receber/a pagar) -> status de `financial_transactions`,
+ * que aceita apenas: pendente | pago | cancelado.
+ * "Atrasado" continua pendente (vencido, mas em aberto).
+ */
+export function mapFinanceStatus(value: unknown): 'pendente' | 'pago' | 'cancelado' {
+  const s = normalizeText(value);
+  if (!s) return 'pendente';
+  if (s.includes('cancel')) return 'cancelado';
+  if (s.includes('confirm') || s.includes('receb') || s.includes('pago') || s.includes('quitad') || s.includes('liquidad')) {
+    return 'pago';
+  }
+  return 'pendente';
 }

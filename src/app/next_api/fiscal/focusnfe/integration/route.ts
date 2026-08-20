@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { tenant_id, api_token, environment, cnpj_emitente, enabled = true, nfe_serie, nfce_serie } = body as {
+    const { tenant_id, api_token, environment, cnpj_emitente, enabled = true, nfe_serie, nfce_serie, primary_provider, fallback_enabled } = body as {
       tenant_id?: string;
       api_token?: string;
       environment?: Environment;
@@ -43,6 +43,8 @@ export async function POST(request: NextRequest) {
       enabled?: boolean;
       nfe_serie?: string;
       nfce_serie?: string;
+      primary_provider?: 'focusnfe' | 'notaas';
+      fallback_enabled?: boolean;
     };
 
     if (!tenant_id) {
@@ -81,15 +83,26 @@ export async function POST(request: NextRequest) {
     if (cnpj_emitente !== undefined) payload.cnpj_emitente = cnpj_emitente;
     if (nfe_serie !== undefined) payload.nfe_serie = nfe_serie;
     if (nfce_serie !== undefined) payload.nfce_serie = nfce_serie;
+    if (primary_provider !== undefined) payload.primary_provider = primary_provider;
+    if (fallback_enabled !== undefined) payload.fallback_enabled = fallback_enabled;
 
     const { data, error } = await supabaseAdmin
       .from('fiscal_integrations')
       .upsert(payload, { onConflict: 'tenant_id,provider' })
-      .select('id, tenant_id, provider, environment, cnpj_emitente, enabled, nfe_serie, nfce_serie, created_at, updated_at')
+      .select('id, tenant_id, provider, environment, cnpj_emitente, enabled, nfe_serie, nfce_serie, primary_provider, fallback_enabled, created_at, updated_at')
       .single();
 
     if (error) {
       return NextResponse.json({ error: 'Erro ao salvar integração', details: error.message }, { status: 400, headers: jsonHeaders });
+    }
+
+    // Sincronizar primary_provider e fallback_enabled no registro do outro provedor
+    if (primary_provider !== undefined) {
+      await supabaseAdmin
+        .from('fiscal_integrations')
+        .update({ primary_provider, fallback_enabled: fallback_enabled ?? true, updated_at: new Date().toISOString() })
+        .eq('tenant_id', tenant_id)
+        .eq('provider', 'notaas');
     }
 
     return NextResponse.json({ success: true, data }, { headers: jsonHeaders });
@@ -127,7 +140,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabaseAdmin
       .from('fiscal_integrations')
-      .select('id, tenant_id, provider, environment, api_token, cnpj_emitente, enabled, focus_empresa_id, focus_token_homologacao, focus_token_producao, cert_valid_from, cert_valid_to, cert_cnpj, nfe_serie, nfce_serie, created_at, updated_at')
+      .select('id, tenant_id, provider, environment, api_token, cnpj_emitente, enabled, focus_empresa_id, focus_token_homologacao, focus_token_producao, cert_valid_from, cert_valid_to, cert_cnpj, nfe_serie, nfce_serie, primary_provider, fallback_enabled, created_at, updated_at')
       .eq('tenant_id', tenant_id)
       .eq('provider', 'focusnfe')
       .maybeSingle();

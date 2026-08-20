@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requestMiddleware } from '@/lib/api-utils'
 import { effectiveUnitCost } from '@/lib/sale-calculations'
+import { fetchAllPaged, fetchAllByIds } from '@/lib/report-queries'
 
 const SUPABASE_URL = 'https://lfxietcasaooenffdodr.supabase.co'
 const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10'
@@ -139,16 +140,18 @@ async function handler(request: NextRequest): Promise<Response> {
       salesQuery = salesQuery.lte('delivery_date', deliveryEnd)
     }
 
-    const { data: salesData, error: salesError } = await salesQuery.order('created_at', {
-      ascending: false,
-    })
-
-    if (salesError) {
+    // Pagina até trazer o período inteiro: sem isso o PostgREST corta em 1000
+    // vendas e o relatório mostra um faturamento menor que o real.
+    // `id` entra como critério de desempate para as páginas não repetirem linhas.
+    let salesRows: any[]
+    try {
+      salesRows = await fetchAllPaged(
+        salesQuery.order('created_at', { ascending: false }).order('id', { ascending: false })
+      )
+    } catch (salesError: any) {
       console.error('❌ Erro ao buscar vendas:', salesError)
       return NextResponse.json({ error: salesError.message }, { status: 500 })
     }
-
-    let salesRows = salesData || []
 
     type ItemAgg = { cost: number; value: number; discount: number }
     const bySale: Record<string, ItemAgg> = {}
@@ -156,17 +159,23 @@ async function handler(request: NextRequest): Promise<Response> {
     if (salesRows.length > 0) {
       const saleIds = salesRows.map((r: any) => r.id)
 
-      let itemsQuery = supabase
-        .from('sale_items')
-        .select('sale_id, product_id, quantity, unit_price, subtotal, total_price, cost_price')
-        .in('sale_id', saleIds)
-
-      if (filterByProduct) {
-        itemsQuery = itemsQuery.eq('product_id', product_id)
+      // Os ids vão em lotes: um `.in(...)` com milhares de ids estoura a URL,
+      // e antes o erro era descartado (custo, lucro e desconto zeravam).
+      let items: any[]
+      try {
+        items = await fetchAllByIds((ids) => {
+          let q = supabase
+            .from('sale_items')
+            .select('sale_id, product_id, quantity, unit_price, subtotal, total_price, cost_price')
+            .in('sale_id', ids)
+            .order('id', { ascending: true })
+          if (filterByProduct) q = q.eq('product_id', product_id)
+          return q
+        }, saleIds)
+      } catch (itemsError: any) {
+        console.error('❌ Erro ao buscar itens das vendas:', itemsError)
+        return NextResponse.json({ error: itemsError.message }, { status: 500 })
       }
-
-      const { data: itemsData } = await itemsQuery
-      const items = itemsData || []
 
       if (filterByProduct) {
         const matchingSaleIds = new Set(items.map((i: any) => String(i.sale_id)))
@@ -177,12 +186,17 @@ async function handler(request: NextRequest): Promise<Response> {
       const costByProduct: Record<string, number> = {}
 
       if (productIds.length > 0) {
-        const { data: productsData } = await supabase
-          .from('products')
-          .select('id, cost_price')
-          .in('id', productIds)
-          .eq('tenant_id', tenantId)
-        ;(productsData || []).forEach((p: any) => {
+        const productsData = await fetchAllByIds(
+          (ids) =>
+            supabase
+              .from('products')
+              .select('id, cost_price')
+              .in('id', ids)
+              .eq('tenant_id', tenantId)
+              .order('id', { ascending: true }),
+          productIds
+        )
+        productsData.forEach((p: any) => {
           costByProduct[String(p.id)] = Number(p.cost_price) || 0
         })
       }

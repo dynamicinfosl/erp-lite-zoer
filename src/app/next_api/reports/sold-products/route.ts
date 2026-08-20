@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requestMiddleware } from '@/lib/api-utils'
 import { effectiveUnitCost } from '@/lib/sale-calculations'
+import { fetchAllPaged, fetchAllByIds } from '@/lib/report-queries'
 
 const SUPABASE_URL = 'https://lfxietcasaooenffdodr.supabase.co'
 const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmeGlldGNhc2Fvb2VuZmZkb2RyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzAxNzc0MywiZXhwIjoyMDcyNTkzNzQzfQ.gspNzN0khb9f1CP3GsTR5ghflVb2uU5f5Yy4mxlum10'
@@ -68,14 +69,13 @@ async function handler(request: NextRequest): Promise<Response> {
       salesQuery = salesQuery.lte('created_at', endISO)
     }
 
-    const { data: salesData, error: salesError } = await salesQuery
-
-    if (salesError) {
+    let salesRows: any[]
+    try {
+      salesRows = await fetchAllPaged(salesQuery.order('id', { ascending: true }))
+    } catch (salesError: any) {
       console.error('❌ Erro ao buscar vendas para relatório:', salesError)
       return NextResponse.json({ error: salesError.message }, { status: 500 })
     }
-
-    const salesRows = salesData || []
     if (salesRows.length === 0) {
       return NextResponse.json({
         totals: { quantity: 0, cost: 0, value: 0, discount: 0, profit: 0 },
@@ -85,23 +85,21 @@ async function handler(request: NextRequest): Promise<Response> {
 
     const saleIds = salesRows.map((r: any) => r.id)
 
-    let itemsQuery = supabase
-      .from('sale_items')
-      .select('sale_id, product_id, quantity, unit_price, subtotal, total_price, cost_price')
-      .in('sale_id', saleIds)
-
-    if (product_id && product_id.trim() !== '') {
-      itemsQuery = itemsQuery.eq('product_id', product_id.trim())
-    }
-
-    const { data: itemsData, error: itemsError } = await itemsQuery
-
-    if (itemsError) {
+    let items: any[]
+    try {
+      items = await fetchAllByIds((ids) => {
+        let q = supabase
+          .from('sale_items')
+          .select('sale_id, product_id, quantity, unit_price, subtotal, total_price, cost_price')
+          .in('sale_id', ids)
+          .order('id', { ascending: true })
+        if (product_id && product_id.trim() !== '') q = q.eq('product_id', product_id.trim())
+        return q
+      }, saleIds)
+    } catch (itemsError: any) {
       console.error('❌ Erro ao buscar itens de vendas:', itemsError)
       return NextResponse.json({ error: itemsError.message }, { status: 500 })
     }
-
-    const items = itemsData || []
     if (items.length === 0) {
       return NextResponse.json({
         totals: { quantity: 0, cost: 0, value: 0, discount: 0, profit: 0 },

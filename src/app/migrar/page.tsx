@@ -1,8 +1,25 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext-Fixed';
-import { identifyBackupFile, BACKUP_FILE_LABELS, BackupFileKey } from '@/lib/migration/backup-files';
+import {
+  identifyBackupFile,
+  BACKUP_FILE_LABELS,
+  BackupFileKey,
+  DISPLAY_KEYS,
+  IMPORTED_KEYS,
+} from '@/lib/migration/backup-files';
+import {
+  runMigration,
+  sortParts,
+  STEP_LABELS,
+  STEP_ORDER,
+  type BatchResult,
+  type Row,
+  type SourceFile,
+  type StepKey,
+  type StepTotals,
+} from '@/lib/migration/runner';
 import { toast } from 'react-hot-toast';
 import {
   FolderOpen,
@@ -23,26 +40,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 
-interface ParsedFile {
-  key: BackupFileKey;
-  fileName: string;
-  rowCount: number;
-  data: any[];
-}
+type FilesByKey = Partial<Record<BackupFileKey, SourceFile<File>[]>>;
 
-interface StepStatus {
-  step: 'customers' | 'products' | 'sales' | 'finance' | 'fiscal';
+interface StepState {
+  step: StepKey;
   label: string;
   status: 'idle' | 'running' | 'success' | 'error' | 'skipped';
-  progress: number;
-  result?: {
-    inserted: number;
-    updated: number;
-    skipped: number;
-    failed: number;
-    errors: string[];
-  };
+  phase: string;
+  totals: StepTotals | null;
 }
+
+function emptySteps(): StepState[] {
+  return STEP_ORDER.map((step) => ({
+    step,
+    label: STEP_LABELS[step],
+    status: 'idle' as const,
+    phase: '',
+    totals: null,
+  }));
+}
+
+const numberFmt = new Intl.NumberFormat('pt-BR');
 
 export default function MigrarPage() {
   const { tenant, user, loading: authLoading } = useSimpleAuth();
@@ -51,29 +69,10 @@ export default function MigrarPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [isRollingBack, setIsRollingBack] = useState(false);
   const [scanSummary, setScanSummary] = useState<string>('');
+  const [ignoredFiles, setIgnoredFiles] = useState<string[]>([]);
 
-  const [parsedFiles, setParsedFiles] = useState<Record<BackupFileKey, ParsedFile | null>>({
-    clientes: null,
-    clientes_enderecos: null,
-    produtos: null,
-    vendas: null,
-    vendas_produtos: null,
-    vendas_pagamentos: null,
-    vendas_historicos: null,
-    contas_receber: null,
-    notas_fiscais: null,
-    notas_fiscais_produtos: null,
-    notas_fiscais_pagamentos: null,
-  });
-
-  const [steps, setSteps] = useState<StepStatus[]>([
-    { step: 'customers', label: 'Clientes & Endereços', status: 'idle', progress: 0 },
-    { step: 'products', label: 'Cadastro de Produtos', status: 'idle', progress: 0 },
-    { step: 'sales', label: 'Vendas & Itens/Pagamentos/Histórico', status: 'idle', progress: 0 },
-    { step: 'finance', label: 'Financeiro (Contas a Receber)', status: 'idle', progress: 0 },
-    { step: 'fiscal', label: 'Histórico de Notas Fiscais', status: 'idle', progress: 0 },
-  ]);
-
+  const [filesByKey, setFilesByKey] = useState<FilesByKey>({});
+  const [steps, setSteps] = useState<StepState[]>(emptySteps());
   const [openErrors, setOpenErrors] = useState<Record<string, boolean>>({});
 
   const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,65 +81,53 @@ export default function MigrarPage() {
 
     setIsScanning(true);
     setScanSummary('');
-    const files = Array.from(filesList);
-
-    // Reset previous states
-    const newParsedFiles: Record<BackupFileKey, ParsedFile | null> = {
-      clientes: null,
-      clientes_enderecos: null,
-      produtos: null,
-      vendas: null,
-      vendas_produtos: null,
-      vendas_pagamentos: null,
-      vendas_historicos: null,
-      contas_receber: null,
-      notas_fiscais: null,
-      notas_fiscais_produtos: null,
-      notas_fiscais_pagamentos: null,
-    };
+    setIgnoredFiles([]);
+    setSteps(emptySteps());
 
     try {
-      const XLSX = await import('xlsx');
-      let matchedCount = 0;
+      const next: FilesByKey = {};
+      const ignored: string[] = [];
+      let matched = 0;
 
-      for (const file of files) {
+      // A varredura apenas classifica os arquivos pelo nome. As planilhas são
+      // lidas uma a uma durante a importação — o backup pode ter centenas de
+      // partes e mais de um milhão de linhas.
+      for (const file of Array.from(filesList)) {
         const key = identifyBackupFile(file.name);
-        if (!key) continue;
-
-        try {
-          const buffer = await file.arrayBuffer();
-          const wb = XLSX.read(buffer, { type: 'array' });
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          const json = XLSX.utils.sheet_to_json(ws, { defval: null });
-
-          newParsedFiles[key] = {
-            key,
-            fileName: file.name,
-            rowCount: json.length,
-            data: json,
-          };
-          matchedCount++;
-        } catch (err: any) {
-          console.error(`Erro ao ler arquivo ${file.name}:`, err);
-          toast.error(`Erro ao ler ${file.name}: ${err.message}`);
+        if (!key) {
+          if (/\.(xlsx|xls|csv)$/i.test(file.name)) ignored.push(file.name);
+          continue;
         }
+        if (!next[key]) next[key] = [];
+        next[key]!.push({ key, name: file.name, handle: file });
+        matched++;
       }
 
-      setParsedFiles(newParsedFiles);
-      setScanSummary(`Varredura concluída. Encontrados ${matchedCount} arquivos válidos de backup.`);
-      toast.success(`${matchedCount} planilhas identificadas com sucesso!`);
+      for (const key of Object.keys(next) as BackupFileKey[]) {
+        next[key] = sortParts(next[key]!);
+      }
+
+      setFilesByKey(next);
+      setIgnoredFiles(ignored);
+
+      const categorias = Object.keys(next).length;
+      setScanSummary(
+        `${matched} planilha(s) reconhecida(s) em ${categorias} categoria(s).` +
+          (ignored.length > 0 ? ` ${ignored.length} arquivo(s) ignorado(s).` : '')
+      );
+      toast.success(`${matched} planilhas identificadas com sucesso!`);
     } catch (err: any) {
-      console.error('Erro na importação da lib XLSX:', err);
-      toast.error('Não foi possível carregar a biblioteca de planilhas.');
+      console.error('Erro ao varrer a pasta:', err);
+      toast.error('Não foi possível ler a pasta selecionada.');
     } finally {
       setIsScanning(false);
     }
   };
 
-  const triggerFolderSelect = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
+  const triggerFolderSelect = () => fileInputRef.current?.click();
+
+  const patchStep = (step: StepKey, patch: Partial<StepState>) => {
+    setSteps((prev) => prev.map((s) => (s.step === step ? { ...s, ...patch } : s)));
   };
 
   const executeImport = async () => {
@@ -150,134 +137,82 @@ export default function MigrarPage() {
     }
 
     setIsImporting(true);
+    setSteps(emptySteps());
 
-    // Reset steps
-    const updatedSteps = steps.map((s) => ({
-      ...s,
-      status: 'idle' as const,
-      progress: 0,
-      result: undefined,
-    }));
-    setSteps(updatedSteps);
+    const XLSX = await import('xlsx');
+    try {
+      const report = await runMigration<File>(filesByKey, {
+        async readRows(file) {
+          const buffer = await file.handle.arrayBuffer();
+          const wb = XLSX.read(buffer, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          if (!ws) return [];
+          return XLSX.utils.sheet_to_json(ws, { defval: null }) as Row[];
+        },
 
-    const runStep = async (index: number) => {
-      if (index >= steps.length) {
-        setIsImporting(false);
-        toast.success('Processamento do backup finalizado!');
-        return;
-      }
+        async postBatch(step, data, reset): Promise<BatchResult> {
+          const response = await fetch('/next_api/migration/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tenant_id: tenant.id,
+              user_id: user?.id,
+              step,
+              reset,
+              data,
+            }),
+          });
+          const resBody = await response.json().catch(() => ({}));
+          if (!response.ok || !resBody?.success) {
+            throw new Error(resBody?.error || `Falha HTTP ${response.status}`);
+          }
+          return resBody.result as BatchResult;
+        },
 
-      const stepConfig = steps[index];
-      let requestData: any = {};
-      let hasData = false;
+        onProgress(step, totals, phase) {
+          patchStep(step, {
+            status: phase === 'concluído' ? (totals.failed > 0 ? 'error' : 'success') : 'running',
+            phase,
+            totals: { ...totals, errors: [...totals.errors] },
+          });
+        },
 
-      // Monta os payloads baseados na etapa
-      if (stepConfig.step === 'customers') {
-        requestData = {
-          clientes: parsedFiles.clientes?.data || [],
-          enderecos: parsedFiles.clientes_enderecos?.data || [],
-        };
-        hasData = requestData.clientes.length > 0;
-      } else if (stepConfig.step === 'products') {
-        requestData = {
-          produtos: parsedFiles.produtos?.data || [],
-        };
-        hasData = requestData.produtos.length > 0;
-      } else if (stepConfig.step === 'sales') {
-        requestData = {
-          vendas: parsedFiles.vendas?.data || [],
-          itens: parsedFiles.vendas_produtos?.data || [],
-          pagamentos: parsedFiles.vendas_pagamentos?.data || [],
-          historicos: parsedFiles.vendas_historicos?.data || [],
-        };
-        hasData = requestData.vendas.length > 0;
-      } else if (stepConfig.step === 'finance') {
-        requestData = {
-          contas: parsedFiles.contas_receber?.data || [],
-        };
-        hasData = requestData.contas.length > 0;
-      } else if (stepConfig.step === 'fiscal') {
-        requestData = {
-          notas: parsedFiles.notas_fiscais?.data || [],
-          notasProdutos: parsedFiles.notas_fiscais_produtos?.data || [],
-          notasPagamentos: parsedFiles.notas_fiscais_pagamentos?.data || [],
-        };
-        hasData = requestData.notas.length > 0;
-      }
+        onStepSkipped(step) {
+          patchStep(step, { status: 'skipped', phase: 'sem arquivo correspondente' });
+        },
+      });
 
-      // Se não há dados, pula a etapa
-      if (!hasData) {
-        setSteps((prev) =>
-          prev.map((s, idx) =>
-            idx === index
-              ? {
-                  ...s,
-                  status: 'skipped' as const,
-                  progress: 100,
-                  result: { inserted: 0, updated: 0, skipped: 0, failed: 0, errors: [] },
-                }
-              : s
-          )
+      const stepTotals = Object.values(report).filter(Boolean) as StepTotals[];
+      const gravados = stepTotals.reduce((acc, t) => acc + t.inserted + t.updated, 0);
+      const rejeitados = stepTotals.reduce((acc, t) => acc + t.failed, 0);
+      if (rejeitados > 0) {
+        toast.error(
+          `Importação finalizada: ${numberFmt.format(gravados)} registros gravados, ` +
+            `${numberFmt.format(rejeitados)} rejeitados. Confira os erros abaixo.`
         );
-        runStep(index + 1);
-        return;
+      } else {
+        toast.success(`Importação concluída: ${numberFmt.format(gravados)} registros gravados.`);
       }
-
-      // Inicia etapa
+    } catch (err: any) {
+      console.error('Erro na importação:', err);
       setSteps((prev) =>
-        prev.map((s, idx) => (idx === index ? { ...s, status: 'running' as const, progress: 40 } : s))
+        prev.map((s) =>
+          s.status === 'running'
+            ? {
+                ...s,
+                status: 'error',
+                phase: 'interrompido',
+                totals: s.totals
+                  ? { ...s.totals, errors: [...s.totals.errors, err.message || String(err)] }
+                  : null,
+              }
+            : s
+        )
       );
-
-      try {
-        const response = await fetch('/next_api/migration/import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tenant_id: tenant.id,
-            user_id: user?.id,
-            step: stepConfig.step,
-            data: requestData,
-          }),
-        });
-
-        const resBody = await response.json();
-
-        if (response.ok && resBody.success) {
-          const result = resBody.result;
-          setSteps((prev) =>
-            prev.map((s, idx) =>
-              idx === index ? { ...s, status: 'success' as const, progress: 100, result } : s
-            )
-          );
-        } else {
-          throw new Error(resBody.error || 'Erro na requisição');
-        }
-      } catch (err: any) {
-        console.error(`Erro na etapa ${stepConfig.step}:`, err);
-        setSteps((prev) =>
-          prev.map((s, idx) =>
-            idx === index
-              ? {
-                  ...s,
-                  status: 'error' as const,
-                  progress: 100,
-                  result: {
-                    inserted: 0,
-                    updated: 0,
-                    skipped: 0,
-                    failed: 0,
-                    errors: [err.message || String(err)],
-                  },
-                }
-              : s
-          )
-        );
-      }
-
-      runStep(index + 1);
-    };
-
-    runStep(0);
+      toast.error(`Importação interrompida: ${err.message || String(err)}`);
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const handleRollback = async () => {
@@ -287,7 +222,9 @@ export default function MigrarPage() {
     }
 
     const confirmRollback = window.confirm(
-      'Atenção: Isso excluirá permanentemente todos os clientes, produtos, vendas, transações financeiras e notas fiscais importadas via migração de backup. Deseja continuar?'
+      'Atenção: isso excluirá permanentemente os clientes, produtos, vendas, itens, ' +
+        'transações financeiras e notas fiscais que vieram da migração de backup. ' +
+        'Produtos importados por planilha na tela de Produtos também são removidos. Deseja continuar?'
     );
     if (!confirmRollback) return;
 
@@ -301,13 +238,17 @@ export default function MigrarPage() {
       const resBody = await response.json();
 
       if (response.ok && resBody.success) {
-        const result = resBody.result;
+        const r = resBody.result;
         toast.success(
-          `Limpeza concluída! Removidos: ${result.sales} vendas, ${result.products} produtos, ${result.customers} clientes, ${result.finance} transações e ${result.fiscal} notas.`
+          `Limpeza concluída: ${numberFmt.format(r.sales)} vendas, ${numberFmt.format(
+            r.sale_items
+          )} itens, ${numberFmt.format(r.products)} produtos, ${numberFmt.format(
+            r.customers
+          )} clientes, ${numberFmt.format(r.finance)} transações e ${numberFmt.format(
+            r.fiscal
+          )} notas.`
         );
-
-        // Reset progress steps
-        setSteps(steps.map((s) => ({ ...s, status: 'idle', progress: 0, result: undefined })));
+        setSteps(emptySteps());
       } else {
         throw new Error(resBody.error || 'Erro ao desfazer migração');
       }
@@ -323,6 +264,11 @@ export default function MigrarPage() {
     setOpenErrors((prev) => ({ ...prev, [stepKey]: !prev[stepKey] }));
   };
 
+  const hasMinData = useMemo(
+    () => IMPORTED_KEYS.some((k) => (filesByKey[k]?.length || 0) > 0),
+    [filesByKey]
+  );
+
   if (authLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
@@ -333,9 +279,6 @@ export default function MigrarPage() {
       </div>
     );
   }
-
-  // Verificar se há pelo menos um arquivo obrigatório detectado
-  const hasMinData = parsedFiles.clientes || parsedFiles.produtos || parsedFiles.vendas || parsedFiles.contas_receber || parsedFiles.notas_fiscais;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 px-4 py-8 sm:px-6 lg:px-8 text-gray-900 dark:text-gray-100">
@@ -376,7 +319,9 @@ export default function MigrarPage() {
             </div>
             <h3 className="text-lg font-semibold mb-1">Selecionar Pasta do Backup</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 max-w-md mb-5">
-              Escolha a pasta principal do backup descompactado. O sistema irá rastrear os 11 arquivos `.xlsx` esperados (clientes, produtos, vendas, pagamentos, etc.).
+              Escolha a pasta principal do backup descompactado. O sistema reconhece as planilhas
+              mesmo divididas em várias partes (<code>vendas_1.xlsx</code>, <code>vendas_2.xlsx</code>…)
+              e soma todas elas.
             </p>
             <Button
               onClick={triggerFolderSelect}
@@ -400,6 +345,12 @@ export default function MigrarPage() {
                 {scanSummary}
               </p>
             )}
+            {ignoredFiles.length > 0 && (
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2 max-w-lg">
+                Ignorados: {ignoredFiles.slice(0, 6).join(', ')}
+                {ignoredFiles.length > 6 ? ` e mais ${ignoredFiles.length - 6}` : ''}
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -416,16 +367,20 @@ export default function MigrarPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(Object.keys(BACKUP_FILE_LABELS) as BackupFileKey[]).map((key) => {
-                const file = parsedFiles[key];
+              {DISPLAY_KEYS.map((key) => {
+                const parts = filesByKey[key] || [];
+                const found = parts.length > 0;
                 const isMandatory = ['clientes', 'produtos', 'vendas'].includes(key);
+                const isImported = IMPORTED_KEYS.includes(key);
 
                 return (
                   <div
                     key={key}
                     className={`flex items-center justify-between p-3.5 rounded-xl border transition ${
-                      file
-                        ? 'bg-emerald-50/40 dark:bg-emerald-950/10 border-emerald-200 dark:border-emerald-900/60'
+                      found
+                        ? isImported
+                          ? 'bg-emerald-50/40 dark:bg-emerald-950/10 border-emerald-200 dark:border-emerald-900/60'
+                          : 'bg-amber-50/40 dark:bg-amber-950/10 border-amber-200 dark:border-amber-900/60'
                         : 'bg-gray-50 dark:bg-gray-900/40 border-gray-200 dark:border-gray-800'
                     }`}
                   >
@@ -439,18 +394,26 @@ export default function MigrarPage() {
                         )}
                       </div>
                       <span className="text-[11px] text-gray-500 dark:text-gray-400 block truncate">
-                        {file ? file.fileName : `Esperado: ${key}.xlsx`}
+                        {found
+                          ? parts.length === 1
+                            ? parts[0].name
+                            : `${parts[0].name} … ${parts[parts.length - 1].name}`
+                          : `Esperado: ${key}.xlsx`}
                       </span>
                     </div>
 
                     <div className="flex items-center">
-                      {file ? (
+                      {found ? (
                         <div className="text-right">
-                          <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white rounded-lg text-xs py-0.5">
-                            Detectado
+                          <Badge
+                            className={`${
+                              isImported ? 'bg-emerald-600 hover:bg-emerald-600' : 'bg-amber-500 hover:bg-amber-500'
+                            } text-white rounded-lg text-xs py-0.5`}
+                          >
+                            {isImported ? 'Detectado' : 'Sem destino'}
                           </Badge>
                           <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 block mt-1">
-                            {file.rowCount} linhas
+                            {parts.length === 1 ? '1 arquivo' : `${parts.length} arquivos`}
                           </span>
                         </div>
                       ) : (
@@ -512,77 +475,103 @@ export default function MigrarPage() {
           <Card className="bg-white dark:bg-gray-900 shadow-md border border-gray-200 dark:border-gray-800">
             <CardHeader>
               <CardTitle className="text-lg">Progresso da Migração</CardTitle>
-              <CardDescription>Acompanhe o processamento de cada módulo do ERP.</CardDescription>
+              <CardDescription>
+                Acompanhe o processamento de cada módulo do ERP. Se a importação for interrompida,
+                basta executá-la de novo: os registros já gravados são ignorados.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 {steps.map((s) => {
+                  const totals = s.totals;
+                  const progress =
+                    totals && totals.filesTotal > 0
+                      ? Math.min(100, Math.round((totals.filesDone / totals.filesTotal) * 100))
+                      : 0;
+
                   return (
                     <div key={s.step} className="border border-gray-100 dark:border-gray-800 rounded-xl p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          {s.status === 'running' && (
-                            <Loader2 className="h-4.5 w-4.5 animate-spin text-blue-500" />
-                          )}
-                          {s.status === 'success' && (
-                            <CheckCircle2 className="h-4.5 w-4.5 text-emerald-500" />
-                          )}
-                          {s.status === 'error' && (
-                            <AlertCircle className="h-4.5 w-4.5 text-rose-500" />
-                          )}
-                          {s.status === 'skipped' && (
-                            <AlertCircle className="h-4.5 w-4.5 text-gray-400" />
-                          )}
+                          {s.status === 'running' && <Loader2 className="h-4.5 w-4.5 animate-spin text-blue-500" />}
+                          {s.status === 'success' && <CheckCircle2 className="h-4.5 w-4.5 text-emerald-500" />}
+                          {s.status === 'error' && <AlertCircle className="h-4.5 w-4.5 text-rose-500" />}
+                          {s.status === 'skipped' && <AlertCircle className="h-4.5 w-4.5 text-gray-400" />}
                           {s.status === 'idle' && (
                             <div className="h-4.5 w-4.5 rounded-full border border-gray-300 dark:border-gray-700" />
                           )}
                           <span className="font-semibold text-sm">{s.label}</span>
                         </div>
-                        <div>
+                        <div className="text-right">
                           {s.status === 'running' && (
-                            <span className="text-xs text-blue-500 font-semibold animate-pulse">Gravando...</span>
+                            <span className="text-xs text-blue-500 font-semibold animate-pulse">
+                              {s.phase || 'Gravando...'}
+                            </span>
                           )}
-                          {s.status === 'success' && (
-                            <span className="text-xs text-emerald-500 font-semibold">Sucesso</span>
-                          )}
-                          {s.status === 'error' && (
-                            <span className="text-xs text-rose-500 font-semibold">Falha</span>
-                          )}
+                          {s.status === 'success' && <span className="text-xs text-emerald-500 font-semibold">Sucesso</span>}
+                          {s.status === 'error' && <span className="text-xs text-rose-500 font-semibold">Falha</span>}
                           {s.status === 'skipped' && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Pulado (sem arquivo)</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                              Pulado (sem arquivo)
+                            </span>
                           )}
-                          {s.status === 'idle' && (
-                            <span className="text-xs text-gray-400 font-medium">Aguardando</span>
-                          )}
+                          {s.status === 'idle' && <span className="text-xs text-gray-400 font-medium">Aguardando</span>}
                         </div>
                       </div>
 
-                      {s.status === 'running' && <Progress value={s.progress} className="h-2 bg-blue-50 dark:bg-blue-950" />}
+                      {s.status === 'running' && (
+                        <>
+                          <Progress value={progress} className="h-2 bg-blue-50 dark:bg-blue-950" />
+                          {totals && (
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                              {totals.filesDone}/{totals.filesTotal} arquivos ·{' '}
+                              {numberFmt.format(totals.rowsRead)} linhas lidas ·{' '}
+                              {numberFmt.format(totals.inserted)} gravadas
+                            </p>
+                          )}
+                        </>
+                      )}
 
-                      {s.result && (
-                        <div className="bg-gray-50 dark:bg-gray-950 rounded-xl p-3 border border-gray-100 dark:border-gray-800 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-xs">
+                      {totals && (
+                        <div className="bg-gray-50 dark:bg-gray-950 rounded-xl p-3 border border-gray-100 dark:border-gray-800 grid grid-cols-2 sm:grid-cols-5 gap-3 text-center text-xs">
+                          <div>
+                            <span className="text-gray-500 block">Lidos</span>
+                            <span className="font-bold text-sm text-gray-700 dark:text-gray-300">
+                              {numberFmt.format(totals.rowsRead)}
+                            </span>
+                          </div>
                           <div>
                             <span className="text-gray-500 block">Inseridos</span>
-                            <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400">{s.result.inserted}</span>
+                            <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400">
+                              {numberFmt.format(totals.inserted)}
+                            </span>
                           </div>
                           <div>
                             <span className="text-gray-500 block">Atualizados</span>
-                            <span className="font-bold text-sm text-blue-600 dark:text-blue-400">{s.result.updated}</span>
+                            <span className="font-bold text-sm text-blue-600 dark:text-blue-400">
+                              {numberFmt.format(totals.updated)}
+                            </span>
                           </div>
                           <div>
                             <span className="text-gray-500 block">Ignorados</span>
-                            <span className="font-bold text-sm text-gray-500">{s.result.skipped}</span>
+                            <span className="font-bold text-sm text-gray-500">
+                              {numberFmt.format(totals.skipped)}
+                            </span>
                           </div>
                           <div>
                             <span className="text-gray-500 block">Erros</span>
-                            <span className={`font-bold text-sm ${s.result.failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-500'}`}>
-                              {s.result.failed}
+                            <span
+                              className={`font-bold text-sm ${
+                                totals.failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-500'
+                              }`}
+                            >
+                              {numberFmt.format(totals.failed)}
                             </span>
                           </div>
                         </div>
                       )}
 
-                      {s.result && s.result.errors && s.result.errors.length > 0 && (
+                      {totals && totals.errors.length > 0 && (
                         <div className="space-y-1.5">
                           <button
                             onClick={() => toggleErrors(s.step)}
@@ -590,18 +579,21 @@ export default function MigrarPage() {
                           >
                             {openErrors[s.step] ? (
                               <>
-                                <ChevronUp className="h-3 w-3" /> Ocultar erros ({s.result.errors.length})
+                                <ChevronUp className="h-3 w-3" /> Ocultar erros ({totals.errors.length})
                               </>
                             ) : (
                               <>
-                                <ChevronDown className="h-3 w-3" /> Mostrar erros ({s.result.errors.length})
+                                <ChevronDown className="h-3 w-3" /> Mostrar erros ({totals.errors.length})
                               </>
                             )}
                           </button>
                           {openErrors[s.step] && (
                             <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 rounded-lg p-2.5 max-h-40 overflow-y-auto font-mono text-[10px] text-rose-700 dark:text-rose-300 space-y-1">
-                              {s.result.errors.map((err, i) => (
-                                <p key={i} className="leading-relaxed border-b border-rose-100/50 dark:border-rose-900/20 pb-1 last:border-0 last:pb-0">
+                              {totals.errors.map((err, i) => (
+                                <p
+                                  key={i}
+                                  className="leading-relaxed border-b border-rose-100/50 dark:border-rose-900/20 pb-1 last:border-0 last:pb-0"
+                                >
                                   {err}
                                 </p>
                               ))}
