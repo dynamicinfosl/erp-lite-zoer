@@ -59,15 +59,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'environment inválido (use homologacao ou producao)' }, { status: 400, headers: jsonHeaders });
     }
 
-    // Buscar ambiente existente se não foi enviado no payload
+    // Buscar ambiente e empresa existentes se não foram enviados no payload
     let finalEnvironment = environment;
+    const { data: existing } = await supabaseAdmin
+      .from('fiscal_integrations')
+      .select('environment, focus_empresa_id')
+      .eq('tenant_id', tenant_id)
+      .eq('provider', 'focusnfe')
+      .maybeSingle();
+
     if (!finalEnvironment) {
-      const { data: existing } = await supabaseAdmin
-        .from('fiscal_integrations')
-        .select('environment')
-        .eq('tenant_id', tenant_id)
-        .eq('provider', 'focusnfe')
-        .maybeSingle();
       finalEnvironment = existing?.environment || 'homologacao';
     }
 
@@ -94,6 +95,43 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       return NextResponse.json({ error: 'Erro ao salvar integração', details: error.message }, { status: 400, headers: jsonHeaders });
+    }
+
+    // Sincronizar séries com a API da FocusNFe se a empresa já estiver provisionada
+    if (existing?.focus_empresa_id && (nfe_serie !== undefined || nfce_serie !== undefined)) {
+      try {
+        const { data: globalConfig } = await supabaseAdmin
+          .from('fiscal_integrations')
+          .select('api_token, environment')
+          .eq('tenant_id', '00000000-0000-0000-0000-000000000000')
+          .eq('provider', 'focusnfe')
+          .maybeSingle();
+
+        const masterToken = globalConfig?.api_token || api_token;
+        const env = finalEnvironment || globalConfig?.environment || 'homologacao';
+        const baseUrl = env === 'producao' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
+
+        const updateBody: any = {};
+        if (nfe_serie) {
+          updateBody.serie_nfe_producao = String(nfe_serie);
+          updateBody.serie_nfe_homologacao = String(nfe_serie);
+        }
+        if (nfce_serie) {
+          updateBody.serie_nfce_producao = String(nfce_serie);
+          updateBody.serie_nfce_homologacao = String(nfce_serie);
+        }
+
+        await fetch(`${baseUrl}/v2/empresas/${existing.focus_empresa_id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Basic ${Buffer.from(`${masterToken}:`).toString('base64')}`,
+          },
+          body: JSON.stringify(updateBody),
+        });
+      } catch (syncErr) {
+        console.warn('Aviso: falha ao sincronizar séries com a FocusNFe:', syncErr);
+      }
     }
 
     // Sincronizar primary_provider e fallback_enabled no registro do outro provedor
