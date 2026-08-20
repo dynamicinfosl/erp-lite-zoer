@@ -174,9 +174,10 @@ export class NotaAsClient {
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
-      throw new Error(
-        data?.message || data?.error || `Erro ${response.status} ao emitir NF-e na Nota AaS`
-      );
+      const errorMsg = data?.detail
+        ? `${data.error ? data.error + ': ' : ''}${data.detail}`
+        : data?.message || data?.error || `Erro ${response.status} ao emitir NF-e na Nota AaS`;
+      throw new Error(errorMsg);
     }
 
     return data as NotaAsIssueResponse;

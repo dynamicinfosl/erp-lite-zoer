@@ -544,13 +544,23 @@ async function importSaleItems(
   const writtenInThisRun = (cache.itemsWrittenFor ??= new Set<number>());
   const saleIds = [...saleIdByNumber.values()].filter((id) => !writtenInThisRun.has(id));
   const alreadyHasItems = new Set<number>();
-  for (const part of chunk(saleIds, 300)) {
-    const { data: found, error } = await supabaseAdmin
-      .from('sale_items')
-      .select('sale_id')
-      .in('sale_id', part);
-    if (error) throw new Error(`sale_items.sale_id: ${error.message}`);
-    for (const r of found || []) alreadyHasItems.add(Number(r.sale_id));
+  // Precisa paginar: cada venda tem varios itens, entao poucas centenas de
+  // vendas ja passam do teto de 1000 linhas do PostgREST. Sem isso a consulta
+  // vinha truncada, vendas apareciam como "sem itens" e os itens eram regravados.
+  for (const part of chunk(saleIds, 200)) {
+    for (let from = 0; ; from += PAGE) {
+      const { data: found, error } = await supabaseAdmin
+        .from('sale_items')
+        .select('sale_id')
+        .eq('tenant_id', tenantId)
+        .in('sale_id', part)
+        .order('id', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error(`sale_items.sale_id: ${error.message}`);
+      const rows = found || [];
+      for (const r of rows) alreadyHasItems.add(Number(r.sale_id));
+      if (rows.length < PAGE) break;
+    }
   }
 
   const toInsert: Row[] = [];

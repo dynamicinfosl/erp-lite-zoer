@@ -180,3 +180,93 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabaseAdmin = getSupabaseClient();
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { 
+          error: 'Supabase não configurado. Configure NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY',
+          details: 'Variáveis de ambiente do Supabase não configuradas' 
+        },
+        { status: 500, headers: jsonHeaders }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    let tenant_id = searchParams.get('tenant_id');
+    let certificate_id = searchParams.get('id');
+
+    // Tentar ler do body caso não venha na URL
+    if (!tenant_id) {
+      try {
+        const body = await request.json();
+        tenant_id = body?.tenant_id;
+        certificate_id = body?.id || certificate_id;
+      } catch {
+        // Body vazio, prosseguir com searchParams
+      }
+    }
+
+    if (!tenant_id || !isUuid(tenant_id)) {
+      return NextResponse.json({ error: 'tenant_id inválido' }, { status: 400, headers: jsonHeaders });
+    }
+
+    // 1. Buscar os certificados para deletar do Storage
+    let query = supabaseAdmin
+      .from('fiscal_certificates')
+      .select('id, storage_path')
+      .eq('tenant_id', tenant_id);
+
+    if (certificate_id && isUuid(certificate_id)) {
+      query = query.eq('id', certificate_id);
+    }
+
+    const { data: certs, error: fetchError } = await query;
+
+    if (fetchError) {
+      return NextResponse.json({ error: 'Erro ao buscar certificados para exclusão', details: fetchError.message }, { status: 400, headers: jsonHeaders });
+    }
+
+    // 2. Deletar arquivos do Storage
+    if (certs && certs.length > 0) {
+      const pathsToDelete = certs.map((c) => c.storage_path).filter(Boolean);
+      if (pathsToDelete.length > 0) {
+        const { error: storageError } = await supabaseAdmin.storage.from(BUCKET).remove(pathsToDelete);
+        if (storageError) {
+          console.warn('Aviso: falha ao remover arquivos do Storage:', storageError.message);
+        }
+      }
+    }
+
+    // 3. Deletar registros do banco de dados
+    let deleteQuery = supabaseAdmin
+      .from('fiscal_certificates')
+      .delete()
+      .eq('tenant_id', tenant_id);
+
+    if (certificate_id && isUuid(certificate_id)) {
+      deleteQuery = deleteQuery.eq('id', certificate_id);
+    }
+
+    const { error: deleteError } = await deleteQuery;
+
+    if (deleteError) {
+      return NextResponse.json({ error: 'Erro ao excluir certificado do banco', details: deleteError.message }, { status: 400, headers: jsonHeaders });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Certificado(s) excluído(s) com sucesso',
+      deleted_count: certs?.length || 0,
+    }, { headers: jsonHeaders });
+  } catch (error: any) {
+    console.error('❌ Erro na rota DELETE certificate:', error);
+    return NextResponse.json({ 
+      error: 'Erro interno do servidor', 
+      details: error?.message || 'Erro desconhecido' 
+    }, { status: 500, headers: jsonHeaders });
+  }
+}
+

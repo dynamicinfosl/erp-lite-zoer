@@ -214,6 +214,21 @@ export async function POST(request: NextRequest) {
     let http_status = resp.status;
     let providerBody = await fetchJsonOrText(resp);
 
+    // Se o método era PUT e retornou 404 (empresa não existe nesta conta Master / token novo), tentar POST
+    if (!resp.ok && method === 'PUT' && resp.status === 404) {
+      console.log('🔄 Empresa não encontrada pelo ID anterior (possível troca de token Master). Criando nova via POST...');
+      resp = await fetch(`${baseUrl}/v2/empresas`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Basic ${Buffer.from(`${masterToken}:`).toString('base64')}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      http_status = resp.status;
+      providerBody = await fetchJsonOrText(resp);
+    }
+
     // Se falhar e for erro de CNPJ já cadastrado, tentar recuperar o ID existente via API
     if (!resp.ok) {
       const errorsList = providerBody?.erros || providerBody?.errors;

@@ -23,7 +23,8 @@ import {
   Download,
   RefreshCw,
   Eye,
-  Search
+  Search,
+  Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -103,6 +104,7 @@ export default function ConfiguracaoFiscalPage() {
   const { user, tenant: authTenant, loading: authLoading } = useSimpleAuth();
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [deletingCert, setDeletingCert] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
   const [integration, setIntegration] = useState<FiscalIntegration | null>(null);
   const [certificate, setCertificate] = useState<FiscalCertificate | null>(null);
@@ -282,6 +284,40 @@ export default function ConfiguracaoFiscalPage() {
       toast.error('Erro ao fazer upload: ' + errorMessage);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleDeleteCertificate = async () => {
+    const fallbackTenantId = user?.id || '00000000-0000-0000-0000-000000000000';
+    const tenantId = authTenant?.id || fallbackTenantId;
+
+    if (!confirm('Tem certeza que deseja excluir o certificado digital atual?')) {
+      return;
+    }
+
+    try {
+      setDeletingCert(true);
+      const response = await fetch(`/next_api/fiscal/focusnfe/certificate?tenant_id=${tenantId}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao excluir certificado');
+      }
+
+      toast.success('Certificado excluído com sucesso!');
+      setCertificate(null);
+      setSelectedFile(null);
+      setFormData({ ...formData, certificate_password: '' });
+      await loadFiscalData();
+    } catch (error) {
+      console.error('Erro ao excluir certificado:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error('Erro ao excluir certificado: ' + errorMessage);
+    } finally {
+      setDeletingCert(false);
     }
   };
 
@@ -572,23 +608,45 @@ export default function ConfiguracaoFiscalPage() {
               <CardContent className="space-y-6">
                 {certificate && (
                   <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-200 dark:border-emerald-800 p-5">
-                    <div className="flex items-start gap-4">
-                      <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/40">
-                        <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-bold text-emerald-900 dark:text-emerald-100">
-                          ✅ Certificado cadastrado com sucesso
-                        </p>
-                        <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">
-                          Arquivo: <span className="font-medium">{certificate.original_filename}</span>
-                        </p>
-                        {certificate.size_bytes && (
-                          <p className="text-sm text-emerald-600 dark:text-emerald-400">
-                            Tamanho: {(certificate.size_bytes / 1024).toFixed(2)} KB
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="flex items-start gap-4">
+                        <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/40">
+                          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-bold text-emerald-900 dark:text-emerald-100">
+                            ✅ Certificado cadastrado com sucesso
                           </p>
-                        )}
+                          <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">
+                            Arquivo: <span className="font-medium">{certificate.original_filename}</span>
+                          </p>
+                          {certificate.size_bytes && (
+                            <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                              Tamanho: {(certificate.size_bytes / 1024).toFixed(2)} KB
+                            </p>
+                          )}
+                        </div>
                       </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDeleteCertificate}
+                        disabled={deletingCert}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-800 flex items-center gap-1.5 shadow-sm"
+                      >
+                        {deletingCert ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Excluindo...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="h-4 w-4" />
+                            Excluir Certificado
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 )}
