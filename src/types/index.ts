@@ -69,7 +69,7 @@ export interface Sale {
   total_amount: number;
   discount_amount: number;
   final_amount: number;
-  payment_method: 'dinheiro' | 'pix' | 'cartao_debito' | 'cartao_credito' | 'fiado' | 'boleto';
+  payment_method: 'dinheiro' | 'pix' | 'cartao_debito' | 'cartao_credito' | 'fiado' | 'a_prazo' | 'boleto' | 'boleto_bancario' | 'transferencia' | 'outros' | (string & {});
   sale_type: 'balcao' | 'entrega';
   sale_source?: 'pdv' | 'produtos';
   status: 'finalizada' | 'cancelada' | 'pendente' | 'paga';

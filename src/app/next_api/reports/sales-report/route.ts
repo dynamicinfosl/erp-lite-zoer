@@ -12,8 +12,12 @@ const PAYMENT_LABELS: Record<string, string> = {
   pix: 'PIX',
   cartao_debito: 'Cartão Débito',
   cartao_credito: 'Cartão Crédito',
-  fiado: 'Fiado',
-  boleto: 'Boleto',
+  fiado: 'A Prazo',
+  a_prazo: 'A Prazo',
+  boleto: 'Boleto Bancário',
+  boleto_bancario: 'Boleto Bancário',
+  transferencia: 'Transferência Bancária',
+  outros: 'Outros',
 }
 
 function statusLabel(status: string | null | undefined): string {

@@ -271,12 +271,16 @@ function mapItemToFocus(
  * Auxiliar para mapear forma de pagamento
  */
 function mapPaymentMethod(method: string) {
-  switch (method) {
+  switch (method?.toLowerCase()) {
     case 'dinheiro': return '01';
     case 'pix': return '17';
     case 'cartao_credito': return '03';
     case 'cartao_debito': return '04';
-    case 'boleto': return '15';
+    case 'boleto':
+    case 'boleto_bancario': return '15';
+    case 'transferencia': return '18';
+    case 'fiado':
+    case 'a_prazo': return '05'; // Crédito Loja / A Prazo
     default: return '99'; // Outros
   }
 }

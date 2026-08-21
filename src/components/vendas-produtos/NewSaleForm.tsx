@@ -205,11 +205,40 @@ export function NewSaleForm({ onSuccess, onCancel, saleId }: NewSaleFormProps) {
     }
   }, [tenantId]);
 
-  // Load products and customers
+  const [paymentMethodsList, setPaymentMethodsList] = useState<Array<{ value: string; label: string }>>([
+    { value: 'dinheiro', label: 'Dinheiro' },
+    { value: 'pix', label: 'PIX' },
+    { value: 'cartao_debito', label: 'Cartão de Débito' },
+    { value: 'cartao_credito', label: 'Cartão de Crédito' },
+    { value: 'a_prazo', label: 'A Prazo' },
+    { value: 'boleto_bancario', label: 'Boleto Bancário' },
+    { value: 'transferencia', label: 'Transferência Bancária' },
+    { value: 'outros', label: 'Outros' },
+  ]);
+
+  // Load products, customers and payment methods
   useEffect(() => {
     if (!tenantId) return;
     loadProducts();
     loadCustomers();
+
+    async function loadPaymentMethods() {
+      try {
+        const res = await fetch(`/next_api/payment-methods?tenant_id=${encodeURIComponent(tenantId || '')}&only_active=true`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+            setPaymentMethodsList(json.data.map((m: any) => ({
+              value: m.code,
+              label: m.name,
+            })));
+          }
+        }
+      } catch (e) {
+        console.error('Erro ao carregar formas de pagamento:', e);
+      }
+    }
+    loadPaymentMethods();
   }, [tenantId, loadProducts, loadCustomers]);
 
   // Load sale details if editing
@@ -292,10 +321,14 @@ export function NewSaleForm({ onSuccess, onCancel, saleId }: NewSaleFormProps) {
             })));
           }
 
+          let loadedPaymentMethod = sale.payment_method || '';
+          if (loadedPaymentMethod === 'fiado') loadedPaymentMethod = 'a_prazo';
+          if (loadedPaymentMethod === 'boleto') loadedPaymentMethod = 'boleto_bancario';
+
           setPayments([{
             due_date: sale.created_at ? sale.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
             value: Number(sale.final_amount || sale.total_amount || 0),
-            payment_method: sale.payment_method || '',
+            payment_method: loadedPaymentMethod || 'dinheiro',
             chart_of_accounts: 'Vendas de produtos',
             observation: '',
           }]);
@@ -600,15 +633,27 @@ export function NewSaleForm({ onSuccess, onCancel, saleId }: NewSaleFormProps) {
     }).format(value);
   };
 
-  // Opções de forma de pagamento
-  const paymentMethods = [
-    { value: 'dinheiro', label: 'Dinheiro' },
-    { value: 'pix', label: 'PIX' },
-    { value: 'cartao_debito', label: 'Cartão de Débito' },
-    { value: 'cartao_credito', label: 'Cartão de Crédito' },
-    { value: 'boleto', label: 'Boleto' },
-    { value: 'transferencia', label: 'Transferência Bancária' },
-  ];
+  // Opções de forma de pagamento dinâmicas com fallback robusto
+  const paymentMethods = useMemo(() => {
+    const currentSelectedMethods = payments.map(p => p.payment_method).filter(Boolean);
+    const result = [...paymentMethodsList];
+    
+    currentSelectedMethods.forEach(code => {
+      if (!result.some(m => m.value === code)) {
+        let label = code;
+        if (code === 'fiado' || code === 'a_prazo') label = 'A Prazo';
+        else if (code === 'boleto' || code === 'boleto_bancario') label = 'Boleto Bancário';
+        else if (code === 'cartao_credito') label = 'Cartão de Crédito';
+        else if (code === 'cartao_debito') label = 'Cartão de Débito';
+        else if (code === 'dinheiro') label = 'Dinheiro';
+        else if (code === 'pix') label = 'PIX';
+        else if (code === 'transferencia') label = 'Transferência Bancária';
+        result.push({ value: code, label });
+      }
+    });
+
+    return result;
+  }, [paymentMethodsList, payments]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8 pb-10 px-0.5">

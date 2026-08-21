@@ -17,7 +17,9 @@ import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
-  ShoppingCart
+  ShoppingCart,
+  FileText,
+  Building
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -132,7 +134,9 @@ export function CashRegister({ total, onFinalize, onCancel, customerName, cartIt
     { value: 'pix', label: 'PIX', icon: Smartphone, color: 'bg-blue-500' },
     { value: 'cartao_debito', label: 'Cartão Débito', icon: CreditCard, color: 'bg-purple-500' },
     { value: 'cartao_credito', label: 'Cartão Crédito', icon: CreditCard, color: 'bg-indigo-500' },
-    { value: 'fiado', label: 'Fiado', icon: Clock, color: 'bg-orange-500' },
+    { value: 'a_prazo', label: 'A Prazo', icon: Clock, color: 'bg-amber-500' },
+    { value: 'boleto_bancario', label: 'Boleto Bancário', icon: FileText, color: 'bg-orange-500' },
+    { value: 'transferencia', label: 'Transferência', icon: Building, color: 'bg-teal-500' },
   ];
 
   return (

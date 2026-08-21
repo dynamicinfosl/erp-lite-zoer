@@ -72,10 +72,14 @@ export function SaleA4Layout({ sale, company }: SaleA4LayoutProps) {
       pix: 'PIX',
       cartao_debito: 'Cartão de Débito',
       cartao_credito: 'Cartão de Crédito',
-      boleto: 'Boleto',
-      fiado: 'Fiado',
+      boleto: 'Boleto Bancário',
+      boleto_bancario: 'Boleto Bancário',
+      fiado: 'A Prazo',
+      a_prazo: 'A Prazo',
+      transferencia: 'Transferência Bancária',
+      outros: 'Outros',
     };
-    return labels[method] || method;
+    return labels[method?.toLowerCase()] || method;
   };
 
   const deliveryAddress = sale.delivery_address as DeliveryAddress | undefined;

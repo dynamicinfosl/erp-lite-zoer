@@ -97,7 +97,16 @@ const menuGroups = [
   {
     title: 'Gestão',
     items: [
-      { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin', 'vendedor', 'financeiro'] },
+      { 
+        title: 'Financeiro', 
+        url: '/financeiro', 
+        icon: DollarSign, 
+        roles: ['admin', 'vendedor', 'financeiro'],
+        subItems: [
+          { title: 'Transações', url: '/financeiro', icon: DollarSign },
+          { title: 'Formas de Pagamento', url: '/financeiro/formas-pagamento', icon: CreditCard },
+        ]
+      },
       { title: 'Filiais', url: '/filiais', icon: Building2, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Perfil Empresa', url: '/perfil-empresa', icon: Store, roles: ['admin', 'vendedor', 'financeiro'] },
       { title: 'Notas Fiscais', url: '/notas-fiscais', icon: Receipt, roles: ['admin', 'vendedor', 'financeiro'] },

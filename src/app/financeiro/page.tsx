@@ -380,8 +380,10 @@ export default function FinanceiroPage() {
                       <SelectItem value="pix">PIX</SelectItem>
                       <SelectItem value="cartao_debito">Cartão Débito</SelectItem>
                       <SelectItem value="cartao_credito">Cartão Crédito</SelectItem>
-                      <SelectItem value="transferencia">Transferência</SelectItem>
-                      <SelectItem value="boleto">Boleto</SelectItem>
+                      <SelectItem value="a_prazo">A Prazo</SelectItem>
+                      <SelectItem value="boleto_bancario">Boleto Bancário</SelectItem>
+                      <SelectItem value="transferencia">Transferência Bancária</SelectItem>
+                      <SelectItem value="outros">Outros</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

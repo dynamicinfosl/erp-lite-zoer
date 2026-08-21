@@ -524,18 +524,22 @@ export default function VendasProdutosPage() {
     );
   };
 
-  const getFormaPagamentoBadge = (forma: Sale['forma_pagamento']) => {
+  const getFormaPagamentoBadge = (forma: string | undefined | null) => {
     const formaMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
       'dinheiro': { label: 'Dinheiro', variant: 'secondary' },
       'cartao_debito': { label: 'Cartão Débito', variant: 'outline' },
       'cartao_credito': { label: 'Cartão Crédito', variant: 'outline' },
       'pix': { label: 'PIX', variant: 'default' },
-      'boleto': { label: 'Boleto', variant: 'secondary' }
+      'fiado': { label: 'A Prazo', variant: 'secondary' },
+      'a_prazo': { label: 'A Prazo', variant: 'secondary' },
+      'boleto': { label: 'Boleto Bancário', variant: 'secondary' },
+      'boleto_bancario': { label: 'Boleto Bancário', variant: 'secondary' },
+      'transferencia': { label: 'Transferência', variant: 'outline' },
+      'outros': { label: 'Outros', variant: 'secondary' },
     };
     
-    const formaData = forma && formaMap[forma] 
-      ? formaMap[forma] 
-      : { label: forma || 'Não informado', variant: 'secondary' as const };
+    const key = String(forma || '').toLowerCase();
+    const formaData = formaMap[key] || { label: forma || 'Não informado', variant: 'secondary' as const };
     
     return (
       <Badge variant={formaData.variant}>
@@ -1433,10 +1437,13 @@ export default function VendasProdutosPage() {
                 >
                   <option value="">Todas as formas</option>
                   <option value="dinheiro">Dinheiro</option>
+                  <option value="pix">PIX</option>
                   <option value="cartao_debito">Cartão Débito</option>
                   <option value="cartao_credito">Cartão Crédito</option>
-                  <option value="pix">PIX</option>
-                  <option value="boleto">Boleto</option>
+                  <option value="a_prazo">A Prazo</option>
+                  <option value="boleto_bancario">Boleto Bancário</option>
+                  <option value="transferencia">Transferência Bancária</option>
+                  <option value="outros">Outros</option>
                 </select>
                 <Input
                   placeholder="Vendedor..."

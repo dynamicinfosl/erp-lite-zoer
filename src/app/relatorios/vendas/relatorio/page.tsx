@@ -951,8 +951,9 @@ export default function RelatorioVendasPage() {
                     <SelectItem value="pix">PIX</SelectItem>
                     <SelectItem value="cartao_debito">Cartão Débito</SelectItem>
                     <SelectItem value="cartao_credito">Cartão Crédito</SelectItem>
-                    <SelectItem value="fiado">Fiado</SelectItem>
-                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="a_prazo">A Prazo</SelectItem>
+                    <SelectItem value="boleto_bancario">Boleto Bancário</SelectItem>
+                    <SelectItem value="transferencia">Transferência Bancária</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { CreditCard, Banknote, Smartphone, DollarSign, Clock, CheckCircle2, User, MapPin, Phone, Percent, Receipt } from 'lucide-react';
+import { CreditCard, Banknote, Smartphone, DollarSign, Clock, CheckCircle2, User, MapPin, Phone, Percent, Receipt, FileText, Building } from 'lucide-react';
 
 interface PaymentFormProps {
   total: number;
@@ -32,6 +32,8 @@ export function PaymentForm({ total, onFinalizeSale, onCancel }: PaymentFormProp
   const [paymentMethod, setPaymentMethod] = useState('dinheiro');
   const [saleType, setSaleType] = useState('balcao');
   const [discount, setDiscount] = useState(0);
+  const [discountType, setDiscountType] = useState<'value' | 'percentage'>('value');
+  const [discountInputValue, setDiscountInputValue] = useState('');
   const [customerInfo, setCustomerInfo] = useState({
     name: '',
     address: '',
@@ -39,14 +41,26 @@ export function PaymentForm({ total, onFinalizeSale, onCancel }: PaymentFormProp
   });
   const [notes, setNotes] = useState('');
 
-  const finalAmount = total - discount;
-
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL',
+      currency: 'BRL'
     }).format(value);
   };
+
+  const handleDiscountChange = (value: string, type: 'value' | 'percentage') => {
+    setDiscountInputValue(value);
+    const numValue = parseFloat(value) || 0;
+    
+    if (type === 'percentage') {
+      const calculatedDiscount = (total * numValue) / 100;
+      setDiscount(Math.min(calculatedDiscount, total));
+    } else {
+      setDiscount(Math.min(numValue, total));
+    }
+  };
+
+  const finalAmount = total - discount;
 
   const handleFinalize = () => {
     const saleData = {
@@ -65,7 +79,9 @@ export function PaymentForm({ total, onFinalizeSale, onCancel }: PaymentFormProp
     { value: 'pix', label: 'PIX', icon: Smartphone },
     { value: 'cartao_debito', label: 'Cartão Débito', icon: CreditCard },
     { value: 'cartao_credito', label: 'Cartão Crédito', icon: CreditCard },
-    { value: 'fiado', label: 'Fiado', icon: Clock },
+    { value: 'a_prazo', label: 'A Prazo', icon: Clock },
+    { value: 'boleto_bancario', label: 'Boleto Bancário', icon: FileText },
+    { value: 'transferencia', label: 'Transferência', icon: Building },
   ];
 
   return (
