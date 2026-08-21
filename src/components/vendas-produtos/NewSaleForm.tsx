@@ -321,17 +321,32 @@ export function NewSaleForm({ onSuccess, onCancel, saleId }: NewSaleFormProps) {
             })));
           }
 
-          let loadedPaymentMethod = sale.payment_method || '';
-          if (loadedPaymentMethod === 'fiado') loadedPaymentMethod = 'a_prazo';
-          if (loadedPaymentMethod === 'boleto') loadedPaymentMethod = 'boleto_bancario';
+          if (Array.isArray(sale.payments) && sale.payments.length > 0) {
+            setPayments(sale.payments.map((p: any) => {
+              let m = p.method || p.payment_method || '';
+              if (m === 'fiado') m = 'a_prazo';
+              if (m === 'boleto') m = 'boleto_bancario';
+              return {
+                due_date: p.due_date || (sale.created_at ? sale.created_at.split('T')[0] : new Date().toISOString().split('T')[0]),
+                value: Number(p.amount ?? p.value ?? 0),
+                payment_method: m || 'dinheiro',
+                chart_of_accounts: p.chart_of_accounts || 'Vendas de produtos',
+                observation: p.observation || p.notes || '',
+              };
+            }));
+          } else {
+            let loadedPaymentMethod = sale.payment_method || '';
+            if (loadedPaymentMethod === 'fiado') loadedPaymentMethod = 'a_prazo';
+            if (loadedPaymentMethod === 'boleto') loadedPaymentMethod = 'boleto_bancario';
 
-          setPayments([{
-            due_date: sale.created_at ? sale.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-            value: Number(sale.final_amount || sale.total_amount || 0),
-            payment_method: loadedPaymentMethod || 'dinheiro',
-            chart_of_accounts: 'Vendas de produtos',
-            observation: '',
-          }]);
+            setPayments([{
+              due_date: sale.created_at ? sale.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+              value: Number(sale.final_amount || sale.total_amount || 0),
+              payment_method: loadedPaymentMethod || 'dinheiro',
+              chart_of_accounts: 'Vendas de produtos',
+              observation: '',
+            }]);
+          }
         }
       } catch (err) {
         console.error(err);
@@ -593,7 +608,17 @@ export function NewSaleForm({ onSuccess, onCancel, saleId }: NewSaleFormProps) {
           discount: service.discount,
           subtotal: service.subtotal,
         })),
-        payments: generatePaymentConditions ? payments : [],
+        payments: payments.filter(p => p.payment_method && Number(p.value) > 0).map(p => ({
+          method: p.payment_method,
+          payment_method: p.payment_method,
+          amount: Number(p.value || 0),
+          value: Number(p.value || 0),
+          due_date: p.due_date,
+          observation: p.observation || '',
+          chart_of_accounts: p.chart_of_accounts || 'Vendas de produtos',
+        })),
+        amount_paid: payments.reduce((sum, p) => sum + (Number(p.value) || 0), 0),
+        change_amount: 0,
       };
 
       if (saleId) {

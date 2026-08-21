@@ -1159,6 +1159,7 @@ export default function PDVPage() {
         remaining_amount: paymentData?.remaining || 0,
         payment_status: paymentData?.paymentStatus || 'paid',
         payment_notes: paymentData?.notes,
+        payments: paymentData?.payments || (paymentData?.paymentMethod ? [{ method: paymentData.paymentMethod, amount: total }] : []),
         cash_session_id: currentCashSessionId || null,
         products: productsArray
       };

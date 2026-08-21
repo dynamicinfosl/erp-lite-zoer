@@ -24,6 +24,17 @@ interface SaleData {
   delivery_address?: string | null;
   total_amount: number;
   payment_method: string;
+  payments?: Array<{
+    id?: string;
+    method?: string;
+    payment_method?: string;
+    amount?: number;
+    value?: number;
+    due_date?: string;
+    observation?: string;
+  }>;
+  change_amount?: number;
+  amount_paid?: number;
   created_at: string;
   delivery_date?: string;
   items: Array<{
@@ -48,6 +59,25 @@ interface CompanyData {
   complemento?: string;
   bairro?: string;
   seller_name?: string;
+}
+
+const PAYMENT_METHOD_NAMES: Record<string, string> = {
+  dinheiro: 'Dinheiro à Vista',
+  pix: 'PIX',
+  cartao_debito: 'Cartão Débito',
+  cartao_credito: 'Cartão Crédito',
+  fiado: 'A Prazo',
+  a_prazo: 'A Prazo',
+  boleto: 'Boleto Bancário',
+  boleto_bancario: 'Boleto Bancário',
+  transferencia: 'Transferência Bancária',
+  outros: 'Outros',
+};
+
+function formatPaymentMethodName(method: string | undefined): string {
+  if (!method) return 'NÃO INFORMADO';
+  const key = method.toLowerCase();
+  return PAYMENT_METHOD_NAMES[key] || method.toUpperCase();
 }
 
 export default function ReceiptPage() {
@@ -606,14 +636,53 @@ export default function ReceiptPage() {
         
         <table style={{ fontSize: `${couponSettings.fontSize - 2}px` }}>
           <tbody>
-            <tr>
-              <td style={{ width: '50%' }}>
-                <strong>Forma:</strong> {saleData.payment_method.toUpperCase()}
-              </td>
-              <td style={{ width: '50%', textAlign: 'right' }}>
-                <strong>R$ {saleData.total_amount.toFixed(2)}</strong>
-              </td>
-            </tr>
+            {Array.isArray(saleData.payments) && saleData.payments.length > 0 ? (
+              saleData.payments.map((p, idx) => {
+                const method = p.method || p.payment_method || saleData.payment_method;
+                const amt = Number(p.amount ?? p.value ?? 0);
+                return (
+                  <tr key={idx}>
+                    <td style={{ width: '60%' }}>
+                      <strong>Forma:</strong> {formatPaymentMethodName(method)}
+                    </td>
+                    <td style={{ width: '40%', textAlign: 'right' }}>
+                      <strong>R$ {amt.toFixed(2)}</strong>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td style={{ width: '60%' }}>
+                  <strong>Forma:</strong> {formatPaymentMethodName(saleData.payment_method)}
+                </td>
+                <td style={{ width: '40%', textAlign: 'right' }}>
+                  <strong>R$ {saleData.total_amount.toFixed(2)}</strong>
+                </td>
+              </tr>
+            )}
+            {/* Valor Recebido se maior que o total ou se houver troco */}
+            {saleData.amount_paid !== undefined && saleData.amount_paid > saleData.total_amount && (
+              <tr>
+                <td style={{ width: '60%' }}>
+                  <strong>Valor Recebido:</strong>
+                </td>
+                <td style={{ width: '40%', textAlign: 'right' }}>
+                  R$ {saleData.amount_paid.toFixed(2)}
+                </td>
+              </tr>
+            )}
+            {/* Troco */}
+            {saleData.change_amount !== undefined && saleData.change_amount > 0 && (
+              <tr style={{ fontWeight: 'bold' }}>
+                <td style={{ width: '60%' }}>
+                  <strong>TROCO:</strong>
+                </td>
+                <td style={{ width: '40%', textAlign: 'right' }}>
+                  <strong>R$ {saleData.change_amount.toFixed(2)}</strong>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
 

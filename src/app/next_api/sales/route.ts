@@ -256,6 +256,15 @@ async function createSaleHandler(request: NextRequest) {
         saleData.cash_session_id = String(cash_session_id);
       }
     }
+    if (body.payments !== undefined) {
+      saleData.payments = Array.isArray(body.payments) ? body.payments : [];
+    }
+    if (body.change_amount !== undefined || body.change !== undefined) {
+      saleData.change_amount = Number(body.change_amount ?? body.change ?? 0);
+    }
+    if (body.amount_paid !== undefined) {
+      saleData.amount_paid = Number(body.amount_paid ?? 0);
+    }
 
     const { data: sale, error: saleError } = await supabaseAdmin
       .from('sales')

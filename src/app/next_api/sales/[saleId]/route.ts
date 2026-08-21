@@ -174,6 +174,9 @@ export async function GET(
       carrier_name: sale.carrier_name,
       delivery_address: sale.delivery_address,
       notes: sale.notes,
+      payments: sale.payments || [],
+      change_amount: Number(sale.change_amount || 0),
+      amount_paid: Number(sale.amount_paid || 0),
       tenant_id: sale.tenant_id,
       sale_source: sale.sale_source,
       sale_type: sale.sale_type,
@@ -281,6 +284,11 @@ export async function PUT(
     if (body.internal_notes !== undefined) updateData.internal_notes = body.internal_notes;
     if (body.payment_condition !== undefined) updateData.payment_condition = body.payment_condition;
     if (body.branch_id !== undefined) updateData.branch_id = body.branch_id === null ? null : Number(body.branch_id);
+    if (body.payments !== undefined) updateData.payments = Array.isArray(body.payments) ? body.payments : [];
+    if (body.change_amount !== undefined || body.change !== undefined) {
+      updateData.change_amount = Number(body.change_amount ?? body.change ?? 0);
+    }
+    if (body.amount_paid !== undefined) updateData.amount_paid = Number(body.amount_paid ?? 0);
 
     const hasProductsArray = Array.isArray(body?.products);
 

@@ -52,6 +52,7 @@ interface PaymentData {
   discountAmount?: number;
   discountPercentage?: number;
   notes?: string;
+  payments?: PaymentEntry[];
 }
 
 interface PaymentEntry {
@@ -155,6 +156,7 @@ export function PaymentSection({ total, onFinalize, onCancel, customerName, cart
       discountAmount: calculatedDiscount,
       discountPercentage: discountPerc > 0 ? discountPerc : undefined,
       notes: notes || undefined,
+      payments: payments.map(p => ({ id: p.id, method: p.method, amount: p.amount })),
     };
 
     onFinalize(paymentData);

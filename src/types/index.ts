@@ -84,6 +84,18 @@ export interface Sale {
   delivery_address?: DeliveryAddress;
   seller_name?: string;
   customer_name?: string;
+  payments?: Array<{
+    id?: string;
+    method?: string;
+    payment_method?: string;
+    amount?: number;
+    value?: number;
+    due_date?: string;
+    observation?: string;
+    chart_of_accounts?: string;
+  }>;
+  change_amount?: number;
+  amount_paid?: number;
 }
 
 export interface SaleItem {

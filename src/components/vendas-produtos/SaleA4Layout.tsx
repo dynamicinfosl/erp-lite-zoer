@@ -20,6 +20,17 @@ interface SaleA4LayoutProps {
     customer_state?: string;
     customer_zipcode?: string;
     seller_name?: string;
+    payments?: Array<{
+      id?: string;
+      method?: string;
+      payment_method?: string;
+      amount?: number;
+      value?: number;
+      due_date?: string;
+      observation?: string;
+    }>;
+    change_amount?: number;
+    amount_paid?: number;
   };
   company: {
     name: string;
@@ -440,12 +451,37 @@ export function SaleA4Layout({ sale, company }: SaleA4LayoutProps) {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td>{sale.delivery_date ? formatDate(sale.delivery_date) : formatDate(sale.created_at)}</td>
-            <td>{formatCurrency(totalAmount)}</td>
-            <td>{getPaymentMethodLabel(sale.payment_method)}</td>
-            <td>{sale.payment_condition || sale.notes || ''}</td>
-          </tr>
+          {Array.isArray(sale.payments) && sale.payments.length > 0 ? (
+            sale.payments.map((p, idx) => {
+              const method = p.method || p.payment_method || sale.payment_method;
+              const amt = Number(p.amount ?? p.value ?? 0);
+              const dueDate = p.due_date || (sale.delivery_date ? sale.delivery_date : sale.created_at);
+              return (
+                <tr key={idx}>
+                  <td>{dueDate ? formatDate(dueDate) : formatDate(sale.created_at)}</td>
+                  <td>{formatCurrency(amt)}</td>
+                  <td>{getPaymentMethodLabel(method)}</td>
+                  <td>{p.observation || (idx === 0 ? sale.payment_condition || sale.notes || '' : '')}</td>
+                </tr>
+              );
+            })
+          ) : (
+            <tr>
+              <td>{sale.delivery_date ? formatDate(sale.delivery_date) : formatDate(sale.created_at)}</td>
+              <td>{formatCurrency(totalAmount)}</td>
+              <td>{getPaymentMethodLabel(sale.payment_method)}</td>
+              <td>{sale.payment_condition || sale.notes || ''}</td>
+            </tr>
+          )}
+          {sale.change_amount !== undefined && sale.change_amount > 0 && (
+            <tr style={{ fontWeight: 'bold', backgroundColor: '#f9f9f9' }}>
+              <td colSpan={2} style={{ textAlign: 'right' }}>TROCO:</td>
+              <td colSpan={2}>
+                {formatCurrency(sale.change_amount)}
+                {sale.amount_paid && sale.amount_paid > totalAmount ? ` (Valor Recebido: ${formatCurrency(sale.amount_paid)})` : ''}
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
 

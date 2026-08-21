@@ -23,6 +23,17 @@ interface SaleData {
   final_amount: number;
   payment_method: string;
   payment_condition?: string;
+  payments?: Array<{
+    id?: string;
+    method?: string;
+    payment_method?: string;
+    amount?: number;
+    value?: number;
+    due_date?: string;
+    observation?: string;
+  }>;
+  change_amount?: number;
+  amount_paid?: number;
   created_at: string;
   delivery_date?: string;
   carrier_name?: string;
@@ -118,6 +129,9 @@ export default function VendasBalcaoA4Page() {
           final_amount: sale.final_amount || sale.total_amount || 0,
           payment_method: sale.payment_method || 'dinheiro',
           payment_condition: sale.payment_condition || '',
+          payments: sale.payments || [],
+          change_amount: Number(sale.change_amount || 0),
+          amount_paid: Number(sale.amount_paid || 0),
           created_at: sale.created_at,
           delivery_date: sale.delivery_date,
           carrier_name: sale.carrier_name || '',
