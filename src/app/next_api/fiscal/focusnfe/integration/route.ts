@@ -35,7 +35,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { tenant_id, api_token, environment, cnpj_emitente, enabled = true, nfe_serie, nfce_serie, primary_provider, fallback_enabled } = body as {
+    const { 
+      tenant_id, 
+      api_token, 
+      environment, 
+      cnpj_emitente, 
+      enabled = true, 
+      nfe_serie, 
+      nfce_serie, 
+      proximo_numero_nfe, 
+      proximo_numero_nfce, 
+      primary_provider, 
+      fallback_enabled 
+    } = body as {
       tenant_id?: string;
       api_token?: string;
       environment?: Environment;
@@ -43,6 +55,8 @@ export async function POST(request: NextRequest) {
       enabled?: boolean;
       nfe_serie?: string;
       nfce_serie?: string;
+      proximo_numero_nfe?: number | string;
+      proximo_numero_nfce?: number | string;
       primary_provider?: 'focusnfe' | 'notaas';
       fallback_enabled?: boolean;
     };
@@ -97,8 +111,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Erro ao salvar integração', details: error.message }, { status: 400, headers: jsonHeaders });
     }
 
-    // Sincronizar séries com a API da FocusNFe se a empresa já estiver provisionada
-    if (existing?.focus_empresa_id && (nfe_serie !== undefined || nfce_serie !== undefined)) {
+    // Sincronizar séries e próximo número com a API da FocusNFe se a empresa já estiver provisionada
+    if (existing?.focus_empresa_id && (nfe_serie !== undefined || nfce_serie !== undefined || proximo_numero_nfe !== undefined || proximo_numero_nfce !== undefined)) {
       try {
         const { data: globalConfig } = await supabaseAdmin
           .from('fiscal_integrations')
@@ -120,17 +134,33 @@ export async function POST(request: NextRequest) {
           updateBody.serie_nfce_producao = String(nfce_serie);
           updateBody.serie_nfce_homologacao = String(nfce_serie);
         }
+        if (proximo_numero_nfe) {
+          const nextNfeNum = parseInt(String(proximo_numero_nfe), 10);
+          if (!isNaN(nextNfeNum) && nextNfeNum > 0) {
+            updateBody.proximo_numero_nfe_producao = nextNfeNum;
+            updateBody.proximo_numero_nfe_homologacao = nextNfeNum;
+          }
+        }
+        if (proximo_numero_nfce) {
+          const nextNfceNum = parseInt(String(proximo_numero_nfce), 10);
+          if (!isNaN(nextNfceNum) && nextNfceNum > 0) {
+            updateBody.proximo_numero_nfce_producao = nextNfceNum;
+            updateBody.proximo_numero_nfce_homologacao = nextNfceNum;
+          }
+        }
 
-        await fetch(`${baseUrl}/v2/empresas/${existing.focus_empresa_id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Basic ${Buffer.from(`${masterToken}:`).toString('base64')}`,
-          },
-          body: JSON.stringify(updateBody),
-        });
+        if (Object.keys(updateBody).length > 0) {
+          await fetch(`${baseUrl}/v2/empresas/${existing.focus_empresa_id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Basic ${Buffer.from(`${masterToken}:`).toString('base64')}`,
+            },
+            body: JSON.stringify(updateBody),
+          });
+        }
       } catch (syncErr) {
-        console.warn('Aviso: falha ao sincronizar séries com a FocusNFe:', syncErr);
+        console.warn('Aviso: falha ao sincronizar séries/numeração com a FocusNFe:', syncErr);
       }
     }
 
@@ -186,6 +216,36 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('Erro ao buscar integração:', error);
       return NextResponse.json({ success: true, data: null }, { headers: jsonHeaders });
+    }
+
+    if (data?.focus_empresa_id) {
+      try {
+        const { data: globalConfig } = await supabaseAdmin
+          .from('fiscal_integrations')
+          .select('api_token, environment')
+          .eq('tenant_id', '00000000-0000-0000-0000-000000000000')
+          .eq('provider', 'focusnfe')
+          .maybeSingle();
+
+        const masterToken = globalConfig?.api_token || data.api_token;
+        const env = data.environment || globalConfig?.environment || 'homologacao';
+        const baseUrl = env === 'producao' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
+
+        const focusRes = await fetch(`${baseUrl}/v2/empresas/${data.focus_empresa_id}`, {
+          headers: {
+            Authorization: `Basic ${Buffer.from(`${masterToken}:`).toString('base64')}`,
+          },
+          signal: AbortSignal.timeout(4000),
+        });
+
+        if (focusRes.ok) {
+          const emp = await focusRes.json();
+          (data as any).proximo_numero_nfe = env === 'producao' ? emp.proximo_numero_nfe_producao : emp.proximo_numero_nfe_homologacao;
+          (data as any).proximo_numero_nfce = env === 'producao' ? emp.proximo_numero_nfce_producao : emp.proximo_numero_nfce_homologacao;
+        }
+      } catch (err) {
+        console.warn('Não foi possível obter proximo_numero da FocusNFe:', err);
+      }
     }
 
     return NextResponse.json({ success: true, data: data || null }, { headers: jsonHeaders });

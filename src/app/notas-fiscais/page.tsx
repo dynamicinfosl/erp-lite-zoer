@@ -38,6 +38,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { getFullFileUrl } from '@/lib/fiscal/focusnfe-urls';
+import { isAuthorizedFiscalStatus } from '@/lib/fiscal/focusnfe-client';
 
 function getPreviousMonthValue(): string {
   const now = new Date();
@@ -323,9 +324,9 @@ export default function NotasFiscaisPage() {
     // 2. Status filter
     if (statusFilter !== 'all') {
       const docStatus = (doc.status || '').toLowerCase();
-      if (statusFilter === 'autorizado' && !docStatus.includes('autoriz') && !docStatus.includes('processado')) return false;
+      if (statusFilter === 'autorizado' && !isAuthorizedFiscalStatus(docStatus)) return false;
       if (statusFilter === 'cancelado' && !docStatus.includes('cancel')) return false;
-      if (statusFilter === 'erro' && !docStatus.includes('err') && !docStatus.includes('rejeic')) return false;
+      if (statusFilter === 'erro' && !docStatus.includes('err') && !docStatus.includes('rejeic') && docStatus !== 'erro_autorizacao') return false;
       if (statusFilter === 'pendente' && docStatus !== '' && !docStatus.includes('submitt') && !docStatus.includes('pendent')) return false;
     }
 
@@ -334,11 +335,11 @@ export default function NotasFiscaisPage() {
 
   const getStatusBadge = (status: string) => {
     const s = (status || '').toLowerCase();
-    if (s.includes('autoriz') || s.includes('processado') || s.includes('success')) {
+    if (s.includes('err') || s.includes('rejeic') || s.includes('fail') || s === 'erro_autorizacao') {
       return (
-        <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white flex items-center gap-1 w-fit">
-          <CheckCircle2 className="h-3 w-3" />
-          Autorizada
+        <Badge className="bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-1 w-fit">
+          <AlertCircle className="h-3 w-3" />
+          Erro na SEFAZ
         </Badge>
       );
     }
@@ -350,11 +351,11 @@ export default function NotasFiscaisPage() {
         </Badge>
       );
     }
-    if (s.includes('err') || s.includes('rejeic') || s.includes('fail')) {
+    if (isAuthorizedFiscalStatus(s)) {
       return (
-        <Badge className="bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-1 w-fit">
-          <AlertCircle className="h-3 w-3" />
-          Erro
+        <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white flex items-center gap-1 w-fit">
+          <CheckCircle2 className="h-3 w-3" />
+          Autorizada
         </Badge>
       );
     }
@@ -618,7 +619,7 @@ export default function NotasFiscaisPage() {
                               </Button>
                             )}
 
-                            {doc.provider === 'focusnfe' && (doc.status === 'autorizado' || doc.status === 'processado' || doc.status === 'success' || doc.status.includes('autoriz') || doc.status.includes('success')) && (
+                            {doc.provider === 'focusnfe' && isAuthorizedFiscalStatus(doc.status) && !!doc.chave && (
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -766,7 +767,7 @@ export default function NotasFiscaisPage() {
 
               {/* Ações adicionais */}
               <div className="flex justify-end gap-2 border-t pt-4">
-                {selectedDoc.provider === 'focusnfe' && (selectedDoc.status === 'autorizado' || selectedDoc.status === 'processado' || selectedDoc.status === 'success' || selectedDoc.status.includes('autoriz') || selectedDoc.status.includes('success')) && (
+                {selectedDoc.provider === 'focusnfe' && isAuthorizedFiscalStatus(selectedDoc.status) && !!selectedDoc.chave && (
                   <Button
                     variant="outline"
                     onClick={() => {

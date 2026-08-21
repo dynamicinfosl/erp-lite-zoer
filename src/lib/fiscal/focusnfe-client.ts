@@ -208,12 +208,12 @@ export function isAuthorizedFiscalStatus(status: string | null | undefined): boo
   const s = (status || '').toLowerCase();
   if (!s) return false;
   if (s.includes('cancel')) return false;
-  if (s.includes('err') || s.includes('rejeic')) return false;
+  if (s.includes('err') || s.includes('rejeic') || s.includes('fail') || s === 'erro_autorizacao') return false;
   return (
-    s.includes('autoriz') ||
-    s.includes('processado') ||
-    s.includes('success') ||
     s === 'autorizado' ||
-    s === 'autorizada'
+    s === 'autorizada' ||
+    s === 'authorized' ||
+    s === 'processado' ||
+    s === 'success'
   );
 }

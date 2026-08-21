@@ -126,6 +126,8 @@ export default function ConfiguracaoFiscalPage() {
 
   const [nfeSerie, setNfeSerie] = useState('1');
   const [nfceSerie, setNfceSerie] = useState('1');
+  const [proximoNumeroNfe, setProximoNumeroNfe] = useState('');
+  const [proximoNumeroNfce, setProximoNumeroNfce] = useState('');
   const [savingSeries, setSavingSeries] = useState(false);
 
   const loadFiscalData = useCallback(async () => {
@@ -186,6 +188,12 @@ export default function ConfiguracaoFiscalPage() {
           setIntegration(integrationResult.data);
           setNfeSerie(integrationResult.data.nfe_serie || '1');
           setNfceSerie(integrationResult.data.nfce_serie || '1');
+          if (integrationResult.data.proximo_numero_nfe !== undefined) {
+            setProximoNumeroNfe(String(integrationResult.data.proximo_numero_nfe || ''));
+          }
+          if (integrationResult.data.proximo_numero_nfce !== undefined) {
+            setProximoNumeroNfce(String(integrationResult.data.proximo_numero_nfce || ''));
+          }
           setFormData({
             certificate_password: '',
           });
@@ -401,19 +409,21 @@ export default function ConfiguracaoFiscalPage() {
           api_token: integration.api_token,
           nfe_serie: nfeSerie,
           nfce_serie: nfceSerie,
+          proximo_numero_nfe: proximoNumeroNfe ? parseInt(proximoNumeroNfe, 10) : undefined,
+          proximo_numero_nfce: proximoNumeroNfce ? parseInt(proximoNumeroNfce, 10) : undefined,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao salvar séries');
+        throw new Error(errorData.error || 'Erro ao salvar séries e numeração');
       }
 
-      toast.success('Séries de notas fiscais atualizadas com sucesso!');
+      toast.success('Séries e numeração fiscal atualizadas com sucesso!');
       await loadFiscalData();
     } catch (error: any) {
       console.error('Erro ao salvar séries:', error);
-      toast.error(`Erro ao salvar séries: ${error.message}`);
+      toast.error(`Erro ao salvar: ${error.message}`);
     } finally {
       setSavingSeries(false);
     }
@@ -963,10 +973,10 @@ export default function ConfiguracaoFiscalPage() {
                   <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md">
                     <FileText className="h-5 w-5 text-white" />
                   </div>
-                  Série dos Documentos Fiscais
+                  Série e Numeração dos Documentos Fiscais
                 </CardTitle>
                 <CardDescription>
-                  Configure as séries que serão utilizadas para a emissão em Produção / Homologação.
+                  Configure as séries e o próximo número sequencial para emissão na SEFAZ.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -983,9 +993,27 @@ export default function ConfiguracaoFiscalPage() {
                       className="h-12 text-base border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Se você configurou a série no painel da Focus NFe (Ex: série 50), informe-a aqui.
+                      Série configurada para notas fiscais modelo 55 (Ex: série 50).
                     </p>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="proximo_numero_nfe" className="text-sm font-semibold text-foreground">
+                      Próximo Número da NF-e (Modelo 55)
+                    </Label>
+                    <Input
+                      id="proximo_numero_nfe"
+                      value={proximoNumeroNfe}
+                      onChange={(e) => setProximoNumeroNfe(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Ex: 9"
+                      className="h-12 text-base border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500 font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Próximo número sequencial a ser enviado à SEFAZ nesta série.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6 pt-4 border-t border-slate-200 dark:border-slate-700/50">
                   <div className="space-y-2">
                     <Label htmlFor="nfce_serie" className="text-sm font-semibold text-foreground">
                       Série da NFC-e (Consumidor / Modelo 65)
@@ -1001,7 +1029,23 @@ export default function ConfiguracaoFiscalPage() {
                       Série configurada para cupons fiscais eletrônicos no painel da Focus NFe.
                     </p>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="proximo_numero_nfce" className="text-sm font-semibold text-foreground">
+                      Próximo Número da NFC-e (Modelo 65)
+                    </Label>
+                    <Input
+                      id="proximo_numero_nfce"
+                      value={proximoNumeroNfce}
+                      onChange={(e) => setProximoNumeroNfce(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Ex: 1"
+                      className="h-12 text-base border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500 font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Próximo número sequencial a ser enviado à SEFAZ para NFC-e.
+                    </p>
+                  </div>
                 </div>
+
                 <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-700">
                   <Button
                     type="button"
@@ -1015,7 +1059,7 @@ export default function ConfiguracaoFiscalPage() {
                         Salvando...
                       </>
                     ) : (
-                      'Salvar Séries'
+                      'Salvar Configurações'
                     )}
                   </Button>
                 </div>
