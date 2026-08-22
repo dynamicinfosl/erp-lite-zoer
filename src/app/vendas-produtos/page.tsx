@@ -225,8 +225,15 @@ export default function VendasProdutosPage() {
         tenant_id: tenant.id,
         sale_type: 'produtos',
         branch_scope: shouldUseMatrix ? 'all' : (scope || 'all'),
-        limit: '5000'
+        page: String(page),
+        limit: String(pageSize)
       });
+
+      if (searchTerm) params.set('search', searchTerm);
+      if (advancedFilters.status) params.set('status', advancedFilters.status);
+      if (advancedFilters.forma_pagamento) params.set('payment_method', advancedFilters.forma_pagamento);
+      if (advancedFilters.data_inicio) params.set('start_date', advancedFilters.data_inicio);
+      if (advancedFilters.data_fim) params.set('end_date', advancedFilters.data_fim);
 
       if (!shouldUseMatrix && branchId) {
         params.set('branch_id', String(branchId));
@@ -342,6 +349,7 @@ export default function VendasProdutosPage() {
       });
       
       console.log(`✅ ${mapped.length} vendas de produtos carregadas com sucesso`);
+      setTotalSales(json.total ?? mapped.length);
       setVendas(mapped);
     } catch (error) {
       console.error('❌ Erro ao carregar vendas:', error);
@@ -350,7 +358,7 @@ export default function VendasProdutosPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id, scope, branchId, branchesEnabled, currentBranch, branchLoading]);
+  }, [tenant?.id, scope, branchId, branchesEnabled, currentBranch, branchLoading, page, pageSize, searchTerm, advancedFilters]);
 
   useEffect(() => {
     loadVendas();
@@ -387,11 +395,7 @@ export default function VendasProdutosPage() {
                            (!advancedFilters.valor_min || venda.total >= parseFloat(advancedFilters.valor_min)) &&
                            (!advancedFilters.valor_max || venda.total <= parseFloat(advancedFilters.valor_max));
 
-    // Se não há filtro de status específico, excluir canceladas
-    // Se há filtro de status 'cancelada', incluir apenas canceladas
-    // Se há filtro de outro status, excluir canceladas
     if (!advancedFilters.status) {
-      // Sem filtro: excluir canceladas da visualização padrão
       if (venda.status === 'cancelada') return false;
     }
 
@@ -403,13 +407,13 @@ export default function VendasProdutosPage() {
     setPage(1);
   }, [searchTerm, advancedFilters]);
 
-  const paginatedVendas = filteredVendas.slice((page - 1) * pageSize, page * pageSize);
+  const paginatedVendas = filteredVendas;
 
   const renderPagination = () => {
-    const totalSales = filteredVendas.length;
-    const totalPages = Math.max(1, Math.ceil(totalSales / pageSize));
-    const startRange = totalSales === 0 ? 0 : (page - 1) * pageSize + 1;
-    const endRange = Math.min(page * pageSize, totalSales);
+    const totalCount = totalSales || filteredVendas.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const startRange = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+    const endRange = Math.min(page * pageSize, totalCount);
 
     return (
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-3 border border-border bg-slate-50/10 dark:bg-slate-900/10 px-4 rounded-lg my-3">

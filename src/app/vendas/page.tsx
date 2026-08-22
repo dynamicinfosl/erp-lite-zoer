@@ -389,12 +389,13 @@ export default function VendasPage() {
         if (s.sale_source === 'pdv') return true;
         if (s.sale_source === 'api') return true;
         if (s.sale_type === 'balcao' || s.sale_type === 'entrega') return true;
+        if (s.sale_source === 'migracao' && s.sale_type === 'balcao') return true;
         if (!s.sale_source && s.sale_type !== 'produtos') return true;
         if (s.sale_source === 'produtos' || s.sale_type === 'produtos') return false;
         return !s.sale_source;
       });
 
-      setTotalSales(data.length);
+      setTotalSales(json.total ?? data.length);
 
       const mapped: Sale[] = data.map((s: any, i: number) => {
         let items = Array.isArray(s.items) ? s.items : [];

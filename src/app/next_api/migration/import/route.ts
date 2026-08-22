@@ -477,6 +477,12 @@ async function importSales(
       parseBrazilianDate(g('Data')) || parseBrazilianDate(g('Cadastrado em')) || new Date().toISOString();
     const createdAt = parseBrazilianDate(g('Cadastrado em')) || soldAt;
 
+    const rawSaleType = cleanString(g('Tipo de venda', 'Tipo', 'Canal', 'Origem'));
+    let saleType = 'balcao';
+    if (rawSaleType && normalizeText(rawSaleType).includes('produto')) {
+      saleType = 'produtos';
+    }
+
     toInsert.push({
       tenant_id: tenantId,
       user_id: userId,
@@ -489,7 +495,7 @@ async function importSales(
       payment_method: mapPaymentMethod(rawPayment),
       payment_condition: fitVarchar(paymentCondition, 100),
       sale_source: 'migracao',
-      sale_type: 'produtos',
+      sale_type: saleType,
       seller_name: cleanString(g('Vendedor')),
       status: mapSaleStatus(v.__situacao),
       notes: cleanString(g('Observações', 'Observacoes')),

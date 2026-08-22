@@ -515,7 +515,13 @@ async function listSalesHandler(request: NextRequest) {
     }
 
     if (sale_type) {
-      query = query.eq('sale_type', sale_type);
+      if (sale_type === 'produtos') {
+        query = query.or('sale_type.eq.produtos,sale_source.eq.produtos');
+      } else if (sale_type === 'balcao') {
+        query = query.or('sale_type.eq.balcao,sale_source.eq.pdv,and(sale_source.is.null,sale_type.is.null)');
+      } else {
+        query = query.eq('sale_type', sale_type);
+      }
     }
 
     // Filtrar por operador/usuário (user_id) se fornecido
